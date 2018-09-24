@@ -29,6 +29,8 @@ namespace Kudu.Client.Connection
             _connection = connection ?? throw new ArgumentNullException(nameof(connection));
         }
 
+        public override string ToString() => _connection.ToString();
+
         public void Dispose()
         {
             _connection.Dispose();
@@ -41,7 +43,7 @@ namespace Kudu.Client.Connection
             socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
 
             await socket.ConnectAsync(hostPort.Host, hostPort.Port);
-            var connection = SocketConnection.Create(socket);
+            var connection = SocketConnection.Create(socket, name: hostPort.ToString());
 
             // After the client connects to a server, the client first sends a connection header.
             // The connection header consists of a magic number "hrpc" and three byte flags, for a total of 7 bytes.
