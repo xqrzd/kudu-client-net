@@ -1,58 +1,60 @@
 ﻿using System;
 using System.Buffers;
 using System.IO;
+using System.Threading;
 using Kudu.Client.Protocol.Rpc;
 using ProtoBuf;
 
 namespace Kudu.Client.Connection
 {
-    // TODO: Rethink this class.
-    public class CallResponse : IDisposable
+    public class CallResponse : IMemoryOwner<byte>
     {
-        private readonly IMemoryOwner<byte> _memoryOwner;
-
-        public Memory<byte> Memory { get; }
+        private readonly int _offset;
+        private readonly int _length;
+        private byte[] _oversized;
 
         public ResponseHeader Header { get; }
 
-        public CallResponse(
-            ResponseHeader header,
-            IMemoryOwner<byte> memoryOwner,
-            Memory<byte> memory)
+        internal CallResponse(ResponseHeader header, byte[] oversized, int offset, int length)
         {
             Header = header;
-            _memoryOwner = memoryOwner;
-            Memory = memory;
+            _offset = offset;
+            _length = length;
+            _oversized = oversized;
         }
 
-        // TODO: Expose sidecars here.
+        public Memory<byte> Memory => new Memory<byte>(GetArray(), _offset, _length);
 
-        public void Dispose()
-        {
-            _memoryOwner?.Dispose();
-        }
+        private byte[] GetArray() =>
+            Interlocked.CompareExchange(ref _oversized, null, null)
+            ?? throw new ObjectDisposedException(ToString());
 
         public T ParseResponse<T>()
         {
-            // TODO: Remove this wasteful copying when protobuf-net 3 is ready.
-            using (var ms = new MemoryStream(Memory.ToArray()))
+            // TODO: Use span/memory when protobuf-3 is ready.
+            using (var ms = new MemoryStream(_oversized, _offset, _length))
             {
                 var output = Serializer.DeserializeWithLengthPrefix<T>(ms, PrefixStyle.Base128);
                 return output;
             }
         }
 
-        public static CallResponse FromMemory(IMemoryOwner<byte> memoryOwner, int length)
-        {
-            var memory = memoryOwner.Memory.Slice(0, length);
+        // TODO: Expose sidecars here.
 
-            // TODO: Remove this wasteful copying when protobuf-net 3 is ready.
-            using (var ms = new MemoryStream(memory.ToArray()))
+        public void Dispose()
+        {
+            var arr = Interlocked.Exchange(ref _oversized, null);
+            if (arr != null)
+                ArrayPool<byte>.Shared.Return(arr);
+        }
+
+        internal static CallResponse FromMemory(byte[] buffer, int length)
+        {
+            // TODO: Use span/memory when protobuf-3 is ready.
+            using (var ms = new MemoryStream(buffer))
             {
                 var responseHeader = Serializer.DeserializeWithLengthPrefix<ResponseHeader>(ms, PrefixStyle.Base128);
-                var body = memory.Slice((int)ms.Position);
-
-                return new CallResponse(responseHeader, memoryOwner, body);
+                return new CallResponse(responseHeader, buffer, (int)ms.Position, length - (int)ms.Position);
             }
         }
     }

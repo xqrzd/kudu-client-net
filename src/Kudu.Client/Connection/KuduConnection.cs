@@ -20,8 +20,8 @@ namespace Kudu.Client.Connection
         private readonly PipeWriter _output;
         private readonly SemaphoreSlim _singleWriter;
         private readonly Dictionary<int, TaskCompletionSource<CallResponse>> _inflightMessages;
-        private readonly Task _readerTask;
-        private readonly TaskCompletionSource<object> _writerCompletedTcs;
+        private readonly Task _receiveTask;
+        private readonly TaskCompletionSource<object> _inputCompletedTcs;
 
         private int _nextCallId;
 
@@ -38,8 +38,8 @@ namespace Kudu.Client.Connection
                 (Exception ex, object state) => ((KuduConnection)state).OnWriterCompleted(ex),
                 state: this);
 
-            _readerTask = StartReceiveLoopAsync();
-            _writerCompletedTcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _receiveTask = StartReceiveLoopAsync();
+            _inputCompletedTcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
         }
 
         public async Task<CallResponse> SendReceiveAsync<TInput>(RequestHeader header, TInput body)
@@ -95,7 +95,7 @@ namespace Kudu.Client.Connection
             // TODO: Catch exceptions, and complete the reader.
             // TODO: Clean up parsing code.
 
-            IMemoryOwner<byte> memoryOwner = null;
+            byte[] message = null;
             bool readInProgress = false;
             int remainingSize = 0;
             int written = 0;
@@ -116,16 +116,16 @@ namespace Kudu.Client.Connection
 
                     var copyLength = Math.Min(remainingSize, buffer.Length);
                     var slice = buffer.Slice(0, copyLength);
-                    slice.CopyTo(memoryOwner.Memory.Span.Slice(written));
+                    slice.CopyTo(message.AsSpan(written));
                     written += (int)copyLength;
                     remainingSize -= (int)copyLength;
 
                     if (remainingSize == 0)
                     {
                         // Reached the end of the message.
-                        ProcessResponse(CallResponse.FromMemory(memoryOwner, msgSize));
+                        ProcessResponse(CallResponse.FromMemory(message, msgSize));
 
-                        memoryOwner = null;
+                        message = null;
                         readInProgress = false;
                         written = 0;
                     }
@@ -136,10 +136,10 @@ namespace Kudu.Client.Connection
                 while ((TryParseMessageSize(ref buffer, out var messageLength)))
                 {
                     // TODO: Check messageLength.
-                    memoryOwner = MemoryPool<byte>.Shared.Rent(messageLength);
+                    message = ArrayPool<byte>.Shared.Rent(messageLength);
                     msgSize = messageLength;
 
-                    // TODO: Catch exceptions, and return memoryOwner back to the pool.
+                    // TODO: Catch exceptions, and return memory back to the pool.
 
                     // We got a message.
                     // Do we have this entire message?
@@ -147,17 +147,17 @@ namespace Kudu.Client.Connection
                     {
                         // Yes!
                         var slice = buffer.Slice(0, messageLength);
-                        slice.CopyTo(memoryOwner.Memory.Span);
-                        ProcessResponse(CallResponse.FromMemory(memoryOwner, messageLength));
+                        slice.CopyTo(message);
+                        ProcessResponse(CallResponse.FromMemory(message, messageLength));
 
-                        memoryOwner = null;
+                        message = null;
                         buffer = buffer.Slice(messageLength);
                     }
                     else
                     {
                         // We don't have the entire buffer. Take what we can.
 
-                        buffer.CopyTo(memoryOwner.Memory.Span);
+                        buffer.CopyTo(message);
                         readInProgress = true;
                         remainingSize = messageLength - (int)buffer.Length;
                         written += (int)buffer.Length;
@@ -247,7 +247,7 @@ namespace Kudu.Client.Connection
                 _inflightMessages.Clear();
             }
 
-            _writerCompletedTcs.SetResult(null);
+            _inputCompletedTcs.SetResult(null);
         }
 
         public void Dispose()
@@ -258,9 +258,9 @@ namespace Kudu.Client.Connection
             // Wait for the reader to finish processing any data
             // left in its buffer.
             // TODO: Use C# 8 async dispose when it's available.
-            _readerTask.GetAwaiter().GetResult();
+            _receiveTask.GetAwaiter().GetResult();
 
-            _writerCompletedTcs.Task.GetAwaiter().GetResult();
+            _inputCompletedTcs.Task.GetAwaiter().GetResult();
 
             _singleWriter.Dispose();
             _connection.Dispose();
