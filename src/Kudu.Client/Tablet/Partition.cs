@@ -47,16 +47,12 @@ namespace Kudu.Client.Tablet
             byte[] partitionKeyEnd,
             int[] hashBuckets)
         {
-            partitionKeyStart = partitionKeyStart ?? Array.Empty<byte>();
-            partitionKeyEnd = partitionKeyEnd ?? Array.Empty<byte>();
-            hashBuckets = hashBuckets ?? Array.Empty<int>();
+            PartitionKeyStart = partitionKeyStart ?? Array.Empty<byte>();
+            PartitionKeyEnd = partitionKeyEnd ?? Array.Empty<byte>();
+            HashBuckets = hashBuckets ?? Array.Empty<int>();
 
-            PartitionKeyStart = partitionKeyStart;
-            PartitionKeyEnd = partitionKeyEnd;
-            HashBuckets = hashBuckets;
-
-            RangeKeyStart = RangeKey(partitionKeyStart, hashBuckets.Length);
-            RangeKeyEnd = RangeKey(partitionKeyEnd, hashBuckets.Length);
+            RangeKeyStart = RangeKey(PartitionKeyStart, HashBuckets.Length);
+            RangeKeyEnd = RangeKey(PartitionKeyEnd, HashBuckets.Length);
         }
 
         /// <summary>
