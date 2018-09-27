@@ -1,0 +1,104 @@
+﻿using Kudu.Client.Protocol;
+
+namespace Kudu.Client.Builder
+{
+    public class ColumnBuilder
+    {
+        internal ColumnSchemaPB Column;
+
+        public ColumnBuilder()
+        {
+            Column = new ColumnSchemaPB();
+        }
+
+        public string Name
+        {
+            get => Column.Name;
+            set => Column.Name = value;
+        }
+
+        public DataType Type
+        {
+            get => Column.Type;
+            set => Column.Type = value;
+        }
+
+        public bool IsKey
+        {
+            get => Column.IsKey;
+            set => Column.IsKey = value;
+        }
+
+        public bool IsNullable
+        {
+            get => Column.IsNullable;
+            set => Column.IsNullable = value;
+        }
+
+        public byte[] ReadDefaultValue
+        {
+            get => Column.ReadDefaultValue;
+            set => Column.ReadDefaultValue = value;
+        }
+
+        public byte[] WriteDefaultValue
+        {
+            get => Column.WriteDefaultValue;
+            set => Column.WriteDefaultValue = value;
+        }
+
+        public EncodingType Encoding
+        {
+            get => Column.Encoding;
+            set => Column.Encoding = value;
+        }
+
+        public CompressionType Compression
+        {
+            get => Column.Compression;
+            set => Column.Compression = value;
+        }
+
+        public int CfileBlockSize
+        {
+            get => Column.CfileBlockSize;
+            set => Column.CfileBlockSize = value;
+        }
+
+        public int Precision
+        {
+            get
+            {
+                InitTypeAttributes();
+                return Column.TypeAttributes.Precision;
+            }
+            set
+            {
+                InitTypeAttributes();
+                Column.TypeAttributes.Precision = value;
+            }
+        }
+
+        public int Scale
+        {
+            get
+            {
+                InitTypeAttributes();
+                return Column.TypeAttributes.Scale;
+            }
+            set
+            {
+                InitTypeAttributes();
+                Column.TypeAttributes.Scale = value;
+            }
+        }
+
+        private void InitTypeAttributes()
+        {
+            if (Column.TypeAttributes is null)
+                Column.TypeAttributes = new ColumnTypeAttributesPB();
+        }
+
+        public static implicit operator ColumnSchemaPB(ColumnBuilder builder) => builder.Column;
+    }
+}

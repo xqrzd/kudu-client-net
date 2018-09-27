@@ -5,16 +5,16 @@ namespace Kudu.Client.Connection
 {
     public class MasterCache
     {
-        private readonly List<ServerInfo> _masters;
+        private readonly List<HostAndPort> _masters;
         private readonly int _leaderIndex;
 
-        public MasterCache(IReadOnlyList<ServerInfo> masters, int leaderIndex)
+        public MasterCache(List<HostAndPort> masters, int leaderIndex)
         {
             _masters = masters.ToList();
             _leaderIndex = leaderIndex;
         }
 
-        public ServerInfo GetMasterInfo(HostAndPort hostPort, ReplicaSelection replicaSelection)
+        public HostAndPort GetMasterInfo(ReplicaSelection replicaSelection)
         {
             if (replicaSelection == ReplicaSelection.LeaderOnly)
             {
