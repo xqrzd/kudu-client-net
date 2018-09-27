@@ -15,7 +15,7 @@ namespace Kudu.Client.FunctionalTests
         {
             var settings = new KuduClientSettings
             {
-                MasterAddresses = new List<HostAndPort> { new HostAndPort("localhost", 7051) }
+                MasterAddresses = new List<HostAndPort> { new HostAndPort("127.0.0.1", 7051) }
             };
 
             using (var client = new KuduClient(settings))
