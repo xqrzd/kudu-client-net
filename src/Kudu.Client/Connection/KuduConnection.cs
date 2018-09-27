@@ -250,6 +250,8 @@ namespace Kudu.Client.Connection
             _inputCompletedTcs.SetResult(null);
         }
 
+        public override string ToString() => _connection.ToString();
+
         public void Dispose()
         {
             // This connection is done writing, complete the writer.
