@@ -54,8 +54,13 @@ namespace Kudu.Client.Connection
                 _connections.Remove(hostPort, out connectionTask);
             }
 
-            // TODO: Handle exceptions when disposing the connection.
-            connectionTask.Result.Dispose();
+            // Check if the connection exists in the cache. It may have
+            // already been removed if Dispose was called.
+            if (connectionTask != null)
+            {
+                // TODO: Handle exceptions when disposing the connection.
+                connectionTask.Result.Dispose();
+            }
         }
 
         public async Task DisposeAsync()
