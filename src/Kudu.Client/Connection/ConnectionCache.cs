@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Kudu.Client.Connection
@@ -22,26 +23,68 @@ namespace Kudu.Client.Connection
                 else
                 {
                     var task = KuduConnectionFactory.ConnectAsync(hostPort);
+                    RegisterConnectionClosedCallback(task, hostPort);
                     _connections.Add(hostPort, task);
                     return task;
                 }
             }
         }
 
-        public void Dispose()
+        private void RegisterConnectionClosedCallback(Task<KuduConnection> task, HostAndPort hostPort)
         {
-            foreach (var connection in _connections.Values)
+            // Once we have a KuduConnection, register a callback when it's closed,
+            // so we can remove it from the connection cache.
+
+            // TODO: Is it worth trying to avoid a closure here?
+            // We'd need to store both _connections and hostPort in state.
+            task.ContinueWith(
+                (t, s) => t.Result.OnConnectionClosed(RemoveConnection, s),
+                state: hostPort);
+        }
+
+        private void RemoveConnection(Exception ex, object state)
+        {
+            // TODO: Debug log connection removed from cache.
+
+            var hostPort = (HostAndPort)state;
+            Task<KuduConnection> connectionTask;
+
+            lock (_connections)
+            {
+                _connections.Remove(hostPort, out connectionTask);
+            }
+
+            // TODO: Handle exceptions when disposing the connection.
+            connectionTask.Result.Dispose();
+        }
+
+        public async Task DisposeAsync()
+        {
+            List<Task<KuduConnection>> connections;
+
+            lock (_connections)
+            {
+                connections = _connections.Values.ToList();
+                _connections.Clear();
+            }
+
+            foreach (var connectionTask in connections)
             {
                 try
                 {
-                    connection.GetAwaiter().GetResult().Dispose();
+                    var connection = await connectionTask;
+                    connection.Dispose();
                 }
                 catch
                 {
-                    // TODO
-                    throw;
+                    // TODO: Log error
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            DisposeAsync().GetAwaiter().GetResult();
         }
     }
 }

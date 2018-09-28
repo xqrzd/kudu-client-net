@@ -35,11 +35,16 @@ namespace Kudu.Client.Connection
             _nextCallId = 0;
 
             _input.OnWriterCompleted(
-                (Exception ex, object state) => ((KuduConnection)state).OnWriterCompleted(ex),
+                (Exception ex, object state) => ((KuduConnection)state).OnInputCompleted(ex),
                 state: this);
 
             _receiveTask = StartReceiveLoopAsync();
             _inputCompletedTcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        public void OnConnectionClosed(Action<Exception, object> callback, object state)
+        {
+            _input.OnWriterCompleted(callback, state);
         }
 
         public async Task<CallResponse> SendReceiveAsync<TInput>(RequestHeader header, TInput body)
@@ -226,7 +231,7 @@ namespace Kudu.Client.Connection
             }
         }
 
-        private void OnWriterCompleted(Exception exception)
+        private void OnInputCompleted(Exception exception)
         {
             if (exception is null)
                 Console.WriteLine($"KuduConnection [{_connection.ToString()}] closed");
@@ -252,20 +257,24 @@ namespace Kudu.Client.Connection
 
         public override string ToString() => _connection.ToString();
 
-        public void Dispose()
+        public async Task DisposeAsync()
         {
             // This connection is done writing, complete the writer.
+            // This will also signal the reader to stop.
             _output.Complete();
 
-            // Wait for the reader to finish processing any data
-            // left in its buffer.
-            // TODO: Use C# 8 async dispose when it's available.
-            _receiveTask.GetAwaiter().GetResult();
+            // Wait for the reader to finish processing any remaining data.
+            await _receiveTask;
 
-            _inputCompletedTcs.Task.GetAwaiter().GetResult();
+            await _inputCompletedTcs.Task;
 
             _singleWriter.Dispose();
             _connection.Dispose();
+        }
+
+        public void Dispose()
+        {
+            DisposeAsync().GetAwaiter().GetResult();
         }
     }
 }

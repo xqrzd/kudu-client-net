@@ -92,9 +92,14 @@ namespace Kudu.Client
             return rpc.ParseResponse(response);
         }
 
+        public async Task DisposeAsync()
+        {
+            await _connectionCache.DisposeAsync();
+        }
+
         public void Dispose()
         {
-            _connectionCache.Dispose();
+            DisposeAsync().GetAwaiter().GetResult();
         }
     }
 }
