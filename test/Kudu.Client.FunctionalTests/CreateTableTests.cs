@@ -44,6 +44,11 @@ namespace Kudu.Client.FunctionalTests
                 var tableId = await client.CreateTableAsync(table);
 
                 Assert.NotEmpty(tableId);
+
+                var tables = await client.GetTablesAsync();
+
+                Assert.Contains(tables,
+                    t => t.Id.AsSpan().SequenceEqual(tableId));
             }
         }
     }

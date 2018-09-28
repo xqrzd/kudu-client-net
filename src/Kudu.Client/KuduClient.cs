@@ -5,6 +5,7 @@ using Kudu.Client.Builder;
 using Kudu.Client.Connection;
 using Kudu.Client.Exceptions;
 using Kudu.Client.Protocol.Consensus;
+using Kudu.Client.Protocol.Master;
 using Kudu.Client.Protocol.Rpc;
 using Kudu.Client.Requests;
 
@@ -34,6 +35,22 @@ namespace Kudu.Client
                 throw new MasterException(result.Error);
 
             return result.TableId;
+        }
+
+        public async Task<List<ListTablesResponsePB.TableInfo>> GetTablesAsync(string nameFilter = null)
+        {
+            var rpc = new ListTablesRequest(new ListTablesRequestPB
+            {
+                NameFilter = nameFilter
+            });
+
+            var result = await SendRpcToMasterAsync(rpc, ReplicaSelection.ClosestReplica);
+
+            // TODO: Handle errors elsewhere?
+            if (result.Error != null)
+                throw new MasterException(result.Error);
+
+            return result.Tables;
         }
 
         private async Task ConnectToClusterAsync()
