@@ -94,12 +94,12 @@ namespace Kudu.Client.Tablet
 
             foreach (var replica in tabletLocations.Replicas)
             {
-                var uuid = replica.TsInfo.PermanentUuid.ToStringUtf8();
+                var serverInfo = replica.TsInfo.ToServerInfo();
+                var uuid = serverInfo.Uuid;
 
                 if (replica.Role == RaftPeerPB.Role.Leader)
                     leaderUuid = uuid;
 
-                var serverInfo = replica.TsInfo.ToServerInfo();
                 serverInfos.Add(uuid, serverInfo);
             }
 
