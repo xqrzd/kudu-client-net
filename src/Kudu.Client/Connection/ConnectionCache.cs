@@ -58,7 +58,6 @@ namespace Kudu.Client.Connection
             // already been removed if Dispose was called.
             if (connectionTask != null)
             {
-                // TODO: Handle exceptions when disposing the connection.
                 connectionTask.Result.Dispose();
             }
         }

@@ -24,6 +24,8 @@ namespace Kudu.Client.Connection
         private readonly TaskCompletionSource<object> _inputCompletedTcs;
 
         private int _nextCallId;
+        private bool _closed;
+        private Exception _closedException;
 
         public KuduConnection(IConnection connection)
         {
@@ -52,6 +54,13 @@ namespace Kudu.Client.Connection
             var tcs = new TaskCompletionSource<CallResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
             lock (_inflightMessages)
             {
+                if (_closed)
+                {
+                    // This connection is closed. The RPC needs to be retried
+                    // on another connection.
+                    throw _closedException;
+                }
+
                 // If an earlier component set CallId (such as the negotiator)
                 // we don't want to overwrite it.
                 if (header.CallId == 0)
@@ -97,83 +106,89 @@ namespace Kudu.Client.Connection
 
         private async Task StartReceiveLoopAsync()
         {
-            // TODO: Catch exceptions, and complete the reader.
             // TODO: Clean up parsing code.
 
-            byte[] message = null;
-            bool readInProgress = false;
-            int remainingSize = 0;
-            int written = 0;
-            int msgSize = 0;
-
-            while (true)
+            try
             {
-                ReadResult result = await _input.ReadAsync();
-                ReadOnlySequence<byte> buffer = result.Buffer;
+                byte[] message = null;
+                bool readInProgress = false;
+                int remainingSize = 0;
+                int written = 0;
+                int msgSize = 0;
 
-                if (result.IsCompleted || result.IsCanceled)
-                    break;
-
-                // TODO: Break some of these out into separate methods?
-                if (readInProgress)
+                while (true)
                 {
-                    // There's a read in progress (a message too large for one result).
+                    ReadResult result = await _input.ReadAsync();
+                    ReadOnlySequence<byte> buffer = result.Buffer;
 
-                    var copyLength = Math.Min(remainingSize, buffer.Length);
-                    var slice = buffer.Slice(0, copyLength);
-                    slice.CopyTo(message.AsSpan(written));
-                    written += (int)copyLength;
-                    remainingSize -= (int)copyLength;
+                    if (result.IsCompleted || result.IsCanceled)
+                        break;
 
-                    if (remainingSize == 0)
+                    // TODO: Break some of these out into separate methods?
+                    if (readInProgress)
                     {
-                        // Reached the end of the message.
-                        ProcessResponse(CallResponse.FromMemory(message, msgSize));
+                        // There's a read in progress (a message too large for one result).
 
-                        message = null;
-                        readInProgress = false;
-                        written = 0;
+                        var copyLength = Math.Min(remainingSize, buffer.Length);
+                        var slice = buffer.Slice(0, copyLength);
+                        slice.CopyTo(message.AsSpan(written));
+                        written += (int)copyLength;
+                        remainingSize -= (int)copyLength;
+
+                        if (remainingSize == 0)
+                        {
+                            // Reached the end of the message.
+                            ProcessResponse(CallResponse.FromMemory(message, msgSize));
+
+                            message = null;
+                            readInProgress = false;
+                            written = 0;
+                        }
+
+                        buffer = buffer.Slice(copyLength);
                     }
 
-                    buffer = buffer.Slice(copyLength);
+                    while ((TryParseMessageSize(ref buffer, out var messageLength)))
+                    {
+                        // TODO: Check messageLength.
+                        message = ArrayPool<byte>.Shared.Rent(messageLength);
+                        msgSize = messageLength;
+
+                        // TODO: Catch exceptions, and return memory back to the pool.
+
+                        // We got a message.
+                        // Do we have this entire message?
+                        if (buffer.Length >= messageLength)
+                        {
+                            // Yes!
+                            var slice = buffer.Slice(0, messageLength);
+                            slice.CopyTo(message);
+                            ProcessResponse(CallResponse.FromMemory(message, messageLength));
+
+                            message = null;
+                            buffer = buffer.Slice(messageLength);
+                        }
+                        else
+                        {
+                            // We don't have the entire buffer. Take what we can.
+
+                            buffer.CopyTo(message);
+                            readInProgress = true;
+                            remainingSize = messageLength - (int)buffer.Length;
+                            written += (int)buffer.Length;
+                            buffer = buffer.Slice(buffer.Length);
+                        }
+                    }
+
+                    _input.AdvanceTo(buffer.Start, buffer.End);
                 }
 
-                while ((TryParseMessageSize(ref buffer, out var messageLength)))
-                {
-                    // TODO: Check messageLength.
-                    message = ArrayPool<byte>.Shared.Rent(messageLength);
-                    msgSize = messageLength;
-
-                    // TODO: Catch exceptions, and return memory back to the pool.
-
-                    // We got a message.
-                    // Do we have this entire message?
-                    if (buffer.Length >= messageLength)
-                    {
-                        // Yes!
-                        var slice = buffer.Slice(0, messageLength);
-                        slice.CopyTo(message);
-                        ProcessResponse(CallResponse.FromMemory(message, messageLength));
-
-                        message = null;
-                        buffer = buffer.Slice(messageLength);
-                    }
-                    else
-                    {
-                        // We don't have the entire buffer. Take what we can.
-
-                        buffer.CopyTo(message);
-                        readInProgress = true;
-                        remainingSize = messageLength - (int)buffer.Length;
-                        written += (int)buffer.Length;
-                        buffer = buffer.Slice(buffer.Length);
-                    }
-                }
-
-                _input.AdvanceTo(buffer.Start, buffer.End);
+                _input.Complete();
             }
-
-            _input.Complete();
+            catch (Exception ex)
+            {
+                _input.Complete(ex);
+            }
         }
 
         private bool TryParseMessageSize(
@@ -233,20 +248,17 @@ namespace Kudu.Client.Connection
 
         private void OnInputCompleted(Exception exception)
         {
-            if (exception is null)
-                Console.WriteLine($"KuduConnection [{_connection.ToString()}] closed");
-            else
-                Console.WriteLine($"KuduConnection [{_connection.ToString()}] unexpectedly terminated {exception.Message}");
+            var closedException = new ConnectionClosedException(_connection.ToString(), exception);
+            Console.WriteLine(closedException.Message);
 
             lock (_inflightMessages)
             {
+                _closed = true;
+                _closedException = closedException;
+
                 foreach (var inflightMessage in _inflightMessages.Values)
                 {
-                    if (exception is null)
-                        // TODO: Should a separate exception be used, instead of canceling them?
-                        inflightMessage.TrySetCanceled();
-                    else
-                        inflightMessage.TrySetException(exception);
+                    inflightMessage.TrySetException(closedException);
                 }
 
                 _inflightMessages.Clear();
@@ -266,6 +278,8 @@ namespace Kudu.Client.Connection
             // Wait for the reader to finish processing any remaining data.
             await _receiveTask;
 
+            // Completing the reader doesn't wait for any registered callbacks
+            // to finish. Wait for the callback to finish here.
             await _inputCompletedTcs.Task;
 
             _singleWriter.Dispose();
