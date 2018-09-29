@@ -49,6 +49,15 @@ namespace Kudu.Client.FunctionalTests
 
                 Assert.Contains(tables,
                     t => t.Id.AsSpan().SequenceEqual(tableId));
+
+                // TODO: Without this, GetTableLocationsAsync fails with 'Tablet not running'.
+                // CreateTableAsync probably needs to wait for table creation.
+                await Task.Delay(1000);
+
+                var tabletLocations = await client.GetTableLocationsAsync(tableId);
+
+                Assert.Equal(4, tabletLocations.Count);
+                // TODO: Add asserts for tabletLocations contents.
             }
         }
     }

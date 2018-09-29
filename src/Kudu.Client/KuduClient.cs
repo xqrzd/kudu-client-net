@@ -8,6 +8,8 @@ using Kudu.Client.Protocol.Consensus;
 using Kudu.Client.Protocol.Master;
 using Kudu.Client.Protocol.Rpc;
 using Kudu.Client.Requests;
+using Kudu.Client.Tablet;
+using Kudu.Client.Util;
 
 namespace Kudu.Client
 {
@@ -51,6 +53,32 @@ namespace Kudu.Client
                 throw new MasterException(result.Error);
 
             return result.Tables;
+        }
+
+        public async Task<List<RemoteTablet>> GetTableLocationsAsync(byte[] tableId)
+        {
+            var rpc = new GetTableLocationsRequest(new GetTableLocationsRequestPB
+            {
+                Table = new TableIdentifierPB
+                {
+                    TableId = tableId
+                }
+            });
+
+            var result = await SendRpcToMasterAsync(rpc, ReplicaSelection.ClosestReplica);
+
+            if (result.Error != null)
+                throw new MasterException(result.Error);
+
+            var tabletLocations = new List<RemoteTablet>(result.TabletLocations.Count);
+
+            foreach (var tabletLocation in result.TabletLocations)
+            {
+                var tablet = RemoteTablet.FromTabletLocations(tableId.ToStringUtf8(), tabletLocation);
+                tabletLocations.Add(tablet);
+            }
+
+            return tabletLocations;
         }
 
         private async Task ConnectToClusterAsync()
