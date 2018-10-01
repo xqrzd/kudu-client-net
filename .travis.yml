@@ -12,7 +12,7 @@ env:
 install:
   # Install Kudu from the Cloudera apt repository.
   - curl https://archive.cloudera.com/cdh5/ubuntu/trusty/amd64/cdh/archive.key | sudo apt-key add -
-  - sudo wget http://archive.cloudera.com/kudu/ubuntu/trusty/amd64/kudu/cloudera.list -O /etc/apt/sources.list.d/cloudera.list
+  - sudo wget http://archive.cloudera.com/cdh5/ubuntu/trusty/amd64/cdh/cloudera.list -O /etc/apt/sources.list.d/cloudera.list
   - sudo apt-get update -y -qq
   - sudo apt-get install -y kudu kudu-master kudu-tserver
 
