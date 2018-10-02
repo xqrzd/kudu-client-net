@@ -36,12 +36,13 @@ namespace Kudu.Client.Connection
             _inflightMessages = new Dictionary<int, TaskCompletionSource<CallResponse>>();
             _nextCallId = 0;
 
+            _inputCompletedTcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+
             _input.OnWriterCompleted(
                 (Exception ex, object state) => ((KuduConnection)state).OnInputCompleted(ex),
                 state: this);
 
             _receiveTask = StartReceiveLoopAsync();
-            _inputCompletedTcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
         }
 
         public void OnConnectionClosed(Action<Exception, object> callback, object state)
