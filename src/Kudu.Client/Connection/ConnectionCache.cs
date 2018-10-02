@@ -22,24 +22,25 @@ namespace Kudu.Client.Connection
                     return connection;
                 else
                 {
-                    var task = KuduConnectionFactory.ConnectAsync(hostPort);
-                    RegisterConnectionClosedCallback(task, hostPort);
+                    var task = ConnectAsync(hostPort);
                     _connections.Add(hostPort, task);
                     return task;
                 }
             }
         }
 
-        private void RegisterConnectionClosedCallback(Task<KuduConnection> task, HostAndPort hostPort)
+        private async Task<KuduConnection> ConnectAsync(HostAndPort hostPort)
         {
+            var connection = await KuduConnectionFactory.ConnectAsync(hostPort);
+
             // Once we have a KuduConnection, register a callback when it's closed,
             // so we can remove it from the connection cache.
 
             // TODO: Is it worth trying to avoid a closure here?
             // We'd need to store both _connections and hostPort in state.
-            task.ContinueWith(
-                (t, s) => t.Result.OnConnectionClosed(RemoveConnection, s),
-                state: hostPort);
+            connection.OnConnectionClosed(RemoveConnection, hostPort);
+
+            return connection;
         }
 
         private void RemoveConnection(Exception ex, object state)
