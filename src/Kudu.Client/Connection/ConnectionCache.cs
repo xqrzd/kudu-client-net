@@ -19,13 +19,17 @@ namespace Kudu.Client.Connection
             lock (_connections)
             {
                 if (_connections.TryGetValue(hostPort, out var connection))
-                    return connection;
-                else
                 {
-                    var task = ConnectAsync(hostPort);
-                    _connections.Add(hostPort, task);
-                    return task;
+                    // Don't hand out connections we know are faulted, create a new one instead.
+                    // The client may still get a faulted connection (if the task hasn't completed yet),
+                    // but in that case, the client is responsible for retrying.
+                    if (!connection.IsFaulted)
+                        return connection;
                 }
+
+                var task = ConnectAsync(hostPort);
+                _connections[hostPort] = task;
+                return task;
             }
         }
 
