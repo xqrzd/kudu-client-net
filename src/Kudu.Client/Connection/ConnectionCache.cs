@@ -42,12 +42,12 @@ namespace Kudu.Client.Connection
 
             // TODO: Is it worth trying to avoid a closure here?
             // We'd need to store both _connections and hostPort in state.
-            connection.OnConnectionClosed(RemoveConnection, hostPort);
+            connection.OnConnectionClosed(RemoveConnectionAsync, hostPort);
 
             return connection;
         }
 
-        private void RemoveConnection(Exception ex, object state)
+        private async void RemoveConnectionAsync(Exception ex, object state)
         {
             // TODO: Debug log connection removed from cache.
 
@@ -63,7 +63,20 @@ namespace Kudu.Client.Connection
             // already been removed if Dispose was called.
             if (connectionTask != null)
             {
-                connectionTask.Result.Dispose();
+                await DisposeConnectionTask(connectionTask);
+            }
+        }
+
+        private async Task DisposeConnectionTask(Task<KuduConnection> connectionTask)
+        {
+            try
+            {
+                var connection = await connectionTask;
+                await connection.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Exception disposing connection {ex}");
             }
         }
 
@@ -79,15 +92,7 @@ namespace Kudu.Client.Connection
 
             foreach (var connectionTask in connections)
             {
-                try
-                {
-                    var connection = await connectionTask;
-                    connection.Dispose();
-                }
-                catch
-                {
-                    // TODO: Log error
-                }
+                await DisposeConnectionTask(connectionTask);
             }
         }
 
