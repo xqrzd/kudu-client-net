@@ -7,6 +7,7 @@ using Kudu.Client.Exceptions;
 using Kudu.Client.Protocol.Consensus;
 using Kudu.Client.Protocol.Master;
 using Kudu.Client.Protocol.Rpc;
+using Kudu.Client.Protocol.Tserver;
 using Kudu.Client.Requests;
 using Kudu.Client.Tablet;
 using Kudu.Client.Util;
@@ -79,6 +80,71 @@ namespace Kudu.Client
             }
 
             return tabletLocations;
+        }
+
+        public async Task<GetTableSchemaResponsePB> GetTableSchemaAsync(string tableName)
+        {
+            var rpc = new GetTableSchemaRequest(new GetTableSchemaRequestPB
+            {
+                Table = new TableIdentifierPB
+                {
+                    TableName = tableName
+                }
+            });
+
+            var result = await SendRpcToMasterAsync(rpc, ReplicaSelection.ClosestReplica);
+
+            if (result.Error != null)
+                throw new MasterException(result.Error);
+
+            return result;
+        }
+
+        public async Task<KuduTable> OpenTableAsync(string tableName)
+        {
+            var response = await GetTableSchemaAsync(tableName);
+
+            // Kudu returns an error if id is set.
+            foreach (var column in response.Schema.Columns)
+                column.ResetId();
+
+            return new KuduTable(response);
+        }
+
+        public async Task<WriteResponsePB> WriteRowAsync(KuduTable table, PartialRow row)
+        {
+            // TODO: Need to pick the right tablet.
+            // TODO: Need to cache tablet locations.
+
+            var locations = await GetTableLocationsAsync(table.Schema.TableId);
+            var location = locations[0];
+            var hostPort = location.GetServerInfo(ReplicaSelection.LeaderOnly);
+            var connection = await _connectionCache.CreateConnectionAsync(hostPort.HostPort);
+
+            var rows = new byte[row.RowSize];
+            var indirectData = new byte[row.IndirectDataSize];
+
+            row.WriteTo(rows, indirectData);
+
+            var rowOperations = new Protocol.RowOperationsPB
+            {
+                Rows = rows,
+                IndirectData = indirectData
+            };
+
+            var rpc = new WriteRequest(new WriteRequestPB
+            {
+                TabletId = location.TabletId.ToUtf8ByteArray(),
+                Schema = table.Schema.Schema,
+                RowOperations = rowOperations
+            });
+
+            var result = await SendRpcToConnectionAsync(rpc, connection);
+
+            if (result.Error != null)
+                throw new TabletServerException(result.Error);
+
+            return result;
         }
 
         private async Task ConnectToClusterAsync()

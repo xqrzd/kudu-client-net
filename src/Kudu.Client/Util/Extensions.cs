@@ -11,6 +11,9 @@ namespace Kudu.Client.Util
         public static string ToStringUtf8(this byte[] source) =>
             Encoding.UTF8.GetString(source);
 
+        public static byte[] ToUtf8ByteArray(this string source) =>
+            Encoding.UTF8.GetBytes(source);
+
         public static HostAndPort ToHostAndPort(this HostPortPB hostPort) =>
             new HostAndPort(hostPort.Host, (int)hostPort.Port);
 
