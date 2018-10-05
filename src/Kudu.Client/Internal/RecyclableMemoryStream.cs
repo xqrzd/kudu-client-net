@@ -21,7 +21,7 @@ namespace Kudu.Client.Internal
             _position = 0;
         }
 
-        public Memory<byte> Memory => ToMemory();
+        public Memory<byte> Memory => AsMemory();
 
         public override bool CanRead => true;
 
@@ -144,11 +144,11 @@ namespace Kudu.Client.Internal
 
         public byte[] GetBuffer() => _buffer;
 
-        public byte[] ToArray() => ToSpan().ToArray();
+        public byte[] ToArray() => AsSpan().ToArray();
 
-        public Span<byte> ToSpan() => _buffer.AsSpan(0, _length);
+        public Span<byte> AsSpan() => _buffer.AsSpan(0, _length);
 
-        public Span<byte> AsSpan(int size)
+        public Span<byte> GetSpan(int size)
         {
             EnsureCapacity(size);
             var slice = _buffer.AsSpan(_position, size);
@@ -157,9 +157,9 @@ namespace Kudu.Client.Internal
             return slice;
         }
 
-        public Memory<byte> ToMemory() => _buffer.AsMemory(0, _length);
+        public Memory<byte> AsMemory() => _buffer.AsMemory(0, _length);
 
-        public Memory<byte> AsMemory(int size)
+        public Memory<byte> GetMemory(int size)
         {
             EnsureCapacity(size);
             var slice = _buffer.AsMemory(_position, size);

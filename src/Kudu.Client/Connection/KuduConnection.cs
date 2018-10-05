@@ -79,7 +79,7 @@ namespace Kudu.Client.Connection
             using (var stream = new RecyclableMemoryStream())
             {
                 // Make space to write the length of the entire message.
-                var length = stream.AsMemory(4);
+                var length = stream.GetMemory(4);
 
                 Serializer.SerializeWithLengthPrefix(stream, header, PrefixStyle.Base128);
                 Serializer.SerializeWithLengthPrefix(stream, body, PrefixStyle.Base128);
@@ -88,7 +88,7 @@ namespace Kudu.Client.Connection
                 // bytes we already allocated to store the length.
                 BinaryPrimitives.WriteUInt32BigEndian(length.Span, (uint)stream.Length - 4);
 
-                await WriteSynchronized(stream.ToMemory());
+                await WriteSynchronized(stream.AsMemory());
             }
         }
 
