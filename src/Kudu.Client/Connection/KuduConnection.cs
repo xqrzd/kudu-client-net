@@ -79,7 +79,7 @@ namespace Kudu.Client.Connection
             using (var stream = new RecyclableMemoryStream())
             {
                 // Make space to write the length of the entire message.
-                var length = stream.GetMemory(4);
+                Memory<byte> length = stream.GetMemory(4);
 
                 Serializer.SerializeWithLengthPrefix(stream, header, PrefixStyle.Base128);
                 Serializer.SerializeWithLengthPrefix(stream, body, PrefixStyle.Base128);

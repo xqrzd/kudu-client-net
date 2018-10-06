@@ -9,6 +9,8 @@
 
         public HostAndPort HostPort { get; }
 
+        // TODO: Add IsLocal property.
+
         public ServerInfo(string uuid, HostAndPort hostPort)
         {
             Uuid = uuid;
