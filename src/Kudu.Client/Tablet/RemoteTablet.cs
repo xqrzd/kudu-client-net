@@ -13,16 +13,16 @@ namespace Kudu.Client.Tablet
     /// This class encapsulates the information regarding a tablet and its locations.
     ///
     /// RemoteTablet's main function is to keep track of where the leader for this
-    /// tablet is. For example, an RPC might call {@link #getLeaderServerInfo()}, contact that TS, find
-    /// it's not the leader anymore, and then call {@link #demoteLeader(String)}.
+    /// tablet is. For example, an RPC might call GetServerInfo, contact that TS, find
+    /// it's not the leader anymore, and then call DemoteLeader.
     ///
     /// A RemoteTablet's life is expected to be long in a cluster where roles aren't changing often,
     /// and short when they do since the Kudu client will replace the RemoteTablet it caches with new
     /// ones after getting tablet locations from the master.
     /// </summary>
-    public class RemoteTablet : IEquatable<RemoteTablet>, IComparable<RemoteTablet>
+    public class RemoteTablet
     {
-        private readonly Dictionary<string, ServerInfo> _tabletServers;
+        private readonly ServerInfoCache _cache;
 
         public string TableId { get; }
 
@@ -30,46 +30,30 @@ namespace Kudu.Client.Tablet
 
         public Partition Partition { get; }
 
-        public string LeaderUuid { get; }
-
         public RemoteTablet(
             string tableId,
             string tabletId,
             Partition partition,
-            string leaderUuid,
-            Dictionary<string, ServerInfo> tabletServers)
+            ServerInfoCache cache)
         {
             TableId = tableId;
             TabletId = tabletId;
             Partition = partition;
-            LeaderUuid = leaderUuid;
-            _tabletServers = tabletServers;
+            _cache = cache;
         }
 
-        public bool Equals(RemoteTablet other)
-        {
-            throw new NotImplementedException();
-        }
-
-        public int CompareTo(RemoteTablet other)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override bool Equals(object obj) => Equals(obj as RemoteTablet);
-
-        public override int GetHashCode()
-        {
-            return base.GetHashCode();
-        }
+        public ServerInfo GetServerInfo(ReplicaSelection replicaSelection) =>
+            _cache.GetServerInfo(replicaSelection);
 
         public override string ToString()
         {
             var sb = new StringBuilder();
             sb.Append(TabletId).Append("@[");
 
-            var tsStrings = _tabletServers.Values
-                .Select(e => $"{e}{(e.Uuid == LeaderUuid ? "[L]" : "")}")
+            var leader = _cache.GetServerInfo(ReplicaSelection.LeaderOnly);
+
+            var tsStrings = _cache.Servers
+                .Select(e => $"{e}{(e == leader ? "[L]" : "")}")
                 // Sort so that we have a consistent iteration order.
                 .OrderBy(e => e);
 
@@ -90,23 +74,26 @@ namespace Kudu.Client.Tablet
             var serverInfos = new Dictionary<string, ServerInfo>(
                 tabletLocations.Replicas.Count);
 
-            string leaderUuid = null;
+            var replicas = new List<ServerInfo>(tabletLocations.Replicas.Count);
+            int leaderIndex = -1;
 
-            foreach (var replica in tabletLocations.Replicas)
+            for (int i = 0; i < tabletLocations.Replicas.Count; i++)
             {
+                var replica = tabletLocations.Replicas[i];
                 var serverInfo = replica.TsInfo.ToServerInfo();
-                var uuid = serverInfo.Uuid;
 
                 if (replica.Role == RaftPeerPB.Role.Leader)
-                    leaderUuid = uuid;
+                    leaderIndex = i;
 
-                serverInfos.Add(uuid, serverInfo);
+                replicas.Add(serverInfo);
             }
 
-            if (leaderUuid == null)
+            if (leaderIndex == -1)
                 Console.WriteLine($"No leader provided for tablet {tabletId}");
 
-            return new RemoteTablet(tableId, tabletId, partition, leaderUuid, serverInfos);
+            var cache = new ServerInfoCache(replicas, leaderIndex);
+
+            return new RemoteTablet(tableId, tabletId, partition, cache);
         }
     }
 }

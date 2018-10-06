@@ -17,6 +17,12 @@ namespace Kudu.Client.Util
         public static HostAndPort ToHostAndPort(this HostPortPB hostPort) =>
             new HostAndPort(hostPort.Host, (int)hostPort.Port);
 
+        public static void SwapMostSignificantBitBigEndian(this byte[] span) =>
+            span[0] ^= (1 << 7);
+
+        public static void SwapMostSignificantBitBigEndian(this Span<byte> span) =>
+            span[0] ^= (1 << 7);
+
         public static ServerInfo ToServerInfo(this TSInfoPB tsInfo)
         {
             string uuid = tsInfo.PermanentUuid.ToStringUtf8();

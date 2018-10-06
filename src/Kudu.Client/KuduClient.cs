@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Kudu.Client.Builder;
 using Kudu.Client.Connection;
 using Kudu.Client.Exceptions;
+using Kudu.Client.Internal;
 using Kudu.Client.Protocol.Consensus;
 using Kudu.Client.Protocol.Master;
 using Kudu.Client.Protocol.Rpc;
@@ -16,15 +17,18 @@ namespace Kudu.Client
 {
     public class KuduClient : IDisposable
     {
-        private readonly ConnectionCache _connectionCache;
         private readonly KuduClientSettings _settings;
+        private readonly ConnectionCache _connectionCache;
+        // TODO: This needs to be thread safe. Lock or ConcurrentDictionary?
+        private readonly Dictionary<string, TableLocationsCache> _tableLocations;
 
         private volatile MasterCache _masterCache;
 
         public KuduClient(KuduClientSettings settings)
         {
-            _connectionCache = new ConnectionCache();
             _settings = settings;
+            _connectionCache = new ConnectionCache();
+            _tableLocations = new Dictionary<string, TableLocationsCache>();
         }
 
         public async Task<byte[]> CreateTableAsync(TableBuilder table)
@@ -104,27 +108,20 @@ namespace Kudu.Client
         {
             var response = await GetTableSchemaAsync(tableName);
 
-            // Kudu returns an error if id is set.
-            foreach (var column in response.Schema.Columns)
-                column.ResetId();
-
             return new KuduTable(response);
         }
 
         public async Task<WriteResponsePB> WriteRowAsync(KuduTable table, PartialRow row)
         {
-            // TODO: Need to pick the right tablet.
             // TODO: Need to cache tablet locations.
-
-            var locations = await GetTableLocationsAsync(table.Schema.TableId);
-            var location = locations[0];
-            var hostPort = location.GetServerInfo(ReplicaSelection.LeaderOnly);
-            var connection = await _connectionCache.CreateConnectionAsync(hostPort.HostPort);
 
             var rows = new byte[row.RowSize];
             var indirectData = new byte[row.IndirectDataSize];
 
             row.WriteTo(rows, indirectData);
+
+            var ms = new RecyclableMemoryStream();
+            KeyEncoder.EncodePartitionKey(row, table.Schema.PartitionSchema, ms);
 
             var rowOperations = new Protocol.RowOperationsPB
             {
@@ -132,9 +129,22 @@ namespace Kudu.Client
                 IndirectData = indirectData
             };
 
+            // TODO: This implementation is not complete.
+            if (!_tableLocations.TryGetValue(table.Schema.TableName, out var locationCache))
+            {
+                // Find the tablet to send this write to.
+                var locations = await GetTableLocationsAsync(table.Schema.TableId);
+                locationCache = new TableLocationsCache(locations);
+                _tableLocations[table.Schema.TableName] = locationCache;
+            }
+
+            var tablet = locationCache.FindTablet(ms.AsSpan());
+            var serverInfo = tablet.GetServerInfo(ReplicaSelection.LeaderOnly);
+            var connection = await _connectionCache.CreateConnectionAsync(serverInfo.HostPort);
+
             var rpc = new WriteRequest(new WriteRequestPB
             {
-                TabletId = location.TabletId.ToUtf8ByteArray(),
+                TabletId = tablet.TabletId.ToUtf8ByteArray(),
                 Schema = table.Schema.Schema,
                 RowOperations = rowOperations
             });

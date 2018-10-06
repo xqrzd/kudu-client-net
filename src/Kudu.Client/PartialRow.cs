@@ -9,7 +9,7 @@ namespace Kudu.Client
     // TODO: A lot of cleanup needed here.
     public class PartialRow
     {
-        private readonly Schema _schema;
+        public Schema Schema { get; }
 
         private byte[] _rowAlloc;
         private readonly int _headerSize;
@@ -19,7 +19,7 @@ namespace Kudu.Client
 
         public PartialRow(Schema schema, RowOperationsPB.Type type)
         {
-            _schema = schema;
+            Schema = schema;
 
             var columnSize = BitsToBytes(schema.ColumnCount);
             var headerSize = 1 + columnSize;
@@ -40,6 +40,9 @@ namespace Kudu.Client
 
         public int IndirectDataSize { get; private set; }
 
+        // TODO:
+        //public int PrimaryKeySize { get; private set; }
+
         public void WriteTo(Span<byte> buffer, Span<byte> indirectData)
         {
             var varLengthOffset = 0;
@@ -49,12 +52,12 @@ namespace Kudu.Client
 
             var position = _headerSize;
 
-            for (int i = 0; i < _schema.ColumnCount; i++)
+            for (int i = 0; i < Schema.ColumnCount; i++)
             {
-                var length = _schema.GetColumnSize(i);
+                var length = Schema.GetColumnSize(i);
                 if (IsSet(i) && !IsSetToNull(i))
                 {
-                    var type = _schema.GetColumnType(i);
+                    var type = Schema.GetColumnType(i);
 
                     if (type == DataType.String)
                     {
@@ -90,14 +93,14 @@ namespace Kudu.Client
         private void Set(int columnIndex) => BitMapSet(1, columnIndex);
 
         private bool IsSetToNull(int columnIndex) =>
-            _schema.HasNullableColumns ? BitMapGet(_nullOffset, columnIndex) : false;
+            Schema.HasNullableColumns ? BitMapGet(_nullOffset, columnIndex) : false;
 
         private void SetToNull(int columnIndex) => BitMapSet(_nullOffset, columnIndex);
 
         public void SetBool(int columnIndex, bool value)
         {
             Set(columnIndex);
-            _rowAlloc[_schema.GetColumnOffset(columnIndex)] = (byte)(value ? 1 : 0);
+            _rowAlloc[Schema.GetColumnOffset(columnIndex)] = (byte)(value ? 1 : 0);
         }
 
         public void SetNull(int columnIndex)
@@ -133,7 +136,7 @@ namespace Kudu.Client
         private int GetPositionInRowAllocAndSetBitSet(int columnIndex)
         {
             Set(columnIndex);
-            return _schema.GetColumnOffset(columnIndex);
+            return Schema.GetColumnOffset(columnIndex);
         }
 
         private Span<byte> GetSpanInRowAllocAndSetBitSet(int columnIndex)
@@ -142,15 +145,21 @@ namespace Kudu.Client
             return _rowAlloc.AsSpan(position);
         }
 
+        internal Span<byte> GetSpanInRowAlloc(int columnIndex)
+        {
+            var position = _headerSize + Schema.GetColumnOffset(columnIndex);
+            return _rowAlloc.AsSpan(position);
+        }
+
         private int GetRowSize()
         {
             var size = _headerSize;
 
-            for (int i = 0; i < _schema.ColumnCount; i++)
+            for (int i = 0; i < Schema.ColumnCount; i++)
             {
                 if (IsSet(i) && !IsSetToNull(i))
                 {
-                    size += _schema.GetColumnSize(i);
+                    size += Schema.GetColumnSize(i);
                 }
             }
 

@@ -14,22 +14,22 @@ namespace Kudu.Client
 
         public PartialRow NewInsert()
         {
-            return new PartialRow(new Schema(Schema.Schema), Protocol.RowOperationsPB.Type.Insert);
+            return new PartialRow(new Schema(Schema.Schema, Schema), Protocol.RowOperationsPB.Type.Insert);
         }
 
         public PartialRow NewUpdate()
         {
-            return new PartialRow(new Schema(Schema.Schema), Protocol.RowOperationsPB.Type.Update);
+            return new PartialRow(new Schema(Schema.Schema, Schema), Protocol.RowOperationsPB.Type.Update);
         }
 
         public PartialRow NewUpsert()
         {
-            return new PartialRow(new Schema(Schema.Schema), Protocol.RowOperationsPB.Type.Upsert);
+            return new PartialRow(new Schema(Schema.Schema, Schema), Protocol.RowOperationsPB.Type.Upsert);
         }
 
         public PartialRow NewDelete()
         {
-            return new PartialRow(new Schema(Schema.Schema), Protocol.RowOperationsPB.Type.Upsert);
+            return new PartialRow(new Schema(Schema.Schema, Schema), Protocol.RowOperationsPB.Type.Upsert);
         }
     }
 }

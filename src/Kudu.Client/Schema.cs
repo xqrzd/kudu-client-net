@@ -1,14 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
 using Kudu.Client.Protocol;
+using Kudu.Client.Protocol.Master;
 
 namespace Kudu.Client
 {
     public class Schema
     {
+        public GetTableSchemaResponsePB TableSchema { get; }
+
         // TODO: Create a managed class for this?
         private readonly SchemaPB _schema;
         private readonly Dictionary<string, int> _columnsByName;
+        private readonly Dictionary<int, int> _columnsById;
         private readonly int[] _columnOffsets;
 
         public int ColumnCount { get; }
@@ -19,8 +23,9 @@ namespace Kudu.Client
 
         public bool HasNullableColumns { get; }
 
-        public Schema(SchemaPB schema)
+        public Schema(SchemaPB schema, GetTableSchemaResponsePB tableSchema)
         {
+            TableSchema = tableSchema;
             var columns = schema.Columns;
 
             var size = 0;
@@ -28,6 +33,7 @@ namespace Kudu.Client
             var hasNulls = false;
             var columnOffsets = new int[columns.Count];
             var columnsByName = new Dictionary<string, int>(columns.Count);
+            var columnsById = new Dictionary<int, int>(columns.Count);
 
             for (int i = 0; i < columns.Count; i++)
             {
@@ -47,6 +53,10 @@ namespace Kudu.Client
 
                 hasNulls |= column.IsNullable;
                 columnsByName.Add(column.Name, i);
+                columnsById.Add((int)column.Id, i);
+
+                // TODO: Remove this hack-fix. Kudu throws an exception if columnId is supplied.
+                column.ResetId();
 
                 // TODO: store primary key columns
             }
@@ -54,6 +64,7 @@ namespace Kudu.Client
             _schema = schema;
             _columnOffsets = columnOffsets;
             _columnsByName = columnsByName;
+            _columnsById = columnsById;
             ColumnCount = columns.Count;
             RowSize = size;
             VarLengthColumnCount = varLenCnt;
@@ -67,6 +78,10 @@ namespace Kudu.Client
         public int GetColumnSize(int index) => GetTypeSize(GetColumnType(index));
 
         public DataType GetColumnType(int index) => _schema.Columns[index].Type;
+
+        public bool IsPrimaryKey(int index) => _schema.Columns[index].IsKey;
+
+        public int GetColumnIndex(int id) => _columnsById[id];
 
         public static int GetTypeSize(DataType type)
         {
@@ -98,6 +113,21 @@ namespace Kudu.Client
                     return 16;
                 default:
                     throw new ArgumentException();
+            }
+        }
+
+        public static bool IsSigned(DataType type)
+        {
+            switch (type)
+            {
+                case DataType.Int8:
+                case DataType.Int16:
+                case DataType.Int32:
+                case DataType.Int64:
+                case DataType.Int128:
+                    return true;
+                default:
+                    return false;
             }
         }
     }
