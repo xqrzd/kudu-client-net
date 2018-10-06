@@ -15,9 +15,7 @@ namespace Kudu.Client.Connection
 {
     public class KuduConnection : IDisposable
     {
-        private readonly IConnection _connection;
-        private readonly PipeReader _input;
-        private readonly PipeWriter _output;
+        private readonly IDuplexPipe _ioPipe;
         private readonly SemaphoreSlim _singleWriter;
         private readonly Dictionary<int, TaskCompletionSource<CallResponse>> _inflightMessages;
         private readonly Task _receiveTask;
@@ -27,18 +25,16 @@ namespace Kudu.Client.Connection
         private bool _closed;
         private Exception _closedException;
 
-        public KuduConnection(IConnection connection)
+        public KuduConnection(IDuplexPipe ioPipe)
         {
-            _connection = connection;
-            _input = connection.Input;
-            _output = connection.Output;
+            _ioPipe = ioPipe;
             _singleWriter = new SemaphoreSlim(1, 1);
             _inflightMessages = new Dictionary<int, TaskCompletionSource<CallResponse>>();
             _nextCallId = 0;
 
             _inputCompletedTcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            _input.OnWriterCompleted(
+            _ioPipe.Input.OnWriterCompleted(
                 (Exception ex, object state) => ((KuduConnection)state).OnInputCompleted(ex),
                 state: this);
 
@@ -47,7 +43,7 @@ namespace Kudu.Client.Connection
 
         public void OnConnectionClosed(Action<Exception, object> callback, object state)
         {
-            _input.OnWriterCompleted(callback, state);
+            _ioPipe.Input.OnWriterCompleted(callback, state);
         }
 
         public async Task<CallResponse> SendReceiveAsync<TInput>(RequestHeader header, TInput body)
@@ -94,10 +90,11 @@ namespace Kudu.Client.Connection
 
         private async ValueTask WriteSynchronized(ReadOnlyMemory<byte> source)
         {
+            PipeWriter output = _ioPipe.Output;
             await _singleWriter.WaitAsync();
             try
             {
-                await _output.WriteAsync(source);
+                await output.WriteAsync(source);
             }
             finally
             {
@@ -108,6 +105,7 @@ namespace Kudu.Client.Connection
         private async Task StartReceiveLoopAsync()
         {
             // TODO: Clean up parsing code.
+            PipeReader input = _ioPipe.Input;
 
             try
             {
@@ -119,7 +117,7 @@ namespace Kudu.Client.Connection
 
                 while (true)
                 {
-                    ReadResult result = await _input.ReadAsync();
+                    ReadResult result = await input.ReadAsync();
                     ReadOnlySequence<byte> buffer = result.Buffer;
 
                     if (result.IsCompleted || result.IsCanceled)
@@ -181,14 +179,14 @@ namespace Kudu.Client.Connection
                         }
                     }
 
-                    _input.AdvanceTo(buffer.Start, buffer.End);
+                    input.AdvanceTo(buffer.Start, buffer.End);
                 }
 
-                _input.Complete();
+                input.Complete();
             }
             catch (Exception ex)
             {
-                _input.Complete(ex);
+                input.Complete(ex);
             }
         }
 
@@ -249,7 +247,7 @@ namespace Kudu.Client.Connection
 
         private void OnInputCompleted(Exception exception)
         {
-            var closedException = new ConnectionClosedException(_connection.ToString(), exception);
+            var closedException = new ConnectionClosedException(_ioPipe.ToString(), exception);
             Console.WriteLine(closedException.Message);
 
             lock (_inflightMessages)
@@ -268,13 +266,13 @@ namespace Kudu.Client.Connection
             _inputCompletedTcs.SetResult(null);
         }
 
-        public override string ToString() => _connection.ToString();
+        public override string ToString() => _ioPipe.ToString();
 
         public async Task DisposeAsync()
         {
             // This connection is done writing, complete the writer.
             // This will also signal the reader to stop.
-            _output.Complete();
+            _ioPipe.Output.Complete();
 
             // Wait for the reader to finish processing any remaining data.
             await _receiveTask;
@@ -284,7 +282,7 @@ namespace Kudu.Client.Connection
             await _inputCompletedTcs.Task;
 
             _singleWriter.Dispose();
-            _connection.Dispose();
+            (_ioPipe as IDisposable)?.Dispose();
         }
 
         public void Dispose()

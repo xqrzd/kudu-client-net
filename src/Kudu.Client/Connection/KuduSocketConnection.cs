@@ -6,7 +6,7 @@ using Pipelines.Sockets.Unofficial;
 
 namespace Kudu.Client.Connection
 {
-    public class KuduSocketConnection : IConnection
+    public class KuduSocketConnection : IDuplexPipe, IDisposable
     {
         private const byte CurrentRpcVersion = 9;
 
