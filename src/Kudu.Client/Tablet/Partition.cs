@@ -1,4 +1,5 @@
 ﻿using System;
+using Kudu.Client.Util;
 
 namespace Kudu.Client.Tablet
 {
@@ -120,7 +121,7 @@ namespace Kudu.Client.Tablet
         /// correspondence between partition keys and the hash buckets and range keys.
         /// </summary>
         public override int GetHashCode() => HashCode.Combine(
-            GetHashCode(PartitionKeyStart), GetHashCode(PartitionKeyEnd));
+            PartitionKeyStart.GetContentHashCode(), PartitionKeyEnd.GetContentHashCode());
 
         public override string ToString()
         {
@@ -128,19 +129,6 @@ namespace Kudu.Client.Tablet
             var end = PartitionKeyEnd.Length == 0 ? "<end>" : BitConverter.ToString(PartitionKeyEnd);
 
             return $"[{start}, {end})";
-        }
-
-        // TODO: move this elsewhere
-        private static int GetHashCode(byte[] a)
-        {
-            if (a == null)
-                return 0;
-
-            int result = 1;
-            foreach (byte element in a)
-                result = 31 * result + element;
-
-            return result;
         }
     }
 }

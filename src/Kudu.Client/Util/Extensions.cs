@@ -49,5 +49,17 @@ namespace Kudu.Client.Util
             // TODO: Check if address is local.
             return new ServerInfo(uuid, hostPort, endpoint, false);
         }
+
+        public static int GetContentHashCode(this byte[] source)
+        {
+            if (source == null)
+                return 0;
+
+            int result = 1;
+            foreach (byte element in source)
+                result = 31 * result + element;
+
+            return result;
+        }
     }
 }
