@@ -65,8 +65,8 @@ namespace Kudu.Client.Connection
 
                 _inflightMessages.Add(header.CallId, tcs);
             }
-            await WriteAsync(header, body);
-            return await tcs.Task;
+            await WriteAsync(header, body).ConfigureAwait(false);
+            return await tcs.Task.ConfigureAwait(false);
         }
 
         public async ValueTask WriteAsync<TInput>(RequestHeader header, TInput body)
@@ -84,17 +84,17 @@ namespace Kudu.Client.Connection
                 // bytes we already allocated to store the length.
                 BinaryPrimitives.WriteUInt32BigEndian(length.Span, (uint)stream.Length - 4);
 
-                await WriteSynchronized(stream.AsMemory());
+                await WriteSynchronized(stream.AsMemory()).ConfigureAwait(false);
             }
         }
 
         private async ValueTask WriteSynchronized(ReadOnlyMemory<byte> source)
         {
             PipeWriter output = _ioPipe.Output;
-            await _singleWriter.WaitAsync();
+            await _singleWriter.WaitAsync().ConfigureAwait(false);
             try
             {
-                await output.WriteAsync(source);
+                await output.WriteAsync(source).ConfigureAwait(false);
             }
             finally
             {
@@ -117,7 +117,7 @@ namespace Kudu.Client.Connection
 
                 while (true)
                 {
-                    ReadResult result = await input.ReadAsync();
+                    ReadResult result = await input.ReadAsync().ConfigureAwait(false);
                     ReadOnlySequence<byte> buffer = result.Buffer;
 
                     if (result.IsCompleted || result.IsCanceled)
@@ -275,11 +275,11 @@ namespace Kudu.Client.Connection
             _ioPipe.Output.Complete();
 
             // Wait for the reader to finish processing any remaining data.
-            await _receiveTask;
+            await _receiveTask.ConfigureAwait(false);
 
             // Completing the reader doesn't wait for any registered callbacks
             // to finish. Wait for the callback to finish here.
-            await _inputCompletedTcs.Task;
+            await _inputCompletedTcs.Task.ConfigureAwait(false);
 
             _singleWriter.Dispose();
             (_ioPipe as IDisposable)?.Dispose();

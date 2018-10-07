@@ -24,10 +24,10 @@ namespace Kudu.Client.Negotiate
 
         public async Task NegotiateAsync()
         {
-            var features = await NegotiateFeaturesAsync();
-            var result = await AuthenticateAsync();
+            var features = await NegotiateFeaturesAsync().ConfigureAwait(false);
+            var result = await AuthenticateAsync().ConfigureAwait(false);
             Debug.Assert(result.Step == NegotiatePB.NegotiateStep.SaslSuccess);
-            await SendConnectionContextAsync();
+            await SendConnectionContextAsync().ConfigureAwait(false);
         }
 
         private async Task<NegotiatePB> NegotiateFeaturesAsync()
@@ -41,7 +41,7 @@ namespace Kudu.Client.Negotiate
             request.SupportedFeatures.Add(RpcFeatureFlag.ApplicationFeatureFlags);
             request.SaslMechanisms.Add(new NegotiatePB.SaslMechanism { Mechanism = "PLAIN" });
 
-            using (var response = await _client.SendReceiveAsync(header, request))
+            using (var response = await _client.SendReceiveAsync(header, request).ConfigureAwait(false))
             {
                 return response.ParseResponse<NegotiatePB>();
             }
@@ -63,7 +63,7 @@ namespace Kudu.Client.Negotiate
             request.SaslMechanisms.Add(new NegotiatePB.SaslMechanism { Mechanism = "PLAIN" });
             request.Token = SaslPlain.CreateToken(new NetworkCredential("demo", "demo"));
 
-            using (var response = await _client.SendReceiveAsync(header, request))
+            using (var response = await _client.SendReceiveAsync(header, request).ConfigureAwait(false))
             {
                 return response.ParseResponse<NegotiatePB>();
             }

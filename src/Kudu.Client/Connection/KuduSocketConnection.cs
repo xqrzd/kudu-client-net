@@ -39,13 +39,13 @@ namespace Kudu.Client.Connection
         {
             var connection = await SocketConnection.ConnectAsync(
                 serverInfo.Endpoint,
-                name: serverInfo.ToString());
+                name: serverInfo.ToString()).ConfigureAwait(false);
 
             // After the client connects to a server, the client first sends a connection header.
             // The connection header consists of a magic number "hrpc" and three byte flags, for a total of 7 bytes.
             // https://github.com/apache/kudu/blob/master/docs/design-docs/rpc.md#wire-protocol
             // TODO: Should this be done elsewhere?
-            await connection.Output.WriteAsync(ConnectionHeader);
+            await connection.Output.WriteAsync(ConnectionHeader).ConfigureAwait(false);
 
             return new KuduSocketConnection(connection);
         }

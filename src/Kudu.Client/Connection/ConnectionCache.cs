@@ -37,7 +37,7 @@ namespace Kudu.Client.Connection
 
         private async Task<KuduConnection> ConnectAsync(ServerInfo serverInfo)
         {
-            var connection = await KuduConnectionFactory.ConnectAsync(serverInfo);
+            var connection = await KuduConnectionFactory.ConnectAsync(serverInfo).ConfigureAwait(false);
 
             // Once we have a KuduConnection, register a callback when it's closed,
             // so we can remove it from the connection cache.
@@ -65,7 +65,7 @@ namespace Kudu.Client.Connection
             // already been removed if Dispose was called.
             if (connectionTask != null)
             {
-                await DisposeConnectionTask(connectionTask);
+                await DisposeConnectionTask(connectionTask).ConfigureAwait(false);
             }
         }
 
@@ -73,8 +73,8 @@ namespace Kudu.Client.Connection
         {
             try
             {
-                var connection = await connectionTask;
-                await connection.DisposeAsync();
+                var connection = await connectionTask.ConfigureAwait(false);
+                await connection.DisposeAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -94,7 +94,7 @@ namespace Kudu.Client.Connection
 
             foreach (var connectionTask in connections)
             {
-                await DisposeConnectionTask(connectionTask);
+                await DisposeConnectionTask(connectionTask).ConfigureAwait(false);
             }
         }
 

@@ -8,10 +8,10 @@ namespace Kudu.Client.Connection
     {
         public static async Task<KuduConnection> ConnectAsync(ServerInfo serverInfo)
         {
-            var connection = await KuduSocketConnection.ConnectAsync(serverInfo);
+            var connection = await KuduSocketConnection.ConnectAsync(serverInfo).ConfigureAwait(false);
             var kuduConnection = new KuduConnection(connection);
             var negotiator = new Negotiator(kuduConnection);
-            await negotiator.NegotiateAsync();
+            await negotiator.NegotiateAsync().ConfigureAwait(false);
 
             return kuduConnection;
         }
