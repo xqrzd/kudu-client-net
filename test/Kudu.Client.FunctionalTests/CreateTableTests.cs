@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Kudu.Client.Builder;
-using Kudu.Client.Connection;
 using Kudu.Client.Protocol;
 using Xunit;
 
@@ -13,12 +11,7 @@ namespace Kudu.Client.FunctionalTests
         [Fact]
         public async Task CreateTable()
         {
-            var settings = new KuduClientSettings
-            {
-                MasterAddresses = new List<HostAndPort> { new HostAndPort("127.0.0.1", 7051) }
-            };
-
-            using (var client = new KuduClient(settings))
+            using (var client = KuduClient.Build("127.0.0.1:7051"))
             {
                 var table = new TableBuilder()
                     .SetTableName(Guid.NewGuid().ToString())

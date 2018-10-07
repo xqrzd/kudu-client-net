@@ -174,8 +174,6 @@ namespace Kudu.Client
                 if (result.Error != null)
                     throw new MasterException(result.Error);
 
-                Console.WriteLine("Done: " + result.Done);
-
                 if (result.Done)
                     break;
 
@@ -261,6 +259,24 @@ namespace Kudu.Client
         public void Dispose()
         {
             DisposeAsync().GetAwaiter().GetResult();
+        }
+
+        public static KuduClient Build(string masterAddresses)
+        {
+            var masters = masterAddresses.Split(',');
+
+            var settings = new KuduClientSettings
+            {
+                MasterAddresses = new List<HostAndPort>(masters.Length)
+            };
+
+            foreach (var master in masters)
+            {
+                var hostPort = EndpointParser.TryParse(master.Trim(), 7051);
+                settings.MasterAddresses.Add(hostPort);
+            }
+
+            return new KuduClient(settings);
         }
     }
 }
