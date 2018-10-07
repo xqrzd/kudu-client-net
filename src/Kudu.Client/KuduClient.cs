@@ -42,6 +42,8 @@ namespace Kudu.Client
             if (result.Error != null)
                 throw new MasterException(result.Error);
 
+            await WaitForTableDoneAsync(result.TableId).ConfigureAwait(false);
+
             return result.TableId;
         }
 
@@ -156,6 +158,30 @@ namespace Kudu.Client
                 throw new TabletServerException(result.Error);
 
             return result;
+        }
+
+        private async Task WaitForTableDoneAsync(byte[] tableId)
+        {
+            var rpc = new IsCreateTableDoneRequest(new IsCreateTableDoneRequestPB
+            {
+                Table = new TableIdentifierPB { TableId = tableId }
+            });
+
+            while (true)
+            {
+                var result = await SendRpcToMasterAsync(rpc, ReplicaSelection.LeaderOnly).ConfigureAwait(false);
+
+                if (result.Error != null)
+                    throw new MasterException(result.Error);
+
+                Console.WriteLine("Done: " + result.Done);
+
+                if (result.Done)
+                    break;
+
+                await Task.Delay(50).ConfigureAwait(false);
+                // TODO: Increment rpc attempts.
+            }
         }
 
         private async Task ConnectToClusterAsync()

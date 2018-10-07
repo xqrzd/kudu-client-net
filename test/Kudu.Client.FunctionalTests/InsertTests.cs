@@ -46,8 +46,6 @@ namespace Kudu.Client.FunctionalTests
 
                 Assert.NotEmpty(tableId);
 
-                await Task.Delay(1000);
-
                 var openTable = await client.OpenTableAsync(tableName);
                 var insert = openTable.NewInsert();
                 insert.SetInt(0, 7);
