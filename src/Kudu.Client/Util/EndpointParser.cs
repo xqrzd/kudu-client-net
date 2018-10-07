@@ -3,6 +3,9 @@ using Kudu.Client.Connection;
 
 namespace Kudu.Client.Util
 {
+    /// <summary>
+    /// https://github.com/StackExchange/StackExchange.Redis/blob/master/src/StackExchange.Redis/Format.cs
+    /// </summary>
     public static class EndpointParser
     {
         public static bool TryParseInt32(string s, out int value)
