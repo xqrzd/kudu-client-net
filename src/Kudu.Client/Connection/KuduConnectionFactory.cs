@@ -6,9 +6,9 @@ namespace Kudu.Client.Connection
     // TODO: abstract this
     public class KuduConnectionFactory
     {
-        public static async Task<KuduConnection> ConnectAsync(HostAndPort hostPort)
+        public static async Task<KuduConnection> ConnectAsync(ServerInfo serverInfo)
         {
-            var connection = await KuduSocketConnection.ConnectAsync(hostPort);
+            var connection = await KuduSocketConnection.ConnectAsync(serverInfo);
             var kuduConnection = new KuduConnection(connection);
             var negotiator = new Negotiator(kuduConnection);
             await negotiator.NegotiateAsync();

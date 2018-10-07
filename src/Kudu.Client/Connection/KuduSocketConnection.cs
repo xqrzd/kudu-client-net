@@ -1,6 +1,5 @@
 ﻿using System;
 using System.IO.Pipelines;
-using System.Net.Sockets;
 using System.Threading.Tasks;
 using Pipelines.Sockets.Unofficial;
 
@@ -20,14 +19,14 @@ namespace Kudu.Client.Connection
 
         private readonly SocketConnection _connection;
 
-        public PipeReader Input => _connection.Input;
-
-        public PipeWriter Output => _connection.Output;
-
         public KuduSocketConnection(SocketConnection connection)
         {
             _connection = connection ?? throw new ArgumentNullException(nameof(connection));
         }
+
+        public PipeReader Input => _connection.Input;
+
+        public PipeWriter Output => _connection.Output;
 
         public override string ToString() => _connection.ToString();
 
@@ -36,14 +35,11 @@ namespace Kudu.Client.Connection
             _connection.Dispose();
         }
 
-        public static async Task<KuduSocketConnection> ConnectAsync(HostAndPort hostPort)
+        public static async Task<KuduSocketConnection> ConnectAsync(ServerInfo serverInfo)
         {
-            var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            SocketConnection.SetRecommendedClientOptions(socket);
-            socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
-
-            await socket.ConnectAsync(hostPort.Host, hostPort.Port);
-            var connection = SocketConnection.Create(socket, name: hostPort.ToString());
+            var connection = await SocketConnection.ConnectAsync(
+                serverInfo.Endpoint,
+                name: serverInfo.ToString());
 
             // After the client connects to a server, the client first sends a connection header.
             // The connection header consists of a magic number "hrpc" and three byte flags, for a total of 7 bytes.

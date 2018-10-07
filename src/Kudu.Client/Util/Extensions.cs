@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net;
 using System.Text;
 using Kudu.Client.Connection;
 using Kudu.Client.Protocol;
@@ -38,7 +39,15 @@ namespace Kudu.Client.Util
             // based on some kind of policy. For now just use the first always.
             var hostPort = addresses[0].ToHostAndPort();
 
-            return new ServerInfo(uuid, hostPort);
+            // TODO: Don't do this resolution here.
+            var ipAddresses = Dns.GetHostAddresses(hostPort.Host);
+            if (ipAddresses == null || ipAddresses.Length == 0)
+                throw new Exception($"Failed to resolve the IP of '{hostPort.Host}'");
+
+            var endpoint = new IPEndPoint(ipAddresses[0], hostPort.Port);
+
+            // TODO: Check if address is local.
+            return new ServerInfo(uuid, hostPort, endpoint, false);
         }
     }
 }

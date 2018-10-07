@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Threading.Tasks;
 using Kudu.Client.Builder;
 using Kudu.Client.Connection;
@@ -22,7 +23,7 @@ namespace Kudu.Client
         // TODO: This needs to be thread safe. Lock or ConcurrentDictionary?
         private readonly Dictionary<string, TableLocationsCache> _tableLocations;
 
-        private volatile MasterCache _masterCache;
+        private volatile ServerInfoCache _masterCache;
 
         public KuduClient(KuduClientSettings settings)
         {
@@ -140,7 +141,7 @@ namespace Kudu.Client
 
             var tablet = locationCache.FindTablet(ms.AsSpan());
             var serverInfo = tablet.GetServerInfo(ReplicaSelection.LeaderOnly);
-            var connection = await _connectionCache.CreateConnectionAsync(serverInfo.HostPort);
+            var connection = await _connectionCache.CreateConnectionAsync(serverInfo);
 
             var rpc = new WriteRequest(new WriteRequestPB
             {
@@ -159,11 +160,12 @@ namespace Kudu.Client
 
         private async Task ConnectToClusterAsync()
         {
-            var masters = new List<HostAndPort>(_settings.MasterAddresses.Count);
+            var masters = new List<ServerInfo>(_settings.MasterAddresses.Count);
             int leaderIndex = -1;
             foreach (var master in _settings.MasterAddresses)
             {
-                var connection = await _connectionCache.CreateConnectionAsync(master);
+                var serverInfo = CreateServerInfo("master", master);
+                var connection = await _connectionCache.CreateConnectionAsync(serverInfo);
                 var rpc = new ConnectToMasterRequest();
                 var response = await SendRpcToConnectionAsync(rpc, connection);
 
@@ -172,13 +174,13 @@ namespace Kudu.Client
                     leaderIndex = masters.Count;
                 }
 
-                masters.Add(master);
+                masters.Add(serverInfo);
             }
 
             if (leaderIndex == -1)
                 throw new Exception("Unable to find master leader");
 
-            _masterCache = new MasterCache(masters, leaderIndex);
+            _masterCache = new ServerInfoCache(masters, leaderIndex);
         }
 
         private async Task<K> SendRpcToMasterAsync<T, K>(
@@ -188,7 +190,7 @@ namespace Kudu.Client
             if (_masterCache == null)
                 await ConnectToClusterAsync();
 
-            var master = _masterCache.GetMasterInfo(replicaSelection);
+            var master = _masterCache.GetServerInfo(replicaSelection);
             var connection = await _connectionCache.CreateConnectionAsync(master);
 
             return await SendRpcToConnectionAsync(rpc, connection);
@@ -211,6 +213,18 @@ namespace Kudu.Client
             CallResponse response = await connection.SendReceiveAsync(header, rpc.Request);
 
             return rpc.ParseResponse(response);
+        }
+
+        private ServerInfo CreateServerInfo(string uuid, HostAndPort hostPort)
+        {
+            var ipAddresses = Dns.GetHostAddresses(hostPort.Host);
+            if (ipAddresses == null || ipAddresses.Length == 0)
+                throw new Exception($"Failed to resolve the IP of '{hostPort.Host}'");
+
+            var endpoint = new IPEndPoint(ipAddresses[0], hostPort.Port);
+
+            // TODO: Check if address is local.
+            return new ServerInfo(uuid, hostPort, endpoint, false);
         }
 
         public async Task DisposeAsync()
