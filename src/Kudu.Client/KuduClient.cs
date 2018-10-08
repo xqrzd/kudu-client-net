@@ -160,6 +160,11 @@ namespace Kudu.Client
             return result;
         }
 
+        public ScanBuilder NewScanBuilder(KuduTable table)
+        {
+            return new ScanBuilder(this, table);
+        }
+
         private async Task WaitForTableDoneAsync(byte[] tableId)
         {
             var rpc = new IsCreateTableDoneRequest(new IsCreateTableDoneRequestPB
