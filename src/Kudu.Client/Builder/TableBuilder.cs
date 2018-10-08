@@ -37,12 +37,12 @@ namespace Kudu.Client.Builder
             return this;
         }
 
-        public TableBuilder AddHashPartition(int buckets, params string[] columns)
+        public TableBuilder AddHashPartitions(int buckets, params string[] columns)
         {
-            return AddHashPartition(buckets, 0, columns);
+            return AddHashPartitions(buckets, 0, columns);
         }
 
-        public TableBuilder AddHashPartition(int buckets, uint seed, params string[] columns)
+        public TableBuilder AddHashPartitions(int buckets, uint seed, params string[] columns)
         {
             var partition = new PartitionSchemaPB.HashBucketSchemaPB
             {

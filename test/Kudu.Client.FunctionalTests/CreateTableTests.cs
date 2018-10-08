@@ -32,7 +32,7 @@ namespace Kudu.Client.FunctionalTests
                         column.Type = DataType.String;
                         column.Encoding = EncodingType.DictEncoding;
                     })
-                    .AddHashPartition(buckets: 4, "column_x");
+                    .AddHashPartitions(buckets: 4, "column_x");
 
                 var tableId = await client.CreateTableAsync(table);
 

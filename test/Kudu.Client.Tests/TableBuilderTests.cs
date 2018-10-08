@@ -80,7 +80,7 @@ namespace Kudu.Client.Tests
         public void CanAddHashPartitions()
         {
             var builder = new TableBuilder()
-                .AddHashPartition(5, "a", "b", "c");
+                .AddHashPartitions(5, "a", "b", "c");
 
             CreateTableRequestPB request = builder;
 
