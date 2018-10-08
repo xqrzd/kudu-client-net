@@ -19,8 +19,8 @@ namespace Kudu.Client.Builder
 
         public DataType Type
         {
-            get => Column.Type;
-            set => Column.Type = value;
+            get => (DataType)Column.Type;
+            set => Column.Type = (DataTypePB)value;
         }
 
         public bool IsKey
@@ -49,14 +49,14 @@ namespace Kudu.Client.Builder
 
         public EncodingType Encoding
         {
-            get => Column.Encoding;
-            set => Column.Encoding = value;
+            get => (EncodingType)Column.Encoding;
+            set => Column.Encoding = (EncodingTypePB)value;
         }
 
         public CompressionType Compression
         {
-            get => Column.Compression;
-            set => Column.Compression = value;
+            get => (CompressionType)Column.Compression;
+            set => Column.Compression = (CompressionTypePB)value;
         }
 
         public int CfileBlockSize

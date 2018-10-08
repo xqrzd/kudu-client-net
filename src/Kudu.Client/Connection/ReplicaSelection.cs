@@ -1,4 +1,6 @@
-﻿namespace Kudu.Client.Connection
+﻿using Kudu.Client.Protocol;
+
+namespace Kudu.Client.Connection
 {
     /// <summary>
     /// Policy with which to choose amongst multiple replicas.
@@ -8,10 +10,10 @@
         /// <summary>
         /// Select the LEADER replica.
         /// </summary>
-        LeaderOnly,
+        LeaderOnly = ReplicaSelectionPB.LeaderOnly,
         /// <summary>
         /// Select the closest replica to the client, or a random one if all replicas are equidistant.
         /// </summary>
-        ClosestReplica
+        ClosestReplica = ReplicaSelectionPB.ClosestReplica
     }
 }

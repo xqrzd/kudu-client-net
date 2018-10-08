@@ -101,15 +101,15 @@ namespace Kudu.Client.Protocol.Tserver
         public global::Kudu.Client.Protocol.RowOperationsPB RowOperations { get; set; }
 
         [global::ProtoBuf.ProtoMember(4, Name = @"external_consistency_mode")]
-        [global::System.ComponentModel.DefaultValue(global::Kudu.Client.Protocol.ExternalConsistencyMode.ClientPropagated)]
-        public global::Kudu.Client.Protocol.ExternalConsistencyMode ExternalConsistencyMode
+        [global::System.ComponentModel.DefaultValue(global::Kudu.Client.Protocol.ExternalConsistencyModePB.ClientPropagated)]
+        public global::Kudu.Client.Protocol.ExternalConsistencyModePB ExternalConsistencyMode
         {
-            get { return __pbn__ExternalConsistencyMode ?? global::Kudu.Client.Protocol.ExternalConsistencyMode.ClientPropagated; }
+            get { return __pbn__ExternalConsistencyMode ?? global::Kudu.Client.Protocol.ExternalConsistencyModePB.ClientPropagated; }
             set { __pbn__ExternalConsistencyMode = value; }
         }
         public bool ShouldSerializeExternalConsistencyMode() => __pbn__ExternalConsistencyMode != null;
         public void ResetExternalConsistencyMode() => __pbn__ExternalConsistencyMode = null;
-        private global::Kudu.Client.Protocol.ExternalConsistencyMode? __pbn__ExternalConsistencyMode;
+        private global::Kudu.Client.Protocol.ExternalConsistencyModePB? __pbn__ExternalConsistencyMode;
 
         [global::ProtoBuf.ProtoMember(5, Name = @"propagated_timestamp", DataFormat = global::ProtoBuf.DataFormat.FixedSize)]
         public ulong PropagatedTimestamp
@@ -310,15 +310,15 @@ namespace Kudu.Client.Protocol.Tserver
         public global::System.Collections.Generic.List<global::Kudu.Client.Protocol.ColumnSchemaPB> ProjectedColumns { get; } = new global::System.Collections.Generic.List<global::Kudu.Client.Protocol.ColumnSchemaPB>();
 
         [global::ProtoBuf.ProtoMember(5, Name = @"read_mode")]
-        [global::System.ComponentModel.DefaultValue(global::Kudu.Client.Protocol.ReadMode.ReadLatest)]
-        public global::Kudu.Client.Protocol.ReadMode ReadMode
+        [global::System.ComponentModel.DefaultValue(global::Kudu.Client.Protocol.ReadModePB.ReadLatest)]
+        public global::Kudu.Client.Protocol.ReadModePB ReadMode
         {
-            get { return __pbn__ReadMode ?? global::Kudu.Client.Protocol.ReadMode.ReadLatest; }
+            get { return __pbn__ReadMode ?? global::Kudu.Client.Protocol.ReadModePB.ReadLatest; }
             set { __pbn__ReadMode = value; }
         }
         public bool ShouldSerializeReadMode() => __pbn__ReadMode != null;
         public void ResetReadMode() => __pbn__ReadMode = null;
-        private global::Kudu.Client.Protocol.ReadMode? __pbn__ReadMode;
+        private global::Kudu.Client.Protocol.ReadModePB? __pbn__ReadMode;
 
         [global::ProtoBuf.ProtoMember(6, Name = @"snap_timestamp", DataFormat = global::ProtoBuf.DataFormat.FixedSize)]
         public ulong SnapTimestamp
@@ -352,15 +352,15 @@ namespace Kudu.Client.Protocol.Tserver
         private bool? __pbn__CacheBlocks;
 
         [global::ProtoBuf.ProtoMember(11, Name = @"order_mode")]
-        [global::System.ComponentModel.DefaultValue(global::Kudu.Client.Protocol.OrderMode.Unordered)]
-        public global::Kudu.Client.Protocol.OrderMode OrderMode
+        [global::System.ComponentModel.DefaultValue(global::Kudu.Client.Protocol.OrderModePB.Unordered)]
+        public global::Kudu.Client.Protocol.OrderModePB OrderMode
         {
-            get { return __pbn__OrderMode ?? global::Kudu.Client.Protocol.OrderMode.Unordered; }
+            get { return __pbn__OrderMode ?? global::Kudu.Client.Protocol.OrderModePB.Unordered; }
             set { __pbn__OrderMode = value; }
         }
         public bool ShouldSerializeOrderMode() => __pbn__OrderMode != null;
         public void ResetOrderMode() => __pbn__OrderMode = null;
-        private global::Kudu.Client.Protocol.OrderMode? __pbn__OrderMode;
+        private global::Kudu.Client.Protocol.OrderModePB? __pbn__OrderMode;
 
         [global::ProtoBuf.ProtoMember(12, Name = @"last_primary_key")]
         public byte[] LastPrimaryKey

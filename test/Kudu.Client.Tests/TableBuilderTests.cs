@@ -43,17 +43,17 @@ namespace Kudu.Client.Tests
             Assert.Collection(request.Schema.Columns,
                 c => {
                     Assert.Equal("c1", c.Name);
-                    Assert.Equal(DataType.Int32, c.Type);
+                    Assert.Equal(DataTypePB.Int32, c.Type);
                     Assert.True(c.IsKey);
                     Assert.False(c.IsNullable);
-                    Assert.Equal(EncodingType.AutoEncoding, c.Encoding);
-                    Assert.Equal(CompressionType.DefaultCompression, c.Compression);
+                    Assert.Equal(EncodingTypePB.AutoEncoding, c.Encoding);
+                    Assert.Equal(CompressionTypePB.DefaultCompression, c.Compression);
                     Assert.Null(c.TypeAttributes);
                 },
                 c => {
                     Assert.Equal("c2", c.Name);
-                    Assert.Equal(EncodingType.DictEncoding, c.Encoding);
-                    Assert.Equal(CompressionType.Snappy, c.Compression);
+                    Assert.Equal(EncodingTypePB.DictEncoding, c.Encoding);
+                    Assert.Equal(CompressionTypePB.Snappy, c.Compression);
                 });
         }
 

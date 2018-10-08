@@ -84,15 +84,15 @@ namespace Kudu.Client.Protocol
         private ulong? __pbn__Limit;
 
         [global::ProtoBuf.ProtoMember(10, Name = @"read_mode")]
-        [global::System.ComponentModel.DefaultValue(global::Kudu.Client.Protocol.ReadMode.ReadLatest)]
-        public global::Kudu.Client.Protocol.ReadMode ReadMode
+        [global::System.ComponentModel.DefaultValue(global::Kudu.Client.Protocol.ReadModePB.ReadLatest)]
+        public global::Kudu.Client.Protocol.ReadModePB ReadMode
         {
-            get { return __pbn__ReadMode ?? global::Kudu.Client.Protocol.ReadMode.ReadLatest; }
+            get { return __pbn__ReadMode ?? global::Kudu.Client.Protocol.ReadModePB.ReadLatest; }
             set { __pbn__ReadMode = value; }
         }
         public bool ShouldSerializeReadMode() => __pbn__ReadMode != null;
         public void ResetReadMode() => __pbn__ReadMode = null;
-        private global::Kudu.Client.Protocol.ReadMode? __pbn__ReadMode;
+        private global::Kudu.Client.Protocol.ReadModePB? __pbn__ReadMode;
 
         [global::ProtoBuf.ProtoMember(11, Name = @"snap_timestamp", DataFormat = global::ProtoBuf.DataFormat.FixedSize)]
         public ulong SnapTimestamp
@@ -147,15 +147,15 @@ namespace Kudu.Client.Protocol
         private uint? __pbn__BatchSizeBytes;
 
         [global::ProtoBuf.ProtoMember(16, Name = @"replica_selection")]
-        [global::System.ComponentModel.DefaultValue(global::Kudu.Client.Protocol.ReplicaSelection.LeaderOnly)]
-        public global::Kudu.Client.Protocol.ReplicaSelection ReplicaSelection
+        [global::System.ComponentModel.DefaultValue(global::Kudu.Client.Protocol.ReplicaSelectionPB.LeaderOnly)]
+        public global::Kudu.Client.Protocol.ReplicaSelectionPB ReplicaSelection
         {
-            get { return __pbn__ReplicaSelection ?? global::Kudu.Client.Protocol.ReplicaSelection.LeaderOnly; }
+            get { return __pbn__ReplicaSelection ?? global::Kudu.Client.Protocol.ReplicaSelectionPB.LeaderOnly; }
             set { __pbn__ReplicaSelection = value; }
         }
         public bool ShouldSerializeReplicaSelection() => __pbn__ReplicaSelection != null;
         public void ResetReplicaSelection() => __pbn__ReplicaSelection = null;
-        private global::Kudu.Client.Protocol.ReplicaSelection? __pbn__ReplicaSelection;
+        private global::Kudu.Client.Protocol.ReplicaSelectionPB? __pbn__ReplicaSelection;
 
         [global::ProtoBuf.ProtoMember(17, Name = @"scan_request_timeout_ms")]
         public long ScanRequestTimeoutMs

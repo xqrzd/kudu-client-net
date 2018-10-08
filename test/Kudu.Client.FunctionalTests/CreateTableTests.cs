@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Kudu.Client.Builder;
-using Kudu.Client.Protocol;
 using Xunit;
 
 namespace Kudu.Client.FunctionalTests

@@ -94,10 +94,10 @@ namespace Kudu.Client.Protocol.Cfile
             => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
 
         [global::ProtoBuf.ProtoMember(1, Name = @"data_type", IsRequired = true)]
-        public global::Kudu.Client.Protocol.DataType DataType { get; set; } = global::Kudu.Client.Protocol.DataType.UnknownData;
+        public global::Kudu.Client.Protocol.DataTypePB DataType { get; set; } = global::Kudu.Client.Protocol.DataTypePB.UnknownData;
 
         [global::ProtoBuf.ProtoMember(2, Name = @"encoding", IsRequired = true)]
-        public global::Kudu.Client.Protocol.EncodingType Encoding { get; set; } = global::Kudu.Client.Protocol.EncodingType.UnknownEncoding;
+        public global::Kudu.Client.Protocol.EncodingTypePB Encoding { get; set; } = global::Kudu.Client.Protocol.EncodingTypePB.UnknownEncoding;
 
         [global::ProtoBuf.ProtoMember(3, Name = @"num_values", IsRequired = true)]
         public long NumValues { get; set; }
@@ -109,15 +109,15 @@ namespace Kudu.Client.Protocol.Cfile
         public BTreeInfoPB ValidxInfo { get; set; }
 
         [global::ProtoBuf.ProtoMember(6, Name = @"compression")]
-        [global::System.ComponentModel.DefaultValue(global::Kudu.Client.Protocol.CompressionType.NoCompression)]
-        public global::Kudu.Client.Protocol.CompressionType Compression
+        [global::System.ComponentModel.DefaultValue(global::Kudu.Client.Protocol.CompressionTypePB.NoCompression)]
+        public global::Kudu.Client.Protocol.CompressionTypePB Compression
         {
-            get { return __pbn__Compression ?? global::Kudu.Client.Protocol.CompressionType.NoCompression; }
+            get { return __pbn__Compression ?? global::Kudu.Client.Protocol.CompressionTypePB.NoCompression; }
             set { __pbn__Compression = value; }
         }
         public bool ShouldSerializeCompression() => __pbn__Compression != null;
         public void ResetCompression() => __pbn__Compression = null;
-        private global::Kudu.Client.Protocol.CompressionType? __pbn__Compression;
+        private global::Kudu.Client.Protocol.CompressionTypePB? __pbn__Compression;
 
         [global::ProtoBuf.ProtoMember(7, Name = @"metadata")]
         public global::System.Collections.Generic.List<FileMetadataPairPB> Metadatas { get; } = new global::System.Collections.Generic.List<FileMetadataPairPB>();

@@ -59,7 +59,7 @@ namespace Kudu.Client
             var schema = row.Schema;
             var type = schema.GetColumnType(columnIndex);
 
-            if (type == DataType.String || type == DataType.Binary)
+            if (type == DataTypePB.String || type == DataTypePB.Binary)
             {
                 throw new NotImplementedException();
             }

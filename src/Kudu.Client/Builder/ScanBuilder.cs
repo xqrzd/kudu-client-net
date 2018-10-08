@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Kudu.Client.Connection;
 using Kudu.Client.Protocol;
 
 namespace Kudu.Client.Builder
@@ -8,7 +9,8 @@ namespace Kudu.Client.Builder
         internal KuduClient Client { get; }
         internal KuduTable Table { get; }
         internal List<string> ProjectedColumns { get; }
-        internal ReadMode ReadMode { get; private set; }
+        internal ReadModePB ReadMode { get; private set; }
+        internal ReplicaSelectionPB ReplicaSelection { get; private set; }
         internal int BatchSizeBytes { get; private set; }
 
         public ScanBuilder(KuduClient client, KuduTable table)
@@ -24,9 +26,15 @@ namespace Kudu.Client.Builder
             return this;
         }
 
-        public ScanBuilder SetReadMode(KuduReadMode readMode)
+        public ScanBuilder SetReadMode(ReadMode readMode)
         {
-            ReadMode = (ReadMode)readMode;
+            ReadMode = (ReadModePB)readMode;
+            return this;
+        }
+
+        public ScanBuilder SetReplicaSelection(ReplicaSelection replicaSelection)
+        {
+            ReplicaSelection = (ReplicaSelectionPB)replicaSelection;
             return this;
         }
 

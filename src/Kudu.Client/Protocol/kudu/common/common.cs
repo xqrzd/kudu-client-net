@@ -56,7 +56,7 @@ namespace Kudu.Client.Protocol
         public string Name { get; set; }
 
         [global::ProtoBuf.ProtoMember(3, Name = @"type", IsRequired = true)]
-        public DataType Type { get; set; } = DataType.UnknownData;
+        public DataTypePB Type { get; set; } = DataTypePB.UnknownData;
 
         [global::ProtoBuf.ProtoMember(4, Name = @"is_key")]
         [global::System.ComponentModel.DefaultValue(false)]
@@ -101,26 +101,26 @@ namespace Kudu.Client.Protocol
         private byte[] __pbn__WriteDefaultValue;
 
         [global::ProtoBuf.ProtoMember(8, Name = @"encoding")]
-        [global::System.ComponentModel.DefaultValue(EncodingType.AutoEncoding)]
-        public EncodingType Encoding
+        [global::System.ComponentModel.DefaultValue(EncodingTypePB.AutoEncoding)]
+        public EncodingTypePB Encoding
         {
-            get { return __pbn__Encoding ?? EncodingType.AutoEncoding; }
+            get { return __pbn__Encoding ?? EncodingTypePB.AutoEncoding; }
             set { __pbn__Encoding = value; }
         }
         public bool ShouldSerializeEncoding() => __pbn__Encoding != null;
         public void ResetEncoding() => __pbn__Encoding = null;
-        private EncodingType? __pbn__Encoding;
+        private EncodingTypePB? __pbn__Encoding;
 
         [global::ProtoBuf.ProtoMember(9, Name = @"compression")]
-        [global::System.ComponentModel.DefaultValue(CompressionType.DefaultCompression)]
-        public CompressionType Compression
+        [global::System.ComponentModel.DefaultValue(CompressionTypePB.DefaultCompression)]
+        public CompressionTypePB Compression
         {
-            get { return __pbn__Compression ?? CompressionType.DefaultCompression; }
+            get { return __pbn__Compression ?? CompressionTypePB.DefaultCompression; }
             set { __pbn__Compression = value; }
         }
         public bool ShouldSerializeCompression() => __pbn__Compression != null;
         public void ResetCompression() => __pbn__Compression = null;
-        private CompressionType? __pbn__Compression;
+        private CompressionTypePB? __pbn__Compression;
 
         [global::ProtoBuf.ProtoMember(10, Name = @"cfile_block_size")]
         [global::System.ComponentModel.DefaultValue(0)]
@@ -188,26 +188,26 @@ namespace Kudu.Client.Protocol
         private bool? __pbn__RemoveDefault;
 
         [global::ProtoBuf.ProtoMember(6, Name = @"encoding")]
-        [global::System.ComponentModel.DefaultValue(EncodingType.UnknownEncoding)]
-        public EncodingType Encoding
+        [global::System.ComponentModel.DefaultValue(EncodingTypePB.UnknownEncoding)]
+        public EncodingTypePB Encoding
         {
-            get { return __pbn__Encoding ?? EncodingType.UnknownEncoding; }
+            get { return __pbn__Encoding ?? EncodingTypePB.UnknownEncoding; }
             set { __pbn__Encoding = value; }
         }
         public bool ShouldSerializeEncoding() => __pbn__Encoding != null;
         public void ResetEncoding() => __pbn__Encoding = null;
-        private EncodingType? __pbn__Encoding;
+        private EncodingTypePB? __pbn__Encoding;
 
         [global::ProtoBuf.ProtoMember(7, Name = @"compression")]
-        [global::System.ComponentModel.DefaultValue(CompressionType.UnknownCompression)]
-        public CompressionType Compression
+        [global::System.ComponentModel.DefaultValue(CompressionTypePB.UnknownCompression)]
+        public CompressionTypePB Compression
         {
-            get { return __pbn__Compression ?? CompressionType.UnknownCompression; }
+            get { return __pbn__Compression ?? CompressionTypePB.UnknownCompression; }
             set { __pbn__Compression = value; }
         }
         public bool ShouldSerializeCompression() => __pbn__Compression != null;
         public void ResetCompression() => __pbn__Compression = null;
-        private CompressionType? __pbn__Compression;
+        private CompressionTypePB? __pbn__Compression;
 
         [global::ProtoBuf.ProtoMember(8, Name = @"block_size")]
         public int BlockSize
@@ -528,7 +528,7 @@ namespace Kudu.Client.Protocol
     }
 
     [global::ProtoBuf.ProtoContract()]
-    public enum DataType
+    public enum DataTypePB
     {
         [global::ProtoBuf.ProtoEnum(Name = @"UNKNOWN_DATA")]
         UnknownData = 999,
@@ -573,7 +573,7 @@ namespace Kudu.Client.Protocol
     }
 
     [global::ProtoBuf.ProtoContract()]
-    public enum EncodingType
+    public enum EncodingTypePB
     {
         [global::ProtoBuf.ProtoEnum(Name = @"UNKNOWN_ENCODING")]
         UnknownEncoding = 999,
@@ -594,7 +594,7 @@ namespace Kudu.Client.Protocol
     }
 
     [global::ProtoBuf.ProtoContract()]
-    public enum HmsMode
+    public enum HmsModePB
     {
         [global::ProtoBuf.ProtoEnum(Name = @"NONE")]
         None = 0,
@@ -605,7 +605,7 @@ namespace Kudu.Client.Protocol
     }
 
     [global::ProtoBuf.ProtoContract()]
-    public enum ExternalConsistencyMode
+    public enum ExternalConsistencyModePB
     {
         [global::ProtoBuf.ProtoEnum(Name = @"UNKNOWN_EXTERNAL_CONSISTENCY_MODE")]
         UnknownExternalConsistencyMode = 0,
@@ -616,7 +616,7 @@ namespace Kudu.Client.Protocol
     }
 
     [global::ProtoBuf.ProtoContract()]
-    public enum ReadMode
+    public enum ReadModePB
     {
         [global::ProtoBuf.ProtoEnum(Name = @"UNKNOWN_READ_MODE")]
         UnknownReadMode = 0,
@@ -629,7 +629,7 @@ namespace Kudu.Client.Protocol
     }
 
     [global::ProtoBuf.ProtoContract()]
-    public enum OrderMode
+    public enum OrderModePB
     {
         [global::ProtoBuf.ProtoEnum(Name = @"UNKNOWN_ORDER_MODE")]
         UnknownOrderMode = 0,
@@ -640,7 +640,7 @@ namespace Kudu.Client.Protocol
     }
 
     [global::ProtoBuf.ProtoContract()]
-    public enum ReplicaSelection
+    public enum ReplicaSelectionPB
     {
         [global::ProtoBuf.ProtoEnum(Name = @"UNKNOWN_REPLICA_SELECTION")]
         UnknownReplicaSelection = 0,

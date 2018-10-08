@@ -7,7 +7,7 @@ namespace Kudu.Client.Protocol
 {
 
     [global::ProtoBuf.ProtoContract()]
-    public enum CompressionType
+    public enum CompressionTypePB
     {
         [global::ProtoBuf.ProtoEnum(Name = @"UNKNOWN_COMPRESSION")]
         UnknownCompression = 999,

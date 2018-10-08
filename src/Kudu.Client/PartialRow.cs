@@ -59,7 +59,7 @@ namespace Kudu.Client
                 {
                     var type = Schema.GetColumnType(i);
 
-                    if (type == DataType.String)
+                    if (type == DataTypePB.String)
                     {
                         var str = _varLengthData[i] as string;
                         var len = Encoding.UTF8.GetBytes(str, indirectData);
@@ -68,7 +68,7 @@ namespace Kudu.Client
                         BinaryPrimitives.WriteInt64LittleEndian(buffer.Slice(8), len);
                         varLengthOffset += len;
                     }
-                    else if (type == DataType.Binary)
+                    else if (type == DataTypePB.Binary)
                     {
                         var bin = _varLengthData[i] as byte[];
                         bin.AsSpan().CopyTo(indirectData);

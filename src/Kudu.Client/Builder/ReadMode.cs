@@ -5,7 +5,7 @@ namespace Kudu.Client.Builder
     /// <summary>
     /// The possible read modes for scanners.
     /// </summary>
-    public enum KuduReadMode
+    public enum ReadMode
     {
         /// <summary>
         /// When READ_LATEST is specified the server will always return committed writes at
@@ -16,7 +16,7 @@ namespace Kudu.Client.Builder
         /// 
         /// This is the default mode.
         /// </summary>
-        ReadLatest = ReadMode.ReadLatest,
+        ReadLatest = ReadModePB.ReadLatest,
         /// <summary>
         /// When READ_AT_SNAPSHOT is specified the server will attempt to perform a read
         /// at the provided timestamp. If no timestamp is provided the server will take the
@@ -29,7 +29,7 @@ namespace Kudu.Client.Builder
         /// Read". If all writes to the scanned tablet are made externally consistent,
         /// then this corresponds to Isolation mode "Strict-Serializable".
         /// </summary>
-        ReadAtSnapshot = ReadMode.ReadAtSnapshot,
+        ReadAtSnapshot = ReadModePB.ReadAtSnapshot,
         /// <summary>
         /// When READ_YOUR_WRITES is specified, the client will perform a read
         /// such that it follows all previously known writes and reads from this client.
@@ -41,6 +41,6 @@ namespace Kudu.Client.Builder
         /// they provide the same propagated timestamp bound, can execute at different
         /// timestamps and thus may return different results.
         /// </summary>
-        ReadYourWrites = ReadMode.ReadYourWrites
+        ReadYourWrites = ReadModePB.ReadYourWrites
     }
 }

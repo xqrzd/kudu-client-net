@@ -44,15 +44,15 @@ namespace Kudu.Client.Protocol.Tools
         private bool? __pbn__EnableKerberos;
 
         [global::ProtoBuf.ProtoMember(7, Name = @"hms_mode")]
-        [global::System.ComponentModel.DefaultValue(global::Kudu.Client.Protocol.HmsMode.None)]
-        public global::Kudu.Client.Protocol.HmsMode HmsMode
+        [global::System.ComponentModel.DefaultValue(global::Kudu.Client.Protocol.HmsModePB.None)]
+        public global::Kudu.Client.Protocol.HmsModePB HmsMode
         {
-            get { return __pbn__HmsMode ?? global::Kudu.Client.Protocol.HmsMode.None; }
+            get { return __pbn__HmsMode ?? global::Kudu.Client.Protocol.HmsModePB.None; }
             set { __pbn__HmsMode = value; }
         }
         public bool ShouldSerializeHmsMode() => __pbn__HmsMode != null;
         public void ResetHmsMode() => __pbn__HmsMode = null;
-        private global::Kudu.Client.Protocol.HmsMode? __pbn__HmsMode;
+        private global::Kudu.Client.Protocol.HmsModePB? __pbn__HmsMode;
 
         [global::ProtoBuf.ProtoMember(4, Name = @"cluster_root")]
         [global::System.ComponentModel.DefaultValue("")]

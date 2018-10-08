@@ -39,7 +39,7 @@ namespace Kudu.Client
             {
                 var column = columns[i];
 
-                if (column.Type == DataType.String || column.Type == DataType.Binary)
+                if (column.Type == DataTypePB.String || column.Type == DataTypePB.Binary)
                 {
                     varLenCnt++;
                     // Don't increment size here, these types are stored separately
@@ -77,54 +77,54 @@ namespace Kudu.Client
 
         public int GetColumnSize(int index) => GetTypeSize(GetColumnType(index));
 
-        public DataType GetColumnType(int index) => _schema.Columns[index].Type;
+        public DataTypePB GetColumnType(int index) => _schema.Columns[index].Type;
 
         public bool IsPrimaryKey(int index) => _schema.Columns[index].IsKey;
 
         public int GetColumnIndex(int id) => _columnsById[id];
 
-        public static int GetTypeSize(DataType type)
+        public static int GetTypeSize(DataTypePB type)
         {
             switch (type)
             {
-                case DataType.String:
-                case DataType.Binary:
+                case DataTypePB.String:
+                case DataTypePB.Binary:
                     return 8 + 8; // offset then string length
-                case DataType.Bool:
-                case DataType.Int8:
-                case DataType.Uint8:
+                case DataTypePB.Bool:
+                case DataTypePB.Int8:
+                case DataTypePB.Uint8:
                     return 1;
-                case DataType.Int16:
-                case DataType.Uint16:
+                case DataTypePB.Int16:
+                case DataTypePB.Uint16:
                     return 2;
-                case DataType.Int32:
-                case DataType.Uint32:
-                case DataType.Float:
-                case DataType.Decimal32:
+                case DataTypePB.Int32:
+                case DataTypePB.Uint32:
+                case DataTypePB.Float:
+                case DataTypePB.Decimal32:
                     return 4;
-                case DataType.Int64:
-                case DataType.Uint64:
-                case DataType.Double:
-                case DataType.UnixtimeMicros:
-                case DataType.Decimal64:
+                case DataTypePB.Int64:
+                case DataTypePB.Uint64:
+                case DataTypePB.Double:
+                case DataTypePB.UnixtimeMicros:
+                case DataTypePB.Decimal64:
                     return 8;
-                case DataType.Int128:
-                case DataType.Decimal128:
+                case DataTypePB.Int128:
+                case DataTypePB.Decimal128:
                     return 16;
                 default:
                     throw new ArgumentException();
             }
         }
 
-        public static bool IsSigned(DataType type)
+        public static bool IsSigned(DataTypePB type)
         {
             switch (type)
             {
-                case DataType.Int8:
-                case DataType.Int16:
-                case DataType.Int32:
-                case DataType.Int64:
-                case DataType.Int128:
+                case DataTypePB.Int8:
+                case DataTypePB.Int16:
+                case DataTypePB.Int32:
+                case DataTypePB.Int64:
+                case DataTypePB.Int128:
                     return true;
                 default:
                     return false;

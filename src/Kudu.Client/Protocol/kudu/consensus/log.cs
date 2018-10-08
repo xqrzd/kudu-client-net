@@ -86,15 +86,15 @@ namespace Kudu.Client.Protocol.Log
         private uint? __pbn__SchemaVersion;
 
         [global::ProtoBuf.ProtoMember(9, Name = @"compression_codec")]
-        [global::System.ComponentModel.DefaultValue(global::Kudu.Client.Protocol.CompressionType.NoCompression)]
-        public global::Kudu.Client.Protocol.CompressionType CompressionCodec
+        [global::System.ComponentModel.DefaultValue(global::Kudu.Client.Protocol.CompressionTypePB.NoCompression)]
+        public global::Kudu.Client.Protocol.CompressionTypePB CompressionCodec
         {
-            get { return __pbn__CompressionCodec ?? global::Kudu.Client.Protocol.CompressionType.NoCompression; }
+            get { return __pbn__CompressionCodec ?? global::Kudu.Client.Protocol.CompressionTypePB.NoCompression; }
             set { __pbn__CompressionCodec = value; }
         }
         public bool ShouldSerializeCompressionCodec() => __pbn__CompressionCodec != null;
         public void ResetCompressionCodec() => __pbn__CompressionCodec = null;
-        private global::Kudu.Client.Protocol.CompressionType? __pbn__CompressionCodec;
+        private global::Kudu.Client.Protocol.CompressionTypePB? __pbn__CompressionCodec;
 
         [global::ProtoBuf.ProtoContract()]
         public enum FeatureFlag
