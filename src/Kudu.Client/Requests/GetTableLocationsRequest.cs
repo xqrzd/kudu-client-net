@@ -2,10 +2,8 @@
 
 namespace Kudu.Client.Requests
 {
-    class GetTableLocationsRequest : KuduRpc<GetTableLocationsRequestPB, GetTableLocationsResponsePB>
+    class GetTableLocationsRequest : KuduMasterRpc<GetTableLocationsRequestPB, GetTableLocationsResponsePB>
     {
-        public override string ServiceName => MasterServiceName;
-
         public override string MethodName => "GetTableLocations";
 
         public override GetTableLocationsRequestPB Request { get; }

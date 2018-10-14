@@ -2,10 +2,8 @@
 
 namespace Kudu.Client.Requests
 {
-    class ListTablesRequest : KuduRpc<ListTablesRequestPB, ListTablesResponsePB>
+    class ListTablesRequest : KuduMasterRpc<ListTablesRequestPB, ListTablesResponsePB>
     {
-        public override string ServiceName => MasterServiceName;
-
         public override string MethodName => "ListTables";
 
         public override ListTablesRequestPB Request { get; }

@@ -36,7 +36,7 @@ namespace Kudu.Client
         {
             var rpc = new CreateTableRequest(table);
 
-            var result = await SendRpcToMasterAsync(rpc, ReplicaSelection.LeaderOnly).ConfigureAwait(false);
+            var result = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
 
             // TODO: Handle errors elsewhere?
             if (result.Error != null)
@@ -54,7 +54,7 @@ namespace Kudu.Client
                 NameFilter = nameFilter
             });
 
-            var result = await SendRpcToMasterAsync(rpc, ReplicaSelection.ClosestReplica).ConfigureAwait(false);
+            var result = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
 
             // TODO: Handle errors elsewhere?
             if (result.Error != null)
@@ -73,7 +73,7 @@ namespace Kudu.Client
                 }
             });
 
-            var result = await SendRpcToMasterAsync(rpc, ReplicaSelection.ClosestReplica).ConfigureAwait(false);
+            var result = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
 
             if (result.Error != null)
                 throw new MasterException(result.Error);
@@ -99,7 +99,7 @@ namespace Kudu.Client
                 }
             });
 
-            var result = await SendRpcToMasterAsync(rpc, ReplicaSelection.ClosestReplica).ConfigureAwait(false);
+            var result = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
 
             if (result.Error != null)
                 throw new MasterException(result.Error);
@@ -174,7 +174,7 @@ namespace Kudu.Client
 
             while (true)
             {
-                var result = await SendRpcToMasterAsync(rpc, ReplicaSelection.LeaderOnly).ConfigureAwait(false);
+                var result = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
 
                 if (result.Error != null)
                     throw new MasterException(result.Error);
@@ -212,14 +212,13 @@ namespace Kudu.Client
             _masterCache = new ServerInfoCache(masters, leaderIndex);
         }
 
-        private async Task<K> SendRpcToMasterAsync<T, K>(
-            KuduRpc<T, K> rpc, ReplicaSelection replicaSelection)
+        private async Task<K> SendRpcToMasterAsync<T, K>(KuduMasterRpc<T, K> rpc)
         {
             // TODO: Don't allow this to happen in parallel.
             if (_masterCache == null)
                 await ConnectToClusterAsync().ConfigureAwait(false);
 
-            var master = _masterCache.GetServerInfo(replicaSelection);
+            var master = _masterCache.GetServerInfo(rpc.ReplicaSelection);
             var connection = await _connectionCache.CreateConnectionAsync(master).ConfigureAwait(false);
 
             return await SendRpcToConnectionAsync(rpc, connection).ConfigureAwait(false);

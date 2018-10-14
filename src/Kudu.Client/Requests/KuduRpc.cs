@@ -1,5 +1,4 @@
 ﻿using Kudu.Client.Connection;
-using Kudu.Client.Protocol.Master;
 
 namespace Kudu.Client.Requests
 {
@@ -23,8 +22,10 @@ namespace Kudu.Client.Requests
             }
         }
 
-        internal protected virtual byte[] PartitionKey => null;
+        public virtual ReplicaSelection ReplicaSelection => ReplicaSelection.LeaderOnly;
 
-        internal protected virtual MasterFeatures[] MasterFeatures => null;
+        //internal protected virtual byte[] PartitionKey => null;
+
+        //internal protected virtual MasterFeatures[] MasterFeatures => null;
     }
 }
