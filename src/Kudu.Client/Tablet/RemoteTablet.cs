@@ -71,9 +71,6 @@ namespace Kudu.Client.Tablet
                 tabletLocations.Partition.PartitionKeyEnd,
                 tabletLocations.Partition.HashBuckets);
 
-            var serverInfos = new Dictionary<string, ServerInfo>(
-                tabletLocations.Replicas.Count);
-
             var replicas = new List<ServerInfo>(tabletLocations.Replicas.Count);
             int leaderIndex = -1;
 
