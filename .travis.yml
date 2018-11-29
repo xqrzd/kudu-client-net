@@ -18,5 +18,4 @@ install:
 
 script:
   - dotnet build --configuration Release
-  - dotnet test --no-restore --no-build --configuration Release test/Kudu.Client.Tests
-  - dotnet test --no-restore --no-build --configuration Release test/Kudu.Client.FunctionalTests
+  - dotnet test --no-restore --no-build --configuration Release
