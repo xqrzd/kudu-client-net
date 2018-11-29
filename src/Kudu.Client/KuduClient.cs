@@ -20,7 +20,6 @@ namespace Kudu.Client
     {
         private readonly KuduClientSettings _settings;
         private readonly ConnectionCache _connectionCache;
-        // TODO: This needs to be thread safe. Lock or ConcurrentDictionary?
         private readonly Dictionary<string, TableLocationsCache> _tableLocations;
 
         private volatile ServerInfoCache _masterCache;
@@ -63,14 +62,16 @@ namespace Kudu.Client
             return result.Tables;
         }
 
-        public async Task<List<RemoteTablet>> GetTableLocationsAsync(byte[] tableId)
+        public async Task<List<RemoteTablet>> GetTableLocationsAsync(
+            string tableId, byte[] partitionKey, uint fetchBatchSize)
         {
+            // TODO: rate-limit master lookups.
+
             var rpc = new GetTableLocationsRequest(new GetTableLocationsRequestPB
             {
-                Table = new TableIdentifierPB
-                {
-                    TableId = tableId
-                }
+                Table = new TableIdentifierPB { TableId = tableId.ToUtf8ByteArray() },
+                PartitionKeyStart = partitionKey,
+                MaxReturnedLocations = fetchBatchSize
             });
 
             var result = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
@@ -82,7 +83,7 @@ namespace Kudu.Client
 
             foreach (var tabletLocation in result.TabletLocations)
             {
-                var tablet = RemoteTablet.FromTabletLocations(tableId.ToStringUtf8(), tabletLocation);
+                var tablet = RemoteTablet.FromTabletLocations(tableId, tabletLocation);
                 tabletLocations.Add(tablet);
             }
 
@@ -132,18 +133,9 @@ namespace Kudu.Client
                 IndirectData = indirectData
             };
 
-            // TODO: This implementation is not complete.
-            if (!_tableLocations.TryGetValue(table.Schema.TableName, out var locationCache))
-            {
-                // Find the tablet to send this write to.
-                var locations = await GetTableLocationsAsync(table.Schema.TableId).ConfigureAwait(false);
-                locationCache = new TableLocationsCache(locations);
-                _tableLocations[table.Schema.TableName] = locationCache;
-            }
-
-            var tablet = locationCache.FindTablet(ms.AsSpan());
-            var serverInfo = tablet.GetServerInfo(ReplicaSelection.LeaderOnly);
-            var connection = await _connectionCache.CreateConnectionAsync(serverInfo).ConfigureAwait(false);
+            var tablet = await LookupTabletAsync(table.Schema.TableId.ToStringUtf8(), ms.ToArray()).ConfigureAwait(false);
+            var server = tablet.GetServerInfo(ReplicaSelection.LeaderOnly);
+            var connection = await _connectionCache.CreateConnectionAsync(server).ConfigureAwait(false);
 
             var rpc = new WriteRequest(new WriteRequestPB
             {
@@ -241,6 +233,63 @@ namespace Kudu.Client
             CallResponse response = await connection.SendReceiveAsync(header, rpc.Request).ConfigureAwait(false);
 
             return rpc.ParseResponse(response);
+        }
+
+        private ValueTask<RemoteTablet> LookupTabletAsync(string tableId, byte[] partitionKey)
+        {
+            var tablet = FindTabletFromCache(tableId, partitionKey);
+            if (tablet != null)
+            {
+                return new ValueTask<RemoteTablet>(tablet);
+            }
+
+            return LookupTabletSlow(tableId, partitionKey);
+        }
+
+        private async ValueTask<RemoteTablet> LookupTabletSlow(string tableId, byte[] partitionKey)
+        {
+            // TODO: Move to constant.
+            var tablets = await GetTableLocationsAsync(tableId, partitionKey, 10).ConfigureAwait(false);
+
+            CacheTablets(tableId, tablets, partitionKey);
+
+            var tablet = FindTabletFromCache(tableId, partitionKey);
+
+            if (tablet == null)
+                throw new Exception("Partition range does not exist");
+
+            return tablet;
+        }
+
+        private RemoteTablet FindTabletFromCache(string tableId, byte[] partitionKey)
+        {
+            RemoteTablet tablet = null;
+
+            lock (_tableLocations)
+            {
+                if (_tableLocations.TryGetValue(tableId, out var cache))
+                {
+                    tablet = cache.FindTablet(partitionKey);
+                }
+            }
+
+            return tablet;
+        }
+
+        private void CacheTablets(string tableId, List<RemoteTablet> tablets, ReadOnlySpan<byte> partitionKey)
+        {
+            TableLocationsCache cache;
+
+            lock (_tableLocations)
+            {
+                if (!_tableLocations.TryGetValue(tableId, out cache))
+                {
+                    cache = new TableLocationsCache();
+                    _tableLocations.Add(tableId, cache);
+                }
+            }
+
+            cache.CacheTabletLocations(tablets, partitionKey);
         }
 
         private ServerInfo CreateServerInfo(string uuid, HostAndPort hostPort)

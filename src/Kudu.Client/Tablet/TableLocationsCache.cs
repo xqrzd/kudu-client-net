@@ -1,37 +1,120 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
+using Kudu.Client.Internal;
 
 namespace Kudu.Client.Tablet
 {
-    public class TableLocationsCache
+    /// <summary>
+    /// A cache of the tablet locations in a table, keyed by partition key. Unlike the
+    /// Java client, we don't store non-covered ranges. If FindTablet returns null, it
+    /// could mean the tablet doesn't exist, or hasn't been cached yet. A master must
+    /// be contacted to make a determination.
+    /// </summary>
+    public class TableLocationsCache : IDisposable
     {
-        // TODO: Replace this with a tree, or at least a sorted list with binarch search.
-        // This implementation is extremely inefficient.
-        private readonly List<RemoteTablet> _tablets;
+        private readonly AvlTree _cache;
+        private readonly ReaderWriterLockSlim _lock;
 
-        public TableLocationsCache(List<RemoteTablet> tablets)
+        public TableLocationsCache()
         {
-            _tablets = tablets;
+            _cache = new AvlTree();
+            _lock = new ReaderWriterLockSlim();
         }
 
+        /// <summary>
+        /// Retrieves the tablet that the given partition key should go to, or null if
+        /// a tablet couldn't be found.
+        /// </summary>
+        /// <param name="partitionKey">The partition key to look up.</param>
         public RemoteTablet FindTablet(ReadOnlySpan<byte> partitionKey)
         {
-            for (int i = 0; i < _tablets.Count; i++)
+            RemoteTablet tablet;
+            _lock.EnterReadLock();
+            try
             {
-                var start = _tablets[i].Partition.PartitionKeyStart;
-                var end = _tablets[i].Partition.PartitionKeyEnd;
-                var isEnd = _tablets[i].Partition.IsEndPartition;
-
-                var compareStart = partitionKey.SequenceCompareTo(start);
-                var compareEnd = partitionKey.SequenceCompareTo(end);
-
-                if (compareStart >= 0 && (compareEnd < 0 || isEnd))
-                {
-                    return _tablets[i];
-                }
+                tablet = _cache.GetFloorEntry(partitionKey);
+                Console.WriteLine("Writing to " + tablet);
+            }
+            finally
+            {
+                _lock.ExitReadLock();
             }
 
-            throw new Exception("Unable to find tablet");
+            if (tablet != null && (!tablet.Partition.IsEndPartition &&
+                partitionKey.SequenceCompareTo(tablet.Partition.PartitionKeyEnd) >= 0))
+            {
+                // The requested partition key is outside the bounds of this tablet.
+                tablet = null;
+            }
+
+            return tablet;
+        }
+
+        public void CacheTabletLocations(
+            List<RemoteTablet> tablets,
+            ReadOnlySpan<byte> requestPartitionKey)
+        {
+            if (tablets.Count == 0)
+            {
+                // If there are no tablets in the response, then the table is empty. If
+                // there were any tablets in the table they would have been returned, since
+                // the master guarantees that if the partition key falls in a non-covered
+                // range, the previous tablet will be returned, and we did not set an upper
+                // bound partition key on the request.
+                ClearCache();
+            }
+            else
+            {
+                var newEntries = tablets;
+
+                byte[] discoveredlowerBound = newEntries[0].Partition.PartitionKeyStart;
+                byte[] discoveredUpperBound = newEntries[newEntries.Count - 1].Partition.PartitionKeyEnd;
+
+                _lock.EnterWriteLock();
+                try
+                {
+                    // Remove all existing overlapping entries, and add the new entries.
+                    RemoteTablet floorEntry = _cache.GetFloorEntry(discoveredlowerBound);
+
+                    if (floorEntry != null && requestPartitionKey.SequenceCompareTo(
+                        floorEntry.Partition.PartitionKeyEnd) < 0)
+                    {
+                        // TODO: Comment this.
+                        discoveredlowerBound = floorEntry.Partition.PartitionKeyStart;
+                    }
+
+                    _cache.ClearRange(discoveredlowerBound, discoveredUpperBound);
+
+                    foreach (var entry in tablets)
+                    {
+                        Console.WriteLine($"Caching {entry}");
+                        _cache.Insert(entry);
+                    }
+                }
+                finally
+                {
+                    _lock.ExitWriteLock();
+                }
+            }
+        }
+
+        public void ClearCache()
+        {
+            _lock.EnterWriteLock();
+            try
+            {
+                _cache.Clear();
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
+        }
+
+        public void Dispose()
+        {
+            _lock.Dispose();
         }
     }
 }

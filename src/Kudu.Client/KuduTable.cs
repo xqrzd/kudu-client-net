@@ -6,30 +6,34 @@ namespace Kudu.Client
     {
         // TODO: Create a managed class for this.
         public GetTableSchemaResponsePB Schema { get; }
+        //public Schema Schema { get; }
+        private readonly Schema _schema;
 
         public KuduTable(GetTableSchemaResponsePB schema)
         {
-            Schema = schema;
+            var s = new Schema(schema);
+            Schema = s.TableSchema;
+            _schema = s;
         }
 
         public PartialRow NewInsert()
         {
-            return new PartialRow(new Schema(Schema.Schema, Schema), Protocol.RowOperationsPB.Type.Insert);
+            return new PartialRow(_schema, Protocol.RowOperationsPB.Type.Insert);
         }
 
         public PartialRow NewUpdate()
         {
-            return new PartialRow(new Schema(Schema.Schema, Schema), Protocol.RowOperationsPB.Type.Update);
+            return new PartialRow(_schema, Protocol.RowOperationsPB.Type.Update);
         }
 
         public PartialRow NewUpsert()
         {
-            return new PartialRow(new Schema(Schema.Schema, Schema), Protocol.RowOperationsPB.Type.Upsert);
+            return new PartialRow(_schema, Protocol.RowOperationsPB.Type.Upsert);
         }
 
         public PartialRow NewDelete()
         {
-            return new PartialRow(new Schema(Schema.Schema, Schema), Protocol.RowOperationsPB.Type.Upsert);
+            return new PartialRow(_schema, Protocol.RowOperationsPB.Type.Delete);
         }
     }
 }

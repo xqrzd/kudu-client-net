@@ -23,8 +23,9 @@ namespace Kudu.Client
 
         public bool HasNullableColumns { get; }
 
-        public Schema(SchemaPB schema, GetTableSchemaResponsePB tableSchema)
+        public Schema(GetTableSchemaResponsePB tableSchema)
         {
+            var schema = tableSchema.Schema;
             TableSchema = tableSchema;
             var columns = schema.Columns;
 
