@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Kudu.Client.Builder;
+using Kudu.Client.Util;
 using Xunit;
 
 namespace Kudu.Client.FunctionalTests
@@ -42,7 +43,7 @@ namespace Kudu.Client.FunctionalTests
                 Assert.Contains(tables,
                     t => t.Id.AsSpan().SequenceEqual(tableId));
 
-                var tabletLocations = await client.GetTableLocationsAsync(tableId, null, 10);
+                var tabletLocations = await client.GetTableLocationsAsync(tableId.ToStringUtf8(), null, 10);
 
                 Assert.Equal(4, tabletLocations.Count);
                 // TODO: Add asserts for tabletLocations contents.
