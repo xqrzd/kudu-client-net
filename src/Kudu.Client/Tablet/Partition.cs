@@ -22,11 +22,6 @@ namespace Kudu.Client.Tablet
         /// </summary>
         private const int EncodedBucketSize = 4;
 
-        /// <summary>
-        /// True if the partition is the absolute end partition.
-        /// </summary>
-        public bool IsEndPartition => PartitionKeyEnd.Length == 0;
-
         public byte[] PartitionKeyStart { get; }
 
         public byte[] PartitionKeyEnd { get; }
@@ -43,10 +38,7 @@ namespace Kudu.Client.Tablet
         /// <param name="partitionKeyStart">The start partition key.</param>
         /// <param name="partitionKeyEnd">The end partition key.</param>
         /// <param name="hashBuckets">The partition hash buckets.</param>
-        public Partition(
-            byte[] partitionKeyStart,
-            byte[] partitionKeyEnd,
-            int[] hashBuckets)
+        public Partition(byte[] partitionKeyStart, byte[] partitionKeyEnd, int[] hashBuckets)
         {
             PartitionKeyStart = partitionKeyStart ?? Array.Empty<byte>();
             PartitionKeyEnd = partitionKeyEnd ?? Array.Empty<byte>();
@@ -55,6 +47,16 @@ namespace Kudu.Client.Tablet
             RangeKeyStart = RangeKey(PartitionKeyStart, HashBuckets.Length);
             RangeKeyEnd = RangeKey(PartitionKeyEnd, HashBuckets.Length);
         }
+
+        /// <summary>
+        /// True if the partition is the start partition.
+        /// </summary>
+        public bool IsStartPartition => PartitionKeyStart.Length == 0;
+
+        /// <summary>
+        /// True if the partition is the absolute end partition.
+        /// </summary>
+        public bool IsEndPartition => PartitionKeyEnd.Length == 0;
 
         /// <summary>
         /// Returns the range key portion of a partition key given the
@@ -125,8 +127,8 @@ namespace Kudu.Client.Tablet
 
         public override string ToString()
         {
-            var start = PartitionKeyStart.Length == 0 ? "<start>" : BitConverter.ToString(PartitionKeyStart);
-            var end = PartitionKeyEnd.Length == 0 ? "<end>" : BitConverter.ToString(PartitionKeyEnd);
+            var start = IsStartPartition ? "<start>" : BitConverter.ToString(PartitionKeyStart);
+            var end = IsEndPartition ? "<end>" : BitConverter.ToString(PartitionKeyEnd);
 
             return $"[{start}, {end})";
         }
