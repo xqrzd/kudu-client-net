@@ -28,22 +28,13 @@ using Kudu.Client.Tablet;
 
 namespace Kudu.Client.Internal
 {
-    public class AvlTree : IEnumerable<AvlNode>
+    public class AvlTree : IEnumerable<RemoteTablet>
     {
         private AvlNode _root;
 
-        public AvlNode Root
+        public IEnumerator<RemoteTablet> GetEnumerator()
         {
-            get
-            {
-                return _root;
-            }
-        }
-
-        public IEnumerator<AvlNode> GetEnumerator()
-        {
-            throw new NotImplementedException();
-            //return new AvlNodeEnumerator<TKey, TValue>(_root);
+            return new AvlNodeEnumerator(_root);
         }
 
         public bool Search(ReadOnlySpan<byte> partitionKey, out RemoteTablet value)
@@ -573,10 +564,10 @@ namespace Kudu.Client.Internal
             }
         }
 
-        public void ClearRange(ReadOnlySpan<byte> from, ReadOnlySpan<byte> to)
+        public void ClearRange(ReadOnlySpan<byte> from, ReadOnlySpan<byte> to, bool upperBoundActive)
         {
             var results = new List<byte[]>();
-            GetInRange(_root, from, to, results);
+            GetInRange(_root, from, to, upperBoundActive, results);
 
             foreach (var result in results)
             {
@@ -584,111 +575,84 @@ namespace Kudu.Client.Internal
             }
         }
 
-        private void GetInRange(AvlNode node,
-            ReadOnlySpan<byte> min, ReadOnlySpan<byte> max, List<byte[]> results)
+        private static void GetInRange(AvlNode node,
+            ReadOnlySpan<byte> min, ReadOnlySpan<byte> max,
+            bool upperBoundActive, List<byte[]> results)
         {
             if (node == null)
                 return;
 
             int compare1 = min.SequenceCompareTo(node.Tablet.Partition.PartitionKeyStart);
-            int compare2 = max.SequenceCompareTo(node.Tablet.Partition.PartitionKeyStart);
+            int compare2 = upperBoundActive ? max.SequenceCompareTo(node.Tablet.Partition.PartitionKeyStart) : 1;
 
-            /* Since the desired o/p is sorted, recurse for left subtree first 
-             If root->data is greater than k1, then only we can get o/p keys 
-             in left subtree */
             if (compare1 < 0)
             {
-                GetInRange(node.Left, min, max, results);
+                GetInRange(node.Left, min, max, upperBoundActive, results);
             }
 
-            /* if root's data lies in range, then prints root's data */
             if (compare1 <= 0 && compare2 > 0)
             {
-                //Console.WriteLine(node.Key);
                 results.Add(node.Tablet.Partition.PartitionKeyStart);
             }
 
-            /* If root->data is smaller than k2, then only we can get o/p keys 
-             in right subtree */
             if (compare2 > 0)
             {
-                GetInRange(node.Right, min, max, results);
+                GetInRange(node.Right, min, max, upperBoundActive, results);
             }
         }
-
-        //private AvlNode FindRange(ReadOnlySpan<byte> from, ReadOnlySpan<byte> to)
-        //{
-        //    AvlNode node = _root;
-
-        //    while (node != null)
-        //    {
-        //        if (from.SequenceCompareTo(node.Tablet.Partition.PartitionKeyStart) > 0)
-        //        {
-        //            node = node.Right;
-        //        }
-        //        else
-        //        {
-        //            if (to.SequenceCompareTo(node.Tablet.Partition.PartitionKeyStart) < 0)
-        //            {
-        //                node = node.Left;
-        //            }
-        //            else
-        //            {
-        //                return node;
-        //            }
-        //        }
-        //    }
-
-        //    return null;
-        //}
 
         public void Clear()
         {
             _root = null;
         }
 
-        public RemoteTablet GetFloorEntry(ReadOnlySpan<byte> partitionKey)
+        public RemoteTablet GetFloor(ReadOnlySpan<byte> partitionKey)
         {
-            AvlNode node = GetFloorEntryInternal(partitionKey);
+            AvlNode node = GetFloor(_root, partitionKey);
             return node == null ? default : node.Tablet;
         }
 
-        private AvlNode GetFloorEntryInternal(ReadOnlySpan<byte> partitionKey)
+        private static AvlNode GetFloor(AvlNode node, ReadOnlySpan<byte> partitionKey)
         {
-            AvlNode p = _root;
-
-            while (p != null)
+            while (node != null)
             {
-                int cmp = partitionKey.SequenceCompareTo(p.Tablet.Partition.PartitionKeyStart);
-                if (cmp > 0)
+                int compare = partitionKey.SequenceCompareTo(node.Tablet.Partition.PartitionKeyStart);
+
+                if (compare > 0)
                 {
-                    if (p.Right != null)
-                        p = p.Right;
-                    else
-                        return p;
-                }
-                else if (cmp < 0)
-                {
-                    if (p.Left != null)
+                    if (node.Right != null)
                     {
-                        p = p.Left;
+                        node = node.Right;
                     }
                     else
                     {
-                        AvlNode parent = p.Parent;
-                        AvlNode ch = p;
-                        while (parent != null && ch == parent.Left)
+                        return node;
+                    }
+                }
+                else if (compare < 0)
+                {
+                    if (node.Left != null)
+                    {
+                        node = node.Left;
+                    }
+                    else
+                    {
+                        AvlNode parent = node.Parent;
+                        AvlNode child = node;
+                        while (parent != null && child == parent.Left)
                         {
-                            ch = parent;
+                            child = parent;
                             parent = parent.Parent;
                         }
                         return parent;
                     }
                 }
                 else
-                    return p;
-
+                {
+                    return node;
+                }
             }
+
             return null;
         }
 
@@ -718,6 +682,107 @@ namespace Kudu.Client.Internal
         IEnumerator IEnumerable.GetEnumerator()
         {
             return GetEnumerator();
+        }
+
+        private sealed class AvlNode
+        {
+            public AvlNode Parent;
+            public AvlNode Left;
+            public AvlNode Right;
+            //public TKey Key;
+            //public TValue Value;
+            public int Balance;
+
+            public RemoteTablet Tablet;
+        }
+
+        private sealed class AvlNodeEnumerator : IEnumerator<RemoteTablet>
+        {
+            private readonly AvlNode _root;
+            private Action _action;
+            private AvlNode _current;
+            private AvlNode _right;
+
+            public AvlNodeEnumerator(AvlNode root)
+            {
+                _right = _root = root;
+                _action = _root == null ? Action.End : Action.Right;
+            }
+
+            public bool MoveNext()
+            {
+                switch (_action)
+                {
+                    case Action.Right:
+                        _current = _right;
+
+                        while (_current.Left != null)
+                        {
+                            _current = _current.Left;
+                        }
+
+                        _right = _current.Right;
+                        _action = _right != null ? Action.Right : Action.Parent;
+
+                        return true;
+
+                    case Action.Parent:
+                        while (_current.Parent != null)
+                        {
+                            AvlNode previous = _current;
+
+                            _current = _current.Parent;
+
+                            if (_current.Left == previous)
+                            {
+                                _right = _current.Right;
+                                _action = _right != null ? Action.Right : Action.Parent;
+
+                                return true;
+                            }
+                        }
+
+                        _action = Action.End;
+
+                        return false;
+
+                    default:
+                        return false;
+                }
+            }
+
+            public void Reset()
+            {
+                _right = _root;
+                _action = _root == null ? Action.End : Action.Right;
+            }
+
+            public RemoteTablet Current
+            {
+                get
+                {
+                    return _current.Tablet;
+                }
+            }
+
+            object IEnumerator.Current
+            {
+                get
+                {
+                    return Current;
+                }
+            }
+
+            public void Dispose()
+            {
+            }
+
+            enum Action
+            {
+                Parent,
+                Right,
+                End
+            }
         }
     }
 }

@@ -33,8 +33,7 @@ namespace Kudu.Client.Tablet
             _lock.EnterReadLock();
             try
             {
-                tablet = _cache.GetFloorEntry(partitionKey);
-                Console.WriteLine("Writing to " + tablet);
+                tablet = _cache.GetFloor(partitionKey);
             }
             finally
             {
@@ -66,31 +65,27 @@ namespace Kudu.Client.Tablet
             }
             else
             {
-                var newEntries = tablets;
-
-                byte[] discoveredlowerBound = newEntries[0].Partition.PartitionKeyStart;
-                byte[] discoveredUpperBound = newEntries[newEntries.Count - 1].Partition.PartitionKeyEnd;
+                byte[] discoveredlowerBound = tablets[0].Partition.PartitionKeyStart;
+                byte[] discoveredUpperBound = tablets[tablets.Count - 1].Partition.PartitionKeyEnd;
 
                 _lock.EnterWriteLock();
                 try
                 {
                     // Remove all existing overlapping entries, and add the new entries.
-                    RemoteTablet floorEntry = _cache.GetFloorEntry(discoveredlowerBound);
+                    RemoteTablet floorEntry = _cache.GetFloor(discoveredlowerBound);
 
                     if (floorEntry != null && requestPartitionKey.SequenceCompareTo(
                         floorEntry.Partition.PartitionKeyEnd) < 0)
                     {
-                        // TODO: Comment this.
+                        // A new partition now covers part of an old partition.
                         discoveredlowerBound = floorEntry.Partition.PartitionKeyStart;
                     }
 
-                    _cache.ClearRange(discoveredlowerBound, discoveredUpperBound);
+                    bool upperBoundActive = discoveredUpperBound.Length > 0;
+                    _cache.ClearRange(discoveredlowerBound, discoveredUpperBound, upperBoundActive);
 
                     foreach (var entry in tablets)
-                    {
-                        Console.WriteLine($"Caching {entry}");
                         _cache.Insert(entry);
-                    }
                 }
                 finally
                 {
