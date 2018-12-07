@@ -12,7 +12,7 @@ namespace Kudu.Client.Negotiate
             var passwordLength = Encoding.UTF8.GetByteCount(credentials.Password);
 
             var token = new byte[usernameLength + passwordLength + 2];
-            var span = token.AsSpan().Slice(1); // Skip authorization identity.
+            var span = token.AsSpan(1); // Skip authorization identity.
 
             Encoding.UTF8.GetBytes(credentials.UserName, span);
             Encoding.UTF8.GetBytes(credentials.Password, span.Slice(usernameLength + 1));
