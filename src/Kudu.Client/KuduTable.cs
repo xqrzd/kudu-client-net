@@ -4,17 +4,16 @@ namespace Kudu.Client
 {
     public class KuduTable
     {
-        // TODO: Create a managed class for this.
-        public GetTableSchemaResponsePB Schema { get; }
-        //public Schema Schema { get; }
         private readonly Schema _schema;
 
-        public KuduTable(GetTableSchemaResponsePB schema)
+        public KuduTable(GetTableSchemaResponsePB schemaPb)
         {
-            var s = new Schema(schema);
-            Schema = s.TableSchema;
-            _schema = s;
+            _schema = new Schema(schemaPb.Schema);
+            SchemaPb = schemaPb;
         }
+
+        // TODO: Create a managed class for this.
+        public GetTableSchemaResponsePB SchemaPb { get; }
 
         public PartialRow NewInsert()
         {

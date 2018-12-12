@@ -1,14 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using Kudu.Client.Protocol;
-using Kudu.Client.Protocol.Master;
 
 namespace Kudu.Client
 {
     public class Schema
     {
-        public GetTableSchemaResponsePB TableSchema { get; }
-
         // TODO: Create a managed class for this?
         private readonly SchemaPB _schema;
         private readonly Dictionary<string, int> _columnsByName;
@@ -23,10 +20,8 @@ namespace Kudu.Client
 
         public bool HasNullableColumns { get; }
 
-        public Schema(GetTableSchemaResponsePB tableSchema)
+        public Schema(SchemaPB schema)
         {
-            var schema = tableSchema.Schema;
-            TableSchema = tableSchema;
             var columns = schema.Columns;
 
             var size = 0;
@@ -90,7 +85,7 @@ namespace Kudu.Client
             {
                 case DataTypePB.String:
                 case DataTypePB.Binary:
-                    return 8 + 8; // offset then string length
+                    return 8 + 8; // Offset then string length.
                 case DataTypePB.Bool:
                 case DataTypePB.Int8:
                 case DataTypePB.Uint8:

@@ -125,7 +125,7 @@ namespace Kudu.Client
             row.WriteTo(rows, indirectData);
 
             var ms = new RecyclableMemoryStream();
-            KeyEncoder.EncodePartitionKey(row, table.Schema.PartitionSchema, ms);
+            KeyEncoder.EncodePartitionKey(row, table.SchemaPb.PartitionSchema, ms);
 
             var rowOperations = new Protocol.RowOperationsPB
             {
@@ -133,14 +133,14 @@ namespace Kudu.Client
                 IndirectData = indirectData
             };
 
-            var tablet = await LookupTabletAsync(table.Schema.TableId.ToStringUtf8(), ms.ToArray()).ConfigureAwait(false);
+            var tablet = await LookupTabletAsync(table.SchemaPb.TableId.ToStringUtf8(), ms.ToArray()).ConfigureAwait(false);
             var server = tablet.GetServerInfo(ReplicaSelection.LeaderOnly);
             var connection = await _connectionCache.CreateConnectionAsync(server).ConfigureAwait(false);
 
             var rpc = new WriteRequest(new WriteRequestPB
             {
                 TabletId = tablet.TabletId.ToUtf8ByteArray(),
-                Schema = table.Schema.Schema,
+                Schema = table.SchemaPb.Schema,
                 RowOperations = rowOperations
             });
 
