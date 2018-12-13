@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using Kudu.Client.Connection;
 using Kudu.Client.Protocol;
@@ -44,7 +45,22 @@ namespace Kudu.Client.Util
             if (ipAddresses == null || ipAddresses.Length == 0)
                 throw new Exception($"Failed to resolve the IP of '{hostPort.Host}'");
 
-            var endpoint = new IPEndPoint(ipAddresses[0], hostPort.Port);
+            var ipAddress = ipAddresses[0];
+            if (ipAddress.AddressFamily != AddressFamily.InterNetwork)
+            {
+                // Prefer an IPv4 address.
+                for (int i = 1; i < ipAddresses.Length; i++)
+                {
+                    var newAddress = ipAddresses[i];
+                    if (newAddress.AddressFamily == AddressFamily.InterNetwork)
+                    {
+                        ipAddress = newAddress;
+                        break;
+                    }
+                }
+            }
+
+            var endpoint = new IPEndPoint(ipAddress, hostPort.Port);
 
             // TODO: Check if address is local.
             return new ServerInfo(uuid, hostPort, endpoint, false);
