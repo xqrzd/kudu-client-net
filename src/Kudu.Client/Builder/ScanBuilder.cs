@@ -12,6 +12,7 @@ namespace Kudu.Client.Builder
         internal ReadModePB ReadMode { get; private set; }
         internal ReplicaSelectionPB ReplicaSelection { get; private set; }
         internal int BatchSizeBytes { get; private set; }
+        internal int Limit { get; private set; }
 
         public ScanBuilder(KuduClient client, KuduTable table)
         {
@@ -41,6 +42,12 @@ namespace Kudu.Client.Builder
         public ScanBuilder SetBatchSizeBytes(int batchSizeBytes)
         {
             BatchSizeBytes = batchSizeBytes;
+            return this;
+        }
+
+        public ScanBuilder SetLimit(int limit)
+        {
+            Limit = limit;
             return this;
         }
 
