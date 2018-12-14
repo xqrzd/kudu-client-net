@@ -17,6 +17,13 @@ namespace Kudu.Client
 {
     public class KuduClient : IDisposable
     {
+        /// <summary>
+        /// The number of tablets to fetch from the master in a round trip when
+        /// performing a lookup of a single partition (e.g. for a write), or
+        /// re-looking-up a tablet with stale information.
+        /// </summary>
+        private const int FetchTabletsPerPointLookup = 10;
+
         private readonly KuduClientSettings _settings;
         private readonly ConnectionCache _connectionCache;
         private readonly Dictionary<string, TableLocationsCache> _tableLocations;
@@ -132,7 +139,8 @@ namespace Kudu.Client
                 IndirectData = indirectData
             };
 
-            var tablet = await LookupTabletAsync(table.SchemaPb.TableId.ToStringUtf8(), ms.ToArray()).ConfigureAwait(false);
+            var tablet = await GetTabletAsync(table.SchemaPb.TableId.ToStringUtf8(), ms.ToArray()).ConfigureAwait(false);
+            // TODO: Check that tablet exists.
             var server = tablet.GetServerInfo(ReplicaSelection.LeaderOnly);
             var connection = await _connectionCache.CreateConnectionAsync(server).ConfigureAwait(false);
 
@@ -234,47 +242,66 @@ namespace Kudu.Client
             return rpc.ParseResponse(response);
         }
 
-        private ValueTask<RemoteTablet> LookupTabletAsync(string tableId, byte[] partitionKey)
+        /// <summary>
+        /// Locates a tablet by consulting the table location cache, then by contacting
+        /// a master if we haven't seen the tablet before. The results are cached.
+        /// </summary>
+        /// <param name="tableId">The table identifier.</param>
+        /// <param name="partitionKey">The partition key.</param>
+        /// <returns>The requested tablet, or null if the tablet doesn't exist.</returns>
+        private ValueTask<RemoteTablet> GetTabletAsync(string tableId, byte[] partitionKey)
         {
-            var tablet = FindTabletFromCache(tableId, partitionKey);
+            var tablet = GetTabletFromCache(tableId, partitionKey);
+
             if (tablet != null)
-            {
                 return new ValueTask<RemoteTablet>(tablet);
-            }
 
-            return LookupTabletSlow(tableId, partitionKey);
+            return new ValueTask<RemoteTablet>(LookupAndCacheTabletAsync(tableId, partitionKey));
         }
 
-        private async ValueTask<RemoteTablet> LookupTabletSlow(string tableId, byte[] partitionKey)
+        /// <summary>
+        /// Locates a tablet by consulting the table location cache.
+        /// </summary>
+        /// <param name="tableId">The table identifier.</param>
+        /// <param name="partitionKey">The partition key.</param>
+        /// <returns>The requested tablet, or null if the tablet doesn't exist.</returns>
+        private RemoteTablet GetTabletFromCache(string tableId, ReadOnlySpan<byte> partitionKey)
         {
-            // TODO: Move to constant.
-            var tablets = await GetTableLocationsAsync(tableId, partitionKey, 10).ConfigureAwait(false);
-
-            CacheTablets(tableId, tablets, partitionKey);
-
-            var tablet = FindTabletFromCache(tableId, partitionKey);
-
-            if (tablet == null)
-                throw new Exception("Partition range does not exist");
-
-            return tablet;
-        }
-
-        private RemoteTablet FindTabletFromCache(string tableId, byte[] partitionKey)
-        {
-            RemoteTablet tablet = null;
+            TableLocationsCache tableCache;
 
             lock (_tableLocations)
             {
-                if (_tableLocations.TryGetValue(tableId, out var cache))
-                {
-                    tablet = cache.FindTablet(partitionKey);
-                }
+                if (!_tableLocations.TryGetValue(tableId, out tableCache))
+                    return null;
             }
+
+            return tableCache.FindTablet(partitionKey);
+        }
+
+        /// <summary>
+        /// Locates a tablet by consulting a master and caches the results.
+        /// </summary>
+        /// <param name="tableId">The table identifier.</param>
+        /// <param name="partitionKey">The partition key.</param>
+        /// <returns>The requested tablet, or null if the tablet doesn't exist.</returns>
+        private async Task<RemoteTablet> LookupAndCacheTabletAsync(string tableId, byte[] partitionKey)
+        {
+            var tablets = await GetTableLocationsAsync(
+                tableId, partitionKey, FetchTabletsPerPointLookup).ConfigureAwait(false);
+
+            CacheTablets(tableId, tablets, partitionKey);
+
+            var tablet = GetTabletFromCache(tableId, partitionKey);
 
             return tablet;
         }
 
+        /// <summary>
+        /// Adds the given tablets to the table location cache.
+        /// </summary>
+        /// <param name="tableId">The table identifier.</param>
+        /// <param name="tablets">The tablets to cache.</param>
+        /// <param name="partitionKey">The partition key used to locate the given tablets.</param>
         private void CacheTablets(string tableId, List<RemoteTablet> tablets, ReadOnlySpan<byte> partitionKey)
         {
             TableLocationsCache cache;
