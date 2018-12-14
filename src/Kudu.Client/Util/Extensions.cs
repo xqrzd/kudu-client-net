@@ -81,6 +81,8 @@ namespace Kudu.Client.Util
             var endpoint = new IPEndPoint(ipAddress, hostPort.Port);
             var isLocal = ipAddress.IsLocal();
 
+            Console.WriteLine($"Endpoint: {endpoint} [local: {isLocal}]");
+
             return new ServerInfo(uuid, hostPort, endpoint, isLocal);
         }
 
@@ -101,7 +103,6 @@ namespace Kudu.Client.Util
                 foreach (var ip in networkInterface.GetIPProperties().UnicastAddresses)
                 {
                     addresses.Add(ip.Address);
-                    Console.WriteLine(ip.Address);
                 }
             }
 
