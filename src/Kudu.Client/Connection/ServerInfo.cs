@@ -20,7 +20,7 @@ namespace Kudu.Client.Connection
             Uuid = uuid;
             HostPort = hostPort;
             Endpoint = endpoint;
-            IsLocal = IsLocal;
+            IsLocal = isLocal;
         }
 
         public override string ToString() => $"{Uuid} ({HostPort})";
