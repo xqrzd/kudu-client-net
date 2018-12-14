@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace Kudu.Client.Connection
 {
@@ -15,16 +16,42 @@ namespace Kudu.Client.Connection
             _leaderIndex = leaderIndex;
         }
 
+        public ServerInfo GetLeaderServerInfo()
+        {
+            // Check if we have a leader.
+            if (_leaderIndex == -1)
+                return null;
+
+            return _servers[_leaderIndex];
+        }
+
+        public ServerInfo GetClosestServerInfo()
+        {
+            ServerInfo last = null;
+
+            foreach (var server in _servers)
+            {
+                last = server;
+
+                if (server.IsLocal)
+                    break;
+            }
+
+            return last;
+        }
+
         public ServerInfo GetServerInfo(ReplicaSelection replicaSelection)
         {
-            if (replicaSelection == ReplicaSelection.LeaderOnly)
+            switch (replicaSelection)
             {
-                return _servers[_leaderIndex];
-            }
-            else
-            {
-                // TODO: Add location awareness.
-                return _servers[0];
+                case ReplicaSelection.LeaderOnly:
+                    return GetLeaderServerInfo();
+
+                case ReplicaSelection.ClosestReplica:
+                    return GetClosestServerInfo();
+
+                default:
+                    throw new NotSupportedException($"Unknown replica selection {replicaSelection}");
             }
         }
     }
