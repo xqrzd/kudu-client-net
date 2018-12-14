@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Net;
 using System.Threading.Tasks;
 using Kudu.Client.Builder;
 using Kudu.Client.Connection;
@@ -185,7 +184,7 @@ namespace Kudu.Client
             int leaderIndex = -1;
             foreach (var master in _settings.MasterAddresses)
             {
-                var serverInfo = CreateServerInfo("master", master);
+                var serverInfo = master.CreateServerInfo("master");
                 var connection = await _connectionCache.CreateConnectionAsync(serverInfo).ConfigureAwait(false);
                 var rpc = new ConnectToMasterRequest();
                 var response = await SendRpcToConnectionAsync(rpc, connection).ConfigureAwait(false);
@@ -290,18 +289,6 @@ namespace Kudu.Client
             }
 
             cache.CacheTabletLocations(tablets, partitionKey);
-        }
-
-        private ServerInfo CreateServerInfo(string uuid, HostAndPort hostPort)
-        {
-            var ipAddresses = Dns.GetHostAddresses(hostPort.Host);
-            if (ipAddresses == null || ipAddresses.Length == 0)
-                throw new Exception($"Failed to resolve the IP of '{hostPort.Host}'");
-
-            var endpoint = new IPEndPoint(ipAddresses[0], hostPort.Port);
-
-            // TODO: Check if address is local.
-            return new ServerInfo(uuid, hostPort, endpoint, false);
         }
 
         public async Task DisposeAsync()

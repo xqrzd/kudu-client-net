@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
 using Kudu.Client.Connection;
@@ -20,10 +22,22 @@ namespace Kudu.Client.Util
             new HostAndPort(hostPort.Host, (int)hostPort.Port);
 
         public static void SwapMostSignificantBitBigEndian(this byte[] span) =>
-            span[0] ^= (1 << 7);
+            span[0] ^= 1 << 7;
 
         public static void SwapMostSignificantBitBigEndian(this Span<byte> span) =>
-            span[0] ^= (1 << 7);
+            span[0] ^= 1 << 7;
+
+        public static int GetContentHashCode(this byte[] source)
+        {
+            if (source == null)
+                return 0;
+
+            int result = 1;
+            foreach (byte element in source)
+                result = 31 * result + element;
+
+            return result;
+        }
 
         public static ServerInfo ToServerInfo(this TSInfoPB tsInfo)
         {
@@ -40,7 +54,11 @@ namespace Kudu.Client.Util
             // based on some kind of policy. For now just use the first always.
             var hostPort = addresses[0].ToHostAndPort();
 
-            // TODO: Don't do this resolution here.
+            return hostPort.CreateServerInfo(uuid);
+        }
+
+        public static ServerInfo CreateServerInfo(this HostAndPort hostPort, string uuid)
+        {
             var ipAddresses = Dns.GetHostAddresses(hostPort.Host);
             if (ipAddresses == null || ipAddresses.Length == 0)
                 throw new Exception($"Failed to resolve the IP of '{hostPort.Host}'");
@@ -61,21 +79,33 @@ namespace Kudu.Client.Util
             }
 
             var endpoint = new IPEndPoint(ipAddress, hostPort.Port);
+            var isLocal = ipAddress.IsLocal();
 
-            // TODO: Check if address is local.
-            return new ServerInfo(uuid, hostPort, endpoint, false);
+            return new ServerInfo(uuid, hostPort, endpoint, isLocal);
         }
 
-        public static int GetContentHashCode(this byte[] source)
+        public static bool IsLocal(this IPAddress ipAddress)
         {
-            if (source == null)
-                return 0;
+            List<IPAddress> localIPs = GetLocalAddresses();
+            return IPAddress.IsLoopback(ipAddress) || localIPs.Contains(ipAddress);
+        }
 
-            int result = 1;
-            foreach (byte element in source)
-                result = 31 * result + element;
+        private static List<IPAddress> GetLocalAddresses()
+        {
+            var addresses = new List<IPAddress>();
 
-            return result;
+            // Dns.GetHostAddresses(Dns.GetHostName()) returns incomplete results on Linux.
+            // https://github.com/dotnet/corefx/issues/32611
+            foreach (var networkInterface in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                foreach (var ip in networkInterface.GetIPProperties().UnicastAddresses)
+                {
+                    addresses.Add(ip.Address);
+                    Console.WriteLine(ip.Address);
+                }
+            }
+
+            return addresses;
         }
     }
 }
