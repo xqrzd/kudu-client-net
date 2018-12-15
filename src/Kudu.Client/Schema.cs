@@ -8,8 +8,20 @@ namespace Kudu.Client
     {
         // TODO: Create a managed class for this?
         private readonly SchemaPB _schema;
+
+        /// <summary>
+        /// Maps column name to column index.
+        /// </summary>
         private readonly Dictionary<string, int> _columnsByName;
+
+        /// <summary>
+        /// Maps columnId to column index.
+        /// </summary>
         private readonly Dictionary<int, int> _columnsById;
+
+        /// <summary>
+        /// Maps column index to data index.
+        /// </summary>
         private readonly int[] _columnOffsets;
 
         public int ColumnCount { get; }
@@ -27,9 +39,9 @@ namespace Kudu.Client
             var size = 0;
             var varLenCnt = 0;
             var hasNulls = false;
-            var columnOffsets = new int[columns.Count];
             var columnsByName = new Dictionary<string, int>(columns.Count);
             var columnsById = new Dictionary<int, int>(columns.Count);
+            var columnOffsets = new int[columns.Count];
 
             for (int i = 0; i < columns.Count; i++)
             {
@@ -37,6 +49,7 @@ namespace Kudu.Client
 
                 if (column.Type == DataTypePB.String || column.Type == DataTypePB.Binary)
                 {
+                    columnOffsets[i] = varLenCnt;
                     varLenCnt++;
                     // Don't increment size here, these types are stored separately
                     // in PartialRow.
