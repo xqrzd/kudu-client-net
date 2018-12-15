@@ -11,7 +11,7 @@ namespace Kudu.Client
     {
         public Schema Schema { get; }
 
-        private byte[] _rowAlloc;
+        private readonly byte[] _rowAlloc;
         private readonly int _headerSize;
         private readonly int _nullOffset;
 

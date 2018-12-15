@@ -123,8 +123,6 @@ namespace Kudu.Client
 
         public async Task<WriteResponsePB> WriteRowAsync(KuduTable table, PartialRow row)
         {
-            // TODO: Need to cache tablet locations.
-
             var rows = new byte[row.RowSize];
             var indirectData = new byte[row.IndirectDataSize];
 
@@ -139,7 +137,7 @@ namespace Kudu.Client
                 IndirectData = indirectData
             };
 
-            var tablet = await GetTabletAsync(table.SchemaPb.TableId.ToStringUtf8(), ms.ToArray()).ConfigureAwait(false);
+            var tablet = await GetTabletAsync(table.TableId, ms.ToArray()).ConfigureAwait(false);
             // TODO: Check that tablet exists.
             var server = tablet.GetServerInfo(ReplicaSelection.LeaderOnly);
             var connection = await _connectionCache.CreateConnectionAsync(server).ConfigureAwait(false);

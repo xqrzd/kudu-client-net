@@ -1,4 +1,5 @@
 ﻿using Kudu.Client.Protocol.Master;
+using Kudu.Client.Util;
 
 namespace Kudu.Client
 {
@@ -6,14 +7,21 @@ namespace Kudu.Client
     {
         private readonly Schema _schema;
 
+        // TODO: Create a managed class for this.
+        public GetTableSchemaResponsePB SchemaPb { get; }
+
+        public string TableId { get; }
+
         public KuduTable(GetTableSchemaResponsePB schemaPb)
         {
             _schema = new Schema(schemaPb.Schema);
             SchemaPb = schemaPb;
+            TableId = schemaPb.TableId.ToStringUtf8();
         }
 
-        // TODO: Create a managed class for this.
-        public GetTableSchemaResponsePB SchemaPb { get; }
+        public int NumReplicas => SchemaPb.NumReplicas;
+
+        public string TableName => SchemaPb.TableName;
 
         public PartialRow NewInsert()
         {
