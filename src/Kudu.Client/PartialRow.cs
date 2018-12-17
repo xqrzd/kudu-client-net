@@ -15,7 +15,7 @@ namespace Kudu.Client
         private readonly int _headerSize;
         private readonly int _nullOffset;
 
-        private readonly object[] _varLengthData;
+        private readonly byte[][] _varLengthData;
 
         public PartialRow(Schema schema, RowOperationsPB.Type type)
         {
@@ -33,7 +33,7 @@ namespace Kudu.Client
                 _nullOffset = 1 + columnSize;
 
             _headerSize = headerSize;
-            _varLengthData = new object[schema.ColumnCount];
+            _varLengthData = new byte[schema.VarLengthColumnCount][];
         }
 
         public int RowSize => GetRowSize();
@@ -59,18 +59,10 @@ namespace Kudu.Client
                 {
                     var type = Schema.GetColumnType(i);
 
-                    if (type == DataTypePB.String)
+                    if (type == DataTypePB.String || type == DataTypePB.Binary)
                     {
-                        var str = _varLengthData[i] as string;
-                        var len = Encoding.UTF8.GetBytes(str, indirectData);
-                        indirectData = indirectData.Slice(len);
-                        BinaryPrimitives.WriteInt64LittleEndian(buffer, varLengthOffset);
-                        BinaryPrimitives.WriteInt64LittleEndian(buffer.Slice(8), len);
-                        varLengthOffset += len;
-                    }
-                    else if (type == DataTypePB.Binary)
-                    {
-                        var bin = _varLengthData[i] as byte[];
+                        var offset = Schema.GetColumnOffset(i);
+                        var bin = _varLengthData[offset];
                         bin.AsSpan().CopyTo(indirectData);
                         indirectData = indirectData.Slice(bin.Length);
                         BinaryPrimitives.WriteInt64LittleEndian(buffer, varLengthOffset);
@@ -123,14 +115,17 @@ namespace Kudu.Client
 
         public void SetString(int columnIndex, string value)
         {
+            var data = Encoding.UTF8.GetBytes(value);
+            SetBinary(columnIndex, data);
+        }
+
+        public void SetBinary(int columnIndex, byte[] value)
+        {
             Set(columnIndex);
 
-            // C# strings are unicode (UTF-16).
-            // UTF-8 length may be different from string length.
-            var length = Encoding.UTF8.GetByteCount(value);
-
-            _varLengthData[columnIndex] = value;
-            IndirectDataSize += length;
+            var varLenColumnIndex = Schema.GetColumnOffset(columnIndex);
+            _varLengthData[varLenColumnIndex] = value;
+            IndirectDataSize += value.Length;
         }
 
         private int GetPositionInRowAllocAndSetBitSet(int columnIndex)
@@ -145,10 +140,16 @@ namespace Kudu.Client
             return _rowAlloc.AsSpan(position);
         }
 
-        internal Span<byte> GetSpanInRowAlloc(int columnIndex)
+        internal ReadOnlySpan<byte> GetSpanInRowAlloc(int columnIndex)
         {
             var position = _headerSize + Schema.GetColumnOffset(columnIndex);
             return _rowAlloc.AsSpan(position);
+        }
+
+        internal ReadOnlySpan<byte> GetSpanInVarLenData(int columnIndex)
+        {
+            var varLenColumnIndex = Schema.GetColumnOffset(columnIndex);
+            return _varLengthData[varLenColumnIndex];
         }
 
         private int GetRowSize()

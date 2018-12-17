@@ -128,17 +128,16 @@ namespace Kudu.Client
 
             row.WriteTo(rows, indirectData);
 
-            var ms = new RecyclableMemoryStream();
-            KeyEncoder.EncodePartitionKey(row, table.SchemaPb.PartitionSchema, ms);
-
             var rowOperations = new Protocol.RowOperationsPB
             {
                 Rows = rows,
                 IndirectData = indirectData
             };
 
-            var tablet = await GetTabletAsync(table.TableId, ms.ToArray()).ConfigureAwait(false);
-            // TODO: Check that tablet exists.
+            var tablet = await GetRowTabletAsync(table, row).ConfigureAwait(false);
+            if (tablet == null)
+                throw new Exception("The requested tablet does not exist");
+
             var server = tablet.GetServerInfo(ReplicaSelection.LeaderOnly);
             var connection = await _connectionCache.CreateConnectionAsync(server).ConfigureAwait(false);
 
@@ -240,6 +239,17 @@ namespace Kudu.Client
             return rpc.ParseResponse(response);
         }
 
+        private ValueTask<RemoteTablet> GetRowTabletAsync(KuduTable table, PartialRow row)
+        {
+            using (var writer = new BufferWriter(256))
+            {
+                KeyEncoder.EncodePartitionKey(row, table.SchemaPb.PartitionSchema, writer);
+                var partitionKey = writer.Memory.Span;
+
+                return GetTabletAsync(table.TableId, partitionKey);
+            }
+        }
+
         /// <summary>
         /// Locates a tablet by consulting the table location cache, then by contacting
         /// a master if we haven't seen the tablet before. The results are cached.
@@ -247,14 +257,15 @@ namespace Kudu.Client
         /// <param name="tableId">The table identifier.</param>
         /// <param name="partitionKey">The partition key.</param>
         /// <returns>The requested tablet, or null if the tablet doesn't exist.</returns>
-        private ValueTask<RemoteTablet> GetTabletAsync(string tableId, byte[] partitionKey)
+        private ValueTask<RemoteTablet> GetTabletAsync(string tableId, ReadOnlySpan<byte> partitionKey)
         {
             var tablet = GetTabletFromCache(tableId, partitionKey);
 
             if (tablet != null)
                 return new ValueTask<RemoteTablet>(tablet);
 
-            return new ValueTask<RemoteTablet>(LookupAndCacheTabletAsync(tableId, partitionKey));
+            var task = LookupAndCacheTabletAsync(tableId, partitionKey.ToArray());
+            return new ValueTask<RemoteTablet>(task);
         }
 
         /// <summary>

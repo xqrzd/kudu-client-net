@@ -12,62 +12,58 @@ namespace Kudu.Client
     public static class KeyEncoder
     {
         public static void EncodePartitionKey(
-            PartialRow row,
-            PartitionSchemaPB partitionSchema,
-            // TODO: Change this to Span<byte>?
-            RecyclableMemoryStream stream)
+            PartialRow row, PartitionSchemaPB partitionSchema, BufferWriter writer)
         {
             foreach (var hashSchema in partitionSchema.HashBucketSchemas)
             {
                 var bucket = GetHashBucket(row, hashSchema);
-                var slice = stream.GetSpan(4);
+                var slice = writer.GetSpan(4);
                 BinaryPrimitives.WriteInt32BigEndian(slice, bucket);
+                writer.Advance(4);
             }
 
-            var rangeColumns = partitionSchema.RangeSchema.Columns.Select(c => c.Id).ToList();
-            EncodeColumns(row, rangeColumns, stream);
+            var rangeColumns = partitionSchema.RangeSchema.Columns;
+            EncodeColumns(row, rangeColumns, writer);
         }
 
         public static int GetHashBucket(PartialRow row, HashBucketSchemaPB hashSchema)
         {
-            using (var ms = new RecyclableMemoryStream(256))
+            using (var writer = new BufferWriter(256))
             {
-                var columns = hashSchema.Columns.Select(c => c.Id).ToList();
-                EncodeColumns(row, columns, ms);
-                var hash = Murmur2.Hash64(ms.AsSpan(), hashSchema.Seed);
+                EncodeColumns(row, hashSchema.Columns, writer);
+                var hash = Murmur2.Hash64(writer.Memory.Span, hashSchema.Seed);
                 var bucket = hash % (uint)hashSchema.NumBuckets;
-                return (int)bucket;// TODO: Return type
+                return (int)bucket;
             }
         }
 
-        private static void EncodeColumns(PartialRow row, List<int> columnIds, RecyclableMemoryStream stream)
+        private static void EncodeColumns(
+            PartialRow row, List<ColumnIdentifierPB> columns, BufferWriter writer)
         {
-            for (int i = 0; i < columnIds.Count; i++)
+            for (int i = 0; i < columns.Count; i++)
             {
-                bool isLast = i + 1 == columnIds.Count;
-                var columnIndex = row.Schema.GetColumnIndex(columnIds[i]);
-                EncodeColumn(row, columnIndex, isLast, stream);
+                bool isLast = i + 1 == columns.Count;
+                var columnIndex = row.Schema.GetColumnIndex(columns[i].Id);
+                EncodeColumn(row, columnIndex, isLast, writer);
             }
         }
 
         private static void EncodeColumn(
-            PartialRow row,
-            int columnIndex,
-            bool isLast,
-            RecyclableMemoryStream stream)
+            PartialRow row, int columnIndex, bool isLast, BufferWriter writer)
         {
             var schema = row.Schema;
             var type = schema.GetColumnType(columnIndex);
 
             if (type == DataTypePB.String || type == DataTypePB.Binary)
             {
-                throw new NotImplementedException();
+                var data = row.GetSpanInVarLenData(columnIndex);
+                EncodeBinary(data, writer, isLast);
             }
             else
             {
                 // TODO: Benchmark MemoryMarshal.TryRead
                 var size = schema.GetColumnSize(columnIndex);
-                var slice = stream.GetSpan(size);
+                var slice = writer.GetSpan(size);
 
                 var data = row.GetSpanInRowAlloc(columnIndex);
                 data.Slice(0, size).CopyTo(slice);
@@ -75,34 +71,56 @@ namespace Kudu.Client
                 // Row data is little endian, but key encoding is big endian.
                 slice.Reverse();
 
-
                 if (Schema.IsSigned(type))
                     slice.SwapMostSignificantBitBigEndian();
+
+                writer.Advance(size);
             }
         }
 
         private static void EncodeBinary(
-            ReadOnlySpan<byte> value, bool isLast, bool hasZeros, Span<byte> buffer)
+            ReadOnlySpan<byte> value, BufferWriter writer, bool isLast)
         {
             if (isLast)
             {
-                value.CopyTo(buffer);
+                var span = writer.GetSpan(value.Length);
+                value.CopyTo(span);
+                writer.Advance(value.Length);
             }
             else
             {
-                if (hasZeros)
+                // Make sure we have enough space for the worst case
+                // where every byte is 0.
+                var span = writer.GetSpan(value.Length * 2 + 2);
+
+                int bytesWritten = EncodeBinarySlow(value, span);
+
+                span[bytesWritten] = 0x0;
+                span[bytesWritten + 1] = 0x0;
+
+                writer.Advance(bytesWritten + 2);
+            }
+        }
+
+        private static int EncodeBinarySlow(
+            ReadOnlySpan<byte> value, Span<byte> destination)
+        {
+            int length = 0;
+
+            foreach (byte b in value)
+            {
+                if (b == 0)
                 {
-                    // TODO: Handle the case where value contains zeros.
-                    throw new NotImplementedException();
+                    destination[length++] = 0;
+                    destination[length++] = 1;
                 }
                 else
                 {
-                    value.CopyTo(buffer);
-
-                    buffer[value.Length] = 0x0;
-                    buffer[value.Length + 1] = 0x0;
+                    destination[length++] = b;
                 }
             }
+
+            return length;
         }
     }
 }
