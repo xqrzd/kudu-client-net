@@ -31,14 +31,14 @@ namespace Kudu.Client.Internal
 
         public Span<byte> GetSpan(int sizeHint = 0)
         {
-            int desiredLength = EnsureCapacity(sizeHint);
-            return new Span<byte>(_buffer, _offset, desiredLength);
+            int length = EnsureCapacity(sizeHint);
+            return new Span<byte>(_buffer, _offset, length);
         }
 
         public Memory<byte> GetMemory(int sizeHint = 0)
         {
-            int desiredLength = EnsureCapacity(sizeHint);
-            return new Memory<byte>(_buffer, _offset, desiredLength);
+            int length = EnsureCapacity(sizeHint);
+            return new Memory<byte>(_buffer, _offset, length);
         }
 
         public void Advance(int count)
