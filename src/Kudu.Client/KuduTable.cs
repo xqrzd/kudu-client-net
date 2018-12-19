@@ -23,24 +23,18 @@ namespace Kudu.Client
 
         public string TableName => SchemaPb.TableName;
 
-        public PartialRow NewInsert()
-        {
-            return new PartialRow(_schema, Protocol.RowOperationsPB.Type.Insert);
-        }
+        public Operation NewInsert() => NewOperation(ChangeType.Insert);
 
-        public PartialRow NewUpdate()
-        {
-            return new PartialRow(_schema, Protocol.RowOperationsPB.Type.Update);
-        }
+        public Operation NewUpdate() => NewOperation(ChangeType.Update);
 
-        public PartialRow NewUpsert()
-        {
-            return new PartialRow(_schema, Protocol.RowOperationsPB.Type.Upsert);
-        }
+        public Operation NewUpsert() => NewOperation(ChangeType.Upsert);
 
-        public PartialRow NewDelete()
+        public Operation NewDelete() => NewOperation(ChangeType.Delete);
+
+        private Operation NewOperation(ChangeType changeType)
         {
-            return new PartialRow(_schema, Protocol.RowOperationsPB.Type.Delete);
+            var row = new PartialRow(_schema, changeType);
+            return new Operation(this, row);
         }
     }
 }

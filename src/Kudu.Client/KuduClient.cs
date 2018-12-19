@@ -121,8 +121,10 @@ namespace Kudu.Client
             return new KuduTable(response);
         }
 
-        public async Task<WriteResponsePB> WriteRowAsync(KuduTable table, PartialRow row)
+        public async Task<WriteResponsePB> WriteRowAsync(Operation operation)
         {
+            var row = operation.Row;
+            var table = operation.Table;
             var rows = new byte[row.RowSize];
             var indirectData = new byte[row.IndirectDataSize];
 
@@ -154,6 +156,54 @@ namespace Kudu.Client
                 throw new TabletServerException(result.Error);
 
             return result;
+        }
+
+        public async Task<WriteResponsePB> WriteRowAsync(List<Operation> operations, RemoteTablet tablet)
+        {
+            var table = operations[0].Table;
+
+            byte[] rowData;
+            byte[] indirectData;
+
+            // TODO: Estimate better sizes for these.
+            using (var rowBuffer = new BufferWriter(1024))
+            using (var indirectBuffer = new BufferWriter(1024))
+            {
+                OperationsEncoder.Encode(operations, rowBuffer, indirectBuffer);
+
+                // protobuf-net doesn't support serializing Memory<byte>,
+                // so we need to copy these into an array.
+                rowData = rowBuffer.Memory.ToArray();
+                indirectData = indirectBuffer.Memory.ToArray();
+            }
+
+            var rowOperations = new Protocol.RowOperationsPB
+            {
+                Rows = rowData,
+                IndirectData = indirectData
+            };
+
+            var server = tablet.GetServerInfo(ReplicaSelection.LeaderOnly);
+            var connection = await _connectionCache.CreateConnectionAsync(server).ConfigureAwait(false);
+
+            var rpc = new WriteRequest(new WriteRequestPB
+            {
+                TabletId = tablet.TabletId.ToUtf8ByteArray(),
+                Schema = table.SchemaPb.Schema,
+                RowOperations = rowOperations
+            });
+
+            var result = await SendRpcToConnectionAsync(rpc, connection).ConfigureAwait(false);
+
+            if (result.Error != null)
+                throw new TabletServerException(result.Error);
+
+            return result;
+        }
+
+        public KuduSession NewSession()
+        {
+            return new KuduSession(this);
         }
 
         public ScanBuilder NewScanBuilder(KuduTable table)
@@ -239,7 +289,7 @@ namespace Kudu.Client
             return rpc.ParseResponse(response);
         }
 
-        private ValueTask<RemoteTablet> GetRowTabletAsync(KuduTable table, PartialRow row)
+        internal ValueTask<RemoteTablet> GetRowTabletAsync(KuduTable table, PartialRow row)
         {
             using (var writer = new BufferWriter(256))
             {

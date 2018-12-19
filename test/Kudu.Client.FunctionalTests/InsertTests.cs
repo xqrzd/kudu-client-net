@@ -35,15 +35,18 @@ namespace Kudu.Client.FunctionalTests
                     });
 
                 var tableId = await client.CreateTableAsync(table);
-
                 Assert.NotEmpty(tableId);
 
                 var openTable = await client.OpenTableAsync(tableName);
-                var insert = openTable.NewInsert();
-                insert.SetInt(0, 7);
-                insert.SetString(1, "test value");
+                Assert.Equal(tableName, openTable.TableName);
+                Assert.Equal(1, openTable.NumReplicas);
 
-                var result = await client.WriteRowAsync(openTable, insert);
+                var insert = openTable.NewInsert();
+                var row = insert.Row;
+                row.SetInt(0, 7);
+                row.SetString(1, "test value");
+
+                var result = await client.WriteRowAsync(insert);
                 Assert.Empty(result.PerRowErrors);
                 Assert.NotEqual(0UL, result.Timestamp);
             }

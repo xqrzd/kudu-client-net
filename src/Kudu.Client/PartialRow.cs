@@ -17,13 +17,14 @@ namespace Kudu.Client
 
         private readonly byte[][] _varLengthData;
 
-        public PartialRow(Schema schema, RowOperationsPB.Type type)
+        public PartialRow(Schema schema, ChangeType type)
         {
             Schema = schema;
 
             var columnSize = BitsToBytes(schema.ColumnCount);
             var headerSize = 1 + columnSize;
             if (schema.HasNullableColumns)
+                // nullsBitSet is the same size as the columnBitSet.
                 headerSize += columnSize;
 
             _rowAlloc = new byte[headerSize + schema.RowSize];
@@ -80,14 +81,14 @@ namespace Kudu.Client
             }
         }
 
-        private bool IsSet(int columnIndex) => BitMapGet(1, columnIndex);
+        private bool IsSet(int columnIndex) => BitmapGet(1, columnIndex);
 
-        private void Set(int columnIndex) => BitMapSet(1, columnIndex);
+        private void Set(int columnIndex) => BitmapSet(1, columnIndex);
 
         private bool IsSetToNull(int columnIndex) =>
-            Schema.HasNullableColumns ? BitMapGet(_nullOffset, columnIndex) : false;
+            Schema.HasNullableColumns ? BitmapGet(_nullOffset, columnIndex) : false;
 
-        private void SetToNull(int columnIndex) => BitMapSet(_nullOffset, columnIndex);
+        private void SetToNull(int columnIndex) => BitmapSet(_nullOffset, columnIndex);
 
         public void SetBool(int columnIndex, bool value)
         {
@@ -167,12 +168,12 @@ namespace Kudu.Client
             return size;
         }
 
-        private void BitMapSet(int offset, int index)
+        private void BitmapSet(int offset, int index)
         {
             _rowAlloc[offset + (index / 8)] |= (byte)(1 << (index % 8));
         }
 
-        private bool BitMapGet(int offset, int index)
+        private bool BitmapGet(int offset, int index)
         {
             return (_rowAlloc[offset + (index / 8)] & (1 << (index % 8))) != 0;
         }
