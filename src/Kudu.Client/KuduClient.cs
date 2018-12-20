@@ -158,7 +158,46 @@ namespace Kudu.Client
             return result;
         }
 
-        public async Task<WriteResponsePB> WriteRowAsync(List<Operation> operations, RemoteTablet tablet)
+        public async Task<WriteResponsePB[]> WriteRowAsync(IEnumerable<Operation> operations)
+        {
+            var operationsByTablet = new Dictionary<RemoteTablet, List<Operation>>();
+
+            foreach (var operation in operations)
+            {
+                var tablet = await GetRowTabletAsync(operation.Table, operation.Row)
+                    .ConfigureAwait(false);
+
+                if (tablet != null)
+                {
+                    if (!operationsByTablet.TryGetValue(tablet, out var tabletOperations))
+                    {
+                        tabletOperations = new List<Operation>();
+                        operationsByTablet.Add(tablet, tabletOperations);
+                    }
+
+                    tabletOperations.Add(operation);
+                }
+                else
+                {
+                    // TODO: Handle failure
+                    Console.WriteLine("Unable to find tablet");
+                }
+            }
+
+            var tasks = new Task<WriteResponsePB>[operationsByTablet.Count];
+            var i = 0;
+
+            foreach (var tabletOperations in operationsByTablet)
+            {
+                var task = WriteRowAsync(tabletOperations.Value, tabletOperations.Key);
+                tasks[i++] = task;
+            }
+
+            var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+            return results;
+        }
+
+        private async Task<WriteResponsePB> WriteRowAsync(List<Operation> operations, RemoteTablet tablet)
         {
             var table = operations[0].Table;
 
@@ -199,11 +238,6 @@ namespace Kudu.Client
                 throw new TabletServerException(result.Error);
 
             return result;
-        }
-
-        public KuduSession NewSession()
-        {
-            return new KuduSession(this);
         }
 
         public ScanBuilder NewScanBuilder(KuduTable table)

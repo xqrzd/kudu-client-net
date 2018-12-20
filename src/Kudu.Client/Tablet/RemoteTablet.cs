@@ -20,7 +20,7 @@ namespace Kudu.Client.Tablet
     /// and short when they do since the Kudu client will replace the RemoteTablet it caches with new
     /// ones after getting tablet locations from the master.
     /// </summary>
-    public class RemoteTablet
+    public class RemoteTablet : IEquatable<RemoteTablet>
     {
         private readonly ServerInfoCache _cache;
 
@@ -44,6 +44,23 @@ namespace Kudu.Client.Tablet
 
         public ServerInfo GetServerInfo(ReplicaSelection replicaSelection) =>
             _cache.GetServerInfo(replicaSelection);
+
+        public bool Equals(RemoteTablet other)
+        {
+            if (other is null)
+                return false;
+
+            if (ReferenceEquals(this, other))
+                return true;
+
+            return TabletId == other.TabletId;
+        }
+
+        public override bool Equals(object obj) =>
+            Equals(obj as RemoteTablet);
+
+        public override int GetHashCode() =>
+            TabletId.GetHashCode();
 
         public override string ToString()
         {
