@@ -9,7 +9,7 @@ using static Kudu.Client.Protocol.PartitionSchemaPB;
 
 namespace Kudu.Client
 {
-    public static class KeyEncoder
+    public static partial class KeyEncoder
     {
         public static void EncodePartitionKey(
             PartialRow row, PartitionSchemaPB partitionSchema, BufferWriter writer)
@@ -78,36 +78,36 @@ namespace Kudu.Client
             }
         }
 
-        private static void EncodeBinary(
-            ReadOnlySpan<byte> value, BufferWriter writer, bool isLast)
+        public static void EncodeBinary(
+            ReadOnlySpan<byte> source, BufferWriter writer, bool isLast)
         {
             if (isLast)
             {
-                var span = writer.GetSpan(value.Length);
-                value.CopyTo(span);
-                writer.Advance(value.Length);
+                var span = writer.GetSpan(source.Length);
+                source.CopyTo(span);
+                writer.Advance(source.Length);
             }
             else
             {
                 // Make sure we have enough space for the worst case
                 // where every byte is 0.
-                var span = writer.GetSpan(value.Length * 2 + 2);
+                var span = writer.GetSpan(source.Length * 2 + 2);
 
-                int bytesWritten = EncodeBinarySlow(value, span);
+                int bytesWritten = EncodeBinary(source, span);
 
-                span[bytesWritten] = 0x0;
-                span[bytesWritten + 1] = 0x0;
+                span[bytesWritten++] = 0x0;
+                span[bytesWritten++] = 0x0;
 
-                writer.Advance(bytesWritten + 2);
+                writer.Advance(bytesWritten);
             }
         }
 
         private static int EncodeBinarySlow(
-            ReadOnlySpan<byte> value, Span<byte> destination)
+            ReadOnlySpan<byte> source, Span<byte> destination)
         {
             int length = 0;
 
-            foreach (byte b in value)
+            foreach (byte b in source)
             {
                 if (b == 0)
                 {
