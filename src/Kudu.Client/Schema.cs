@@ -96,6 +96,10 @@ namespace Kudu.Client
         /// <param name="index">The column index.</param>
         public int GetColumnOffset(int index) => _columnOffsets[index];
 
+        /// <summary>
+        /// Gets the size the column takes up in RowAlloc.
+        /// </summary>
+        /// <param name="index">The column index.</param>
         public int GetColumnSize(int index) => GetTypeSize(GetColumnType(index));
 
         public DataType GetColumnType(int index) => (DataType)_schema.Columns[index].Type;
