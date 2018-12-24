@@ -26,7 +26,7 @@ namespace Kudu.Client
             }
         }
 
-        public static unsafe int EncodeBinaryAvx(
+        private static unsafe int EncodeBinaryAvx(
             ReadOnlySpan<byte> source, Span<byte> destination)
         {
             if (destination.Length < source.Length * 2)

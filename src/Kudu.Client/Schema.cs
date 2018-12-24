@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Kudu.Client.Builder;
 using Kudu.Client.Protocol;
 
 namespace Kudu.Client
@@ -7,6 +8,7 @@ namespace Kudu.Client
     public class Schema
     {
         // TODO: Create a managed class for this?
+        // TODO: Store columns instead?
         private readonly SchemaPB _schema;
 
         /// <summary>
@@ -26,7 +28,10 @@ namespace Kudu.Client
 
         public int ColumnCount { get; }
 
-        public int RowSize { get; }
+        /// <summary>
+        /// The size of all fixed-length columns.
+        /// </summary>
+        public int RowAllocSize { get; }
 
         public int VarLengthColumnCount { get; }
 
@@ -57,7 +62,7 @@ namespace Kudu.Client
                 else
                 {
                     columnOffsets[i] = size;
-                    size += GetTypeSize(column.Type);
+                    size += GetTypeSize((DataType)column.Type);
                 }
 
                 hasNulls |= column.IsNullable;
@@ -75,65 +80,72 @@ namespace Kudu.Client
             _columnsByName = columnsByName;
             _columnsById = columnsById;
             ColumnCount = columns.Count;
-            RowSize = size;
+            RowAllocSize = size;
             VarLengthColumnCount = varLenCnt;
             HasNullableColumns = hasNulls;
         }
 
         public int GetColumnIndex(string name) => _columnsByName[name];
 
+        /// <summary>
+        /// If the column is a fixed-length type, the offset is where that
+        /// column should be in <see cref="PartialRow._rowAlloc"/>. If the
+        /// column is variable-length, the offset is where that column should
+        /// be stored in <see cref="PartialRow._varLengthData"/>.
+        /// </summary>
+        /// <param name="index">The column index.</param>
         public int GetColumnOffset(int index) => _columnOffsets[index];
 
         public int GetColumnSize(int index) => GetTypeSize(GetColumnType(index));
 
-        public DataTypePB GetColumnType(int index) => _schema.Columns[index].Type;
+        public DataType GetColumnType(int index) => (DataType)_schema.Columns[index].Type;
 
         public bool IsPrimaryKey(int index) => _schema.Columns[index].IsKey;
 
         public int GetColumnIndex(int id) => _columnsById[id];
 
-        public static int GetTypeSize(DataTypePB type)
+        public static int GetTypeSize(DataType type)
         {
             switch (type)
             {
-                case DataTypePB.String:
-                case DataTypePB.Binary:
+                case DataType.String:
+                case DataType.Binary:
                     return 8 + 8; // Offset then string length.
-                case DataTypePB.Bool:
-                case DataTypePB.Int8:
-                case DataTypePB.Uint8:
+                case DataType.Bool:
+                case DataType.Int8:
+                case DataType.UInt8:
                     return 1;
-                case DataTypePB.Int16:
-                case DataTypePB.Uint16:
+                case DataType.Int16:
+                case DataType.UInt16:
                     return 2;
-                case DataTypePB.Int32:
-                case DataTypePB.Uint32:
-                case DataTypePB.Float:
-                case DataTypePB.Decimal32:
+                case DataType.Int32:
+                case DataType.UInt32:
+                case DataType.Float:
+                case DataType.Decimal32:
                     return 4;
-                case DataTypePB.Int64:
-                case DataTypePB.Uint64:
-                case DataTypePB.Double:
-                case DataTypePB.UnixtimeMicros:
-                case DataTypePB.Decimal64:
+                case DataType.Int64:
+                case DataType.UInt64:
+                case DataType.Double:
+                case DataType.UnixtimeMicros:
+                case DataType.Decimal64:
                     return 8;
-                case DataTypePB.Int128:
-                case DataTypePB.Decimal128:
+                case DataType.Int128:
+                case DataType.Decimal128:
                     return 16;
                 default:
                     throw new ArgumentException();
             }
         }
 
-        public static bool IsSigned(DataTypePB type)
+        public static bool IsSigned(DataType type)
         {
             switch (type)
             {
-                case DataTypePB.Int8:
-                case DataTypePB.Int16:
-                case DataTypePB.Int32:
-                case DataTypePB.Int64:
-                case DataTypePB.Int128:
+                case DataType.Int8:
+                case DataType.Int16:
+                case DataType.Int32:
+                case DataType.Int64:
+                case DataType.Int128:
                     return true;
                 default:
                     return false;

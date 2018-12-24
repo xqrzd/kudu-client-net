@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Buffers.Binary;
 using System.Text;
-using Kudu.Client.Protocol;
+using Kudu.Client.Builder;
 
 namespace Kudu.Client
 {
@@ -17,21 +17,21 @@ namespace Kudu.Client
 
         private readonly byte[][] _varLengthData;
 
-        public PartialRow(Schema schema, ChangeType type)
+        public PartialRow(Schema schema, RowOperation type)
         {
             Schema = schema;
 
-            var columnSize = BitsToBytes(schema.ColumnCount);
-            var headerSize = 1 + columnSize;
+            var columnBitmapSize = BitsToBytes(schema.ColumnCount);
+            var headerSize = 1 + columnBitmapSize;
             if (schema.HasNullableColumns)
                 // nullsBitSet is the same size as the columnBitSet.
-                headerSize += columnSize;
+                headerSize += columnBitmapSize;
 
-            _rowAlloc = new byte[headerSize + schema.RowSize];
+            _rowAlloc = new byte[headerSize + schema.RowAllocSize];
             _rowAlloc[0] = (byte)type;
 
             if (schema.HasNullableColumns)
-                _nullOffset = 1 + columnSize;
+                _nullOffset = 1 + columnBitmapSize;
 
             _headerSize = headerSize;
             _varLengthData = new byte[schema.VarLengthColumnCount][];
@@ -60,7 +60,7 @@ namespace Kudu.Client
                 {
                     var type = Schema.GetColumnType(i);
 
-                    if (type == DataTypePB.String || type == DataTypePB.Binary)
+                    if (type == DataType.String || type == DataType.Binary)
                     {
                         var offset = Schema.GetColumnOffset(i);
                         var bin = _varLengthData[offset];
@@ -90,16 +90,16 @@ namespace Kudu.Client
 
         private void SetToNull(int columnIndex) => BitmapSet(_nullOffset, columnIndex);
 
-        public void SetBool(int columnIndex, bool value)
-        {
-            Set(columnIndex);
-            _rowAlloc[Schema.GetColumnOffset(columnIndex)] = (byte)(value ? 1 : 0);
-        }
-
         public void SetNull(int columnIndex)
         {
             Set(columnIndex);
             SetToNull(columnIndex);
+        }
+
+        public void SetBool(int columnIndex, bool value)
+        {
+            Set(columnIndex);
+            _rowAlloc[Schema.GetColumnOffset(columnIndex)] = (byte)(value ? 1 : 0);
         }
 
         public void SetShort(int columnIndex, short value)

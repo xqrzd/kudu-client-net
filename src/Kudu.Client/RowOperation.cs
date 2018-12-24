@@ -2,7 +2,7 @@
 
 namespace Kudu.Client
 {
-    public enum ChangeType : byte
+    public enum RowOperation : byte
     {
         Insert = RowOperationsPB.Type.Insert,
         Update = RowOperationsPB.Type.Update,

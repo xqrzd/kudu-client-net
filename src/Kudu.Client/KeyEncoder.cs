@@ -2,6 +2,7 @@
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
+using Kudu.Client.Builder;
 using Kudu.Client.Internal;
 using Kudu.Client.Protocol;
 using Kudu.Client.Util;
@@ -54,7 +55,7 @@ namespace Kudu.Client
             var schema = row.Schema;
             var type = schema.GetColumnType(columnIndex);
 
-            if (type == DataTypePB.String || type == DataTypePB.Binary)
+            if (type == DataType.String || type == DataType.Binary)
             {
                 var data = row.GetSpanInVarLenData(columnIndex);
                 EncodeBinary(data, writer, isLast);
@@ -78,7 +79,7 @@ namespace Kudu.Client
             }
         }
 
-        public static void EncodeBinary(
+        private static void EncodeBinary(
             ReadOnlySpan<byte> source, BufferWriter writer, bool isLast)
         {
             if (isLast)

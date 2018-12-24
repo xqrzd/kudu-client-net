@@ -9,7 +9,7 @@ namespace Kudu.Client
 
         public PartialRow Row { get; }
 
-        // TODO: Should this store ChangeType instead of PartialRow?
+        // TODO: Should this store RowOperation instead of PartialRow?
 
         public Operation(KuduTable table, PartialRow row)
         {
