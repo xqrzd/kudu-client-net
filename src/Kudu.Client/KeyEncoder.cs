@@ -57,7 +57,7 @@ namespace Kudu.Client
 
             if (type == DataType.String || type == DataType.Binary)
             {
-                var data = row.GetSpanInVarLenData(columnIndex);
+                var data = row.GetVarLengthColumn(columnIndex);
                 EncodeBinary(data, writer, isLast);
             }
             else
@@ -66,7 +66,7 @@ namespace Kudu.Client
                 var size = schema.GetColumnSize(columnIndex);
                 var slice = writer.GetSpan(size);
 
-                var data = row.GetSpanInRowAlloc(columnIndex);
+                var data = row.GetRowAllocColumn(columnIndex);
                 data.Slice(0, size).CopyTo(slice);
 
                 // Row data is little endian, but key encoding is big endian.

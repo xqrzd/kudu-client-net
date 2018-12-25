@@ -46,38 +46,48 @@ namespace Kudu.Client
 
         public void WriteTo(Span<byte> buffer, Span<byte> indirectData)
         {
-            var varLengthOffset = 0;
-            // Write the header.
-            _rowAlloc.AsSpan(0, _headerSize).CopyTo(buffer);
+            ReadOnlySpan<byte> rowAlloc = _rowAlloc.AsSpan();
+
+            // Write the header. This includes,
+            // 1) Row operation
+            // 2) Column set bitmap
+            // 3) Nullset bitmap
+            rowAlloc.Slice(0, _headerSize).CopyTo(buffer);
+
+            // Advance buffers.
+            rowAlloc = rowAlloc.Slice(_headerSize);
             buffer = buffer.Slice(_headerSize);
 
-            var position = _headerSize;
+            int varLengthOffset = 0;
 
             for (int i = 0; i < Schema.ColumnCount; i++)
             {
-                var length = Schema.GetColumnSize(i);
                 if (IsSet(i) && !IsSetToNull(i))
                 {
+                    var size = Schema.GetColumnSize(i);
                     var type = Schema.GetColumnType(i);
 
                     if (type == DataType.String || type == DataType.Binary)
                     {
-                        var offset = Schema.GetColumnOffset(i);
-                        var bin = _varLengthData[offset];
-                        bin.AsSpan().CopyTo(indirectData);
-                        indirectData = indirectData.Slice(bin.Length);
+                        var data = GetVarLengthColumn(i);
+                        data.CopyTo(indirectData);
                         BinaryPrimitives.WriteInt64LittleEndian(buffer, varLengthOffset);
-                        BinaryPrimitives.WriteInt64LittleEndian(buffer.Slice(8), bin.Length);
-                        varLengthOffset += bin.Length;
+                        BinaryPrimitives.WriteInt64LittleEndian(buffer.Slice(8), data.Length);
+
+                        indirectData = indirectData.Slice(data.Length);
+                        varLengthOffset += data.Length;
                     }
                     else
                     {
-                        _rowAlloc.AsSpan(position, length).CopyTo(buffer);
-                        buffer = buffer.Slice(length);
-                    }
-                }
+                        var data = rowAlloc.Slice(0, size);
+                        data.CopyTo(buffer);
 
-                position += length;
+                        rowAlloc = rowAlloc.Slice(size);
+                    }
+
+                    // Advance RowAlloc buffer only if we wrote that column.
+                    buffer = buffer.Slice(size);
+                }
             }
         }
 
@@ -141,13 +151,13 @@ namespace Kudu.Client
             return _rowAlloc.AsSpan(position);
         }
 
-        internal ReadOnlySpan<byte> GetSpanInRowAlloc(int columnIndex)
+        internal ReadOnlySpan<byte> GetRowAllocColumn(int columnIndex)
         {
             var position = _headerSize + Schema.GetColumnOffset(columnIndex);
             return _rowAlloc.AsSpan(position);
         }
 
-        internal ReadOnlySpan<byte> GetSpanInVarLenData(int columnIndex)
+        internal ReadOnlySpan<byte> GetVarLengthColumn(int columnIndex)
         {
             var varLenColumnIndex = Schema.GetColumnOffset(columnIndex);
             return _varLengthData[varLenColumnIndex];
