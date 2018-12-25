@@ -1,24 +1,18 @@
-﻿using System.Text;
-using Kudu.Client.Util;
+﻿using Kudu.Client.Util;
 using Xunit;
 
 namespace Kudu.Client.Tests
 {
     public class MurmurHashTests
     {
-        [Fact]
-        public void TestMurmur2Hash64()
+        [Theory]
+        [InlineData("ab", 0, 7115271465109541368UL)]
+        [InlineData("abcdefg", 0, 2601573339036254301UL)]
+        [InlineData("quick brown fox", 42, 3575930248840144026UL)]
+        public void TestMurmur2Hash64(string data, ulong seed, ulong expectedHash)
         {
-            ulong hash;
-
-            hash = Murmur2.Hash64(Encoding.UTF8.GetBytes("ab"), 0);
-            Assert.Equal(7115271465109541368UL, hash);
-
-            hash = Murmur2.Hash64(Encoding.UTF8.GetBytes("abcdefg"), 0);
-            Assert.Equal(2601573339036254301UL, hash);
-
-            hash = Murmur2.Hash64(Encoding.UTF8.GetBytes("quick brown fox"), 42);
-            Assert.Equal(3575930248840144026UL, hash);
+            ulong hash = Murmur2.Hash64(data.ToUtf8ByteArray(), seed);
+            Assert.Equal(expectedHash, hash);
         }
     }
 }
