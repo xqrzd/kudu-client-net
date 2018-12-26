@@ -28,6 +28,7 @@ namespace Kudu.Client.Util
         /// <param name="value">A double precision floating-point number.</param>
         public static long AsLong(this double value)
         {
+            // All NaN values are collapsed to a single "canonical" NaN value.
             if (double.IsNaN(value))
                 return 0x7ff8000000000000;
 
