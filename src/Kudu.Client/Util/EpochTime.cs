@@ -13,8 +13,7 @@ namespace Kudu.Client.Util
         private const long TicksPerMicrosecond = TimeSpan.TicksPerMillisecond / 1000;
 
         /// <summary>
-        /// Time that has elapsed since January 1, 1970 (midnight UTC/GMT),
-        /// not counting leap seconds.
+        /// Unix epoch zero-point: January 1, 1970 (midnight UTC/GMT).
         /// </summary>
         public static DateTime UnixEpoch { get; } =
             new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);

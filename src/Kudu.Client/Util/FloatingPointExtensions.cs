@@ -23,7 +23,7 @@ namespace Kudu.Client.Util
         /// <summary>
         /// Returns a representation of the specified floating-point value
         /// according to the IEEE 754 floating-point "double format" bit layout.
-        /// If the argument is NaN, the result is 0x7fc00000.
+        /// If the argument is NaN, the result is 0x7ff8000000000000.
         /// </summary>
         /// <param name="value">A double precision floating-point number.</param>
         public static long AsLong(this double value)
