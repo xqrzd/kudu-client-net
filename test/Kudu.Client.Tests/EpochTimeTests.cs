@@ -41,7 +41,8 @@ namespace Kudu.Client.Tests
             Assert.Equal(utcTime, fromMicros);
         }
 
-        private string GetTimeZone(string windows, string linux) =>
-            RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? windows : linux;
+        // https://github.com/dotnet/corefx/issues/11897
+        private string GetTimeZone(string windows, string iana) =>
+            RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? windows : iana;
     }
 }

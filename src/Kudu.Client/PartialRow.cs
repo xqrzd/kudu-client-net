@@ -2,6 +2,7 @@
 using System.Buffers.Binary;
 using System.Text;
 using Kudu.Client.Builder;
+using Kudu.Client.Util;
 
 namespace Kudu.Client
 {
@@ -108,8 +109,18 @@ namespace Kudu.Client
 
         public void SetBool(int columnIndex, bool value)
         {
+            SetByte(columnIndex, (byte)(value ? 1 : 0));
+        }
+
+        public void SetSByte(int columnIndex, sbyte value)
+        {
+            SetByte(columnIndex, (byte)value);
+        }
+
+        public void SetByte(int columnIndex, byte value)
+        {
             Set(columnIndex);
-            _rowAlloc[Schema.GetColumnOffset(columnIndex)] = (byte)(value ? 1 : 0);
+            _rowAlloc[Schema.GetColumnOffset(columnIndex)] = value;
         }
 
         public void SetShort(int columnIndex, short value)
@@ -118,10 +129,52 @@ namespace Kudu.Client
             BinaryPrimitives.WriteInt16LittleEndian(span, value);
         }
 
+        public void SetUShort(int columnIndex, ushort value)
+        {
+            var span = GetSpanInRowAllocAndSetBitSet(columnIndex);
+            BinaryPrimitives.WriteUInt16LittleEndian(span, value);
+        }
+
         public void SetInt(int columnIndex, int value)
         {
             var span = GetSpanInRowAllocAndSetBitSet(columnIndex);
             BinaryPrimitives.WriteInt32LittleEndian(span, value);
+        }
+
+        public void SetUInt(int columnIndex, uint value)
+        {
+            var span = GetSpanInRowAllocAndSetBitSet(columnIndex);
+            BinaryPrimitives.WriteUInt32LittleEndian(span, value);
+        }
+
+        public void SetFloat(int columnIndex, float value)
+        {
+            var intValue = value.AsInt();
+            SetInt(columnIndex, intValue);
+        }
+
+        public void SetDouble(int columnIndex, double value)
+        {
+            var longValue = value.AsLong();
+            SetLong(columnIndex, longValue);
+        }
+
+        public void SetLong(int columnIndex, long value)
+        {
+            var span = GetSpanInRowAllocAndSetBitSet(columnIndex);
+            BinaryPrimitives.WriteInt64LittleEndian(span, value);
+        }
+
+        public void SetULong(int columnIndex, ulong value)
+        {
+            var span = GetSpanInRowAllocAndSetBitSet(columnIndex);
+            BinaryPrimitives.WriteUInt64LittleEndian(span, value);
+        }
+
+        public void SetDateTime(int columnIndex, DateTime value)
+        {
+            var micros = EpochTime.ToUnixEpochMicros(value);
+            SetLong(columnIndex, micros);
         }
 
         public void SetString(int columnIndex, string value)
