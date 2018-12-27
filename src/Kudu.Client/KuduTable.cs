@@ -7,8 +7,9 @@ namespace Kudu.Client
     {
         private readonly Schema _schema;
 
-        // TODO: Create a managed class for this.
-        public GetTableSchemaResponsePB SchemaPb { get; }
+        internal GetTableSchemaResponsePB SchemaPb { get; }
+
+        public PartitionSchema PartitionSchema { get; }
 
         public string TableId { get; }
 
@@ -16,6 +17,7 @@ namespace Kudu.Client
         {
             _schema = new Schema(schemaPb.Schema);
             SchemaPb = schemaPb;
+            PartitionSchema = new PartitionSchema(schemaPb.PartitionSchema);
             TableId = schemaPb.TableId.ToStringUtf8();
         }
 

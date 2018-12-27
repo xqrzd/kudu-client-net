@@ -327,7 +327,7 @@ namespace Kudu.Client
         {
             using (var writer = new BufferWriter(256))
             {
-                KeyEncoder.EncodePartitionKey(row, table.SchemaPb.PartitionSchema, writer);
+                KeyEncoder.EncodePartitionKey(row, table.PartitionSchema, writer);
                 var partitionKey = writer.Memory.Span;
 
                 return GetTabletAsync(table.TableId, partitionKey);
