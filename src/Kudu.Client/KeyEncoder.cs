@@ -21,7 +21,8 @@ namespace Kudu.Client
                 writer.Advance(4);
             }
 
-            EncodeColumns(row, partitionSchema.RangeSchemaColumnIds, writer);
+            var rangeColumns = partitionSchema.RangeSchema.ColumnIds;
+            EncodeColumns(row, rangeColumns, writer);
         }
 
         public static int GetHashBucket(PartialRow row, HashBucketSchema hashSchema)

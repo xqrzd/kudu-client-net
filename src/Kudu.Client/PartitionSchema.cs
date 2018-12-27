@@ -5,20 +5,20 @@ namespace Kudu.Client
 {
     public class PartitionSchema
     {
-        public List<int> RangeSchemaColumnIds { get; }
+        public RangeSchema RangeSchema { get; }
 
         public List<HashBucketSchema> HashBucketSchemas { get; }
 
-        public PartitionSchema(List<int> rangeSchema, List<HashBucketSchema> hashBucketSchemas)
+        public PartitionSchema(RangeSchema rangeSchema, List<HashBucketSchema> hashBucketSchemas)
         {
-            RangeSchemaColumnIds = rangeSchema;
+            RangeSchema = rangeSchema;
             HashBucketSchemas = hashBucketSchemas;
             // TODO: Calculate IsSimpleRangePartitioning
         }
 
         public PartitionSchema(PartitionSchemaPB partitionSchemaPb)
         {
-            RangeSchemaColumnIds = ToColumnIds(partitionSchemaPb.RangeSchema.Columns);
+            RangeSchema = new RangeSchema(ToColumnIds(partitionSchemaPb.RangeSchema.Columns));
 
             HashBucketSchemas = new List<HashBucketSchema>(partitionSchemaPb.HashBucketSchemas.Count);
             foreach (var hashSchema in partitionSchemaPb.HashBucketSchemas)
@@ -41,6 +41,16 @@ namespace Kudu.Client
                 columnIds.Add(column.Id);
 
             return columnIds;
+        }
+    }
+
+    public class RangeSchema
+    {
+        public List<int> ColumnIds { get; }
+
+        public RangeSchema(List<int> columnIds)
+        {
+            ColumnIds = columnIds;
         }
     }
 
