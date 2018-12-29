@@ -39,7 +39,7 @@ namespace Kudu.Client
 
         public async Task<byte[]> CreateTableAsync(TableBuilder table)
         {
-            var rpc = new CreateTableRequest(table);
+            var rpc = new CreateTableRequest(table.Build());
 
             var result = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
 

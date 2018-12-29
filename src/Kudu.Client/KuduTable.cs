@@ -5,9 +5,9 @@ namespace Kudu.Client
 {
     public class KuduTable
     {
-        private readonly Schema _schema;
-
         internal GetTableSchemaResponsePB SchemaPb { get; }
+
+        public Schema Schema { get; }
 
         public PartitionSchema PartitionSchema { get; }
 
@@ -15,7 +15,7 @@ namespace Kudu.Client
 
         public KuduTable(GetTableSchemaResponsePB schemaPb)
         {
-            _schema = new Schema(schemaPb.Schema);
+            Schema = new Schema(schemaPb.Schema);
             SchemaPb = schemaPb;
             PartitionSchema = new PartitionSchema(schemaPb.PartitionSchema);
             TableId = schemaPb.TableId.ToStringUtf8();
@@ -35,7 +35,7 @@ namespace Kudu.Client
 
         private Operation NewOperation(RowOperation rowOperation)
         {
-            var row = new PartialRow(_schema, rowOperation);
+            var row = new PartialRow(Schema, rowOperation);
             return new Operation(this, row);
         }
     }

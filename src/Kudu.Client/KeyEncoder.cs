@@ -51,7 +51,8 @@ namespace Kudu.Client
             PartialRow row, int columnIndex, bool isLast, BufferWriter writer)
         {
             var schema = row.Schema;
-            var type = schema.GetColumnType(columnIndex);
+            var column = schema.GetColumn(columnIndex);
+            var type = column.Type;
 
             if (type == DataType.String || type == DataType.Binary)
             {
@@ -61,7 +62,7 @@ namespace Kudu.Client
             else
             {
                 // TODO: Benchmark MemoryMarshal.TryRead
-                var size = schema.GetColumnSize(columnIndex);
+                var size = column.Size;
                 var slice = writer.GetSpan(size);
 
                 var data = row.GetRowAllocColumn(columnIndex);
@@ -70,7 +71,7 @@ namespace Kudu.Client
                 // Row data is little endian, but key encoding is big endian.
                 slice.Reverse();
 
-                if (Schema.IsSigned(type))
+                if (column.IsSigned)
                     slice.SwapMostSignificantBitBigEndian();
 
                 writer.Advance(size);

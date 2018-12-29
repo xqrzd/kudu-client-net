@@ -5,11 +5,15 @@ using Kudu.Client.Protocol;
 
 namespace Kudu.Client
 {
+    /// <summary>
+    /// Represents table's schema which is essentially a list of columns.
+    /// </summary>
     public class Schema
     {
-        // TODO: Create a managed class for this?
-        // TODO: Store columns instead?
-        private readonly SchemaPB _schema;
+        /// <summary>
+        /// Maps column index to column.
+        /// </summary>
+        private readonly ColumnSchema[] _columnsByIndex;
 
         /// <summary>
         /// Maps column name to column index.
@@ -26,8 +30,6 @@ namespace Kudu.Client
         /// </summary>
         private readonly int[] _columnOffsets;
 
-        public int ColumnCount { get; }
-
         /// <summary>
         /// The size of all fixed-length columns.
         /// </summary>
@@ -36,6 +38,50 @@ namespace Kudu.Client
         public int VarLengthColumnCount { get; }
 
         public bool HasNullableColumns { get; }
+
+        public Schema(List<ColumnSchema> columns)
+            : this(columns, null) { }
+
+        public Schema(List<ColumnSchema> columns, List<int> columnIds)
+        {
+            var hasColumnIds = columnIds != null;
+            if (hasColumnIds)
+                _columnsById = new Dictionary<int, int>(columns.Count);
+
+            _columnsByName = new Dictionary<string, int>(columns.Count);
+            _columnsById = new Dictionary<int, int>(columns.Count);
+            _columnOffsets = new int[columns.Count];
+
+            for (int i = 0; i < columns.Count; i++)
+            {
+                var column = columns[i];
+
+                if (column.Type == DataType.String || column.Type == DataType.Binary)
+                {
+                    _columnOffsets[i] = VarLengthColumnCount;
+                    VarLengthColumnCount++;
+
+                    // Don't increment size here, these types are stored separately
+                    // in PartialRow (_varLengthData).
+                }
+                else
+                {
+                    _columnOffsets[i] = RowAllocSize;
+                    RowAllocSize += column.Size;
+                }
+
+                HasNullableColumns |= column.IsNullable;
+                _columnsByName.Add(column.Name, i);
+
+                if (hasColumnIds)
+                    _columnsById.TryAdd(columnIds[i], i);
+
+                // TODO: store primary key columns
+            }
+
+            _columnsByIndex = new ColumnSchema[columns.Count];
+            columns.CopyTo(_columnsByIndex);
+        }
 
         public Schema(SchemaPB schema)
         {
@@ -47,6 +93,7 @@ namespace Kudu.Client
             var columnsByName = new Dictionary<string, int>(columns.Count);
             var columnsById = new Dictionary<int, int>(columns.Count);
             var columnOffsets = new int[columns.Count];
+            var columnsByIndex = new ColumnSchema[columns.Count];
 
             for (int i = 0; i < columns.Count; i++)
             {
@@ -68,6 +115,7 @@ namespace Kudu.Client
                 hasNulls |= column.IsNullable;
                 columnsByName.Add(column.Name, i);
                 columnsById.Add((int)column.Id, i);
+                columnsByIndex[i] = new ColumnSchema(columns[i]);
 
                 // TODO: Remove this hack-fix. Kudu throws an exception if columnId is supplied.
                 column.ResetId();
@@ -75,15 +123,16 @@ namespace Kudu.Client
                 // TODO: store primary key columns
             }
 
-            _schema = schema;
             _columnOffsets = columnOffsets;
             _columnsByName = columnsByName;
             _columnsById = columnsById;
-            ColumnCount = columns.Count;
+            _columnsByIndex = columnsByIndex;
             RowAllocSize = size;
             VarLengthColumnCount = varLenCnt;
             HasNullableColumns = hasNulls;
         }
+
+        public int ColumnCount => _columnsByIndex.Length;
 
         public int GetColumnIndex(string name) => _columnsByName[name];
 
@@ -96,15 +145,7 @@ namespace Kudu.Client
         /// <param name="index">The column index.</param>
         public int GetColumnOffset(int index) => _columnOffsets[index];
 
-        /// <summary>
-        /// Gets the size the column takes up in RowAlloc.
-        /// </summary>
-        /// <param name="index">The column index.</param>
-        public int GetColumnSize(int index) => GetTypeSize(GetColumnType(index));
-
-        public DataType GetColumnType(int index) => (DataType)_schema.Columns[index].Type;
-
-        public bool IsPrimaryKey(int index) => _schema.Columns[index].IsKey;
+        public ColumnSchema GetColumn(int index) => _columnsByIndex[index];
 
         public int GetColumnIndex(int id) => _columnsById[id];
 

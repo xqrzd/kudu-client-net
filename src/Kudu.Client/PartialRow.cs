@@ -65,8 +65,9 @@ namespace Kudu.Client
             {
                 if (IsSet(i) && !IsSetToNull(i))
                 {
-                    var size = Schema.GetColumnSize(i);
-                    var type = Schema.GetColumnType(i);
+                    var column = Schema.GetColumn(i);
+                    var size = column.Size;
+                    var type = column.Type;
 
                     if (type == DataType.String || type == DataType.Binary)
                     {
@@ -224,7 +225,8 @@ namespace Kudu.Client
             {
                 if (IsSet(i) && !IsSetToNull(i))
                 {
-                    size += Schema.GetColumnSize(i);
+                    var column = Schema.GetColumn(i);
+                    size += column.Size;
                 }
             }
 
