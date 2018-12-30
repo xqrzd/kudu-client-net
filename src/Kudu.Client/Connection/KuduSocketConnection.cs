@@ -14,7 +14,7 @@ namespace Kudu.Client.Connection
             (byte)'h', (byte)'r', (byte)'p', (byte)'c',
             CurrentRpcVersion,
             0, // ServiceClass (unused)
-            0  // AuthProtocol (unsed)
+            0  // AuthProtocol (unused)
         };
 
         private readonly SocketConnection _connection;
