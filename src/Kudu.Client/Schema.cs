@@ -74,7 +74,7 @@ namespace Kudu.Client
                 _columnsByName.Add(column.Name, i);
 
                 if (hasColumnIds)
-                    _columnsById.TryAdd(columnIds[i], i);
+                    _columnsById.Add(columnIds[i], i);
 
                 // TODO: store primary key columns
             }
