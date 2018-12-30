@@ -49,5 +49,87 @@ namespace Kudu.Client.FunctionalTests
                 // TODO: Add asserts for tabletLocations contents.
             }
         }
+
+        [Fact]
+        public async Task CreateTableWithRangePartitions()
+        {
+            using (var client = KuduClient.Build("127.0.0.1:7051"))
+            {
+                var tableName = Guid.NewGuid().ToString();
+                var builder = new TableBuilder()
+                    .SetTableName(tableName)
+                    .SetNumReplicas(1)
+                    .AddColumn(column =>
+                    {
+                        column.Name = "column_x";
+                        column.Type = DataType.Int32;
+                        column.IsKey = true;
+                    })
+                    .AddColumn(column =>
+                    {
+                        column.Name = "column_y";
+                        column.Type = DataType.String;
+                        column.IsKey = true;
+                    })
+                    .SetRangePartitionColumns("column_x")
+                    .AddRangePartition((lower, upper) =>
+                    {
+                        lower.SetInt(0, 20);
+                        upper.SetInt(0, 21);
+                    })
+                    .AddRangePartition((lower, upper) =>
+                    {
+                        lower.SetInt(0, 30);
+                        upper.SetInt(0, 50);
+                    })
+                    .AddRangePartition((lower, upper) =>
+                    {
+                        lower.SetInt(0, 67);
+                        upper.SetInt(0, 99);
+                    });
+
+                var tableId = await client.CreateTableAsync(builder);
+                Assert.NotEmpty(tableId);
+
+                var tables = await client.GetTablesAsync(tableName);
+                Assert.Contains(tables,
+                    t => t.Id.AsSpan().SequenceEqual(tableId));
+
+                var table = await client.OpenTableAsync(tableName);
+                var partition = table.PartitionSchema;
+                Assert.Empty(partition.HashBucketSchemas);
+                Assert.Equal(new int[] { 0 }, partition.RangeSchema.ColumnIds);
+
+                var locations = await client.GetTableLocationsAsync(tableId.ToStringUtf8(), null, 10);
+                Assert.Collection(locations, t =>
+                {
+                    var start = new byte[] { 0x80, 0x0, 0x0, 0x14 };
+                    var end = new byte[] { 0x80, 0x0, 0x0, 0x15 };
+
+                    Assert.Equal(start, t.Partition.PartitionKeyStart);
+                    Assert.Equal(start, t.Partition.RangeKeyStart);
+                    Assert.Equal(end, t.Partition.PartitionKeyEnd);
+                    Assert.Equal(end, t.Partition.RangeKeyEnd);
+                }, t =>
+                {
+                    var start = new byte[] { 0x80, 0x0, 0x0, 0x1E };
+                    var end = new byte[] { 0x80, 0x0, 0x0, 0x32 };
+
+                    Assert.Equal(start, t.Partition.PartitionKeyStart);
+                    Assert.Equal(start, t.Partition.RangeKeyStart);
+                    Assert.Equal(end, t.Partition.PartitionKeyEnd);
+                    Assert.Equal(end, t.Partition.RangeKeyEnd);
+                }, t =>
+                {
+                    var start = new byte[] { 0x80, 0x0, 0x0, 0x43 };
+                    var end = new byte[] { 0x80, 0x0, 0x0, 0x63 };
+
+                    Assert.Equal(start, t.Partition.PartitionKeyStart);
+                    Assert.Equal(start, t.Partition.RangeKeyStart);
+                    Assert.Equal(end, t.Partition.PartitionKeyEnd);
+                    Assert.Equal(end, t.Partition.RangeKeyEnd);
+                });
+            }
+        }
     }
 }
