@@ -174,7 +174,7 @@ namespace Kudu.Client
                 case DataType.UnixtimeMicros:
                 case DataType.Decimal64:
                     return 8;
-                case DataType.Int128:
+                //case DataType.Int128: Not supported in Kudu yet.
                 case DataType.Decimal128:
                     return 16;
                 default:
@@ -190,7 +190,7 @@ namespace Kudu.Client
                 case DataType.Int16:
                 case DataType.Int32:
                 case DataType.Int64:
-                case DataType.Int128:
+                    //case DataType.Int128: Not supported in Kudu yet.
                     return true;
                 default:
                     return false;

@@ -18,7 +18,7 @@ namespace Kudu.Client.Builder
         Double = DataTypePB.Double,
         Binary = DataTypePB.Binary,
         UnixtimeMicros = DataTypePB.UnixtimeMicros,
-        Int128 = DataTypePB.Int128,
+        //Int128 = DataTypePB.Int128, // Not supported in Kudu yet.
         Decimal32 = DataTypePB.Decimal32,
         Decimal64 = DataTypePB.Decimal64,
         Decimal128 = DataTypePB.Decimal128
