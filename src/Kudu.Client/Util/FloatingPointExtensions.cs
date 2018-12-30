@@ -12,6 +12,8 @@ namespace Kudu.Client.Util
         /// <param name="value">A floating-point number.</param>
         public static int AsInt(this float value)
         {
+            // TODO: Use BitConverter.SingleToInt32Bits() on every platform except .NET Standard 2.0
+
             // All NaN values are collapsed to a single "canonical" NaN value.
             if (float.IsNaN(value))
                 return 0x7fc00000;
@@ -28,6 +30,8 @@ namespace Kudu.Client.Util
         /// <param name="value">A double precision floating-point number.</param>
         public static long AsLong(this double value)
         {
+            // TODO: Use BitConverter.DoubleToInt64Bits() on every platform except .NET Standard 2.0
+
             // All NaN values are collapsed to a single "canonical" NaN value.
             if (double.IsNaN(value))
                 return 0x7ff8000000000000;
