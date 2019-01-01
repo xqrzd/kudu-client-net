@@ -148,18 +148,6 @@ namespace Kudu.Client
             BinaryPrimitives.WriteUInt32LittleEndian(span, value);
         }
 
-        public void SetFloat(int columnIndex, float value)
-        {
-            var intValue = value.AsInt();
-            SetInt(columnIndex, intValue);
-        }
-
-        public void SetDouble(int columnIndex, double value)
-        {
-            var longValue = value.AsLong();
-            SetLong(columnIndex, longValue);
-        }
-
         public void SetLong(int columnIndex, long value)
         {
             var span = GetSpanInRowAllocAndSetBitSet(columnIndex);
@@ -176,6 +164,58 @@ namespace Kudu.Client
         {
             var micros = EpochTime.ToUnixEpochMicros(value);
             SetLong(columnIndex, micros);
+        }
+
+        public void SetFloat(int columnIndex, float value)
+        {
+            var intValue = value.AsInt();
+            SetInt(columnIndex, intValue);
+        }
+
+        public void SetDouble(int columnIndex, double value)
+        {
+            var longValue = value.AsLong();
+            SetLong(columnIndex, longValue);
+        }
+
+        public void SetDecimal(int columnIndex, decimal value)
+        {
+            var column = Schema.GetColumn(columnIndex);
+            var precision = column.TypeAttributes.Precision;
+            var scale = column.TypeAttributes.Scale;
+
+            var size = DecimalUtil.PrecisionToSize(precision);
+
+            switch (size)
+            {
+                case DecimalUtil.Decimal32Size:
+                    {
+                        var encodedValue = DecimalUtil.EncodeDecimal32(value, precision, scale);
+                        SetInt(columnIndex, encodedValue);
+                        break;
+                    }
+                case DecimalUtil.Decimal64Size:
+                    {
+                        var encodedValue = DecimalUtil.EncodeDecimal64(value, precision, scale);
+                        SetLong(columnIndex, encodedValue);
+                        break;
+                    }
+                case DecimalUtil.Decimal128Size:
+                    {
+                        var encodedValue = DecimalUtil.EncodeDecimal128(value, precision, scale);
+                        var span = GetSpanInRowAllocAndSetBitSet(columnIndex);
+                        encodedValue.TryWriteBytes(span, out var written);
+
+                        if (encodedValue.Sign == -1)
+                        {
+                            // TODO: Use C# 8 range here: written..^0
+                            var slice = span.Slice(written, 16 - written);
+                            slice.Fill(0xff);
+                        }
+
+                        break;
+                    }
+            }
         }
 
         public void SetString(int columnIndex, string value)
@@ -202,6 +242,7 @@ namespace Kudu.Client
         private Span<byte> GetSpanInRowAllocAndSetBitSet(int columnIndex)
         {
             var position = _headerSize + GetPositionInRowAllocAndSetBitSet(columnIndex);
+            // TODO: Include length here, so the span is the correct size.
             return _rowAlloc.AsSpan(position);
         }
 
