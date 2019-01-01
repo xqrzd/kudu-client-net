@@ -16,7 +16,7 @@ namespace Kudu.Client.Util
         public const long MinUnscaledDecimal64 = -MaxUnscaledDecimal64;
         public const int Decimal64Size = 8;
 
-        public const int MaxDecimal128Precision = 38; // TODO: This is outside C# decimal bounds.
+        public const int MaxDecimal128Precision = 38;
         public const int Decimal128Size = 16;
 
         public const int MaxDecimalPrecision = MaxDecimal128Precision;

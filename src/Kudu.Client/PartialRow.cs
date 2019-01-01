@@ -181,10 +181,9 @@ namespace Kudu.Client
         public void SetDecimal(int columnIndex, decimal value)
         {
             var column = Schema.GetColumn(columnIndex);
+            var size = column.Size;
             var precision = column.TypeAttributes.Precision;
             var scale = column.TypeAttributes.Scale;
-
-            var size = DecimalUtil.PrecisionToSize(precision);
 
             switch (size)
             {
