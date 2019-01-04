@@ -93,8 +93,8 @@ namespace Kudu.Client.Util
             }
 
             var scaleAdjustment = targetScale - (int)d.Scale;
-            var factor = PowBase10Cache32[scaleAdjustment];
-            var maxValue = PowBase10Cache32[targetPrecision - scaleAdjustment] - 1;
+            var factor = Pow10Int32(scaleAdjustment);
+            var maxValue = Pow10Int32(targetPrecision - scaleAdjustment) - 1;
             var unscaledValue = (int)d.Low;
 
             if (d.High > 0 || d.Mid > 0 || unscaledValue > maxValue)
@@ -122,8 +122,8 @@ namespace Kudu.Client.Util
             }
 
             var scaleAdjustment = targetScale - (int)d.Scale;
-            var factor = PowBase10Cache64[scaleAdjustment];
-            var maxValue = PowBase10Cache64[targetPrecision - scaleAdjustment] - 1;
+            var factor = Pow10Int64(scaleAdjustment);
+            var maxValue = Pow10Int64(targetPrecision - scaleAdjustment) - 1;
             var unscaledValue = ToLong(d.Low, d.Mid);
 
             if (d.High > 0 || unscaledValue > maxValue)
@@ -184,6 +184,10 @@ namespace Kudu.Client.Util
             b |= lower;
             return b;
         }
+
+        private static int Pow10Int32(int value) => PowBase10Cache32[value];
+
+        private static long Pow10Int64(int value) => PowBase10Cache64[value];
 
         [StructLayout(LayoutKind.Sequential)]
         private struct DecimalParts
