@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -26,6 +27,15 @@ namespace Kudu.Client.Util
 
         public static void SwapMostSignificantBitBigEndian(this Span<byte> span) =>
             span[0] ^= 1 << 7;
+
+        /// <summary>
+        /// Obtains the data as a list; if it is *already* a list, the original object is returned without
+        /// any duplication; otherwise, ToList() is invoked.
+        /// </summary>
+        /// <typeparam name="T">The type of element in the list.</typeparam>
+        /// <param name="source">The enumerable to return as a list.</param>
+        public static List<T> AsList<T>(this IEnumerable<T> source) =>
+            (source == null || source is List<T>) ? (List<T>)source : source.ToList();
 
         public static int GetContentHashCode(this byte[] source)
         {
