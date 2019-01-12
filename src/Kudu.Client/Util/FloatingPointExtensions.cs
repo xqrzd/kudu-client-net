@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System;
+using System.Runtime.InteropServices;
 
 namespace Kudu.Client.Util
 {
@@ -30,14 +31,11 @@ namespace Kudu.Client.Util
         /// <param name="value">A double precision floating-point number.</param>
         public static long AsLong(this double value)
         {
-            // TODO: Use BitConverter.DoubleToInt64Bits() on every platform except .NET Standard 2.0
-
             // All NaN values are collapsed to a single "canonical" NaN value.
             if (double.IsNaN(value))
                 return 0x7ff8000000000000;
 
-            DoubleUnion union = value;
-            return union.LongValue;
+            return BitConverter.DoubleToInt64Bits(value);
         }
 
         [StructLayout(LayoutKind.Explicit)]
@@ -54,22 +52,6 @@ namespace Kudu.Client.Util
 
             public static implicit operator FloatUnion(float value) =>
                 new FloatUnion { FloatValue = value };
-        }
-
-        [StructLayout(LayoutKind.Explicit)]
-        private struct DoubleUnion
-        {
-            [FieldOffset(0)]
-            public double DoubleValue;
-
-            [FieldOffset(0)]
-            public long LongValue;
-
-            public static implicit operator DoubleUnion(long value) =>
-                new DoubleUnion { LongValue = value };
-
-            public static implicit operator DoubleUnion(double value) =>
-                new DoubleUnion { DoubleValue = value };
         }
     }
 }
