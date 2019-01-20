@@ -9,13 +9,27 @@ namespace Kudu.Client.Connection
     {
         private const byte CurrentRpcVersion = 9;
 
-        private static readonly byte[] ConnectionHeader = new byte[]
+        private static readonly ReadOnlyMemory<byte> ConnectionHeader = new byte[]
         {
             (byte)'h', (byte)'r', (byte)'p', (byte)'c',
             CurrentRpcVersion,
             0, // ServiceClass (unused)
             0  // AuthProtocol (unused)
         };
+
+        private static readonly PipeOptions SendOptions = new PipeOptions(
+            useSynchronizationContext: false);
+
+        private static readonly PipeOptions ReceiveOptions = new PipeOptions(
+            pauseWriterThreshold: 1024 * 1024 * 256,  // 256MB
+            resumeWriterThreshold: 1024 * 1024 * 128, // 128MB
+            minimumSegmentSize: 1024 * 128,
+            useSynchronizationContext: false);
+
+        private static readonly SocketConnectionOptions ConnectionOptions =
+            SocketConnectionOptions.ZeroLengthReads |
+            SocketConnectionOptions.InlineReads |
+            SocketConnectionOptions.InlineWrites;
 
         private readonly SocketConnection _connection;
 
@@ -39,6 +53,9 @@ namespace Kudu.Client.Connection
         {
             var connection = await SocketConnection.ConnectAsync(
                 serverInfo.Endpoint,
+                SendOptions,
+                ReceiveOptions,
+                ConnectionOptions,
                 name: serverInfo.ToString()).ConfigureAwait(false);
 
             // After the client connects to a server, the client first sends a connection header.
