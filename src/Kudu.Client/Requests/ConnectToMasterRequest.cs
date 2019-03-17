@@ -2,10 +2,10 @@
 
 namespace Kudu.Client.Requests
 {
-    public class ConnectToMasterRequest : KuduMasterRpc<ConnectToMasterRequestPB, ConnectToMasterResponsePB>
+    public class ConnectToMasterRequest : KuduRpc<ConnectToMasterRequestPB, ConnectToMasterResponsePB>
     {
-        public override string MethodName => "ConnectToMaster";
+        public override string ServiceName => MasterServiceName;
 
-        public override ConnectToMasterRequestPB Request => new ConnectToMasterRequestPB();
+        public override string MethodName => "ConnectToMaster";
     }
 }

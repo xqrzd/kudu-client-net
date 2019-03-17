@@ -24,16 +24,16 @@ namespace Kudu.Client
         /// </summary>
         private const int FetchTabletsPerPointLookup = 10;
 
-        private readonly KuduClientSettings _settings;
+        private readonly KuduClientOptions _options;
         private readonly ConnectionCache _connectionCache;
         private readonly Dictionary<string, TableLocationsCache> _tableLocations;
 
         private volatile ServerInfoCache _masterCache;
 
-        public KuduClient(KuduClientSettings settings)
+        public KuduClient(KuduClientOptions options)
         {
-            _settings = settings;
-            _connectionCache = new ConnectionCache();
+            _options = options;
+            _connectionCache = new ConnectionCache(new KuduConnectionFactory());
             _tableLocations = new Dictionary<string, TableLocationsCache>();
         }
 
@@ -41,7 +41,8 @@ namespace Kudu.Client
         {
             var rpc = new CreateTableRequest(table.Build());
 
-            var result = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
+            await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
+            var result = rpc.Response;
 
             // TODO: Handle errors elsewhere?
             if (result.Error != null)
@@ -59,7 +60,8 @@ namespace Kudu.Client
                 NameFilter = nameFilter
             });
 
-            var result = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
+            await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
+            var result = rpc.Response;
 
             // TODO: Handle errors elsewhere?
             if (result.Error != null)
@@ -80,7 +82,8 @@ namespace Kudu.Client
                 MaxReturnedLocations = fetchBatchSize
             });
 
-            var result = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
+            await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
+            var result = rpc.Response;
 
             if (result.Error != null)
                 throw new MasterException(result.Error);
@@ -106,7 +109,8 @@ namespace Kudu.Client
                 }
             });
 
-            var result = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
+            await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
+            var result = rpc.Response;
 
             if (result.Error != null)
                 throw new MasterException(result.Error);
@@ -141,7 +145,7 @@ namespace Kudu.Client
                 throw new Exception("The requested tablet does not exist");
 
             var server = tablet.GetServerInfo(ReplicaSelection.LeaderOnly);
-            var connection = await _connectionCache.CreateConnectionAsync(server).ConfigureAwait(false);
+            var connection = await _connectionCache.GetConnectionAsync(server).ConfigureAwait(false);
 
             var rpc = new WriteRequest(new WriteRequestPB
             {
@@ -150,7 +154,8 @@ namespace Kudu.Client
                 RowOperations = rowOperations
             });
 
-            var result = await SendRpcToConnectionAsync(rpc, connection).ConfigureAwait(false);
+            await SendRpcToConnectionAsync(rpc, connection).ConfigureAwait(false);
+            var result = rpc.Response;
 
             if (result.Error != null)
                 throw new TabletServerException(result.Error);
@@ -223,7 +228,7 @@ namespace Kudu.Client
             };
 
             var server = tablet.GetServerInfo(ReplicaSelection.LeaderOnly);
-            var connection = await _connectionCache.CreateConnectionAsync(server).ConfigureAwait(false);
+            var connection = await _connectionCache.GetConnectionAsync(server).ConfigureAwait(false);
 
             var rpc = new WriteRequest(new WriteRequestPB
             {
@@ -232,7 +237,8 @@ namespace Kudu.Client
                 RowOperations = rowOperations
             });
 
-            var result = await SendRpcToConnectionAsync(rpc, connection).ConfigureAwait(false);
+            await SendRpcToConnectionAsync(rpc, connection).ConfigureAwait(false);
+            var result = rpc.Response;
 
             if (result.Error != null)
                 throw new TabletServerException(result.Error);
@@ -254,7 +260,8 @@ namespace Kudu.Client
 
             while (true)
             {
-                var result = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
+                await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
+                var result = rpc.Response;
 
                 if (result.Error != null)
                     throw new MasterException(result.Error);
@@ -269,14 +276,15 @@ namespace Kudu.Client
 
         private async Task ConnectToClusterAsync()
         {
-            var masters = new List<ServerInfo>(_settings.MasterAddresses.Count);
+            var masters = new List<ServerInfo>(_options.MasterAddresses.Count);
             int leaderIndex = -1;
-            foreach (var master in _settings.MasterAddresses)
+            foreach (var master in _options.MasterAddresses)
             {
                 var serverInfo = master.CreateServerInfo("master");
-                var connection = await _connectionCache.CreateConnectionAsync(serverInfo).ConfigureAwait(false);
+                var connection = await _connectionCache.GetConnectionAsync(serverInfo).ConfigureAwait(false);
                 var rpc = new ConnectToMasterRequest();
-                var response = await SendRpcToConnectionAsync(rpc, connection).ConfigureAwait(false);
+                await SendRpcToConnectionAsync(rpc, connection).ConfigureAwait(false);
+                var response = rpc.Response;
 
                 if (response.Role == RaftPeerPB.Role.Leader)
                 {
@@ -292,20 +300,19 @@ namespace Kudu.Client
             _masterCache = new ServerInfoCache(masters, leaderIndex);
         }
 
-        private async Task<K> SendRpcToMasterAsync<T, K>(KuduMasterRpc<T, K> rpc)
+        private async Task SendRpcToMasterAsync(KuduRpc rpc)
         {
             // TODO: Don't allow this to happen in parallel.
             if (_masterCache == null)
                 await ConnectToClusterAsync().ConfigureAwait(false);
 
             var master = _masterCache.GetServerInfo(rpc.ReplicaSelection);
-            var connection = await _connectionCache.CreateConnectionAsync(master).ConfigureAwait(false);
+            var connection = await _connectionCache.GetConnectionAsync(master).ConfigureAwait(false);
 
-            return await SendRpcToConnectionAsync(rpc, connection).ConfigureAwait(false);
+            await SendRpcToConnectionAsync(rpc, connection).ConfigureAwait(false);
         }
 
-        private async Task<K> SendRpcToConnectionAsync<T, K>(
-            KuduRpc<T, K> rpc, KuduConnection connection)
+        private async Task SendRpcToConnectionAsync(KuduRpc rpc, KuduConnection connection)
         {
             var header = new RequestHeader
             {
@@ -318,9 +325,7 @@ namespace Kudu.Client
                 // TODO: Set RequiredFeatureFlags
             };
 
-            CallResponse response = await connection.SendReceiveAsync(header, rpc.Request).ConfigureAwait(false);
-
-            return rpc.ParseResponse(response);
+            await connection.SendReceiveAsync(header, rpc).ConfigureAwait(false);
         }
 
         internal ValueTask<RemoteTablet> GetRowTabletAsync(KuduTable table, PartialRow row)
@@ -330,6 +335,8 @@ namespace Kudu.Client
                 KeyEncoder.EncodePartitionKey(row, table.PartitionSchema, writer);
                 var partitionKey = writer.Memory.Span;
 
+                // Note that we don't have to await this method before disposing the writer, as a
+                // copy of partitionKey will be made if the method cannot complete synchronously.
                 return GetTabletAsync(table.TableId, partitionKey);
             }
         }
@@ -425,7 +432,7 @@ namespace Kudu.Client
         {
             var masters = masterAddresses.Split(',');
 
-            var settings = new KuduClientSettings
+            var options = new KuduClientOptions
             {
                 MasterAddresses = new List<HostAndPort>(masters.Length)
             };
@@ -433,10 +440,10 @@ namespace Kudu.Client
             foreach (var master in masters)
             {
                 var hostPort = EndpointParser.TryParse(master.Trim(), 7051);
-                settings.MasterAddresses.Add(hostPort);
+                options.MasterAddresses.Add(hostPort);
             }
 
-            return new KuduClient(settings);
+            return new KuduClient(options);
         }
     }
 }

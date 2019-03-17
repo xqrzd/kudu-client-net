@@ -1,25 +1,32 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace Kudu.Client.Connection
 {
     public class ConnectionCache : IDisposable
     {
-        private Dictionary<HostAndPort, Task<KuduConnection>> _connections;
+        private readonly IKuduConnectionFactory _connectionFactory;
+        private readonly Dictionary<HostAndPort, Task<KuduConnection>> _connections;
+        private bool _disposed;
 
-        public ConnectionCache()
+        public ConnectionCache(IKuduConnectionFactory connectionFactory)
         {
+            _connectionFactory = connectionFactory;
             _connections = new Dictionary<HostAndPort, Task<KuduConnection>>();
         }
 
-        public Task<KuduConnection> CreateConnectionAsync(ServerInfo serverInfo)
+        public Task<KuduConnection> GetConnectionAsync(ServerInfo serverInfo)
         {
-            HostAndPort hostPort = serverInfo.HostPort;
+            var hostPort = serverInfo.HostPort;
 
             lock (_connections)
             {
+                if (_disposed)
+                    ThrowDisposedException();
+
                 if (_connections.TryGetValue(hostPort, out var connection))
                 {
                     // Don't hand out connections we know are faulted, create a new one instead.
@@ -37,35 +44,34 @@ namespace Kudu.Client.Connection
 
         private async Task<KuduConnection> ConnectAsync(ServerInfo serverInfo)
         {
-            var connection = await KuduConnectionFactory.ConnectAsync(serverInfo).ConfigureAwait(false);
+            var connection = await _connectionFactory.ConnectAsync(serverInfo).ConfigureAwait(false);
 
             // Once we have a KuduConnection, register a callback when it's closed,
             // so we can remove it from the connection cache.
-
-            // TODO: Is it worth trying to avoid a closure here?
-            // We'd need to store both _connections and hostPort in state.
-            connection.OnConnectionClosed(RemoveConnectionAsync, serverInfo.HostPort);
+            connection.OnDisconnected(RemoveConnection, serverInfo.HostPort);
 
             return connection;
         }
 
-        private async void RemoveConnectionAsync(Exception ex, object state)
+        private void RemoveConnection(Exception ex, object state)
         {
-            // TODO: Debug log connection removed from cache.
-
             var hostPort = (HostAndPort)state;
-            Task<KuduConnection> connectionTask;
 
             lock (_connections)
             {
-                _connections.Remove(hostPort, out connectionTask);
-            }
+                // We're here because the connection's OnConnectionClosed
+                // was raised. This means the connection isn't usable anymore
+                // and we need a new one.
 
-            // Check if the connection exists in the cache. It may have
-            // already been removed if Dispose was called.
-            if (connectionTask != null)
-            {
-                await DisposeConnectionTask(connectionTask).ConfigureAwait(false);
+                // Remove this connection from the cache, so the next time
+                // someone requests a connection they get a new one.
+                if (_connections.Remove(hostPort))
+                {
+                    Console.WriteLine($"Connection disconnected, removing from cache {hostPort} {ex}");
+                }
+
+                // Note that connections clean themselves up when disconnected,
+                // so we don't need to dispose the connection here.
             }
         }
 
@@ -82,7 +88,7 @@ namespace Kudu.Client.Connection
             }
         }
 
-        public async Task DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             List<Task<KuduConnection>> connections;
 
@@ -90,17 +96,20 @@ namespace Kudu.Client.Connection
             {
                 connections = _connections.Values.ToList();
                 _connections.Clear();
+                _disposed = true;
             }
 
             foreach (var connectionTask in connections)
-            {
                 await DisposeConnectionTask(connectionTask).ConfigureAwait(false);
-            }
         }
 
         public void Dispose()
         {
             DisposeAsync().GetAwaiter().GetResult();
         }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void ThrowDisposedException() =>
+            throw new ObjectDisposedException(nameof(ConnectionCache));
     }
 }

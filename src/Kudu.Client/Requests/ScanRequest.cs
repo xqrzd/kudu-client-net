@@ -1,4 +1,8 @@
-﻿using Kudu.Client.Protocol.Tserver;
+﻿using System;
+using System.IO.Pipelines;
+using System.Threading.Tasks;
+using Kudu.Client.Protocol.Rpc;
+using Kudu.Client.Protocol.Tserver;
 
 namespace Kudu.Client.Requests
 {
@@ -8,11 +12,18 @@ namespace Kudu.Client.Requests
 
         public override string MethodName => "Scan";
 
-        public override ScanRequestPB Request { get; }
+        public KuduTable Table { get; }
 
-        public ScanRequest(ScanRequestPB request)
+        public ScanRequest(ScanRequestPB request, KuduTable table)
         {
             Request = request;
+            Table = table;
+        }
+
+        public override Task ParseSidecarsAsync(
+            ResponseHeader header, PipeReader reader, int length)
+        {
+            throw new NotImplementedException();
         }
     }
 }

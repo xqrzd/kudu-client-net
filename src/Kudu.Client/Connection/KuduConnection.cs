@@ -2,24 +2,25 @@
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.IO;
 using System.IO.Pipelines;
 using System.Threading;
 using System.Threading.Tasks;
 using Kudu.Client.Exceptions;
 using Kudu.Client.Internal;
 using Kudu.Client.Protocol.Rpc;
+using Kudu.Client.Requests;
+using Kudu.Client.Util;
 using ProtoBuf;
+using ProtoBuf.Meta;
 
 namespace Kudu.Client.Connection
 {
-    public class KuduConnection : IDisposable
+    public class KuduConnection
     {
         private readonly IDuplexPipe _ioPipe;
         private readonly SemaphoreSlim _singleWriter;
-        private readonly Dictionary<int, TaskCompletionSource<CallResponse>> _inflightMessages;
+        private readonly Dictionary<int, InflightMessage> _inflightMessages;
         private readonly Task _receiveTask;
-        private readonly TaskCompletionSource<object> _inputCompletedTcs;
 
         private int _nextCallId;
         private bool _closed;
@@ -29,26 +30,20 @@ namespace Kudu.Client.Connection
         {
             _ioPipe = ioPipe;
             _singleWriter = new SemaphoreSlim(1, 1);
-            _inflightMessages = new Dictionary<int, TaskCompletionSource<CallResponse>>();
+            _inflightMessages = new Dictionary<int, InflightMessage>();
             _nextCallId = 0;
 
-            _inputCompletedTcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-            _ioPipe.Input.OnWriterCompleted(
-                (Exception ex, object state) => ((KuduConnection)state).OnInputCompleted(ex),
-                state: this);
-
-            _receiveTask = StartReceiveLoopAsync();
+            _receiveTask = ReceiveAsync();
         }
 
-        public void OnConnectionClosed(Action<Exception, object> callback, object state)
+        public void OnDisconnected(Action<Exception, object> callback, object state)
         {
             _ioPipe.Input.OnWriterCompleted(callback, state);
         }
 
-        public async Task<CallResponse> SendReceiveAsync<TInput>(RequestHeader header, TInput body)
+        public async Task SendReceiveAsync(RequestHeader header, KuduRpc rpc)
         {
-            var tcs = new TaskCompletionSource<CallResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var message = new InflightMessage(rpc);
             lock (_inflightMessages)
             {
                 if (_closed)
@@ -58,18 +53,15 @@ namespace Kudu.Client.Connection
                     throw _closedException;
                 }
 
-                // If an earlier component set CallId (such as the negotiator)
-                // we don't want to overwrite it.
-                if (header.CallId == 0)
-                    header.CallId = _nextCallId++;
+                header.CallId = _nextCallId++;
 
-                _inflightMessages.Add(header.CallId, tcs);
+                _inflightMessages.Add(header.CallId, message);
             }
-            await WriteAsync(header, body).ConfigureAwait(false);
-            return await tcs.Task.ConfigureAwait(false);
+            await SendAsync(header, rpc).ConfigureAwait(false);
+            await message.Task.ConfigureAwait(false);
         }
 
-        public async ValueTask WriteAsync<TInput>(RequestHeader header, TInput body)
+        private async ValueTask<FlushResult> SendAsync(RequestHeader header, KuduRpc rpc)
         {
             // TODO: Use PipeWriter once protobuf-net supports it.
             using (var stream = new RecyclableMemoryStream())
@@ -78,23 +70,24 @@ namespace Kudu.Client.Connection
                 stream.GetMemory(4);
 
                 Serializer.SerializeWithLengthPrefix(stream, header, PrefixStyle.Base128);
-                Serializer.SerializeWithLengthPrefix(stream, body, PrefixStyle.Base128);
+                rpc.WriteRequest(stream);
 
                 // Go back and write the length of the entire message, minus the 4
                 // bytes we already allocated to store the length.
                 BinaryPrimitives.WriteUInt32BigEndian(stream.AsSpan(), (uint)stream.Length - 4);
 
-                await WriteSynchronized(stream.AsMemory()).ConfigureAwait(false);
+                return await WriteAsync(stream.AsMemory()).ConfigureAwait(false);
             }
         }
 
-        private async ValueTask WriteSynchronized(ReadOnlyMemory<byte> source)
+        private async ValueTask<FlushResult> WriteAsync(ReadOnlyMemory<byte> source)
         {
+            // TODO: CancellationToken support.
             PipeWriter output = _ioPipe.Output;
             await _singleWriter.WaitAsync().ConfigureAwait(false);
             try
             {
-                await output.WriteAsync(source).ConfigureAwait(false);
+                return await output.WriteAsync(source).ConfigureAwait(false);
             }
             finally
             {
@@ -102,84 +95,21 @@ namespace Kudu.Client.Connection
             }
         }
 
-        private async Task StartReceiveLoopAsync()
+        private async Task ReceiveAsync()
         {
-            // TODO: Clean up parsing code.
             PipeReader input = _ioPipe.Input;
+            var state = new ParseStuff();
 
             try
             {
-                byte[] message = null;
-                bool readInProgress = false;
-                int remainingSize = 0;
-                int written = 0;
-                int msgSize = 0;
-
                 while (true)
                 {
-                    ReadResult result = await input.ReadAsync().ConfigureAwait(false);
-                    ReadOnlySequence<byte> buffer = result.Buffer;
+                    var result = await input.ReadAsync().ConfigureAwait(false);
 
-                    if (result.IsCompleted || result.IsCanceled)
+                    if (result.IsCanceled || result.IsCompleted)
                         break;
 
-                    // TODO: Break some of these out into separate methods?
-                    if (readInProgress)
-                    {
-                        // There's a read in progress (a message too large for one result).
-
-                        var copyLength = Math.Min(remainingSize, buffer.Length);
-                        var slice = buffer.Slice(0, copyLength);
-                        slice.CopyTo(message.AsSpan(written));
-                        written += (int)copyLength;
-                        remainingSize -= (int)copyLength;
-
-                        if (remainingSize == 0)
-                        {
-                            // Reached the end of the message.
-                            ProcessResponse(CallResponse.FromMemory(message, msgSize));
-
-                            message = null;
-                            readInProgress = false;
-                            written = 0;
-                        }
-
-                        buffer = buffer.Slice(copyLength);
-                    }
-
-                    while ((TryParseMessageSize(ref buffer, out var messageLength)))
-                    {
-                        // TODO: Check messageLength.
-                        message = ArrayPool<byte>.Shared.Rent(messageLength);
-                        msgSize = messageLength;
-
-                        // TODO: Catch exceptions, and return memory back to the pool.
-
-                        // We got a message.
-                        // Do we have this entire message?
-                        if (buffer.Length >= messageLength)
-                        {
-                            // Yes!
-                            var slice = buffer.Slice(0, messageLength);
-                            slice.CopyTo(message);
-                            ProcessResponse(CallResponse.FromMemory(message, messageLength));
-
-                            message = null;
-                            buffer = buffer.Slice(messageLength);
-                        }
-                        else
-                        {
-                            // We don't have the entire buffer. Take what we can.
-
-                            buffer.CopyTo(message);
-                            readInProgress = true;
-                            remainingSize = messageLength - (int)buffer.Length;
-                            written += (int)buffer.Length;
-                            buffer = buffer.Slice(buffer.Length);
-                        }
-                    }
-
-                    input.AdvanceTo(buffer.Start, buffer.End);
+                    await ParseAsync(input, result.Buffer, ref state).ConfigureAwait(false);
                 }
 
                 input.Complete();
@@ -187,68 +117,186 @@ namespace Kudu.Client.Connection
             catch (Exception ex)
             {
                 input.Complete(ex);
+                Console.WriteLine("--> Input stopped (Exception) " + _ioPipe.ToString() + ex.ToString());
+            }
+
+            // We're done, perform shutdown and mark any outstanding RPC's
+            // with exceptions.
+            Shutdown();
+        }
+
+        private Task ParseAsync(PipeReader input, ReadOnlySequence<byte> buffer, ref ParseStuff state)
+        {
+            do
+            {
+                switch (state.ParseState)
+                {
+                    case ParseState.NotStarted:
+                        {
+                            if (buffer.TryReadInt32BigEndian(out state.TotalMessageLength))
+                                goto case ParseState.ReadHeaderLength;
+                            else
+                                // Not enough data to read message size.
+                                break;
+                        }
+                    case ParseState.ReadHeaderLength:
+                        {
+                            if (buffer.TryReadVarintUInt32(out state.HeaderLength))
+                                goto case ParseState.ReadHeader;
+                            else
+                            {
+                                // Not enough data to read header length.
+                                state.ParseState = ParseState.ReadHeaderLength;
+                                break;
+                            }
+                        }
+                    case ParseState.ReadHeader:
+                        {
+                            if (TryParseResponseHeader(ref buffer, state.HeaderLength, out state.Header))
+                                goto case ParseState.ReadMainMessageLength;
+                            else
+                            {
+                                // Not enough data to read header.
+                                state.ParseState = ParseState.ReadHeader;
+                                break;
+                            }
+                        }
+                    case ParseState.ReadMainMessageLength:
+                        {
+                            if (buffer.TryReadVarintUInt32(out state.MainMessageLength))
+                                goto case ParseState.ReadProtobufMessage;
+                            else
+                            {
+                                // Not enough data to read main message length.
+                                state.ParseState = ParseState.ReadMainMessageLength;
+                                break;
+                            }
+                        }
+                    case ParseState.ReadProtobufMessage:
+                        {
+                            var messageLength = state.ProtobufMessageLength;
+                            if (buffer.Length < messageLength)
+                            {
+                                // Not enough data to parse main protobuf message.
+                                state.ParseState = ParseState.ReadProtobufMessage;
+                                break;
+                            }
+
+                            var header = state.Header;
+                            var messageProtobuf = buffer.Slice(0, messageLength);
+                            var success = TryGetRpc(header, messageProtobuf, out var message);
+                            buffer = buffer.Slice(messageLength);
+
+                            if (success)
+                            {
+                                if (state.HasSidecars)
+                                {
+                                    var length = state.SidecarLength;
+
+                                    input.AdvanceTo(buffer.Start);
+                                    state.Reset();
+
+                                    return ProcessSidecarsAsync(input, message, header, length);
+                                }
+                                else
+                                {
+                                    // This request has no sidecars, we're all done.
+                                    // Complete this RPC.
+                                    message.TrySetResult(null);
+                                }
+                            }
+
+                            // All done.
+                            state.Reset();
+                            break;
+                        }
+                }
+            } while (state.ParseState == ParseState.NotStarted && buffer.Length >= 4);
+
+            input.AdvanceTo(buffer.Start, buffer.End);
+
+            return Task.CompletedTask;
+        }
+
+        private async Task ProcessSidecarsAsync(
+            PipeReader input,
+            InflightMessage message,
+            ResponseHeader header,
+            int length)
+        {
+            try
+            {
+                await message.Rpc.ParseSidecarsAsync(header, input, length).ConfigureAwait(false);
+                message.TrySetResult(null);
+            }
+            catch (Exception ex)
+            {
+                message.TrySetException(ex);
+                throw;
             }
         }
 
-        private bool TryParseMessageSize(
-            ref ReadOnlySequence<byte> input,
-            out int totalMessageLength)
+        private static bool TryParseResponseHeader(
+            ref ReadOnlySequence<byte> buffer, uint length, out ResponseHeader header)
         {
-            if (input.Length < 4)
+            if (buffer.Length < length)
             {
-                // Not enough data for the header.
-                totalMessageLength = default;
+                header = null;
                 return false;
             }
 
-            if (input.First.Length >= 4)
-            {
-                // Already 4 bytes in the first segment.
-                totalMessageLength = BinaryPrimitives.ReadInt32BigEndian(input.First.Span);
-            }
-            else
-            {
-                // Copy 4 bytes into a local span.
-                Span<byte> local = stackalloc byte[4];
-                input.Slice(0, 4).CopyTo(local);
-                totalMessageLength = BinaryPrimitives.ReadInt32BigEndian(local);
-            }
-
-            input = input.Slice(4);
+            var slice = buffer.Slice(0, length);
+            var reader = ProtoReader.Create(out var state, slice, RuntimeTypeModel.Default);
+            var obj = RuntimeTypeModel.Default.Deserialize(reader, ref state, null, typeof(ResponseHeader));
+            buffer = buffer.Slice(length);
+            header = (ResponseHeader)obj;
             return true;
         }
 
-        private void ProcessResponse(CallResponse stream)
+        private static ErrorStatusPB ParseError(ReadOnlySequence<byte> buffer)
         {
-            ResponseHeader header = stream.Header;
-            TaskCompletionSource<CallResponse> tcs;
+            var reader = ProtoReader.Create(out var state, buffer, RuntimeTypeModel.Default);
+            var obj = RuntimeTypeModel.Default.Deserialize(reader, ref state, null, typeof(ErrorStatusPB));
+            return (ErrorStatusPB)obj;
+        }
+
+        private bool TryGetRpc(ResponseHeader header, ReadOnlySequence<byte> buffer, out InflightMessage message)
+        {
+            bool success;
 
             lock (_inflightMessages)
             {
-                // TODO: Check if the message actually exists.
-                tcs = _inflightMessages[header.CallId];
-                _inflightMessages.Remove(header.CallId);
+                success = _inflightMessages.Remove(header.CallId, out message);
+            }
+
+            if (!success)
+            {
+                throw new Exception($"Unable to find inflight message {header.CallId}");
             }
 
             if (header.IsError)
             {
-                // TODO: Use stream.Memory directly once protobuf-net supports it.
-                var ms = new MemoryStream(stream.Memory.ToArray());
-                var error = Serializer.DeserializeWithLengthPrefix<ErrorStatusPB>(ms, PrefixStyle.Base128);
+                var error = ParseError(buffer);
                 var exception = new RpcException(error);
 
-                tcs.SetException(exception);
+                message.TrySetException(exception);
+                return false;
             }
             else
             {
-                tcs.SetResult(stream);
+                message.Rpc.ParseProtobuf(buffer);
+                return true;
             }
         }
 
-        private void OnInputCompleted(Exception exception)
+        /// <summary>
+        /// Stops accepting any new RPCs, and completes any outstanding
+        /// RPCs with exceptions.
+        /// </summary>
+        /// <param name="exception"></param>
+        private void Shutdown(Exception exception = null)
         {
             var closedException = new ConnectionClosedException(_ioPipe.ToString(), exception);
-            Console.WriteLine(closedException.Message);
 
             lock (_inflightMessages)
             {
@@ -256,38 +304,97 @@ namespace Kudu.Client.Connection
                 _closedException = closedException;
 
                 foreach (var inflightMessage in _inflightMessages.Values)
-                {
                     inflightMessage.TrySetException(closedException);
-                }
 
                 _inflightMessages.Clear();
             }
 
-            _inputCompletedTcs.SetResult(null);
+            (_ioPipe as IDisposable)?.Dispose();
+            _singleWriter.Dispose();
         }
 
         public override string ToString() => _ioPipe.ToString();
 
+        /// <summary>
+        /// Stops accepting RPCs and completes any outstanding RPCs with exceptions.
+        /// This method may be called multiple times, but not concurrently.
+        /// </summary>
         public async Task DisposeAsync()
         {
-            // This connection is done writing, complete the writer.
-            // This will also signal the reader to stop.
+            _ioPipe.Input.CancelPendingRead();
+            _ioPipe.Input.Complete();
+            _ioPipe.Output.CancelPendingFlush();
             _ioPipe.Output.Complete();
 
-            // Wait for the reader to finish processing any remaining data.
+            // Wait for the reader loop to finish.
             await _receiveTask.ConfigureAwait(false);
-
-            // Completing the reader doesn't wait for any registered callbacks
-            // to finish. Wait for the callback to finish here.
-            await _inputCompletedTcs.Task.ConfigureAwait(false);
-
-            _singleWriter.Dispose();
-            (_ioPipe as IDisposable)?.Dispose();
         }
 
-        public void Dispose()
+        private struct ParseStuff
         {
-            DisposeAsync().GetAwaiter().GetResult();
+            public ParseState ParseState;
+
+            /// <summary>
+            /// Total message length (4 bytes).
+            /// </summary>
+            public int TotalMessageLength;
+
+            /// <summary>
+            /// RPC Header protobuf length (variable encoding).
+            /// </summary>
+            public uint HeaderLength;
+
+            /// <summary>
+            /// Main message length (variable encoding).
+            /// Includes the size of any sidecars.
+            /// </summary>
+            public uint MainMessageLength;
+
+            /// <summary>
+            /// RPC Header protobuf.
+            /// </summary>
+            public ResponseHeader Header;
+
+            /// <summary>
+            /// Gets the size of the main message protobuf.
+            /// </summary>
+            public int ProtobufMessageLength => Header.SidecarOffsets == null ?
+                (int)MainMessageLength : (int)Header.SidecarOffsets[0];
+
+            public bool HasSidecars => Header.SidecarOffsets != null;
+
+            public int SidecarLength => (int)MainMessageLength - (int)Header.SidecarOffsets[0];
+
+            public void Reset()
+            {
+                ParseState = ParseState.NotStarted;
+                TotalMessageLength = 0;
+                HeaderLength = 0;
+                MainMessageLength = 0;
+                Header = null;
+            }
+        }
+
+        private enum ParseState
+        {
+            NotStarted,
+            ReadTotalMessageLength,
+            ReadHeaderLength,
+            ReadHeader,
+            ReadMainMessageLength,
+            ReadProtobufMessage,
+            ReadSidecars
+        }
+
+        private sealed class InflightMessage : TaskCompletionSource<object>
+        {
+            public KuduRpc Rpc { get; }
+
+            public InflightMessage(KuduRpc rpc)
+                : base(TaskCreationOptions.RunContinuationsAsynchronously)
+            {
+                Rpc = rpc;
+            }
         }
     }
 }

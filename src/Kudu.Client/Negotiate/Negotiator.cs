@@ -1,8 +1,18 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Buffers.Binary;
+using System.Diagnostics;
+using System.IO;
+using System.IO.Pipelines;
 using System.Net;
+using System.Net.Security;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 using Kudu.Client.Connection;
+using Kudu.Client.Internal;
 using Kudu.Client.Protocol.Rpc;
+using Kudu.Client.Util;
+using Pipelines.Sockets.Unofficial;
+using ProtoBuf;
 
 namespace Kudu.Client.Negotiate
 {
@@ -12,42 +22,111 @@ namespace Kudu.Client.Negotiate
     public class Negotiator
     {
         // TODO: Rework this class, and support more negotiation methods.
+        private const byte CurrentRpcVersion = 9;
+
+        private static readonly ReadOnlyMemory<byte> ConnectionHeader = new byte[]
+        {
+            (byte)'h', (byte)'r', (byte)'p', (byte)'c',
+            CurrentRpcVersion,
+            0, // ServiceClass (unused)
+            0  // AuthProtocol (unused)
+        };
+
         private const int ConnectionContextCallID = -3;
         private const int SASLNegotiationCallID = -33;
 
-        private readonly KuduConnection _client;
+        private readonly ServerInfo _serverInfo;
+        private readonly Socket _socket;
+        private readonly PipeOptions _sendPipeOptions;
+        private readonly PipeOptions _receivePipeOptions;
 
-        public Negotiator(KuduConnection client)
+        private Stream _stream;
+
+        public Negotiator(ServerInfo serverInfo, Socket socket,
+            PipeOptions sendPipeOptions, PipeOptions receivePipeOptions)
         {
-            _client = client;
+            _serverInfo = serverInfo;
+            _socket = socket;
+            _sendPipeOptions = sendPipeOptions;
+            _receivePipeOptions = receivePipeOptions;
         }
 
-        public async Task NegotiateAsync()
+        public async Task<KuduConnection> NegotiateAsync()
         {
+            var networkStream = new NetworkStream(_socket, ownsSocket: false);
+            _stream = networkStream;
+
+            // After the client connects to a server, the client first sends a connection header.
+            // The connection header consists of a magic number "hrpc" and three byte flags, for a total of 7 bytes.
+            // https://github.com/apache/kudu/blob/master/docs/design-docs/rpc.md#wire-protocol
+            await networkStream.WriteAsync(ConnectionHeader).ConfigureAwait(false);
+
             var features = await NegotiateFeaturesAsync().ConfigureAwait(false);
+
+            // Always use TLS if the server supports it.
+            if (features.HasRpcFeature(RpcFeatureFlag.Tls))
+            {
+                // TODO: Allow user to supply this in.
+                var tlsHost = _serverInfo.HostPort.Host;
+
+                // If we negotiated TLS, then we want to start the TLS handshake;
+                // otherwise, we can move directly to the authentication phase.
+                _stream = await NegotiateTlsAsync(networkStream, tlsHost).ConfigureAwait(false);
+            }
+
             var result = await AuthenticateAsync().ConfigureAwait(false);
+
             Debug.Assert(result.Step == NegotiatePB.NegotiateStep.SaslSuccess);
+
             await SendConnectionContextAsync().ConfigureAwait(false);
+
+            IDuplexPipe pipe;
+            if (features.HasRpcFeature(RpcFeatureFlag.Tls))
+            {
+                pipe = StreamConnection.GetDuplex(_stream,
+                    _sendPipeOptions, _receivePipeOptions,
+                    name: _serverInfo.ToString());
+            }
+            else
+            {
+                pipe = SocketConnection.Create(_socket,
+                    _sendPipeOptions, _receivePipeOptions,
+                    name: _serverInfo.ToString());
+            }
+
+            var socketConnection = new KuduSocketConnection(_socket, pipe);
+            return new KuduConnection(socketConnection);
         }
 
-        private async Task<NegotiatePB> NegotiateFeaturesAsync()
+        private Task<NegotiatePB> NegotiateFeaturesAsync()
         {
             // Step 1: Negotiate
             // The client and server swap RPC feature flags, supported authentication types,
             // and supported SASL mechanisms. This step always takes exactly one round trip.
 
-            var header = new RequestHeader { CallId = SASLNegotiationCallID };
             var request = new NegotiatePB { Step = NegotiatePB.NegotiateStep.Negotiate };
             request.SupportedFeatures.Add(RpcFeatureFlag.ApplicationFeatureFlags);
+            request.SupportedFeatures.Add(RpcFeatureFlag.Tls);
+            if (_serverInfo.IsLocal)
+                request.SupportedFeatures.Add(RpcFeatureFlag.TlsAuthenticationOnly);
             request.SaslMechanisms.Add(new NegotiatePB.SaslMechanism { Mechanism = "PLAIN" });
 
-            using (var response = await _client.SendReceiveAsync(header, request).ConfigureAwait(false))
-            {
-                return response.ParseResponse<NegotiatePB>();
-            }
+            return SendReceiveAsync(request);
         }
 
-        private async Task<NegotiatePB> AuthenticateAsync()
+        private async Task<SslStream> NegotiateTlsAsync(NetworkStream stream, string tlsHost)
+        {
+            var sslInnerStream = new KuduTlsStream(this);
+            var sslStream = SslStreamFactory.CreateSslStreamTrustAll(sslInnerStream);
+            await sslStream.AuthenticateAsClientAsync(tlsHost).ConfigureAwait(false);
+
+            Console.WriteLine($"TLS Connected {tlsHost}");
+
+            sslInnerStream.Complete(stream);
+            return sslStream;
+        }
+
+        private Task<NegotiatePB> AuthenticateAsync()
         {
             // The client and server now authenticate to each other.
             // There are three authentication types (SASL, token, and TLS/PKI certificate),
@@ -58,27 +137,86 @@ namespace Kudu.Client.Negotiate
             // The server is thus responsible for choosing the authentication type if there are multiple to choose from.
             // Which type is chosen for a particular connection by the server depends on configuration and the available credentials:
 
-            var header = new RequestHeader { CallId = SASLNegotiationCallID };
             var request = new NegotiatePB { Step = NegotiatePB.NegotiateStep.SaslInitiate };
             request.SaslMechanisms.Add(new NegotiatePB.SaslMechanism { Mechanism = "PLAIN" });
             request.Token = SaslPlain.CreateToken(new NetworkCredential("demo", "demo"));
 
-            using (var response = await _client.SendReceiveAsync(header, request).ConfigureAwait(false))
-            {
-                return response.ParseResponse<NegotiatePB>();
-            }
+            return SendReceiveAsync(request);
         }
 
-        private ValueTask SendConnectionContextAsync()
+        private Task SendConnectionContextAsync()
         {
             // Once the SASL negotiation is complete, before the first request, the client sends the
             // server a special call with call_id -3. The body of this call is a ConnectionContextPB.
             // The server should not respond to this call.
 
-            var connectionHeader = new RequestHeader { CallId = ConnectionContextCallID };
-            var connection = new ConnectionContextPB();
+            var header = new RequestHeader { CallId = ConnectionContextCallID };
+            var request = new ConnectionContextPB();
 
-            return _client.WriteAsync(connectionHeader, connection);
+            return SendAsync(header, request);
+        }
+
+        internal Task<NegotiatePB> SendTlsHandshakeAsync(byte[] tlsHandshake)
+        {
+            var request = new NegotiatePB
+            {
+                Step = NegotiatePB.NegotiateStep.TlsHandshake,
+                TlsHandshake = tlsHandshake
+            };
+
+            return SendReceiveAsync(request);
+        }
+
+        private async Task<NegotiatePB> SendReceiveAsync(NegotiatePB request)
+        {
+            var header = new RequestHeader { CallId = SASLNegotiationCallID };
+            await SendAsync(header, request).ConfigureAwait(false);
+            var response = await ReceiveAsync().ConfigureAwait(false);
+            return response;
+        }
+
+        private async Task SendAsync<TInput>(RequestHeader header, TInput body)
+        {
+            using (var stream = new RecyclableMemoryStream())
+            {
+                // Make space to write the length of the entire message.
+                stream.GetMemory(4);
+
+                Serializer.SerializeWithLengthPrefix(stream, header, PrefixStyle.Base128);
+                Serializer.SerializeWithLengthPrefix(stream, body, PrefixStyle.Base128);
+
+                // Go back and write the length of the entire message, minus the 4
+                // bytes we already allocated to store the length.
+                BinaryPrimitives.WriteUInt32BigEndian(stream.AsSpan(), (uint)stream.Length - 4);
+
+                await _stream.WriteAsync(stream.AsMemory()).ConfigureAwait(false);
+            }
+        }
+
+        private async Task<NegotiatePB> ReceiveAsync()
+        {
+            var buffer = new byte[4];
+            await ReadExactAsync(buffer).ConfigureAwait(false);
+            var messageLength = BinaryPrimitives.ReadInt32BigEndian(buffer);
+
+            buffer = new byte[messageLength];
+            await ReadExactAsync(buffer);
+
+            var ms = new MemoryStream(buffer);
+            _ = Serializer.DeserializeWithLengthPrefix<ResponseHeader>(ms, PrefixStyle.Base128);
+            var response = Serializer.DeserializeWithLengthPrefix<NegotiatePB>(ms, PrefixStyle.Base128);
+
+            return response;
+        }
+
+        private async Task ReadExactAsync(Memory<byte> buffer)
+        {
+            do
+            {
+                var read = await _stream.ReadAsync(buffer).ConfigureAwait(false);
+                buffer = buffer.Slice(read);
+
+            } while (buffer.Length > 0);
         }
     }
 }

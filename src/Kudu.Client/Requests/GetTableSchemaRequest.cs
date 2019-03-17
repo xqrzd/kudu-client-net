@@ -2,11 +2,11 @@
 
 namespace Kudu.Client.Requests
 {
-    public class GetTableSchemaRequest : KuduMasterRpc<GetTableSchemaRequestPB, GetTableSchemaResponsePB>
+    public class GetTableSchemaRequest : KuduRpc<GetTableSchemaRequestPB, GetTableSchemaResponsePB>
     {
-        public override string MethodName => "GetTableSchema";
+        public override string ServiceName => MasterServiceName;
 
-        public override GetTableSchemaRequestPB Request { get; }
+        public override string MethodName => "GetTableSchema";
 
         public GetTableSchemaRequest(GetTableSchemaRequestPB request)
         {

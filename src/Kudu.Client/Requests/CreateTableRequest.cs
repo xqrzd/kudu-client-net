@@ -2,11 +2,11 @@
 
 namespace Kudu.Client.Requests
 {
-    public class CreateTableRequest : KuduMasterRpc<CreateTableRequestPB, CreateTableResponsePB>
+    public class CreateTableRequest : KuduRpc<CreateTableRequestPB, CreateTableResponsePB>
     {
-        public override string MethodName => "CreateTable";
+        public override string ServiceName => MasterServiceName;
 
-        public override CreateTableRequestPB Request { get; }
+        public override string MethodName => "CreateTable";
 
         public CreateTableRequest(CreateTableRequestPB request)
         {

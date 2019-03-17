@@ -8,6 +8,7 @@ using System.Text;
 using Kudu.Client.Connection;
 using Kudu.Client.Protocol;
 using Kudu.Client.Protocol.Master;
+using Kudu.Client.Protocol.Rpc;
 
 namespace Kudu.Client.Util
 {
@@ -47,6 +48,12 @@ namespace Kudu.Client.Util
                 result = 31 * result + element;
 
             return result;
+        }
+
+        public static bool HasRpcFeature(this NegotiatePB negotiatePb, RpcFeatureFlag flag)
+        {
+            return negotiatePb.SupportedFeatures != null &&
+                negotiatePb.SupportedFeatures.Contains(flag);
         }
 
         public static ServerInfo ToServerInfo(this TSInfoPB tsInfo)

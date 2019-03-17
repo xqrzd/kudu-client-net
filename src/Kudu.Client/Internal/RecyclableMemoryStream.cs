@@ -4,7 +4,7 @@ using System.IO;
 
 namespace Kudu.Client.Internal
 {
-    public sealed class RecyclableMemoryStream : Stream, IMemoryOwner<byte>
+    public sealed class RecyclableMemoryStream : Stream
     {
         private byte[] _buffer;
         private int _length;
@@ -20,8 +20,6 @@ namespace Kudu.Client.Internal
             _length = 0;
             _position = 0;
         }
-
-        public Memory<byte> Memory => AsMemory();
 
         public override bool CanRead => true;
 

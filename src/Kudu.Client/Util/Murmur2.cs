@@ -15,21 +15,21 @@ namespace Kudu.Client.Util
         /// <summary>
         /// Compute the Murmur2 hash (64-bit version) as described in the original source code.
         /// </summary>
-        /// <param name="data">The data that needs to be hashed.</param>
+        /// <param name="key">The data that needs to be hashed.</param>
         /// <param name="seed">The seed to use to compute the hash.</param>
-        public static ulong Hash64(ReadOnlySpan<byte> data, ulong seed)
+        public static ulong Hash64(ReadOnlySpan<byte> key, ulong seed)
         {
-            uint length = (uint)data.Length;
+            uint length = (uint)key.Length;
             ulong m = 0xc6a4a7935bd1e995;
             int r = 47;
 
             ulong h = seed ^ (length * m);
 
-            ReadOnlySpan<ulong> dataAsUlong = MemoryMarshal.Cast<byte, ulong>(data);
+            ReadOnlySpan<ulong> data = MemoryMarshal.Cast<byte, ulong>(key);
 
-            for (int i = 0; i < dataAsUlong.Length; i++)
+            for (int i = 0; i < data.Length; i++)
             {
-                ulong k = dataAsUlong[i];
+                ulong k = data[i];
 
                 k *= m;
                 k ^= k >> r;
@@ -39,18 +39,18 @@ namespace Kudu.Client.Util
                 h *= m;
             }
 
-            var data2 = data.Slice(dataAsUlong.Length * sizeof(ulong));
+            var data2 = key.Slice(data.Length * sizeof(ulong));
 
             switch (length & 7)
             {
-                case 7: h ^= (ulong)(data2[6]) << 48; goto case 6;
-                case 6: h ^= (ulong)(data2[5]) << 40; goto case 5;
-                case 5: h ^= (ulong)(data2[4]) << 32; goto case 4;
-                case 4: h ^= (ulong)(data2[3]) << 24; goto case 3;
-                case 3: h ^= (ulong)(data2[2]) << 16; goto case 2;
-                case 2: h ^= (ulong)(data2[1]) << 8; goto case 1;
+                case 7: h ^= (ulong)data2[6] << 48; goto case 6;
+                case 6: h ^= (ulong)data2[5] << 40; goto case 5;
+                case 5: h ^= (ulong)data2[4] << 32; goto case 4;
+                case 4: h ^= (ulong)data2[3] << 24; goto case 3;
+                case 3: h ^= (ulong)data2[2] << 16; goto case 2;
+                case 2: h ^= (ulong)data2[1] << 8; goto case 1;
                 case 1:
-                    h ^= (data2[0]);
+                    h ^= data2[0];
                     h *= m;
                     break;
             }

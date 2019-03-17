@@ -1,5 +1,7 @@
 ﻿using System;
 using System.IO.Pipelines;
+using System.Net;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 using Pipelines.Sockets.Unofficial;
 
@@ -7,64 +9,42 @@ namespace Kudu.Client.Connection
 {
     public class KuduSocketConnection : IDuplexPipe, IDisposable
     {
-        private const byte CurrentRpcVersion = 9;
+        private readonly Socket _socket;
+        private readonly IDuplexPipe _ioPipe;
 
-        private static readonly ReadOnlyMemory<byte> ConnectionHeader = new byte[]
+        public KuduSocketConnection(Socket socket, IDuplexPipe ioPipe)
         {
-            (byte)'h', (byte)'r', (byte)'p', (byte)'c',
-            CurrentRpcVersion,
-            0, // ServiceClass (unused)
-            0  // AuthProtocol (unused)
-        };
-
-        private static readonly PipeOptions SendOptions = new PipeOptions(
-            useSynchronizationContext: false);
-
-        private static readonly PipeOptions ReceiveOptions = new PipeOptions(
-            pauseWriterThreshold: 1024 * 1024 * 256,  // 256MB
-            resumeWriterThreshold: 1024 * 1024 * 128, // 128MB
-            minimumSegmentSize: 1024 * 128,
-            useSynchronizationContext: false);
-
-        private static readonly SocketConnectionOptions ConnectionOptions =
-            SocketConnectionOptions.ZeroLengthReads |
-            SocketConnectionOptions.InlineReads |
-            SocketConnectionOptions.InlineWrites;
-
-        private readonly SocketConnection _connection;
-
-        public KuduSocketConnection(SocketConnection connection)
-        {
-            _connection = connection ?? throw new ArgumentNullException(nameof(connection));
+            _socket = socket ?? throw new ArgumentNullException(nameof(socket));
+            _ioPipe = ioPipe ?? throw new ArgumentNullException(nameof(ioPipe));
         }
 
-        public PipeReader Input => _connection.Input;
+        public PipeReader Input => _ioPipe.Input;
 
-        public PipeWriter Output => _connection.Output;
+        public PipeWriter Output => _ioPipe.Output;
 
-        public override string ToString() => _connection.ToString();
+        public override string ToString() => _ioPipe.ToString();
 
         public void Dispose()
         {
-            _connection.Dispose();
+            try { _ioPipe.Input.CancelPendingRead(); } catch { }
+            try { _ioPipe.Input.Complete(); } catch { }
+            try { _ioPipe.Output.CancelPendingFlush(); } catch { }
+            try { _ioPipe.Output.Complete(); } catch { }
+
+            try { using (_ioPipe as IDisposable) { } } catch { }
+
+            try { _socket.Shutdown(SocketShutdown.Both); } catch { }
+            try { _socket.Close(); } catch { }
+            try { _socket.Dispose(); } catch { }
         }
 
-        public static async Task<KuduSocketConnection> ConnectAsync(ServerInfo serverInfo)
+        public static async Task<Socket> ConnectAsync(IPEndPoint endpoint)
         {
-            var connection = await SocketConnection.ConnectAsync(
-                serverInfo.Endpoint,
-                SendOptions,
-                ReceiveOptions,
-                ConnectionOptions,
-                name: serverInfo.ToString()).ConfigureAwait(false);
+            var socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            SocketConnection.SetRecommendedClientOptions(socket);
 
-            // After the client connects to a server, the client first sends a connection header.
-            // The connection header consists of a magic number "hrpc" and three byte flags, for a total of 7 bytes.
-            // https://github.com/apache/kudu/blob/master/docs/design-docs/rpc.md#wire-protocol
-            // TODO: Should this be done elsewhere?
-            await connection.Output.WriteAsync(ConnectionHeader).ConfigureAwait(false);
-
-            return new KuduSocketConnection(connection);
+            await socket.ConnectAsync(endpoint).ConfigureAwait(false);
+            return socket;
         }
     }
 }

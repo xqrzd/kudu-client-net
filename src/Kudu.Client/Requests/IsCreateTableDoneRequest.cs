@@ -2,11 +2,11 @@
 
 namespace Kudu.Client.Requests
 {
-    public class IsCreateTableDoneRequest : KuduMasterRpc<IsCreateTableDoneRequestPB, IsCreateTableDoneResponsePB>
+    public class IsCreateTableDoneRequest : KuduRpc<IsCreateTableDoneRequestPB, IsCreateTableDoneResponsePB>
     {
-        public override string MethodName => "IsCreateTableDone";
+        public override string ServiceName => MasterServiceName;
 
-        public override IsCreateTableDoneRequestPB Request { get; }
+        public override string MethodName => "IsCreateTableDone";
 
         public IsCreateTableDoneRequest(IsCreateTableDoneRequestPB request)
         {
