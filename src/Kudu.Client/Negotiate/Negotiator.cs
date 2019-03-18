@@ -62,6 +62,7 @@ namespace Kudu.Client.Negotiate
             await networkStream.WriteAsync(ConnectionHeader).ConfigureAwait(false);
 
             var features = await NegotiateFeaturesAsync().ConfigureAwait(false);
+            var useTls = false;
 
             // Always use TLS if the server supports it.
             if (features.HasRpcFeature(RpcFeatureFlag.Tls))
@@ -71,7 +72,14 @@ namespace Kudu.Client.Negotiate
 
                 // If we negotiated TLS, then we want to start the TLS handshake;
                 // otherwise, we can move directly to the authentication phase.
-                _stream = await NegotiateTlsAsync(networkStream, tlsHost).ConfigureAwait(false);
+                var tlsStream = await NegotiateTlsAsync(networkStream, tlsHost).ConfigureAwait(false);
+
+                // Don't wrap the TLS socket if we are using TLS for authentication only.
+                if (!features.HasRpcFeature(RpcFeatureFlag.TlsAuthenticationOnly))
+                {
+                    useTls = true;
+                    _stream = tlsStream;
+                }
             }
 
             var result = await AuthenticateAsync().ConfigureAwait(false);
@@ -81,7 +89,7 @@ namespace Kudu.Client.Negotiate
             await SendConnectionContextAsync().ConfigureAwait(false);
 
             IDuplexPipe pipe;
-            if (features.HasRpcFeature(RpcFeatureFlag.Tls))
+            if (useTls)
             {
                 pipe = StreamConnection.GetDuplex(_stream,
                     _sendPipeOptions, _receivePipeOptions,
@@ -200,7 +208,7 @@ namespace Kudu.Client.Negotiate
             var messageLength = BinaryPrimitives.ReadInt32BigEndian(buffer);
 
             buffer = new byte[messageLength];
-            await ReadExactAsync(buffer);
+            await ReadExactAsync(buffer).ConfigureAwait(false);
 
             var ms = new MemoryStream(buffer);
             _ = Serializer.DeserializeWithLengthPrefix<ResponseHeader>(ms, PrefixStyle.Base128);
@@ -215,7 +223,6 @@ namespace Kudu.Client.Negotiate
             {
                 var read = await _stream.ReadAsync(buffer).ConfigureAwait(false);
                 buffer = buffer.Slice(read);
-
             } while (buffer.Length > 0);
         }
     }
