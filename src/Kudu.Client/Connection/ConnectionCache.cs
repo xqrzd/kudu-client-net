@@ -60,11 +60,8 @@ namespace Kudu.Client.Connection
             lock (_connections)
             {
                 // We're here because the connection's OnConnectionClosed
-                // was raised. This means the connection isn't usable anymore
-                // and we need a new one.
-
-                // Remove this connection from the cache, so the next time
-                // someone requests a connection they get a new one.
+                // was raised. Remove this connection from the cache, so the
+                // next time someone requests a connection they get a new one.
                 if (_connections.Remove(hostPort))
                 {
                     Console.WriteLine($"Connection disconnected, removing from cache {hostPort} {ex}");

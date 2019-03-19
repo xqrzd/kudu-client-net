@@ -29,8 +29,7 @@ namespace Kudu.Client.Requests
 
         public abstract void ParseProtobuf(ReadOnlySequence<byte> buffer);
 
-        public virtual Task ParseSidecarsAsync(
-            ResponseHeader header, PipeReader reader, int length)
+        public virtual Task ParseSidecarsAsync(ResponseHeader header, PipeReader reader, int length)
         {
             throw new NotImplementedException();
         }

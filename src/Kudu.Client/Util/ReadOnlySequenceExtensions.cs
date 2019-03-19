@@ -10,29 +10,29 @@ namespace Kudu.Client.Util
             this ref ReadOnlySequence<byte> buffer, out int value)
         {
             ReadOnlySpan<byte> span = buffer.First.Span;
-            if (span.Length < sizeof(int))
+            if (span.Length < 4)
                 return TryReadMultisegment(ref buffer, out value);
 
             value = BinaryPrimitives.ReadInt32BigEndian(span);
-            buffer = buffer.Slice(sizeof(int));
+            buffer = buffer.Slice(4);
             return true;
         }
 
         private static unsafe bool TryReadMultisegment(
             this ref ReadOnlySequence<byte> buffer, out int value)
         {
-            if (buffer.Length < sizeof(int))
+            if (buffer.Length < 4)
             {
                 value = default;
                 return false;
             }
 
             // Not enough data in the current segment.
-            Span<byte> tempSpan = stackalloc byte[sizeof(int)];
-            buffer.CopyTo(tempSpan);
+            Span<byte> tempSpan = stackalloc byte[4];
+            buffer.Slice(0, 4).CopyTo(tempSpan);
 
             value = BinaryPrimitives.ReadInt32BigEndian(tempSpan);
-            buffer = buffer.Slice(sizeof(int));
+            buffer = buffer.Slice(4);
             return true;
         }
 

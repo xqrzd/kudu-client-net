@@ -211,7 +211,9 @@ namespace Kudu.Client.Negotiate
             await ReadExactAsync(buffer).ConfigureAwait(false);
 
             var ms = new MemoryStream(buffer);
-            _ = Serializer.DeserializeWithLengthPrefix<ResponseHeader>(ms, PrefixStyle.Base128);
+            var header = Serializer.DeserializeWithLengthPrefix<ResponseHeader>(ms, PrefixStyle.Base128);
+            if (header.CallId != SASLNegotiationCallID)
+                throw new Exception($"Negotiate failed, expected {SASLNegotiationCallID}, got {header.CallId}");
             var response = Serializer.DeserializeWithLengthPrefix<NegotiatePB>(ms, PrefixStyle.Base128);
 
             return response;

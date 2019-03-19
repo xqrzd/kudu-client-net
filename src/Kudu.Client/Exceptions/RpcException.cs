@@ -8,7 +8,7 @@ namespace Kudu.Client.Exceptions
         public ErrorStatusPB Error { get; }
 
         public RpcException(ErrorStatusPB error)
-            : base(error.Message)
+            : base($"{error.Code}: {error.Message}")
         {
             Error = error;
         }
