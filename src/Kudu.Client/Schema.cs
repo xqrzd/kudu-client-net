@@ -158,18 +158,14 @@ namespace Kudu.Client
                     return 8 + 8; // Offset then string length.
                 case DataType.Bool:
                 case DataType.Int8:
-                case DataType.UInt8:
                     return 1;
                 case DataType.Int16:
-                case DataType.UInt16:
                     return 2;
                 case DataType.Int32:
-                case DataType.UInt32:
                 case DataType.Float:
                 case DataType.Decimal32:
                     return 4;
                 case DataType.Int64:
-                case DataType.UInt64:
                 case DataType.Double:
                 case DataType.UnixtimeMicros:
                 case DataType.Decimal64:

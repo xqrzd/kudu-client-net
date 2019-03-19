@@ -107,8 +107,8 @@ namespace Kudu.Client.Tests
                 })
                 .AddColumn(c =>
                 {
-                    c.Name = "uint32";
-                    c.Type = DataType.UInt32;
+                    c.Name = "int32";
+                    c.Type = DataType.Int32;
                     c.IsKey = true;
                 })
                 .AddColumn(c =>
@@ -160,19 +160,19 @@ namespace Kudu.Client.Tests
             Assert.Equal(16, column1.Size);
             Assert.False(column1.IsSigned);
 
-            Assert.Equal(1, schema.GetColumnIndex(name: "uint32"));
+            Assert.Equal(1, schema.GetColumnIndex(name: "int32"));
             Assert.Equal(1, schema.GetColumnIndex(id: 1));
             Assert.Equal(0, schema.GetColumnOffset(index: 1));
             var column2 = schema.GetColumn(1);
-            Assert.Equal("uint32", column2.Name);
-            Assert.Equal(DataType.UInt32, column2.Type);
+            Assert.Equal("int32", column2.Name);
+            Assert.Equal(DataType.Int32, column2.Type);
             Assert.True(column2.IsKey);
             Assert.False(column2.IsNullable);
             Assert.Equal(EncodingType.AutoEncoding, column2.Encoding);
             Assert.Equal(CompressionType.DefaultCompression, column2.Compression);
             Assert.Null(column2.TypeAttributes);
             Assert.Equal(4, column2.Size);
-            Assert.False(column2.IsSigned);
+            Assert.True(column2.IsSigned);
 
             Assert.Equal(2, schema.GetColumnIndex(name: "bool"));
             Assert.Equal(2, schema.GetColumnIndex(id: 2));
