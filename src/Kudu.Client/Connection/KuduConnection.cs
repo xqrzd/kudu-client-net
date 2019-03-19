@@ -98,7 +98,7 @@ namespace Kudu.Client.Connection
         private async Task ReceiveAsync()
         {
             PipeReader input = _ioPipe.Input;
-            var state = new ParseStuff();
+            var state = new ParseState();
 
             try
             {
@@ -125,60 +125,60 @@ namespace Kudu.Client.Connection
             Shutdown();
         }
 
-        private Task ParseAsync(PipeReader input, ReadOnlySequence<byte> buffer, ref ParseStuff state)
+        private Task ParseAsync(PipeReader input, ReadOnlySequence<byte> buffer, ref ParseState state)
         {
             do
             {
-                switch (state.ParseState)
+                switch (state.Step)
                 {
-                    case ParseState.NotStarted:
+                    case ParseStep.NotStarted:
                         {
                             if (buffer.TryReadInt32BigEndian(out state.TotalMessageLength))
-                                goto case ParseState.ReadHeaderLength;
+                                goto case ParseStep.ReadHeaderLength;
                             else
                                 // Not enough data to read message size.
                                 break;
                         }
-                    case ParseState.ReadHeaderLength:
+                    case ParseStep.ReadHeaderLength:
                         {
                             if (buffer.TryReadVarintUInt32(out state.HeaderLength))
-                                goto case ParseState.ReadHeader;
+                                goto case ParseStep.ReadHeader;
                             else
                             {
                                 // Not enough data to read header length.
-                                state.ParseState = ParseState.ReadHeaderLength;
+                                state.Step = ParseStep.ReadHeaderLength;
                                 break;
                             }
                         }
-                    case ParseState.ReadHeader:
+                    case ParseStep.ReadHeader:
                         {
                             if (TryParseResponseHeader(ref buffer, state.HeaderLength, out state.Header))
-                                goto case ParseState.ReadMainMessageLength;
+                                goto case ParseStep.ReadMainMessageLength;
                             else
                             {
                                 // Not enough data to read header.
-                                state.ParseState = ParseState.ReadHeader;
+                                state.Step = ParseStep.ReadHeader;
                                 break;
                             }
                         }
-                    case ParseState.ReadMainMessageLength:
+                    case ParseStep.ReadMainMessageLength:
                         {
                             if (buffer.TryReadVarintUInt32(out state.MainMessageLength))
-                                goto case ParseState.ReadProtobufMessage;
+                                goto case ParseStep.ReadProtobufMessage;
                             else
                             {
                                 // Not enough data to read main message length.
-                                state.ParseState = ParseState.ReadMainMessageLength;
+                                state.Step = ParseStep.ReadMainMessageLength;
                                 break;
                             }
                         }
-                    case ParseState.ReadProtobufMessage:
+                    case ParseStep.ReadProtobufMessage:
                         {
                             var messageLength = state.ProtobufMessageLength;
                             if (buffer.Length < messageLength)
                             {
                                 // Not enough data to parse main protobuf message.
-                                state.ParseState = ParseState.ReadProtobufMessage;
+                                state.Step = ParseStep.ReadProtobufMessage;
                                 break;
                             }
 
@@ -211,7 +211,7 @@ namespace Kudu.Client.Connection
                             break;
                         }
                 }
-            } while (state.ParseState == ParseState.NotStarted && buffer.Length >= 4);
+            } while (state.Step == ParseStep.NotStarted && buffer.Length >= 4);
 
             input.AdvanceTo(buffer.Start, buffer.End);
 
@@ -317,9 +317,8 @@ namespace Kudu.Client.Connection
 
         /// <summary>
         /// Stops accepting RPCs and completes any outstanding RPCs with exceptions.
-        /// This method may be called multiple times, but not concurrently.
         /// </summary>
-        public async Task DisposeAsync()
+        public Task StopAsync()
         {
             _ioPipe.Input.CancelPendingRead();
             _ioPipe.Input.Complete();
@@ -327,12 +326,12 @@ namespace Kudu.Client.Connection
             _ioPipe.Output.Complete();
 
             // Wait for the reader loop to finish.
-            await _receiveTask.ConfigureAwait(false);
+            return _receiveTask;
         }
 
-        private struct ParseStuff
+        private struct ParseState
         {
-            public ParseState ParseState;
+            public ParseStep Step;
 
             /// <summary>
             /// Total message length (4 bytes).
@@ -367,7 +366,7 @@ namespace Kudu.Client.Connection
 
             public void Reset()
             {
-                ParseState = ParseState.NotStarted;
+                Step = ParseStep.NotStarted;
                 TotalMessageLength = 0;
                 HeaderLength = 0;
                 MainMessageLength = 0;
@@ -375,7 +374,7 @@ namespace Kudu.Client.Connection
             }
         }
 
-        private enum ParseState
+        private enum ParseStep
         {
             NotStarted,
             ReadTotalMessageLength,

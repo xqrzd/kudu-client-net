@@ -18,7 +18,7 @@ namespace Kudu.Client.Util
             return true;
         }
 
-        private static unsafe bool TryReadMultisegment(
+        private static bool TryReadMultisegment(
             this ref ReadOnlySequence<byte> buffer, out int value)
         {
             if (buffer.Length < 4)

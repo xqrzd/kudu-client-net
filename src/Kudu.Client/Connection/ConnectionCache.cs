@@ -77,7 +77,7 @@ namespace Kudu.Client.Connection
             try
             {
                 var connection = await connectionTask.ConfigureAwait(false);
-                await connection.DisposeAsync().ConfigureAwait(false);
+                await connection.StopAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
