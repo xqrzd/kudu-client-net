@@ -7,6 +7,89 @@ namespace Kudu.Client.Protocol.Security
 {
 
     [global::ProtoBuf.ProtoContract()]
+    public partial class ColumnPrivilegePB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"scan_privilege")]
+        public bool ScanPrivilege
+        {
+            get { return __pbn__ScanPrivilege.GetValueOrDefault(); }
+            set { __pbn__ScanPrivilege = value; }
+        }
+        public bool ShouldSerializeScanPrivilege() => __pbn__ScanPrivilege != null;
+        public void ResetScanPrivilege() => __pbn__ScanPrivilege = null;
+        private bool? __pbn__ScanPrivilege;
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class TablePrivilegePB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"table_id")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string TableId
+        {
+            get { return __pbn__TableId ?? ""; }
+            set { __pbn__TableId = value; }
+        }
+        public bool ShouldSerializeTableId() => __pbn__TableId != null;
+        public void ResetTableId() => __pbn__TableId = null;
+        private string __pbn__TableId;
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"scan_privilege")]
+        public bool ScanPrivilege
+        {
+            get { return __pbn__ScanPrivilege.GetValueOrDefault(); }
+            set { __pbn__ScanPrivilege = value; }
+        }
+        public bool ShouldSerializeScanPrivilege() => __pbn__ScanPrivilege != null;
+        public void ResetScanPrivilege() => __pbn__ScanPrivilege = null;
+        private bool? __pbn__ScanPrivilege;
+
+        [global::ProtoBuf.ProtoMember(3, Name = @"insert_privilege")]
+        public bool InsertPrivilege
+        {
+            get { return __pbn__InsertPrivilege.GetValueOrDefault(); }
+            set { __pbn__InsertPrivilege = value; }
+        }
+        public bool ShouldSerializeInsertPrivilege() => __pbn__InsertPrivilege != null;
+        public void ResetInsertPrivilege() => __pbn__InsertPrivilege = null;
+        private bool? __pbn__InsertPrivilege;
+
+        [global::ProtoBuf.ProtoMember(4, Name = @"update_privilege")]
+        public bool UpdatePrivilege
+        {
+            get { return __pbn__UpdatePrivilege.GetValueOrDefault(); }
+            set { __pbn__UpdatePrivilege = value; }
+        }
+        public bool ShouldSerializeUpdatePrivilege() => __pbn__UpdatePrivilege != null;
+        public void ResetUpdatePrivilege() => __pbn__UpdatePrivilege = null;
+        private bool? __pbn__UpdatePrivilege;
+
+        [global::ProtoBuf.ProtoMember(5, Name = @"delete_privilege")]
+        public bool DeletePrivilege
+        {
+            get { return __pbn__DeletePrivilege.GetValueOrDefault(); }
+            set { __pbn__DeletePrivilege = value; }
+        }
+        public bool ShouldSerializeDeletePrivilege() => __pbn__DeletePrivilege != null;
+        public void ResetDeletePrivilege() => __pbn__DeletePrivilege = null;
+        private bool? __pbn__DeletePrivilege;
+
+        [global::ProtoBuf.ProtoMember(6, Name = @"column_privileges")]
+        [global::ProtoBuf.ProtoMap]
+        public global::System.Collections.Generic.Dictionary<int, ColumnPrivilegePB> ColumnPrivileges { get; } = new global::System.Collections.Generic.Dictionary<int, ColumnPrivilegePB>();
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
     public partial class AuthnTokenPB : global::ProtoBuf.IExtensible
     {
         private global::ProtoBuf.IExtension __pbn__extensionData;
@@ -32,6 +115,20 @@ namespace Kudu.Client.Protocol.Security
         private global::ProtoBuf.IExtension __pbn__extensionData;
         global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
             => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"username")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string Username
+        {
+            get { return __pbn__Username ?? ""; }
+            set { __pbn__Username = value; }
+        }
+        public bool ShouldSerializeUsername() => __pbn__Username != null;
+        public void ResetUsername() => __pbn__Username = null;
+        private string __pbn__Username;
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"table_privilege")]
+        public TablePrivilegePB TablePrivilege { get; set; }
 
     }
 

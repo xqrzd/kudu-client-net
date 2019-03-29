@@ -14,7 +14,7 @@ namespace Kudu.Client.Protocol.Rpc
             => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
 
         [global::ProtoBuf.ProtoMember(1, Name = @"header", IsRequired = true)]
-        public RequestHeader Header { get; set; }
+        public global::Kudu.Client.Protocol.Rpc.RequestHeader Header { get; set; }
 
         [global::ProtoBuf.ProtoMember(2, Name = @"trace_buffer")]
         [global::System.ComponentModel.DefaultValue("")]
@@ -76,6 +76,145 @@ namespace Kudu.Client.Protocol.Rpc
     }
 
     [global::ProtoBuf.ProtoContract()]
+    public partial class SocketStatsPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"rtt")]
+        public uint Rtt
+        {
+            get { return __pbn__Rtt.GetValueOrDefault(); }
+            set { __pbn__Rtt = value; }
+        }
+        public bool ShouldSerializeRtt() => __pbn__Rtt != null;
+        public void ResetRtt() => __pbn__Rtt = null;
+        private uint? __pbn__Rtt;
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"rttvar")]
+        public uint Rttvar
+        {
+            get { return __pbn__Rttvar.GetValueOrDefault(); }
+            set { __pbn__Rttvar = value; }
+        }
+        public bool ShouldSerializeRttvar() => __pbn__Rttvar != null;
+        public void ResetRttvar() => __pbn__Rttvar = null;
+        private uint? __pbn__Rttvar;
+
+        [global::ProtoBuf.ProtoMember(3, Name = @"snd_cwnd")]
+        public uint SndCwnd
+        {
+            get { return __pbn__SndCwnd.GetValueOrDefault(); }
+            set { __pbn__SndCwnd = value; }
+        }
+        public bool ShouldSerializeSndCwnd() => __pbn__SndCwnd != null;
+        public void ResetSndCwnd() => __pbn__SndCwnd = null;
+        private uint? __pbn__SndCwnd;
+
+        [global::ProtoBuf.ProtoMember(4, Name = @"total_retrans")]
+        public uint TotalRetrans
+        {
+            get { return __pbn__TotalRetrans.GetValueOrDefault(); }
+            set { __pbn__TotalRetrans = value; }
+        }
+        public bool ShouldSerializeTotalRetrans() => __pbn__TotalRetrans != null;
+        public void ResetTotalRetrans() => __pbn__TotalRetrans = null;
+        private uint? __pbn__TotalRetrans;
+
+        [global::ProtoBuf.ProtoMember(5, Name = @"pacing_rate")]
+        public uint PacingRate
+        {
+            get { return __pbn__PacingRate.GetValueOrDefault(); }
+            set { __pbn__PacingRate = value; }
+        }
+        public bool ShouldSerializePacingRate() => __pbn__PacingRate != null;
+        public void ResetPacingRate() => __pbn__PacingRate = null;
+        private uint? __pbn__PacingRate;
+
+        [global::ProtoBuf.ProtoMember(6, Name = @"max_pacing_rate")]
+        public uint MaxPacingRate
+        {
+            get { return __pbn__MaxPacingRate.GetValueOrDefault(); }
+            set { __pbn__MaxPacingRate = value; }
+        }
+        public bool ShouldSerializeMaxPacingRate() => __pbn__MaxPacingRate != null;
+        public void ResetMaxPacingRate() => __pbn__MaxPacingRate = null;
+        private uint? __pbn__MaxPacingRate;
+
+        [global::ProtoBuf.ProtoMember(7, Name = @"bytes_acked")]
+        public ulong BytesAcked
+        {
+            get { return __pbn__BytesAcked.GetValueOrDefault(); }
+            set { __pbn__BytesAcked = value; }
+        }
+        public bool ShouldSerializeBytesAcked() => __pbn__BytesAcked != null;
+        public void ResetBytesAcked() => __pbn__BytesAcked = null;
+        private ulong? __pbn__BytesAcked;
+
+        [global::ProtoBuf.ProtoMember(8, Name = @"bytes_received")]
+        public ulong BytesReceived
+        {
+            get { return __pbn__BytesReceived.GetValueOrDefault(); }
+            set { __pbn__BytesReceived = value; }
+        }
+        public bool ShouldSerializeBytesReceived() => __pbn__BytesReceived != null;
+        public void ResetBytesReceived() => __pbn__BytesReceived = null;
+        private ulong? __pbn__BytesReceived;
+
+        [global::ProtoBuf.ProtoMember(9, Name = @"segs_out")]
+        public uint SegsOut
+        {
+            get { return __pbn__SegsOut.GetValueOrDefault(); }
+            set { __pbn__SegsOut = value; }
+        }
+        public bool ShouldSerializeSegsOut() => __pbn__SegsOut != null;
+        public void ResetSegsOut() => __pbn__SegsOut = null;
+        private uint? __pbn__SegsOut;
+
+        [global::ProtoBuf.ProtoMember(10, Name = @"segs_in")]
+        public uint SegsIn
+        {
+            get { return __pbn__SegsIn.GetValueOrDefault(); }
+            set { __pbn__SegsIn = value; }
+        }
+        public bool ShouldSerializeSegsIn() => __pbn__SegsIn != null;
+        public void ResetSegsIn() => __pbn__SegsIn = null;
+        private uint? __pbn__SegsIn;
+
+        [global::ProtoBuf.ProtoMember(11, Name = @"send_queue_bytes")]
+        public ulong SendQueueBytes
+        {
+            get { return __pbn__SendQueueBytes.GetValueOrDefault(); }
+            set { __pbn__SendQueueBytes = value; }
+        }
+        public bool ShouldSerializeSendQueueBytes() => __pbn__SendQueueBytes != null;
+        public void ResetSendQueueBytes() => __pbn__SendQueueBytes = null;
+        private ulong? __pbn__SendQueueBytes;
+
+        [global::ProtoBuf.ProtoMember(12, Name = @"receive_queue_bytes")]
+        public ulong ReceiveQueueBytes
+        {
+            get { return __pbn__ReceiveQueueBytes.GetValueOrDefault(); }
+            set { __pbn__ReceiveQueueBytes = value; }
+        }
+        public bool ShouldSerializeReceiveQueueBytes() => __pbn__ReceiveQueueBytes != null;
+        public void ResetReceiveQueueBytes() => __pbn__ReceiveQueueBytes = null;
+        private ulong? __pbn__ReceiveQueueBytes;
+
+        [global::ProtoBuf.ProtoMember(13, Name = @"send_bytes_per_sec")]
+        public int SendBytesPerSec
+        {
+            get { return __pbn__SendBytesPerSec.GetValueOrDefault(); }
+            set { __pbn__SendBytesPerSec = value; }
+        }
+        public bool ShouldSerializeSendBytesPerSec() => __pbn__SendBytesPerSec != null;
+        public void ResetSendBytesPerSec() => __pbn__SendBytesPerSec = null;
+        private int? __pbn__SendBytesPerSec;
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
     public partial class RpcConnectionPB : global::ProtoBuf.IExtensible
     {
         private global::ProtoBuf.IExtension __pbn__extensionData;
@@ -112,6 +251,9 @@ namespace Kudu.Client.Protocol.Rpc
         public void ResetOutboundQueueSize() => __pbn__OutboundQueueSize = null;
         private long? __pbn__OutboundQueueSize;
 
+        [global::ProtoBuf.ProtoMember(6, Name = @"socket_stats")]
+        public SocketStatsPB SocketStats { get; set; }
+
         [global::ProtoBuf.ProtoContract()]
         public enum StateType
         {
@@ -126,7 +268,7 @@ namespace Kudu.Client.Protocol.Rpc
     }
 
     [global::ProtoBuf.ProtoContract()]
-    public partial class DumpRunningRpcsRequestPB : global::ProtoBuf.IExtensible
+    public partial class DumpConnectionsRequestPB : global::ProtoBuf.IExtensible
     {
         private global::ProtoBuf.IExtension __pbn__extensionData;
         global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
@@ -146,7 +288,7 @@ namespace Kudu.Client.Protocol.Rpc
     }
 
     [global::ProtoBuf.ProtoContract()]
-    public partial class DumpRunningRpcsResponsePB : global::ProtoBuf.IExtensible
+    public partial class DumpConnectionsResponsePB : global::ProtoBuf.IExtensible
     {
         private global::ProtoBuf.IExtension __pbn__extensionData;
         global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
@@ -209,7 +351,7 @@ namespace Kudu.Client.Protocol.Rpc
             => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
 
         [global::ProtoBuf.ProtoMember(1, Name = @"header")]
-        public RequestHeader Header { get; set; }
+        public global::Kudu.Client.Protocol.Rpc.RequestHeader Header { get; set; }
 
         [global::ProtoBuf.ProtoMember(2, Name = @"trace")]
         [global::System.ComponentModel.DefaultValue("")]

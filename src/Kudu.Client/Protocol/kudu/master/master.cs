@@ -606,6 +606,17 @@ namespace Kudu.Client.Protocol.Master
         [global::ProtoBuf.ProtoMember(2, Name = @"rpc_addresses")]
         public global::System.Collections.Generic.List<global::Kudu.Client.Protocol.HostPortPB> RpcAddresses { get; } = new global::System.Collections.Generic.List<global::Kudu.Client.Protocol.HostPortPB>();
 
+        [global::ProtoBuf.ProtoMember(3, Name = @"location")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string Location
+        {
+            get { return __pbn__Location ?? ""; }
+            set { __pbn__Location = value; }
+        }
+        public bool ShouldSerializeLocation() => __pbn__Location != null;
+        public void ResetLocation() => __pbn__Location = null;
+        private string __pbn__Location;
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -693,6 +704,17 @@ namespace Kudu.Client.Protocol.Master
         public void ResetNumReplicas() => __pbn__NumReplicas = null;
         private int? __pbn__NumReplicas;
 
+        [global::ProtoBuf.ProtoMember(8, Name = @"owner")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string Owner
+        {
+            get { return __pbn__Owner ?? ""; }
+            set { __pbn__Owner = value; }
+        }
+        public bool ShouldSerializeOwner() => __pbn__Owner != null;
+        public void ResetOwner() => __pbn__Owner = null;
+        private string __pbn__Owner;
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -760,6 +782,17 @@ namespace Kudu.Client.Protocol.Master
 
         [global::ProtoBuf.ProtoMember(1, Name = @"table", IsRequired = true)]
         public TableIdentifierPB Table { get; set; }
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"modify_external_catalogs")]
+        [global::System.ComponentModel.DefaultValue(true)]
+        public bool ModifyExternalCatalogs
+        {
+            get { return __pbn__ModifyExternalCatalogs ?? true; }
+            set { __pbn__ModifyExternalCatalogs = value; }
+        }
+        public bool ShouldSerializeModifyExternalCatalogs() => __pbn__ModifyExternalCatalogs != null;
+        public void ResetModifyExternalCatalogs() => __pbn__ModifyExternalCatalogs = null;
+        private bool? __pbn__ModifyExternalCatalogs;
 
     }
 
@@ -932,16 +965,16 @@ namespace Kudu.Client.Protocol.Master
         [global::ProtoBuf.ProtoMember(4, Name = @"schema")]
         public global::Kudu.Client.Protocol.SchemaPB Schema { get; set; }
 
-        [global::ProtoBuf.ProtoMember(5, Name = @"alter_external_catalogs")]
+        [global::ProtoBuf.ProtoMember(5, Name = @"modify_external_catalogs")]
         [global::System.ComponentModel.DefaultValue(true)]
-        public bool AlterExternalCatalogs
+        public bool ModifyExternalCatalogs
         {
-            get { return __pbn__AlterExternalCatalogs ?? true; }
-            set { __pbn__AlterExternalCatalogs = value; }
+            get { return __pbn__ModifyExternalCatalogs ?? true; }
+            set { __pbn__ModifyExternalCatalogs = value; }
         }
-        public bool ShouldSerializeAlterExternalCatalogs() => __pbn__AlterExternalCatalogs != null;
-        public void ResetAlterExternalCatalogs() => __pbn__AlterExternalCatalogs = null;
-        private bool? __pbn__AlterExternalCatalogs;
+        public bool ShouldSerializeModifyExternalCatalogs() => __pbn__ModifyExternalCatalogs != null;
+        public void ResetModifyExternalCatalogs() => __pbn__ModifyExternalCatalogs = null;
+        private bool? __pbn__ModifyExternalCatalogs;
 
         [global::ProtoBuf.ProtoContract()]
         public partial class AddColumn : global::ProtoBuf.IExtensible
@@ -1256,6 +1289,17 @@ namespace Kudu.Client.Protocol.Master
         [global::ProtoBuf.ProtoMember(6, Name = @"hms_config")]
         public HiveMetastoreConfig HmsConfig { get; set; }
 
+        [global::ProtoBuf.ProtoMember(7, Name = @"client_location")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string ClientLocation
+        {
+            get { return __pbn__ClientLocation ?? ""; }
+            set { __pbn__ClientLocation = value; }
+        }
+        public bool ShouldSerializeClientLocation() => __pbn__ClientLocation != null;
+        public void ResetClientLocation() => __pbn__ClientLocation = null;
+        private string __pbn__ClientLocation;
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -1343,6 +1387,17 @@ namespace Kudu.Client.Protocol.Master
             public bool ShouldSerializeMillisSinceHeartbeat() => __pbn__MillisSinceHeartbeat != null;
             public void ResetMillisSinceHeartbeat() => __pbn__MillisSinceHeartbeat = null;
             private int? __pbn__MillisSinceHeartbeat;
+
+            [global::ProtoBuf.ProtoMember(4, Name = @"location")]
+            [global::System.ComponentModel.DefaultValue("")]
+            public string Location
+            {
+                get { return __pbn__Location ?? ""; }
+                set { __pbn__Location = value; }
+            }
+            public bool ShouldSerializeLocation() => __pbn__Location != null;
+            public void ResetLocation() => __pbn__Location = null;
+            private string __pbn__Location;
 
         }
 

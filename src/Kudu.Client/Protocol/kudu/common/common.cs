@@ -326,25 +326,16 @@ namespace Kudu.Client.Protocol
             public void ResetSeed() => __pbn__Seed = null;
             private uint? __pbn__Seed;
 
-            [global::ProtoBuf.ProtoMember(4)]
-            [global::System.ComponentModel.DefaultValue(HashAlgorithm.Unknown)]
-            public HashAlgorithm hash_algorithm
+            [global::ProtoBuf.ProtoMember(4, Name = @"hash_algorithm")]
+            [global::System.ComponentModel.DefaultValue(HashAlgorithm.UnknownHash)]
+            public HashAlgorithm HashAlgorithm
             {
-                get { return __pbn__hash_algorithm ?? HashAlgorithm.Unknown; }
-                set { __pbn__hash_algorithm = value; }
+                get { return __pbn__HashAlgorithm ?? HashAlgorithm.UnknownHash; }
+                set { __pbn__HashAlgorithm = value; }
             }
-            public bool ShouldSerializehash_algorithm() => __pbn__hash_algorithm != null;
-            public void Resethash_algorithm() => __pbn__hash_algorithm = null;
-            private HashAlgorithm? __pbn__hash_algorithm;
-
-            [global::ProtoBuf.ProtoContract()]
-            public enum HashAlgorithm
-            {
-                [global::ProtoBuf.ProtoEnum(Name = @"UNKNOWN")]
-                Unknown = 0,
-                [global::ProtoBuf.ProtoEnum(Name = @"MURMUR_HASH_2")]
-                MurmurHash2 = 1,
-            }
+            public bool ShouldSerializeHashAlgorithm() => __pbn__HashAlgorithm != null;
+            public void ResetHashAlgorithm() => __pbn__HashAlgorithm = null;
+            private HashAlgorithm? __pbn__HashAlgorithm;
 
         }
 
@@ -447,6 +438,55 @@ namespace Kudu.Client.Protocol
         public bool ShouldSerializeis_null() => __pbn__predicate.Is(6);
         public void Resetis_null() => global::ProtoBuf.DiscriminatedUnionObject.Reset(ref __pbn__predicate, 6);
 
+        [global::ProtoBuf.ProtoMember(7)]
+        public InBloomFilter in_bloom_filter
+        {
+            get { return __pbn__predicate.Is(7) ? ((InBloomFilter)__pbn__predicate.Object) : default; }
+            set { __pbn__predicate = new global::ProtoBuf.DiscriminatedUnionObject(7, value); }
+        }
+        public bool ShouldSerializein_bloom_filter() => __pbn__predicate.Is(7);
+        public void Resetin_bloom_filter() => global::ProtoBuf.DiscriminatedUnionObject.Reset(ref __pbn__predicate, 7);
+
+        [global::ProtoBuf.ProtoContract()]
+        public partial class BloomFilter : global::ProtoBuf.IExtensible
+        {
+            private global::ProtoBuf.IExtension __pbn__extensionData;
+            global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+                => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+            [global::ProtoBuf.ProtoMember(1, Name = @"nhash")]
+            public int Nhash
+            {
+                get { return __pbn__Nhash.GetValueOrDefault(); }
+                set { __pbn__Nhash = value; }
+            }
+            public bool ShouldSerializeNhash() => __pbn__Nhash != null;
+            public void ResetNhash() => __pbn__Nhash = null;
+            private int? __pbn__Nhash;
+
+            [global::ProtoBuf.ProtoMember(2, Name = @"bloom_data")]
+            public byte[] BloomData
+            {
+                get { return __pbn__BloomData; }
+                set { __pbn__BloomData = value; }
+            }
+            public bool ShouldSerializeBloomData() => __pbn__BloomData != null;
+            public void ResetBloomData() => __pbn__BloomData = null;
+            private byte[] __pbn__BloomData;
+
+            [global::ProtoBuf.ProtoMember(3, Name = @"hash_algorithm")]
+            [global::System.ComponentModel.DefaultValue(HashAlgorithm.CityHash)]
+            public HashAlgorithm HashAlgorithm
+            {
+                get { return __pbn__HashAlgorithm ?? HashAlgorithm.CityHash; }
+                set { __pbn__HashAlgorithm = value; }
+            }
+            public bool ShouldSerializeHashAlgorithm() => __pbn__HashAlgorithm != null;
+            public void ResetHashAlgorithm() => __pbn__HashAlgorithm = null;
+            private HashAlgorithm? __pbn__HashAlgorithm;
+
+        }
+
         [global::ProtoBuf.ProtoContract()]
         public partial class Range : global::ProtoBuf.IExtensible
         {
@@ -524,6 +564,70 @@ namespace Kudu.Client.Protocol
                 => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
 
         }
+
+        [global::ProtoBuf.ProtoContract()]
+        public partial class InBloomFilter : global::ProtoBuf.IExtensible
+        {
+            private global::ProtoBuf.IExtension __pbn__extensionData;
+            global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+                => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+            [global::ProtoBuf.ProtoMember(1, Name = @"bloom_filters")]
+            public global::System.Collections.Generic.List<ColumnPredicatePB.BloomFilter> BloomFilters { get; } = new global::System.Collections.Generic.List<ColumnPredicatePB.BloomFilter>();
+
+            [global::ProtoBuf.ProtoMember(2, Name = @"lower")]
+            public byte[] Lower
+            {
+                get { return __pbn__Lower; }
+                set { __pbn__Lower = value; }
+            }
+            public bool ShouldSerializeLower() => __pbn__Lower != null;
+            public void ResetLower() => __pbn__Lower = null;
+            private byte[] __pbn__Lower;
+
+            [global::ProtoBuf.ProtoMember(3, Name = @"upper")]
+            public byte[] Upper
+            {
+                get { return __pbn__Upper; }
+                set { __pbn__Upper = value; }
+            }
+            public bool ShouldSerializeUpper() => __pbn__Upper != null;
+            public void ResetUpper() => __pbn__Upper = null;
+            private byte[] __pbn__Upper;
+
+        }
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class KeyRangePB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"start_primary_key")]
+        public byte[] StartPrimaryKey
+        {
+            get { return __pbn__StartPrimaryKey; }
+            set { __pbn__StartPrimaryKey = value; }
+        }
+        public bool ShouldSerializeStartPrimaryKey() => __pbn__StartPrimaryKey != null;
+        public void ResetStartPrimaryKey() => __pbn__StartPrimaryKey = null;
+        private byte[] __pbn__StartPrimaryKey;
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"stop_primary_key")]
+        public byte[] StopPrimaryKey
+        {
+            get { return __pbn__StopPrimaryKey; }
+            set { __pbn__StopPrimaryKey = value; }
+        }
+        public bool ShouldSerializeStopPrimaryKey() => __pbn__StopPrimaryKey != null;
+        public void ResetStopPrimaryKey() => __pbn__StopPrimaryKey = null;
+        private byte[] __pbn__StopPrimaryKey;
+
+        [global::ProtoBuf.ProtoMember(3, Name = @"size_bytes_estimates", IsRequired = true)]
+        public ulong SizeBytesEstimates { get; set; }
 
     }
 

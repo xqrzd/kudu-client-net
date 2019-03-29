@@ -339,6 +339,27 @@ namespace Kudu.Client.Protocol.Server
 
     }
 
+    [global::ProtoBuf.ProtoContract()]
+    public partial class DumpMemTrackersRequestPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class DumpMemTrackersResponsePB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"root_tracker")]
+        public global::Kudu.Client.Protocol.MemTrackerPB RootTracker { get; set; }
+
+    }
+
 }
 
 #pragma warning restore CS1591, CS0612, CS3021, IDE1006

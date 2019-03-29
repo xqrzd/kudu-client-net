@@ -62,6 +62,8 @@ namespace Kudu.Client.Protocol.Tserver
             Throttled = 19,
             [global::ProtoBuf.ProtoEnum(Name = @"TABLET_FAILED")]
             TabletFailed = 20,
+            [global::ProtoBuf.ProtoEnum(Name = @"NOT_AUTHORIZED")]
+            NotAuthorized = 21,
         }
 
     }
@@ -555,6 +557,66 @@ namespace Kudu.Client.Protocol.Tserver
 
         [global::ProtoBuf.ProtoMember(1, Name = @"error")]
         public TabletServerErrorPB Error { get; set; }
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class SplitKeyRangeRequestPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"tablet_id", IsRequired = true)]
+        public byte[] TabletId { get; set; }
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"start_primary_key")]
+        public byte[] StartPrimaryKey
+        {
+            get { return __pbn__StartPrimaryKey; }
+            set { __pbn__StartPrimaryKey = value; }
+        }
+        public bool ShouldSerializeStartPrimaryKey() => __pbn__StartPrimaryKey != null;
+        public void ResetStartPrimaryKey() => __pbn__StartPrimaryKey = null;
+        private byte[] __pbn__StartPrimaryKey;
+
+        [global::ProtoBuf.ProtoMember(3, Name = @"stop_primary_key")]
+        public byte[] StopPrimaryKey
+        {
+            get { return __pbn__StopPrimaryKey; }
+            set { __pbn__StopPrimaryKey = value; }
+        }
+        public bool ShouldSerializeStopPrimaryKey() => __pbn__StopPrimaryKey != null;
+        public void ResetStopPrimaryKey() => __pbn__StopPrimaryKey = null;
+        private byte[] __pbn__StopPrimaryKey;
+
+        [global::ProtoBuf.ProtoMember(4, Name = @"target_chunk_size_bytes")]
+        public ulong TargetChunkSizeBytes
+        {
+            get { return __pbn__TargetChunkSizeBytes.GetValueOrDefault(); }
+            set { __pbn__TargetChunkSizeBytes = value; }
+        }
+        public bool ShouldSerializeTargetChunkSizeBytes() => __pbn__TargetChunkSizeBytes != null;
+        public void ResetTargetChunkSizeBytes() => __pbn__TargetChunkSizeBytes = null;
+        private ulong? __pbn__TargetChunkSizeBytes;
+
+        [global::ProtoBuf.ProtoMember(5, Name = @"columns")]
+        public global::System.Collections.Generic.List<global::Kudu.Client.Protocol.ColumnSchemaPB> Columns { get; } = new global::System.Collections.Generic.List<global::Kudu.Client.Protocol.ColumnSchemaPB>();
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class SplitKeyRangeResponsePB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"error")]
+        public TabletServerErrorPB Error { get; set; }
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"ranges")]
+        public global::System.Collections.Generic.List<global::Kudu.Client.Protocol.KeyRangePB> Ranges { get; } = new global::System.Collections.Generic.List<global::Kudu.Client.Protocol.KeyRangePB>();
 
     }
 

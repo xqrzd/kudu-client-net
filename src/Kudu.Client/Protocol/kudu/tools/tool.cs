@@ -488,6 +488,12 @@ namespace Kudu.Client.Protocol.Tools
         [global::ProtoBuf.ProtoMember(9, Name = @"checksum_results")]
         public KsckChecksumResultsPB ChecksumResults { get; set; }
 
+        [global::ProtoBuf.ProtoMember(10, Name = @"version_summaries")]
+        public global::System.Collections.Generic.List<KsckVersionSummaryPB> VersionSummaries { get; } = new global::System.Collections.Generic.List<KsckVersionSummaryPB>();
+
+        [global::ProtoBuf.ProtoMember(11, Name = @"count_summaries")]
+        public global::System.Collections.Generic.List<KsckCountSummaryPB> CountSummaries { get; } = new global::System.Collections.Generic.List<KsckCountSummaryPB>();
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -551,6 +557,17 @@ namespace Kudu.Client.Protocol.Tools
         public bool ShouldSerializeVersion() => __pbn__Version != null;
         public void ResetVersion() => __pbn__Version = null;
         private string __pbn__Version;
+
+        [global::ProtoBuf.ProtoMember(6, Name = @"location")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string Location
+        {
+            get { return __pbn__Location ?? ""; }
+            set { __pbn__Location = value; }
+        }
+        public bool ShouldSerializeLocation() => __pbn__Location != null;
+        public void ResetLocation() => __pbn__Location = null;
+        private string __pbn__Location;
 
         [global::ProtoBuf.ProtoContract()]
         public enum ServerHealth
@@ -1026,6 +1043,88 @@ namespace Kudu.Client.Protocol.Tools
         public bool ShouldSerializeChecksum() => __pbn__Checksum != null;
         public void ResetChecksum() => __pbn__Checksum = null;
         private ulong? __pbn__Checksum;
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class KsckVersionSummaryPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"version")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string Version
+        {
+            get { return __pbn__Version ?? ""; }
+            set { __pbn__Version = value; }
+        }
+        public bool ShouldSerializeVersion() => __pbn__Version != null;
+        public void ResetVersion() => __pbn__Version = null;
+        private string __pbn__Version;
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"servers")]
+        public global::System.Collections.Generic.List<string> Servers { get; } = new global::System.Collections.Generic.List<string>();
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class KsckCountSummaryPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"masters")]
+        public int Masters
+        {
+            get { return __pbn__Masters.GetValueOrDefault(); }
+            set { __pbn__Masters = value; }
+        }
+        public bool ShouldSerializeMasters() => __pbn__Masters != null;
+        public void ResetMasters() => __pbn__Masters = null;
+        private int? __pbn__Masters;
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"tservers")]
+        public int Tservers
+        {
+            get { return __pbn__Tservers.GetValueOrDefault(); }
+            set { __pbn__Tservers = value; }
+        }
+        public bool ShouldSerializeTservers() => __pbn__Tservers != null;
+        public void ResetTservers() => __pbn__Tservers = null;
+        private int? __pbn__Tservers;
+
+        [global::ProtoBuf.ProtoMember(3, Name = @"tables")]
+        public int Tables
+        {
+            get { return __pbn__Tables.GetValueOrDefault(); }
+            set { __pbn__Tables = value; }
+        }
+        public bool ShouldSerializeTables() => __pbn__Tables != null;
+        public void ResetTables() => __pbn__Tables = null;
+        private int? __pbn__Tables;
+
+        [global::ProtoBuf.ProtoMember(4, Name = @"tablets")]
+        public int Tablets
+        {
+            get { return __pbn__Tablets.GetValueOrDefault(); }
+            set { __pbn__Tablets = value; }
+        }
+        public bool ShouldSerializeTablets() => __pbn__Tablets != null;
+        public void ResetTablets() => __pbn__Tablets = null;
+        private int? __pbn__Tablets;
+
+        [global::ProtoBuf.ProtoMember(5, Name = @"replicas")]
+        public int Replicas
+        {
+            get { return __pbn__Replicas.GetValueOrDefault(); }
+            set { __pbn__Replicas = value; }
+        }
+        public bool ShouldSerializeReplicas() => __pbn__Replicas != null;
+        public void ResetReplicas() => __pbn__Replicas = null;
+        private int? __pbn__Replicas;
 
     }
 

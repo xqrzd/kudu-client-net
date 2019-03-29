@@ -3,7 +3,7 @@
 // Input: client.proto
 
 #pragma warning disable CS1591, CS0612, CS3021, IDE1006
-namespace Kudu.Client.Protocol
+namespace Kudu.Client.Protocol.Client
 {
 
     [global::ProtoBuf.ProtoContract()]
