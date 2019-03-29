@@ -380,28 +380,6 @@ namespace Kudu.Client.Protocol.Rpc
         [global::ProtoBuf.ProtoEnum(Name = @"TLS_AUTHENTICATION_ONLY")]
         TlsAuthenticationOnly = 3,
     }
-
-    public static class Extensions
-    {
-        public static bool GetTrackRpcResult(this global::Google.Protobuf.Reflection.MethodOptions obj)
-            => obj == null ? default : global::ProtoBuf.Extensible.GetValue<bool>(obj, 50006);
-
-        public static void SetTrackRpcResult(this global::Google.Protobuf.Reflection.MethodOptions obj, bool value)
-            => global::ProtoBuf.Extensible.AppendValue<bool>(obj, 50006, value);
-
-        public static string GetAuthzMethod(this global::Google.Protobuf.Reflection.MethodOptions obj)
-            => obj == null ? default : global::ProtoBuf.Extensible.GetValue<string>(obj, 50007);
-
-        public static void SetAuthzMethod(this global::Google.Protobuf.Reflection.MethodOptions obj, string value)
-            => global::ProtoBuf.Extensible.AppendValue<string>(obj, 50007, value);
-
-        public static string GetDefaultAuthzMethod(this global::Google.Protobuf.Reflection.ServiceOptions obj)
-            => obj == null ? default : global::ProtoBuf.Extensible.GetValue<string>(obj, 50007);
-
-        public static void SetDefaultAuthzMethod(this global::Google.Protobuf.Reflection.ServiceOptions obj, string value)
-            => global::ProtoBuf.Extensible.AppendValue<string>(obj, 50007, value);
-
-    }
 }
 
 #pragma warning restore CS1591, CS0612, CS3021, IDE1006
