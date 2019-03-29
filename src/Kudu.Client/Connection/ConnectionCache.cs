@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 namespace Kudu.Client.Connection
@@ -25,7 +24,7 @@ namespace Kudu.Client.Connection
             lock (_connections)
             {
                 if (_disposed)
-                    ThrowDisposedException();
+                    throw new ObjectDisposedException(nameof(ConnectionCache));
 
                 if (_connections.TryGetValue(hostPort, out var connection))
                 {
@@ -72,19 +71,6 @@ namespace Kudu.Client.Connection
             }
         }
 
-        private async Task DisposeConnectionTask(Task<KuduConnection> connectionTask)
-        {
-            try
-            {
-                var connection = await connectionTask.ConfigureAwait(false);
-                await connection.StopAsync().ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Exception disposing connection {ex}");
-            }
-        }
-
         public async ValueTask DisposeAsync()
         {
             List<Task<KuduConnection>> connections;
@@ -97,16 +83,19 @@ namespace Kudu.Client.Connection
             }
 
             foreach (var connectionTask in connections)
-                await DisposeConnectionTask(connectionTask).ConfigureAwait(false);
+            {
+                try
+                {
+                    var connection = await connectionTask.ConfigureAwait(false);
+                    await connection.StopAsync().ConfigureAwait(false);
+                }
+                catch { }
+            }
         }
 
         public void Dispose()
         {
             DisposeAsync().GetAwaiter().GetResult();
         }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private void ThrowDisposedException() =>
-            throw new ObjectDisposedException(nameof(ConnectionCache));
     }
 }

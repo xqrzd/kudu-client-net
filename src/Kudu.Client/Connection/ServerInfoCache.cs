@@ -17,7 +17,7 @@ namespace Kudu.Client.Connection
         /// <summary>
         /// Get replicas of this tablet.
         /// </summary>
-        public IReadOnlyList<ServerInfo> Servers => _servers.AsReadOnly();
+        public IReadOnlyList<ServerInfo> Servers => _servers;
 
         /// <summary>
         /// Get the information on the tablet server that we think holds the

@@ -109,7 +109,7 @@ namespace Kudu.Client.Connection
                     if (result.IsCanceled || result.IsCompleted)
                         break;
 
-                    await ParseAsync(input, result.Buffer, ref state).ConfigureAwait(false);
+                    await ParseAsync(input, result.Buffer, state).ConfigureAwait(false);
                 }
 
                 input.Complete();
@@ -125,7 +125,7 @@ namespace Kudu.Client.Connection
             Shutdown();
         }
 
-        private Task ParseAsync(PipeReader input, ReadOnlySequence<byte> buffer, ref ParseState state)
+        private Task ParseAsync(PipeReader input, ReadOnlySequence<byte> buffer, ParseState state)
         {
             do
             {
@@ -329,7 +329,7 @@ namespace Kudu.Client.Connection
             return _receiveTask;
         }
 
-        private struct ParseState
+        private class ParseState
         {
             public ParseStep Step;
 

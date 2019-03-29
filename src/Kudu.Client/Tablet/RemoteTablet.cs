@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using Kudu.Client.Connection;
 using Kudu.Client.Protocol.Consensus;
 using Kudu.Client.Protocol.Master;
@@ -45,16 +44,8 @@ namespace Kudu.Client.Tablet
         public ServerInfo GetServerInfo(ReplicaSelection replicaSelection) =>
             _cache.GetServerInfo(replicaSelection);
 
-        public bool Equals(RemoteTablet other)
-        {
-            if (other is null)
-                return false;
-
-            if (ReferenceEquals(this, other))
-                return true;
-
-            return TabletId == other.TabletId;
-        }
+        public bool Equals(RemoteTablet other) =>
+            TabletId == other.TabletId;
 
         public override bool Equals(object obj) =>
             Equals(obj as RemoteTablet);
@@ -64,19 +55,14 @@ namespace Kudu.Client.Tablet
 
         public override string ToString()
         {
-            var sb = new StringBuilder();
-            sb.Append(TabletId).Append("@[");
-
             var leader = _cache.GetServerInfo(ReplicaSelection.LeaderOnly);
 
-            var tsStrings = _cache.Servers
+            var tabletServers = _cache.Servers
                 .Select(e => $"{e}{(e == leader ? "[L]" : "")}")
                 // Sort so that we have a consistent iteration order.
                 .OrderBy(e => e);
 
-            sb.Append(string.Join(',', tsStrings));
-            sb.Append(']');
-            return sb.ToString();
+            return $"{TabletId}@[{string.Join(',', tabletServers)}]";
         }
 
         public static RemoteTablet FromTabletLocations(
