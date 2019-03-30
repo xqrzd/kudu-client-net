@@ -1,4 +1,6 @@
 ﻿using System.IO.Pipelines;
+using System.Net;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 using Kudu.Client.Negotiate;
 using Pipelines.Sockets.Unofficial;
@@ -27,11 +29,19 @@ namespace Kudu.Client.Connection
 
         public async Task<KuduConnection> ConnectAsync(ServerInfo serverInfo)
         {
-            var socket = await KuduSocketConnection.ConnectAsync(
-                serverInfo.Endpoint).ConfigureAwait(false);
+            var socket = await ConnectAsync(serverInfo.Endpoint).ConfigureAwait(false);
 
             var negotiator = new Negotiator(serverInfo, socket, DefaultSendOptions, DefaultReceiveOptions);
             return await negotiator.NegotiateAsync().ConfigureAwait(false);
+        }
+
+        private static async Task<Socket> ConnectAsync(IPEndPoint endpoint)
+        {
+            var socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            SocketConnection.SetRecommendedClientOptions(socket);
+
+            await socket.ConnectAsync(endpoint).ConfigureAwait(false);
+            return socket;
         }
     }
 }

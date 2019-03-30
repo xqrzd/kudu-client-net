@@ -1,9 +1,6 @@
 ﻿using System;
 using System.IO.Pipelines;
-using System.Net;
 using System.Net.Sockets;
-using System.Threading.Tasks;
-using Pipelines.Sockets.Unofficial;
 
 namespace Kudu.Client.Connection
 {
@@ -36,15 +33,6 @@ namespace Kudu.Client.Connection
             try { _socket.Shutdown(SocketShutdown.Both); } catch { }
             try { _socket.Close(); } catch { }
             try { _socket.Dispose(); } catch { }
-        }
-
-        public static async Task<Socket> ConnectAsync(IPEndPoint endpoint)
-        {
-            var socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            SocketConnection.SetRecommendedClientOptions(socket);
-
-            await socket.ConnectAsync(endpoint).ConfigureAwait(false);
-            return socket;
         }
     }
 }
