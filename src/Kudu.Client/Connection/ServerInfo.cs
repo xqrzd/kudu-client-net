@@ -13,13 +13,16 @@ namespace Kudu.Client.Connection
 
         public IPEndPoint Endpoint { get; }
 
+        public string Location { get; }
+
         public bool IsLocal { get; }
 
-        public ServerInfo(string uuid, HostAndPort hostPort, IPEndPoint endpoint, bool isLocal)
+        public ServerInfo(string uuid, HostAndPort hostPort, IPEndPoint endpoint, string location, bool isLocal)
         {
             Uuid = uuid;
             HostPort = hostPort;
             Endpoint = endpoint;
+            Location = location;
             IsLocal = isLocal;
         }
 

@@ -25,6 +25,7 @@ namespace Kudu.Client
         private const int FetchTabletsPerPointLookup = 10;
 
         private readonly KuduClientOptions _options;
+        private readonly IKuduConnectionFactory _connectionFactory;
         private readonly ConnectionCache _connectionCache;
         private readonly Dictionary<string, TableLocationsCache> _tableLocations;
 
@@ -33,7 +34,8 @@ namespace Kudu.Client
         public KuduClient(KuduClientOptions options)
         {
             _options = options;
-            _connectionCache = new ConnectionCache(new KuduConnectionFactory());
+            _connectionFactory = new KuduConnectionFactory();
+            _connectionCache = new ConnectionCache(_connectionFactory);
             _tableLocations = new Dictionary<string, TableLocationsCache>();
         }
 
@@ -92,7 +94,8 @@ namespace Kudu.Client
 
             foreach (var tabletLocation in result.TabletLocations)
             {
-                var tablet = RemoteTablet.FromTabletLocations(tableId, tabletLocation);
+                var tablet = await _connectionFactory.GetTabletAsync(tableId, tabletLocation)
+                    .ConfigureAwait(false);
                 tabletLocations.Add(tablet);
             }
 
@@ -280,7 +283,8 @@ namespace Kudu.Client
             int leaderIndex = -1;
             foreach (var master in _options.MasterAddresses)
             {
-                var serverInfo = master.CreateServerInfo("master");
+                var serverInfo = await _connectionFactory.GetServerInfoAsync(
+                    "master", location: null, master).ConfigureAwait(false);
                 var connection = await _connectionCache.GetConnectionAsync(serverInfo).ConfigureAwait(false);
                 var rpc = new ConnectToMasterRequest();
                 await SendRpcToConnectionAsync(rpc, connection).ConfigureAwait(false);

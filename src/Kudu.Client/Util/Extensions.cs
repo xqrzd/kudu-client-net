@@ -1,13 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
 using System.Text;
 using Kudu.Client.Connection;
 using Kudu.Client.Protocol;
-using Kudu.Client.Protocol.Master;
 using Kudu.Client.Protocol.Rpc;
 
 namespace Kudu.Client.Util
@@ -54,74 +50,6 @@ namespace Kudu.Client.Util
         {
             return negotiatePb.SupportedFeatures != null &&
                 negotiatePb.SupportedFeatures.Contains(flag);
-        }
-
-        public static ServerInfo ToServerInfo(this TSInfoPB tsInfo)
-        {
-            string uuid = tsInfo.PermanentUuid.ToStringUtf8();
-            var addresses = tsInfo.RpcAddresses;
-
-            if (addresses.Count == 0)
-            {
-                Console.WriteLine($"Received a tablet server with no addresses {uuid}");
-                return null;
-            }
-
-            // TODO: if the TS advertises multiple host/ports, pick the right one
-            // based on some kind of policy. For now just use the first always.
-            var hostPort = addresses[0].ToHostAndPort();
-
-            return hostPort.CreateServerInfo(uuid);
-        }
-
-        public static ServerInfo CreateServerInfo(this HostAndPort hostPort, string uuid)
-        {
-            var ipAddresses = Dns.GetHostAddresses(hostPort.Host);
-            if (ipAddresses == null || ipAddresses.Length == 0)
-                throw new Exception($"Failed to resolve the IP of '{hostPort.Host}'");
-
-            var ipAddress = ipAddresses[0];
-            if (ipAddress.AddressFamily != AddressFamily.InterNetwork)
-            {
-                // Prefer an IPv4 address.
-                for (int i = 1; i < ipAddresses.Length; i++)
-                {
-                    var newAddress = ipAddresses[i];
-                    if (newAddress.AddressFamily == AddressFamily.InterNetwork)
-                    {
-                        ipAddress = newAddress;
-                        break;
-                    }
-                }
-            }
-
-            var endpoint = new IPEndPoint(ipAddress, hostPort.Port);
-            var isLocal = ipAddress.IsLocal();
-
-            return new ServerInfo(uuid, hostPort, endpoint, isLocal);
-        }
-
-        public static bool IsLocal(this IPAddress ipAddress)
-        {
-            List<IPAddress> localIPs = GetLocalAddresses();
-            return IPAddress.IsLoopback(ipAddress) || localIPs.Contains(ipAddress);
-        }
-
-        private static List<IPAddress> GetLocalAddresses()
-        {
-            var addresses = new List<IPAddress>();
-
-            // Dns.GetHostAddresses(Dns.GetHostName()) returns incomplete results on Linux.
-            // https://github.com/dotnet/corefx/issues/32611
-            foreach (var networkInterface in NetworkInterface.GetAllNetworkInterfaces())
-            {
-                foreach (var ipInfo in networkInterface.GetIPProperties().UnicastAddresses)
-                {
-                    addresses.Add(ipInfo.Address);
-                }
-            }
-
-            return addresses;
         }
     }
 }

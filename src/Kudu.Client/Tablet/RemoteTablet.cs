@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using Kudu.Client.Connection;
-using Kudu.Client.Protocol.Consensus;
-using Kudu.Client.Protocol.Master;
-using Kudu.Client.Util;
 
 namespace Kudu.Client.Tablet
 {
@@ -63,37 +59,6 @@ namespace Kudu.Client.Tablet
                 .OrderBy(e => e);
 
             return $"{TabletId}@[{string.Join(',', tabletServers)}]";
-        }
-
-        public static RemoteTablet FromTabletLocations(
-            string tableId, TabletLocationsPB tabletLocations)
-        {
-            var tabletId = tabletLocations.TabletId.ToStringUtf8();
-            var partition = new Partition(
-                tabletLocations.Partition.PartitionKeyStart,
-                tabletLocations.Partition.PartitionKeyEnd,
-                tabletLocations.Partition.HashBuckets);
-
-            var replicas = new List<ServerInfo>(tabletLocations.Replicas.Count);
-            int leaderIndex = -1;
-
-            for (int i = 0; i < tabletLocations.Replicas.Count; i++)
-            {
-                var replica = tabletLocations.Replicas[i];
-                var serverInfo = replica.TsInfo.ToServerInfo();
-
-                if (replica.Role == RaftPeerPB.Role.Leader)
-                    leaderIndex = i;
-
-                replicas.Add(serverInfo);
-            }
-
-            if (leaderIndex == -1)
-                Console.WriteLine($"No leader provided for tablet {tabletId}");
-
-            var cache = new ServerInfoCache(replicas, leaderIndex);
-
-            return new RemoteTablet(tableId, tabletId, partition, cache);
         }
     }
 }
