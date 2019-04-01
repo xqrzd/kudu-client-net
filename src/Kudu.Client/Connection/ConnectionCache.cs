@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 
 namespace Kudu.Client.Connection
@@ -8,25 +9,25 @@ namespace Kudu.Client.Connection
     public class ConnectionCache : IDisposable
     {
         private readonly IKuduConnectionFactory _connectionFactory;
-        private readonly Dictionary<HostAndPort, Task<KuduConnection>> _connections;
+        private readonly Dictionary<IPEndPoint, Task<KuduConnection>> _connections;
         private bool _disposed;
 
         public ConnectionCache(IKuduConnectionFactory connectionFactory)
         {
             _connectionFactory = connectionFactory;
-            _connections = new Dictionary<HostAndPort, Task<KuduConnection>>();
+            _connections = new Dictionary<IPEndPoint, Task<KuduConnection>>();
         }
 
         public Task<KuduConnection> GetConnectionAsync(ServerInfo serverInfo)
         {
-            var hostPort = serverInfo.HostPort;
+            var endpoint = serverInfo.Endpoint;
 
             lock (_connections)
             {
                 if (_disposed)
                     throw new ObjectDisposedException(nameof(ConnectionCache));
 
-                if (_connections.TryGetValue(hostPort, out var connection))
+                if (_connections.TryGetValue(endpoint, out var connection))
                 {
                     // Don't hand out connections we know are faulted, create a new one instead.
                     // The client may still get a faulted connection (if the task hasn't completed yet),
@@ -36,7 +37,7 @@ namespace Kudu.Client.Connection
                 }
 
                 var task = ConnectAsync(serverInfo);
-                _connections[hostPort] = task;
+                _connections[endpoint] = task;
                 return task;
             }
         }
@@ -47,23 +48,23 @@ namespace Kudu.Client.Connection
 
             // Once we have a KuduConnection, register a callback when it's closed,
             // so we can remove it from the connection cache.
-            connection.OnDisconnected(RemoveConnection, serverInfo.HostPort);
+            connection.OnDisconnected(RemoveConnection, serverInfo);
 
             return connection;
         }
 
         private void RemoveConnection(Exception ex, object state)
         {
-            var hostPort = (HostAndPort)state;
+            var serverInfo = (ServerInfo)state;
 
             lock (_connections)
             {
                 // We're here because the connection's OnConnectionClosed
                 // was raised. Remove this connection from the cache, so the
                 // next time someone requests a connection they get a new one.
-                if (_connections.Remove(hostPort))
+                if (_connections.Remove(serverInfo.Endpoint))
                 {
-                    Console.WriteLine($"Connection disconnected, removing from cache {hostPort} {ex}");
+                    Console.WriteLine($"Connection disconnected, removing from cache {serverInfo.HostPort} {ex}");
                 }
 
                 // Note that connections clean themselves up when disconnected,
