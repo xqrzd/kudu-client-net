@@ -12,7 +12,11 @@ namespace Kudu.Client.Connection
         /// </summary>
         LeaderOnly = ReplicaSelectionPB.LeaderOnly,
         /// <summary>
-        /// Select the closest replica to the client, or a random one if all replicas are equidistant.
+        /// Select the closest replica to the client. Replicas are classified
+        /// from closest to furthest as follows:
+        /// - Local replicas
+        /// - Replicas whose tablet server has the same location as the client
+        /// - All other replicas
         /// </summary>
         ClosestReplica = ReplicaSelectionPB.ClosestReplica
     }

@@ -17,7 +17,12 @@ namespace Kudu.Client.Connection
 
         public bool IsLocal { get; }
 
-        public ServerInfo(string uuid, HostAndPort hostPort, IPEndPoint endpoint, string location, bool isLocal)
+        public ServerInfo(
+            string uuid,
+            HostAndPort hostPort,
+            IPEndPoint endpoint,
+            string location,
+            bool isLocal)
         {
             Uuid = uuid;
             HostPort = hostPort;
@@ -25,6 +30,13 @@ namespace Kudu.Client.Connection
             Location = location;
             IsLocal = isLocal;
         }
+
+        /// <summary>
+        /// Returns true if the server is in the same location as the given location.
+        /// </summary>
+        /// <param name="location">The location to check.</param>
+        public bool InSameLocation(string location) =>
+            !string.IsNullOrEmpty(location) && location.Equals(Location);
 
         public override string ToString() => $"{Uuid} ({HostPort})";
     }

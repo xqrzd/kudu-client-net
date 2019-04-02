@@ -37,8 +37,11 @@ namespace Kudu.Client.Tablet
             _cache = cache;
         }
 
-        public ServerInfo GetServerInfo(ReplicaSelection replicaSelection) =>
-            _cache.GetServerInfo(replicaSelection);
+        public ServerInfo GetServerInfo(
+            ReplicaSelection replicaSelection, string location = null)
+        {
+            return _cache.GetServerInfo(replicaSelection, location);
+        }
 
         public bool Equals(RemoteTablet other) =>
             TabletId == other.TabletId;

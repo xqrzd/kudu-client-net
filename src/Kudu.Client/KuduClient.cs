@@ -30,6 +30,7 @@ namespace Kudu.Client
         private readonly Dictionary<string, TableLocationsCache> _tableLocations;
 
         private volatile ServerInfoCache _masterCache;
+        private volatile string _location;
 
         public KuduClient(KuduClientOptions options)
         {
@@ -147,7 +148,7 @@ namespace Kudu.Client
             if (tablet == null)
                 throw new Exception("The requested tablet does not exist");
 
-            var server = tablet.GetServerInfo(ReplicaSelection.LeaderOnly);
+            var server = GetServerInfo(tablet, ReplicaSelection.LeaderOnly);
             var connection = await _connectionCache.GetConnectionAsync(server).ConfigureAwait(false);
 
             var rpc = new WriteRequest(new WriteRequestPB
@@ -230,7 +231,7 @@ namespace Kudu.Client
                 IndirectData = indirectData
             };
 
-            var server = tablet.GetServerInfo(ReplicaSelection.LeaderOnly);
+            var server = GetServerInfo(tablet, ReplicaSelection.LeaderOnly);
             var connection = await _connectionCache.GetConnectionAsync(server).ConfigureAwait(false);
 
             var rpc = new WriteRequest(new WriteRequestPB
@@ -281,6 +282,7 @@ namespace Kudu.Client
         {
             var masters = new List<ServerInfo>(_options.MasterAddresses.Count);
             int leaderIndex = -1;
+            string location = null;
             foreach (var master in _options.MasterAddresses)
             {
                 var serverInfo = await _connectionFactory.GetServerInfoAsync(
@@ -295,6 +297,7 @@ namespace Kudu.Client
                     leaderIndex = masters.Count;
                 }
 
+                location = response.ClientLocation;
                 masters.Add(serverInfo);
             }
 
@@ -302,6 +305,7 @@ namespace Kudu.Client
                 throw new Exception("Unable to find master leader");
 
             _masterCache = new ServerInfoCache(masters, leaderIndex);
+            _location = location;
         }
 
         private async Task SendRpcToMasterAsync(KuduRpc rpc)
@@ -310,7 +314,7 @@ namespace Kudu.Client
             if (_masterCache == null)
                 await ConnectToClusterAsync().ConfigureAwait(false);
 
-            var master = _masterCache.GetServerInfo(rpc.ReplicaSelection);
+            var master = GetMasterServerInfo(rpc.ReplicaSelection);
             var connection = await _connectionCache.GetConnectionAsync(master).ConfigureAwait(false);
 
             await SendRpcToConnectionAsync(rpc, connection).ConfigureAwait(false);
@@ -330,6 +334,16 @@ namespace Kudu.Client
             };
 
             await connection.SendReceiveAsync(header, rpc).ConfigureAwait(false);
+        }
+
+        private ServerInfo GetServerInfo(RemoteTablet tablet, ReplicaSelection replicaSelection)
+        {
+            return tablet.GetServerInfo(replicaSelection, _location);
+        }
+
+        private ServerInfo GetMasterServerInfo(ReplicaSelection replicaSelection)
+        {
+            return _masterCache.GetServerInfo(replicaSelection, _location);
         }
 
         internal ValueTask<RemoteTablet> GetRowTabletAsync(KuduTable table, PartialRow row)
@@ -376,7 +390,10 @@ namespace Kudu.Client
             lock (_tableLocations)
             {
                 if (!_tableLocations.TryGetValue(tableId, out tableCache))
+                {
+                    // We don't have any tablets cached for this table.
                     return null;
+                }
             }
 
             return tableCache.FindTablet(partitionKey);

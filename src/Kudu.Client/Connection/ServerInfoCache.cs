@@ -38,17 +38,25 @@ namespace Kudu.Client.Connection
         /// the others, return the information on a randomly picked server.
         /// Returns null if this cache doesn't know any servers.
         /// </summary>
-        public ServerInfo GetClosestServerInfo()
+        /// <param name="location">The location of the client.</param>
+        public ServerInfo GetClosestServerInfo(string location = null)
         {
             ServerInfo last = null;
+            ServerInfo lastInSameLocation = null;
 
             foreach (var server in _servers)
             {
                 last = server;
 
                 if (server.IsLocal)
-                    break;
+                    return server;
+
+                if (server.InSameLocation(location))
+                    lastInSameLocation = server;
             }
+
+            if (lastInSameLocation != null)
+                return lastInSameLocation;
 
             return last;
         }
@@ -58,7 +66,8 @@ namespace Kudu.Client.Connection
         /// passed replica selection mechanism.
         /// </summary>
         /// <param name="replicaSelection">Replica selection mechanism to use.</param>
-        public ServerInfo GetServerInfo(ReplicaSelection replicaSelection)
+        /// <param name="location">The location of the client.</param>
+        public ServerInfo GetServerInfo(ReplicaSelection replicaSelection, string location = null)
         {
             switch (replicaSelection)
             {
@@ -66,7 +75,7 @@ namespace Kudu.Client.Connection
                     return GetLeaderServerInfo();
 
                 case ReplicaSelection.ClosestReplica:
-                    return GetClosestServerInfo();
+                    return GetClosestServerInfo(location);
 
                 default:
                     throw new NotSupportedException($"Unknown replica selection {replicaSelection}");
