@@ -1,20 +1,29 @@
 language: csharp
 sudo: true
-dist: trusty
+dist: xenial
 mono: none
 dotnet: 2.1
 
 env:
   global:
-    - DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+    - DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
     - DOTNET_CLI_TELEMETRY_OPTOUT: 1
 
 install:
   # Install Kudu from the Cloudera apt repository.
-  - curl https://archive.cloudera.com/cdh5/ubuntu/trusty/amd64/cdh/archive.key | sudo apt-key add -
-  - sudo wget http://archive.cloudera.com/cdh5/ubuntu/trusty/amd64/cdh/cloudera.list -O /etc/apt/sources.list.d/cloudera.list
+  - curl https://archive.cloudera.com/cdh6/6.2.0/ubuntu1604/apt/archive.key | sudo apt-key add -
+  - sudo add-apt-repository "deb https://archive.cloudera.com/cdh6/6.2.0/ubuntu1604/apt xenial-cdh6 contrib"
   - sudo apt-get update -y -qq
-  - sudo apt-get install -y kudu kudu-master kudu-tserver
+  - sudo apt-get install -y kudu
+
+  # Kudu requires NTP to be synchronized.
+  - sudo apt-get install ntp
+  - sudo service ntp restart
+  - ntptime # sanity check that NTP is functioning
+
+  # Temp fix until https://gerrit.cloudera.org/c/12523/ is ready
+  - sudo cp /usr/sbin/kudu-master /usr/lib/kudu/bin-release
+  - sudo cp /usr/sbin/kudu-tserver /usr/lib/kudu/bin-release
 
 script:
   - dotnet build --configuration Release
