@@ -124,13 +124,14 @@ namespace Kudu.Client.Negotiate
 
         private async Task<SslStream> NegotiateTlsAsync(NetworkStream stream, string tlsHost)
         {
-            var sslInnerStream = new KuduTlsStream(this);
+            var authenticationStream = new KuduTlsAuthenticationStream(this);
+            var sslInnerStream = new StreamWrapper(authenticationStream);
             var sslStream = SslStreamFactory.CreateSslStreamTrustAll(sslInnerStream);
             await sslStream.AuthenticateAsClientAsync(tlsHost).ConfigureAwait(false);
 
             Console.WriteLine($"TLS Connected {tlsHost}");
 
-            sslInnerStream.Complete(stream);
+            sslInnerStream.ReplaceStream(stream);
             return sslStream;
         }
 
