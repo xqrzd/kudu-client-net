@@ -9,9 +9,7 @@ using Kudu.Client.Exceptions;
 using Kudu.Client.Internal;
 using Kudu.Client.Protocol.Rpc;
 using Kudu.Client.Requests;
-using Kudu.Client.Util;
 using ProtoBuf;
-using ProtoBuf.Meta;
 
 namespace Kudu.Client.Connection
 {
@@ -98,7 +96,7 @@ namespace Kudu.Client.Connection
         private async Task ReceiveAsync()
         {
             PipeReader input = _ioPipe.Input;
-            var state = new ParseState();
+            var parserContext = new ParserContext();
 
             try
             {
@@ -109,109 +107,49 @@ namespace Kudu.Client.Connection
                     if (result.IsCanceled || result.IsCompleted)
                         break;
 
-                    await ParseAsync(input, result.Buffer, state).ConfigureAwait(false);
+                    await ParseAsync(input, result.Buffer, parserContext).ConfigureAwait(false);
                 }
 
                 input.Complete();
+                Shutdown();
             }
             catch (Exception ex)
             {
                 input.Complete(ex);
+                Shutdown(ex);
                 Console.WriteLine("--> Input stopped (Exception) " + _ioPipe.ToString() + ex.ToString());
             }
-
-            // We're done, perform shutdown and mark any outstanding RPC's
-            // with exceptions.
-            Shutdown();
         }
 
-        private Task ParseAsync(PipeReader input, ReadOnlySequence<byte> buffer, ParseState state)
+        private Task ParseAsync(
+            PipeReader input, ReadOnlySequence<byte> buffer, ParserContext parserContext)
         {
             do
             {
-                switch (state.Step)
+                if (KuduProtocol.TryParseMessage(ref buffer, parserContext))
                 {
-                    case ParseStep.NotStarted:
-                        {
-                            if (buffer.TryReadInt32BigEndian(out state.TotalMessageLength))
-                                goto case ParseStep.ReadHeaderLength;
-                            else
-                                // Not enough data to read message size.
-                                break;
-                        }
-                    case ParseStep.ReadHeaderLength:
-                        {
-                            if (buffer.TryReadVarintUInt32(out state.HeaderLength))
-                                goto case ParseStep.ReadHeader;
-                            else
-                            {
-                                // Not enough data to read header length.
-                                state.Step = ParseStep.ReadHeaderLength;
-                                break;
-                            }
-                        }
-                    case ParseStep.ReadHeader:
-                        {
-                            if (TryParseResponseHeader(ref buffer, state.HeaderLength, out state.Header))
-                                goto case ParseStep.ReadMainMessageLength;
-                            else
-                            {
-                                // Not enough data to read header.
-                                state.Step = ParseStep.ReadHeader;
-                                break;
-                            }
-                        }
-                    case ParseStep.ReadMainMessageLength:
-                        {
-                            if (buffer.TryReadVarintUInt32(out state.MainMessageLength))
-                                goto case ParseStep.ReadProtobufMessage;
-                            else
-                            {
-                                // Not enough data to read main message length.
-                                state.Step = ParseStep.ReadMainMessageLength;
-                                break;
-                            }
-                        }
-                    case ParseStep.ReadProtobufMessage:
-                        {
-                            var messageLength = state.ProtobufMessageLength;
-                            if (buffer.Length < messageLength)
-                            {
-                                // Not enough data to parse main protobuf message.
-                                state.Step = ParseStep.ReadProtobufMessage;
-                                break;
-                            }
+                    var header = parserContext.Header;
+                    var messageLength = parserContext.MainMessageLength;
+                    var messageProtobuf = buffer.Slice(0, messageLength);
+                    var success = TryGetRpc(header, messageProtobuf, out var message);
+                    buffer = buffer.Slice(messageLength);
 
-                            var header = state.Header;
-                            var messageProtobuf = buffer.Slice(0, messageLength);
-                            var success = TryGetRpc(header, messageProtobuf, out var message);
-                            buffer = buffer.Slice(messageLength);
+                    if (success)
+                    {
+                        if (parserContext.HasSidecars)
+                        {
+                            input.AdvanceTo(buffer.Start);
 
-                            if (success)
-                            {
-                                if (state.HasSidecars)
-                                {
-                                    var length = state.SidecarLength;
-
-                                    input.AdvanceTo(buffer.Start);
-                                    state.Reset();
-
-                                    return ProcessSidecarsAsync(input, message, header, length);
-                                }
-                                else
-                                {
-                                    // This request has no sidecars, we're all done.
-                                    // Complete this RPC.
-                                    message.TrySetResult(null);
-                                }
-                            }
-
-                            // All done.
-                            state.Reset();
-                            break;
+                            var length = parserContext.SidecarLength;
+                            return ProcessSidecarsAsync(input, message, header, length);
                         }
+                        else
+                        {
+                            message.Complete();
+                        }
+                    }
                 }
-            } while (state.Step == ParseStep.NotStarted && buffer.Length >= 4);
+            } while (parserContext.Step == ParseStep.NotStarted && buffer.Length >= 4);
 
             input.AdvanceTo(buffer.Start, buffer.End);
 
@@ -227,37 +165,16 @@ namespace Kudu.Client.Connection
             try
             {
                 await message.Rpc.ParseSidecarsAsync(header, input, length).ConfigureAwait(false);
-                message.TrySetResult(null);
+                message.Complete();
             }
             catch (Exception ex)
             {
-                message.TrySetException(ex);
+                // We've already dequeued the message from _inflightMessages,
+                // so we can't rely on the connection shutdown to mark this
+                // rpc as failed.
+                message.CompleteWithError(ex);
                 throw;
             }
-        }
-
-        private static bool TryParseResponseHeader(
-            ref ReadOnlySequence<byte> buffer, uint length, out ResponseHeader header)
-        {
-            if (buffer.Length < length)
-            {
-                header = null;
-                return false;
-            }
-
-            var slice = buffer.Slice(0, length);
-            var reader = ProtoReader.Create(out var state, slice, RuntimeTypeModel.Default);
-            var obj = RuntimeTypeModel.Default.Deserialize(reader, ref state, null, typeof(ResponseHeader));
-            buffer = buffer.Slice(length);
-            header = (ResponseHeader)obj;
-            return true;
-        }
-
-        private static ErrorStatusPB ParseError(ReadOnlySequence<byte> buffer)
-        {
-            var reader = ProtoReader.Create(out var state, buffer, RuntimeTypeModel.Default);
-            var obj = RuntimeTypeModel.Default.Deserialize(reader, ref state, null, typeof(ErrorStatusPB));
-            return (ErrorStatusPB)obj;
         }
 
         private bool TryGetRpc(ResponseHeader header, ReadOnlySequence<byte> buffer, out InflightMessage message)
@@ -276,10 +193,10 @@ namespace Kudu.Client.Connection
 
             if (header.IsError)
             {
-                var error = ParseError(buffer);
+                var error = KuduProtocol.ParseError(buffer);
                 var exception = new RpcException(error);
 
-                message.TrySetException(exception);
+                message.CompleteWithError(exception);
                 return false;
             }
             else
@@ -304,7 +221,7 @@ namespace Kudu.Client.Connection
                 _closedException = closedException;
 
                 foreach (var inflightMessage in _inflightMessages.Values)
-                    inflightMessage.TrySetException(closedException);
+                    inflightMessage.CompleteWithError(closedException);
 
                 _inflightMessages.Clear();
             }
@@ -329,63 +246,7 @@ namespace Kudu.Client.Connection
             return _receiveTask;
         }
 
-        private class ParseState
-        {
-            public ParseStep Step;
-
-            /// <summary>
-            /// Total message length (4 bytes).
-            /// </summary>
-            public int TotalMessageLength;
-
-            /// <summary>
-            /// RPC Header protobuf length (variable encoding).
-            /// </summary>
-            public uint HeaderLength;
-
-            /// <summary>
-            /// Main message length (variable encoding).
-            /// Includes the size of any sidecars.
-            /// </summary>
-            public uint MainMessageLength;
-
-            /// <summary>
-            /// RPC Header protobuf.
-            /// </summary>
-            public ResponseHeader Header;
-
-            /// <summary>
-            /// Gets the size of the main message protobuf.
-            /// </summary>
-            public int ProtobufMessageLength => Header.SidecarOffsets == null ?
-                (int)MainMessageLength : (int)Header.SidecarOffsets[0];
-
-            public bool HasSidecars => Header.SidecarOffsets != null;
-
-            public int SidecarLength => (int)MainMessageLength - (int)Header.SidecarOffsets[0];
-
-            public void Reset()
-            {
-                Step = ParseStep.NotStarted;
-                TotalMessageLength = 0;
-                HeaderLength = 0;
-                MainMessageLength = 0;
-                Header = null;
-            }
-        }
-
-        private enum ParseStep
-        {
-            NotStarted,
-            ReadTotalMessageLength,
-            ReadHeaderLength,
-            ReadHeader,
-            ReadMainMessageLength,
-            ReadProtobufMessage,
-            ReadSidecars
-        }
-
-        private sealed class InflightMessage : TaskCompletionSource<object>
+        private sealed class InflightMessage : TaskCompletionSource<KuduRpc>
         {
             public KuduRpc Rpc { get; }
 
@@ -394,6 +255,10 @@ namespace Kudu.Client.Connection
             {
                 Rpc = rpc;
             }
+
+            public void Complete() => TrySetResult(Rpc);
+
+            public void CompleteWithError(Exception exception) => TrySetException(exception);
         }
     }
 }
