@@ -2,7 +2,7 @@ language: csharp
 sudo: true
 dist: xenial
 mono: none
-dotnet: 2.1
+dotnet: 2.1.602
 
 env:
   global:
@@ -19,7 +19,8 @@ install:
   # Kudu requires NTP to be synchronized.
   - sudo apt-get install ntp
   - sudo service ntp restart
-  - ntptime # sanity check that NTP is functioning
+  # Sanity check that NTP is functioning.
+  - ntptime
 
   # Temp fix until https://gerrit.cloudera.org/c/12523/ is ready
   - sudo cp /usr/sbin/kudu-master /usr/lib/kudu/bin-release
