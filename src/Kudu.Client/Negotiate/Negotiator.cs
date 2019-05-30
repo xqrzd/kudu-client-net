@@ -6,6 +6,7 @@ using System.IO.Pipelines;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using Kudu.Client.Connection;
 using Kudu.Client.Internal;
@@ -32,8 +33,8 @@ namespace Kudu.Client.Negotiate
             0  // AuthProtocol (unused)
         };
 
-        private const int ConnectionContextCallID = -3;
-        private const int SASLNegotiationCallID = -33;
+        private const int ConnectionContextCallId = -3;
+        private const int SaslNegotiationCallId = -33;
 
         private readonly ServerInfo _serverInfo;
         private readonly Socket _socket;
@@ -51,7 +52,7 @@ namespace Kudu.Client.Negotiate
             _receivePipeOptions = receivePipeOptions;
         }
 
-        public async Task<KuduConnection> NegotiateAsync()
+        public async Task<KuduConnection> NegotiateAsync(CancellationToken cancellationToken = default)
         {
             var networkStream = new NetworkStream(_socket, ownsSocket: false);
             _stream = networkStream;
@@ -59,9 +60,9 @@ namespace Kudu.Client.Negotiate
             // After the client connects to a server, the client first sends a connection header.
             // The connection header consists of a magic number "hrpc" and three byte flags, for a total of 7 bytes.
             // https://github.com/apache/kudu/blob/master/docs/design-docs/rpc.md#wire-protocol
-            await networkStream.WriteAsync(ConnectionHeader).ConfigureAwait(false);
+            await networkStream.WriteAsync(ConnectionHeader, cancellationToken).ConfigureAwait(false);
 
-            var features = await NegotiateFeaturesAsync().ConfigureAwait(false);
+            var features = await NegotiateFeaturesAsync(cancellationToken).ConfigureAwait(false);
             var useTls = false;
 
             // Always use TLS if the server supports it.
@@ -82,11 +83,11 @@ namespace Kudu.Client.Negotiate
                 }
             }
 
-            var result = await AuthenticateAsync().ConfigureAwait(false);
+            var result = await AuthenticateAsync(cancellationToken).ConfigureAwait(false);
 
             Debug.Assert(result.Step == NegotiatePB.NegotiateStep.SaslSuccess);
 
-            await SendConnectionContextAsync().ConfigureAwait(false);
+            await SendConnectionContextAsync(cancellationToken).ConfigureAwait(false);
 
             IDuplexPipe pipe;
             if (useTls)
@@ -106,7 +107,7 @@ namespace Kudu.Client.Negotiate
             return new KuduConnection(socketConnection);
         }
 
-        private Task<NegotiatePB> NegotiateFeaturesAsync()
+        private Task<NegotiatePB> NegotiateFeaturesAsync(CancellationToken cancellationToken)
         {
             // Step 1: Negotiate
             // The client and server swap RPC feature flags, supported authentication types,
@@ -119,7 +120,7 @@ namespace Kudu.Client.Negotiate
                 request.SupportedFeatures.Add(RpcFeatureFlag.TlsAuthenticationOnly);
             request.SaslMechanisms.Add(new NegotiatePB.SaslMechanism { Mechanism = "PLAIN" });
 
-            return SendReceiveAsync(request);
+            return SendReceiveAsync(request, cancellationToken);
         }
 
         private async Task<SslStream> NegotiateTlsAsync(NetworkStream stream, string tlsHost)
@@ -135,7 +136,7 @@ namespace Kudu.Client.Negotiate
             return sslStream;
         }
 
-        private Task<NegotiatePB> AuthenticateAsync()
+        private Task<NegotiatePB> AuthenticateAsync(CancellationToken cancellationToken)
         {
             // The client and server now authenticate to each other.
             // There are three authentication types (SASL, token, and TLS/PKI certificate),
@@ -150,22 +151,22 @@ namespace Kudu.Client.Negotiate
             request.SaslMechanisms.Add(new NegotiatePB.SaslMechanism { Mechanism = "PLAIN" });
             request.Token = SaslPlain.CreateToken(new NetworkCredential("demo", "demo"));
 
-            return SendReceiveAsync(request);
+            return SendReceiveAsync(request, cancellationToken);
         }
 
-        private Task SendConnectionContextAsync()
+        private Task SendConnectionContextAsync(CancellationToken cancellationToken)
         {
             // Once the SASL negotiation is complete, before the first request, the client sends the
             // server a special call with call_id -3. The body of this call is a ConnectionContextPB.
             // The server should not respond to this call.
 
-            var header = new RequestHeader { CallId = ConnectionContextCallID };
+            var header = new RequestHeader { CallId = ConnectionContextCallId };
             var request = new ConnectionContextPB();
 
-            return SendAsync(header, request);
+            return SendAsync(header, request, cancellationToken);
         }
 
-        internal Task<NegotiatePB> SendTlsHandshakeAsync(byte[] tlsHandshake)
+        internal Task<NegotiatePB> SendTlsHandshakeAsync(byte[] tlsHandshake, CancellationToken cancellationToken)
         {
             var request = new NegotiatePB
             {
@@ -173,18 +174,18 @@ namespace Kudu.Client.Negotiate
                 TlsHandshake = tlsHandshake
             };
 
-            return SendReceiveAsync(request);
+            return SendReceiveAsync(request, cancellationToken);
         }
 
-        private async Task<NegotiatePB> SendReceiveAsync(NegotiatePB request)
+        private async Task<NegotiatePB> SendReceiveAsync(NegotiatePB request, CancellationToken cancellationToken)
         {
-            var header = new RequestHeader { CallId = SASLNegotiationCallID };
-            await SendAsync(header, request).ConfigureAwait(false);
-            var response = await ReceiveAsync().ConfigureAwait(false);
+            var header = new RequestHeader { CallId = SaslNegotiationCallId };
+            await SendAsync(header, request, cancellationToken).ConfigureAwait(false);
+            var response = await ReceiveAsync(cancellationToken).ConfigureAwait(false);
             return response;
         }
 
-        private async Task SendAsync<TInput>(RequestHeader header, TInput body)
+        private async Task SendAsync<TInput>(RequestHeader header, TInput body, CancellationToken cancellationToken)
         {
             using (var stream = new RecyclableMemoryStream())
             {
@@ -198,33 +199,33 @@ namespace Kudu.Client.Negotiate
                 // bytes we already allocated to store the length.
                 BinaryPrimitives.WriteUInt32BigEndian(stream.AsSpan(), (uint)stream.Length - 4);
 
-                await _stream.WriteAsync(stream.AsMemory()).ConfigureAwait(false);
+                await _stream.WriteAsync(stream.AsMemory(), cancellationToken).ConfigureAwait(false);
             }
         }
 
-        private async Task<NegotiatePB> ReceiveAsync()
+        private async Task<NegotiatePB> ReceiveAsync(CancellationToken cancellationToken)
         {
             var buffer = new byte[4];
-            await ReadExactAsync(buffer).ConfigureAwait(false);
+            await ReadExactAsync(buffer, cancellationToken).ConfigureAwait(false);
             var messageLength = BinaryPrimitives.ReadInt32BigEndian(buffer);
 
             buffer = new byte[messageLength];
-            await ReadExactAsync(buffer).ConfigureAwait(false);
+            await ReadExactAsync(buffer, cancellationToken).ConfigureAwait(false);
 
             var ms = new MemoryStream(buffer);
             var header = Serializer.DeserializeWithLengthPrefix<ResponseHeader>(ms, PrefixStyle.Base128);
-            if (header.CallId != SASLNegotiationCallID)
-                throw new Exception($"Negotiate failed, expected {SASLNegotiationCallID}, got {header.CallId}");
+            if (header.CallId != SaslNegotiationCallId)
+                throw new Exception($"Negotiate failed, expected {SaslNegotiationCallId}, got {header.CallId}");
             var response = Serializer.DeserializeWithLengthPrefix<NegotiatePB>(ms, PrefixStyle.Base128);
 
             return response;
         }
 
-        private async Task ReadExactAsync(Memory<byte> buffer)
+        private async Task ReadExactAsync(Memory<byte> buffer, CancellationToken cancellationToken)
         {
             do
             {
-                var read = await _stream.ReadAsync(buffer).ConfigureAwait(false);
+                var read = await _stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
                 buffer = buffer.Slice(read);
             } while (buffer.Length > 0);
         }

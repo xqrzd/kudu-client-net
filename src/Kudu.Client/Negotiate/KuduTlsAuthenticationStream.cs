@@ -32,17 +32,17 @@ namespace Kudu.Client.Negotiate
 
         public override void Write(byte[] buffer, int offset, int count)
         {
-            SendHandshakeAsync(new ReadOnlyMemory<byte>(buffer, offset, count)).GetAwaiter().GetResult();
+            SendHandshakeAsync(new ReadOnlyMemory<byte>(buffer, offset, count), default).GetAwaiter().GetResult();
         }
 
         public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
-            return SendHandshakeAsync(new ReadOnlyMemory<byte>(buffer, offset, count)).AsTask();
+            return SendHandshakeAsync(new ReadOnlyMemory<byte>(buffer, offset, count), cancellationToken).AsTask();
         }
 
         public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
-            return SendHandshakeAsync(buffer);
+            return SendHandshakeAsync(buffer, cancellationToken);
         }
 
         public override int Read(byte[] buffer, int offset, int count)
@@ -74,11 +74,12 @@ namespace Kudu.Client.Negotiate
             throw new NotImplementedException();
         }
 
-        private async ValueTask SendHandshakeAsync(ReadOnlyMemory<byte> buffer)
+        private async ValueTask SendHandshakeAsync(
+            ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
         {
-            // TODO: Wire up a cancellation token.
             _readPosition = 0;
-            _result = await _negotiator.SendTlsHandshakeAsync(buffer.ToArray()).ConfigureAwait(false);
+            _result = await _negotiator.SendTlsHandshakeAsync(
+                buffer.ToArray(), cancellationToken).ConfigureAwait(false);
         }
 
         private int ReadHandshake(Memory<byte> buffer)

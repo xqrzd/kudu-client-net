@@ -4,6 +4,7 @@ using System.IO.Pipelines;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using Kudu.Client.Negotiate;
 using Pipelines.Sockets.Unofficial;
@@ -30,12 +31,13 @@ namespace Kudu.Client.Connection
 
         // TODO: Allow users to supply in pipe options.
 
-        public async Task<KuduConnection> ConnectAsync(ServerInfo serverInfo)
+        public async Task<KuduConnection> ConnectAsync(
+            ServerInfo serverInfo, CancellationToken cancellationToken = default)
         {
             var socket = await ConnectAsync(serverInfo.Endpoint).ConfigureAwait(false);
 
             var negotiator = new Negotiator(serverInfo, socket, DefaultSendOptions, DefaultReceiveOptions);
-            return await negotiator.NegotiateAsync().ConfigureAwait(false);
+            return await negotiator.NegotiateAsync(cancellationToken).ConfigureAwait(false);
         }
 
         public async Task<ServerInfo> GetServerInfoAsync(string uuid, string location, HostAndPort hostPort)

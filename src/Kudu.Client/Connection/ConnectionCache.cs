@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Kudu.Client.Connection
@@ -18,7 +19,8 @@ namespace Kudu.Client.Connection
             _connections = new Dictionary<IPEndPoint, Task<KuduConnection>>();
         }
 
-        public Task<KuduConnection> GetConnectionAsync(ServerInfo serverInfo)
+        public Task<KuduConnection> GetConnectionAsync(
+            ServerInfo serverInfo, CancellationToken cancellationToken = default)
         {
             var endpoint = serverInfo.Endpoint;
 
@@ -36,15 +38,17 @@ namespace Kudu.Client.Connection
                         return connection;
                 }
 
-                var task = ConnectAsync(serverInfo);
+                var task = ConnectAsync(serverInfo, cancellationToken);
                 _connections[endpoint] = task;
                 return task;
             }
         }
 
-        private async Task<KuduConnection> ConnectAsync(ServerInfo serverInfo)
+        private async Task<KuduConnection> ConnectAsync(
+            ServerInfo serverInfo, CancellationToken cancellationToken)
         {
-            var connection = await _connectionFactory.ConnectAsync(serverInfo).ConfigureAwait(false);
+            var connection = await _connectionFactory
+                .ConnectAsync(serverInfo, cancellationToken).ConfigureAwait(false);
 
             // Once we have a KuduConnection, register a callback when it's closed,
             // so we can remove it from the connection cache.
