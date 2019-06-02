@@ -40,7 +40,7 @@ namespace Kudu.Client
             _tableLocations = new Dictionary<string, TableLocationsCache>();
         }
 
-        public async Task<byte[]> CreateTableAsync(TableBuilder table)
+        public async Task<KuduTable> CreateTableAsync(TableBuilder table)
         {
             var rpc = new CreateTableRequest(table.Build());
 
@@ -53,7 +53,29 @@ namespace Kudu.Client
 
             await WaitForTableDoneAsync(result.TableId).ConfigureAwait(false);
 
-            return result.TableId;
+            var tableIdentifier = new TableIdentifierPB { TableId = result.TableId };
+            return await OpenTableAsync(tableIdentifier).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Delete a table on the cluster with the specified name.
+        /// </summary>
+        /// <param name="tableName">The table's name.</param>
+        /// <param name="modifyExternalCatalogs">Whether to apply the deletion to external catalogs, such as the Hive Metastore.</param>
+        public async Task DeleteTableAsync(string tableName, bool modifyExternalCatalogs = true)
+        {
+            var rpc = new DeleteTableRequest(new DeleteTableRequestPB
+            {
+                Table = new TableIdentifierPB { TableName = tableName },
+                ModifyExternalCatalogs = modifyExternalCatalogs
+            });
+
+            await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
+            var result = rpc.Response;
+
+            // TODO: Handle errors elsewhere?
+            if (result.Error != null)
+                throw new MasterException(result.Error);
         }
 
         public async Task<List<ListTablesResponsePB.TableInfo>> GetTablesAsync(string nameFilter = null)
@@ -103,28 +125,16 @@ namespace Kudu.Client
             return tabletLocations;
         }
 
-        public async Task<GetTableSchemaResponsePB> GetTableSchemaAsync(string tableName)
+        public Task<GetTableSchemaResponsePB> GetTableSchemaAsync(string tableName)
         {
-            var rpc = new GetTableSchemaRequest(new GetTableSchemaRequestPB
-            {
-                Table = new TableIdentifierPB
-                {
-                    TableName = tableName
-                }
-            });
-
-            await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
-            var result = rpc.Response;
-
-            if (result.Error != null)
-                throw new MasterException(result.Error);
-
-            return result;
+            var tableIdentifier = new TableIdentifierPB { TableName = tableName };
+            return GetTableSchemaAsync(tableIdentifier);
         }
 
         public async Task<KuduTable> OpenTableAsync(string tableName)
         {
-            var response = await GetTableSchemaAsync(tableName).ConfigureAwait(false);
+            var tableIdentifier = new TableIdentifierPB { TableName = tableName };
+            var response = await GetTableSchemaAsync(tableIdentifier).ConfigureAwait(false);
 
             return new KuduTable(response);
         }
@@ -253,6 +263,29 @@ namespace Kudu.Client
         public ScanBuilder NewScanBuilder(KuduTable table)
         {
             return new ScanBuilder(this, table);
+        }
+
+        public async Task<KuduTable> OpenTableAsync(TableIdentifierPB tableIdentifier)
+        {
+            var response = await GetTableSchemaAsync(tableIdentifier).ConfigureAwait(false);
+
+            return new KuduTable(response);
+        }
+
+        private async Task<GetTableSchemaResponsePB> GetTableSchemaAsync(TableIdentifierPB tableIdentifier)
+        {
+            var rpc = new GetTableSchemaRequest(new GetTableSchemaRequestPB
+            {
+                Table = tableIdentifier
+            });
+
+            await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
+            var result = rpc.Response;
+
+            if (result.Error != null)
+                throw new MasterException(result.Error);
+
+            return result;
         }
 
         private async Task WaitForTableDoneAsync(byte[] tableId)

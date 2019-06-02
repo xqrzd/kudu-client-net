@@ -2,7 +2,6 @@ using System;
 using System.Threading.Tasks;
 using Kudu.Client.Builder;
 using Kudu.Client.FunctionalTests.MiniCluster;
-using Kudu.Client.Util;
 using McMaster.Extensions.Xunit;
 using Xunit;
 
@@ -11,12 +10,13 @@ namespace Kudu.Client.FunctionalTests
     public class CreateTableTests : MiniKuduClusterTestBase
     {
         [SkippableFact]
-        public async Task CreateTable()
+        public async Task CreateTableWithHashPartitions()
         {
             var client = GetKuduClient();
 
-            var table = new TableBuilder()
-                .SetTableName(Guid.NewGuid().ToString())
+            var tableName = Guid.NewGuid().ToString();
+            var builder = new TableBuilder()
+                .SetTableName(tableName)
                 .SetNumReplicas(1)
                 .AddColumn(column =>
                 {
@@ -34,21 +34,82 @@ namespace Kudu.Client.FunctionalTests
                     column.Type = DataType.String;
                     column.Encoding = EncodingType.DictEncoding;
                 })
-                .AddHashPartitions(buckets: 4, "column_x");
+                .AddHashPartitions(buckets: 4, seed: 777, "column_x");
 
-            var tableId = await client.CreateTableAsync(table);
+            var table = await client.CreateTableAsync(builder);
+            Assert.Equal(tableName, table.TableName);
 
-            Assert.NotEmpty(tableId);
+            var partitionSchema = table.PartitionSchema;
+            Assert.Collection(partitionSchema.HashBucketSchemas, h =>
+            {
+                Assert.Equal(4, h.NumBuckets);
+                Assert.Equal(777ul, h.Seed);
+                Assert.Equal(new int[] { 0 }, h.ColumnIds);
+            });
+            Assert.Empty(partitionSchema.RangeSchema.ColumnIds);
 
-            var tables = await client.GetTablesAsync();
+            var locations = await client.GetTableLocationsAsync(table.TableId, null, 10);
+            Assert.Collection(locations, t =>
+            {
+                var start = new byte[0];
+                var end = new byte[] { 0x00, 0x00, 0x00, 0x01 };
 
-            Assert.Contains(tables,
-                t => t.Id.AsSpan().SequenceEqual(tableId));
+                Assert.Equal(new int[] { 0 }, t.Partition.HashBuckets);
 
-            var tabletLocations = await client.GetTableLocationsAsync(tableId.ToStringUtf8(), null, 10);
+                Assert.True(t.Partition.IsStartPartition);
+                Assert.False(t.Partition.IsEndPartition);
 
-            Assert.Equal(4, tabletLocations.Count);
-            // TODO: Add asserts for tabletLocations contents.
+                Assert.Equal(start, t.Partition.PartitionKeyStart);
+                Assert.Equal(end, t.Partition.PartitionKeyEnd);
+
+                Assert.Empty(t.Partition.RangeKeyStart);
+                Assert.Empty(t.Partition.RangeKeyEnd);
+            }, t =>
+            {
+                var start = new byte[] { 0x00, 0x00, 0x00, 0x01 };
+                var end = new byte[] { 0x00, 0x00, 0x00, 0x02 };
+
+                Assert.Equal(new int[] { 1 }, t.Partition.HashBuckets);
+
+                Assert.False(t.Partition.IsStartPartition);
+                Assert.False(t.Partition.IsEndPartition);
+
+                Assert.Equal(start, t.Partition.PartitionKeyStart);
+                Assert.Equal(end, t.Partition.PartitionKeyEnd);
+
+                Assert.Empty(t.Partition.RangeKeyStart);
+                Assert.Empty(t.Partition.RangeKeyEnd);
+            }, t =>
+            {
+                var start = new byte[] { 0x00, 0x00, 0x00, 0x02 };
+                var end = new byte[] { 0x00, 0x00, 0x00, 0x03 };
+
+                Assert.Equal(new int[] { 2 }, t.Partition.HashBuckets);
+
+                Assert.False(t.Partition.IsStartPartition);
+                Assert.False(t.Partition.IsEndPartition);
+
+                Assert.Equal(start, t.Partition.PartitionKeyStart);
+                Assert.Equal(end, t.Partition.PartitionKeyEnd);
+
+                Assert.Empty(t.Partition.RangeKeyStart);
+                Assert.Empty(t.Partition.RangeKeyEnd);
+            }, t =>
+            {
+                var start = new byte[] { 0x00, 0x00, 0x00, 0x03 };
+                var end = new byte[0];
+
+                Assert.Equal(new int[] { 3 }, t.Partition.HashBuckets);
+
+                Assert.False(t.Partition.IsStartPartition);
+                Assert.True(t.Partition.IsEndPartition);
+
+                Assert.Equal(start, t.Partition.PartitionKeyStart);
+                Assert.Equal(end, t.Partition.PartitionKeyEnd);
+
+                Assert.Empty(t.Partition.RangeKeyStart);
+                Assert.Empty(t.Partition.RangeKeyEnd);
+            });
         }
 
         [SkippableFact]
@@ -89,19 +150,14 @@ namespace Kudu.Client.FunctionalTests
                     upper.SetInt(0, 99);
                 });
 
-            var tableId = await client.CreateTableAsync(builder);
-            Assert.NotEmpty(tableId);
+            var table = await client.CreateTableAsync(builder);
+            Assert.Equal(tableName, table.TableName);
 
-            var tables = await client.GetTablesAsync(tableName);
-            Assert.Contains(tables,
-                t => t.Id.AsSpan().SequenceEqual(tableId));
+            var partitionSchema = table.PartitionSchema;
+            Assert.Equal(new int[] { 0 }, partitionSchema.RangeSchema.ColumnIds);
+            Assert.Empty(partitionSchema.HashBucketSchemas);
 
-            var table = await client.OpenTableAsync(tableName);
-            var partition = table.PartitionSchema;
-            Assert.Empty(partition.HashBucketSchemas);
-            Assert.Equal(new int[] { 0 }, partition.RangeSchema.ColumnIds);
-
-            var locations = await client.GetTableLocationsAsync(tableId.ToStringUtf8(), null, 10);
+            var locations = await client.GetTableLocationsAsync(table.TableId, null, 10);
             Assert.Collection(locations, t =>
             {
                 var start = new byte[] { 0x80, 0x0, 0x0, 0x14 };
@@ -111,6 +167,10 @@ namespace Kudu.Client.FunctionalTests
                 Assert.Equal(start, t.Partition.RangeKeyStart);
                 Assert.Equal(end, t.Partition.PartitionKeyEnd);
                 Assert.Equal(end, t.Partition.RangeKeyEnd);
+
+                Assert.False(t.Partition.IsStartPartition);
+                Assert.False(t.Partition.IsEndPartition);
+                Assert.Empty(t.Partition.HashBuckets);
             }, t =>
             {
                 var start = new byte[] { 0x80, 0x0, 0x0, 0x1E };
@@ -120,6 +180,10 @@ namespace Kudu.Client.FunctionalTests
                 Assert.Equal(start, t.Partition.RangeKeyStart);
                 Assert.Equal(end, t.Partition.PartitionKeyEnd);
                 Assert.Equal(end, t.Partition.RangeKeyEnd);
+
+                Assert.False(t.Partition.IsStartPartition);
+                Assert.False(t.Partition.IsEndPartition);
+                Assert.Empty(t.Partition.HashBuckets);
             }, t =>
             {
                 var start = new byte[] { 0x80, 0x0, 0x0, 0x43 };
@@ -129,6 +193,10 @@ namespace Kudu.Client.FunctionalTests
                 Assert.Equal(start, t.Partition.RangeKeyStart);
                 Assert.Equal(end, t.Partition.PartitionKeyEnd);
                 Assert.Equal(end, t.Partition.RangeKeyEnd);
+
+                Assert.False(t.Partition.IsStartPartition);
+                Assert.False(t.Partition.IsEndPartition);
+                Assert.Empty(t.Partition.HashBuckets);
             });
         }
     }

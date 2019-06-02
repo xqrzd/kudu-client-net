@@ -15,8 +15,7 @@ namespace Kudu.Client.FunctionalTests
             var client = GetKuduClient();
 
             var tableName = Guid.NewGuid().ToString();
-
-            var table = new TableBuilder()
+            var builder = new TableBuilder()
                 .SetTableName(tableName)
                 .SetNumReplicas(1)
                 .AddColumn(column =>
@@ -36,14 +35,11 @@ namespace Kudu.Client.FunctionalTests
                     column.Encoding = EncodingType.DictEncoding;
                 });
 
-            var tableId = await client.CreateTableAsync(table);
-            Assert.NotEmpty(tableId);
+            var table = await client.CreateTableAsync(builder);
+            Assert.Equal(tableName, table.TableName);
+            Assert.Equal(1, table.NumReplicas);
 
-            var openTable = await client.OpenTableAsync(tableName);
-            Assert.Equal(tableName, openTable.TableName);
-            Assert.Equal(1, openTable.NumReplicas);
-
-            var insert = openTable.NewInsert();
+            var insert = table.NewInsert();
             var row = insert.Row;
             row.SetInt(0, 7);
             row.SetString(1, "test value");
