@@ -6,7 +6,7 @@ using Kudu.Client.Builder;
 using Kudu.Client.Internal;
 using Kudu.Client.Util;
 
-namespace Kudu.Client
+namespace Kudu.Client.Tablet
 {
     public static partial class KeyEncoder
     {

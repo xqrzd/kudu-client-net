@@ -1,7 +1,7 @@
 ﻿#if !NETCOREAPP3_0
 using System;
 
-namespace Kudu.Client
+namespace Kudu.Client.Tablet
 {
     public static partial class KeyEncoder
     {

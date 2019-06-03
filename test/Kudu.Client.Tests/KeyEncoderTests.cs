@@ -2,6 +2,7 @@
 using Kudu.Client.Builder;
 using Kudu.Client.Internal;
 using Kudu.Client.Protocol.Master;
+using Kudu.Client.Tablet;
 using Xunit;
 
 namespace Kudu.Client.Tests
