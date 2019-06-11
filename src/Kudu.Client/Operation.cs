@@ -3,7 +3,7 @@ using Kudu.Client.Internal;
 
 namespace Kudu.Client
 {
-    public struct Operation
+    public readonly struct Operation
     {
         public KuduTable Table { get; }
 

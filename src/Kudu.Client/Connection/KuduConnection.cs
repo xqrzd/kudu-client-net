@@ -129,7 +129,7 @@ namespace Kudu.Client.Connection
                 if (KuduProtocol.TryParseMessage(ref buffer, parserContext))
                 {
                     var header = parserContext.Header;
-                    var messageLength = parserContext.MainMessageLength;
+                    var messageLength = parserContext.ProtobufMessageLength;
                     var messageProtobuf = buffer.Slice(0, messageLength);
                     var success = TryGetRpc(header, messageProtobuf, out var message);
                     buffer = buffer.Slice(messageLength);

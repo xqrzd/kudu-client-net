@@ -147,6 +147,8 @@ namespace Kudu.Client
 
         public ColumnSchema GetColumn(int index) => _columnsByIndex[index];
 
+        public ColumnSchema GetColumn(string name) => GetColumn(GetColumnIndex(name));
+
         public int GetColumnIndex(int id) => _columnsById[id];
 
         public static int GetTypeSize(DataType type)
