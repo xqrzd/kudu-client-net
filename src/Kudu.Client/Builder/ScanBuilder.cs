@@ -11,6 +11,11 @@ namespace Kudu.Client.Builder
 
         internal KuduTable Table { get; }
 
+        /// <summary>
+        /// Map of column name to predicate.
+        /// </summary>
+        internal Dictionary<string, KuduPredicate> Predicates { get; }
+
         internal List<string> ProjectedColumns { get; private set; }
 
         internal ReadMode ReadMode { get; private set; } = ReadMode.ReadLatest;
@@ -27,6 +32,7 @@ namespace Kudu.Client.Builder
         {
             Client = client;
             Table = table;
+            Predicates = new Dictionary<string, KuduPredicate>();
         }
 
         /// <summary>
@@ -103,6 +109,30 @@ namespace Kudu.Client.Builder
         public ScanBuilder SetCacheBlocks(bool cacheBlocks)
         {
             CacheBlocks = cacheBlocks;
+            return this;
+        }
+
+        /// <summary>
+        /// Adds a predicate to the scan.
+        /// </summary>
+        /// <param name="predicate">The predicate to add.</param>
+        public ScanBuilder AddPredicate(KuduPredicate predicate)
+        {
+            var column = predicate.Column;
+            var columnName = column.Name;
+
+            if (Predicates.TryGetValue(columnName, out var existing))
+            {
+                predicate = existing.Merge(predicate);
+            }
+
+            // KUDU-1652: Do not send an IS NOT NULL predicate to the server for a non-nullable column.
+            if (!column.IsNullable && predicate.Type == PredicateType.IsNotNull)
+            {
+                return this;
+            }
+
+            Predicates[columnName] = predicate;
             return this;
         }
 

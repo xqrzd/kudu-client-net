@@ -24,6 +24,17 @@ namespace Kudu.Client.Util
         }
 
         /// <summary>
+        /// Returns the <see cref="float"/> value corresponding to a given bit
+        /// representation. The argument is considered to be a representation
+        /// of a floating-point value according to the IEEE 754 floating-point
+        /// "single format" bit layout.
+        /// </summary>
+        public static float AsFloat(this int value)
+        {
+            return BitConverter.Int32BitsToSingle(value);
+        }
+
+        /// <summary>
         /// Returns a representation of the specified floating-point value
         /// according to the IEEE 754 floating-point "double format" bit layout.
         /// If the argument is NaN, the result is 0x7ff8000000000000.
@@ -36,6 +47,45 @@ namespace Kudu.Client.Util
                 return 0x7ff8000000000000;
 
             return BitConverter.DoubleToInt64Bits(value);
+        }
+
+        /// <summary>
+        /// Returns the <see cref="double"/> value corresponding to a given bit
+        /// representation. The argument is considered to be a representation
+        /// of a floating-point value according to the IEEE 754 floating-point
+        /// "double format" bit layout.
+        /// </summary>
+        public static double AsDouble(this long value)
+        {
+            return BitConverter.Int64BitsToDouble(value);
+        }
+
+        /// <summary>
+        /// Returns the adjacent floating-point value in the direction of
+        /// positive infinity.
+        /// </summary>
+        /// <param name="value">Starting floating-point value.</param>
+        public static float NextUp(this float value)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value))
+                return value;
+
+            int bits = BitConverter.SingleToInt32Bits(value + 0.0f);
+            return BitConverter.Int32BitsToSingle(bits + ((bits >= 0) ? 1 : -1));
+        }
+
+        /// <summary>
+        /// Returns the adjacent floating-point value in the direction of
+        /// positive infinity.
+        /// </summary>
+        /// <param name="value">Starting floating-point value.</param>
+        public static double NextUp(this double value)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value))
+                return value;
+
+            long bits = BitConverter.DoubleToInt64Bits(value + 0.0d);
+            return BitConverter.Int64BitsToDouble(bits + ((bits >= 0L) ? 1L : -1L));
         }
 
         [StructLayout(LayoutKind.Explicit)]

@@ -1,9 +1,10 @@
-﻿using Kudu.Client.Builder;
+﻿using System;
+using Kudu.Client.Builder;
 using Kudu.Client.Protocol;
 
 namespace Kudu.Client
 {
-    public class ColumnSchema
+    public class ColumnSchema : IEquatable<ColumnSchema>
     {
         public string Name { get; }
 
@@ -60,6 +61,25 @@ namespace Kudu.Client
             Size = Schema.GetTypeSize(Type);
             IsSigned = Schema.IsSigned(Type);
         }
+
+        public bool Equals(ColumnSchema other)
+        {
+            if (other is null)
+                return false;
+
+            if (ReferenceEquals(this, other))
+                return true;
+
+            return
+                Name == other.Name &&
+                Type == other.Type &&
+                IsKey == other.IsKey &&
+                IsNullable == other.IsNullable;
+        }
+
+        public override bool Equals(object obj) => Equals(obj as ColumnSchema);
+
+        public override int GetHashCode() => HashCode.Combine(Name, Type);
     }
 
     public class ColumnTypeAttributes
