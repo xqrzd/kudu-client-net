@@ -21,7 +21,7 @@ namespace Kudu.Client.Util
 
         public const int MaxDecimalPrecision = MaxDecimal128Precision;
 
-        private static readonly int[] PowBase10Cache32 = {
+        private static readonly int[] Pow10Cache32 = {
             1,
             10,
             100,
@@ -34,7 +34,7 @@ namespace Kudu.Client.Util
             1000000000
         };
 
-        private static readonly long[] PowBase10Cache64 = {
+        private static readonly long[] Pow10Cache64 = {
             1,
             10,
             100,
@@ -84,154 +84,143 @@ namespace Kudu.Client.Util
 
         public static int EncodeDecimal32(decimal value, int targetPrecision, int targetScale)
         {
-            DecimalParts d = value;
+            var dec = new DecimalAccessor(value);
+            int scale = dec.Scale;
 
-            if (d.Scale > targetScale)
+            CheckConditions(value, scale, targetPrecision, targetScale);
+
+            int scaleAdjustment = targetScale - scale;
+            int maxValue = Pow10Int32(targetPrecision - scaleAdjustment) - 1;
+            int unscaledValue = dec.Low;
+
+            if (dec.High > 0 || dec.Mid > 0 || unscaledValue > maxValue)
             {
-                throw new ArgumentException(
-                    $"Value scale {d.Scale} can't be coerced to target scale {targetScale}.");
+                ThrowValueTooBig(value, targetPrecision);
             }
 
-            var scaleAdjustment = targetScale - (int)d.Scale;
-            var factor = Pow10Int32(scaleAdjustment);
-            var maxValue = Pow10Int32(targetPrecision - scaleAdjustment) - 1;
-            var unscaledValue = (int)d.Low;
-
-            if (d.High > 0 || d.Mid > 0 || unscaledValue > maxValue)
-            {
-                throw new ArgumentException(
-                    $"Value {value} (after scale coercion) can't be coerced to target precision {targetPrecision}.");
-            }
-
+            int factor = Pow10Int32(scaleAdjustment);
             int result = checked(unscaledValue * factor);
 
-            if (d.IsNegative)
-                result *= -1;
-
-            return result;
+            return dec.IsNegative ? result * -1 : result;
         }
 
         public static long EncodeDecimal64(decimal value, int targetPrecision, int targetScale)
         {
-            DecimalParts d = value;
+            var dec = new DecimalAccessor(value);
+            int scale = dec.Scale;
 
-            if (d.Scale > targetScale)
+            CheckConditions(value, scale, targetPrecision, targetScale);
+
+            int scaleAdjustment = targetScale - scale;
+            long maxValue = Pow10Int64(targetPrecision - scaleAdjustment) - 1;
+            long unscaledValue = ToLong(dec.Low, dec.Mid);
+
+            if (dec.High > 0 || unscaledValue > maxValue)
             {
-                throw new ArgumentException(
-                    $"Value scale {d.Scale} can't be coerced to target scale {targetScale}.");
+                ThrowValueTooBig(value, targetPrecision);
             }
 
-            var scaleAdjustment = targetScale - (int)d.Scale;
-            var factor = Pow10Int64(scaleAdjustment);
-            var maxValue = Pow10Int64(targetPrecision - scaleAdjustment) - 1;
-            var unscaledValue = ToLong(d.Low, d.Mid);
-
-            if (d.High > 0 || unscaledValue > maxValue)
-            {
-                throw new ArgumentException(
-                    $"Value {value} (after scale coercion) can't be coerced to target precision {targetPrecision}.");
-            }
-
+            long factor = Pow10Int64(scaleAdjustment);
             long result = checked(unscaledValue * factor);
 
-            if (d.IsNegative)
-                result *= -1;
-
-            return result;
+            return dec.IsNegative ? result * -1 : result;
         }
 
         public static BigInteger EncodeDecimal128(decimal value, int targetPrecision, int targetScale)
         {
-            DecimalParts d = value;
+            var dec = new DecimalAccessor(value);
+            int scale = dec.Scale;
 
-            if (d.Scale > targetScale)
-            {
-                throw new ArgumentException(
-                    $"Value scale {d.Scale} can't be coerced to target scale {targetScale}.");
-            }
+            CheckConditions(value, scale, targetPrecision, targetScale);
 
-            var scaleAdjustment = targetScale - (int)d.Scale;
-            var factor = BigInteger.Pow(10, scaleAdjustment);
+            var scaleAdjustment = targetScale - dec.Scale;
             var maxValue = BigInteger.Pow(10, targetPrecision - scaleAdjustment) - 1;
 
-            Span<uint> data = stackalloc uint[3];
-            data[0] = d.Low;
-            data[1] = d.Mid;
-            data[2] = d.High;
+            Span<int> data = stackalloc int[3];
+            data[0] = dec.Low;
+            data[1] = dec.Mid;
+            data[2] = dec.High;
 
             var unscaledValue = new BigInteger(
-                MemoryMarshal.Cast<uint, byte>(data),
+                MemoryMarshal.Cast<int, byte>(data),
                 isUnsigned: true, isBigEndian: false);
 
             if (unscaledValue > maxValue)
             {
-                throw new ArgumentException(
-                    $"Value {value} (after scale coercion) can't be coerced to target precision {targetPrecision}.");
+                ThrowValueTooBig(value, targetPrecision);
             }
 
+            var factor = BigInteger.Pow(10, scaleAdjustment);
             var result = unscaledValue * factor;
 
-            if (d.IsNegative)
-                result *= -1;
-
-            return result;
+            return dec.IsNegative ? result * -1 : result;
         }
 
-        private static long ToLong(uint lower, uint upper)
+        private static long ToLong(int lower, int upper)
         {
-            long b = upper;
+            long b = (uint)upper;
             b <<= 32;
-            b |= lower;
+            b |= (uint)lower;
             return b;
         }
 
-        private static int Pow10Int32(int value) => PowBase10Cache32[value];
-
-        private static long Pow10Int64(int value) => PowBase10Cache64[value];
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct DecimalParts
+        private static void CheckConditions(decimal value, int scale, int targetPrecision, int targetScale)
         {
-            // Sign mask for the flags field. A value of zero in this bit indicates a
-            // positive Decimal value, and a value of one in this bit indicates a
-            // negative Decimal value.
-            private const int SignMask = unchecked((int)0x80000000);
+            if (scale > targetScale)
+            {
+                throw new ArgumentException(
+                    $"Value scale {scale} can't be coerced to target scale {targetScale}.");
+            }
 
-            // Scale mask for the flags field. This byte in the flags field contains
-            // the power of 10 to divide the Decimal value by. The scale byte must
-            // contain a value between 0 and 28 inclusive.
-            private const int ScaleMask = 0x00FF0000;
-
-            // Number of bits scale is shifted by.
-            private const int ScaleShift = 16;
-
-            public uint Flags;
-            public uint High;
-            public uint Low;
-            public uint Mid;
-
-            public uint Scale => (Flags & ScaleMask) >> ScaleShift;
-
-            public bool IsNegative => (Flags & SignMask) > 0;
-
-            public static implicit operator DecimalParts(decimal value) =>
-                new DecimalUnion { DecimalValue = value }.Parts;
+            if (targetScale > targetPrecision)
+            {
+                ThrowValueTooBig(value, targetPrecision);
+            }
         }
 
+        private static void ThrowValueTooBig(decimal value, int targetPrecision)
+        {
+            throw new ArgumentException(
+                $"Value {value} (after scale coercion) can't be coerced to target precision {targetPrecision}.");
+        }
+
+        private static int Pow10Int32(int value) => Pow10Cache32[value];
+
+        private static long Pow10Int64(int value) => Pow10Cache64[value];
+
+        /// <summary>
+        /// Provides access to the inner fields of a decimal.
+        /// Similar to decimal.GetBits(), but faster and avoids the int[] allocation
+        /// </summary>
         [StructLayout(LayoutKind.Explicit)]
-        private struct DecimalUnion
+        private readonly struct DecimalAccessor
         {
             [FieldOffset(0)]
-            public decimal DecimalValue;
+            public readonly int Flags;
+            [FieldOffset(4)]
+            public readonly int High;
+            [FieldOffset(8)]
+            public readonly int Low;
+            [FieldOffset(12)]
+            public readonly int Mid;
 
             [FieldOffset(0)]
-            public DecimalParts Parts;
+            public readonly decimal Decimal;
 
-            public static implicit operator DecimalUnion(DecimalParts value) =>
-                new DecimalUnion { Parts = value };
+            public DecimalAccessor(decimal value)
+            {
+                this = default;
+                Decimal = value;
+            }
 
-            public static implicit operator DecimalUnion(decimal value) =>
-                new DecimalUnion { DecimalValue = value };
+            /// <summary>
+            /// This byte in the flags field contains the power
+            /// of 10 to divide the Decimal value by. The scale
+            /// byte must contain a value between 0 and 28 inclusive.
+            /// </summary>
+            public int Scale => (Flags & 0x00FF0000) >> 16;
+
+            public bool IsNegative => (Flags & 0x80000000) > 0;
         }
     }
 }
