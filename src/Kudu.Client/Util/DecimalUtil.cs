@@ -21,7 +21,7 @@ namespace Kudu.Client.Util
 
         public const int MaxDecimalPrecision = MaxDecimal128Precision;
 
-        private static readonly int[] Pow10Cache32 = {
+        private static readonly uint[] Pow10Cache32 = {
             1,
             10,
             100,
@@ -34,7 +34,7 @@ namespace Kudu.Client.Util
             1000000000
         };
 
-        private static readonly long[] Pow10Cache64 = {
+        private static readonly ulong[] Pow10Cache64 = {
             1,
             10,
             100,
@@ -53,7 +53,8 @@ namespace Kudu.Client.Util
             1000000000000000,
             10000000000000000,
             100000000000000000,
-            1000000000000000000
+            1000000000000000000,
+            10000000000000000000
         };
 
         /// <summary>
@@ -78,28 +79,28 @@ namespace Kudu.Client.Util
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(precision),
-                    "Unsupported decimal type precision: " + precision);
+                    $"Unsupported decimal type precision: {precision}");
             }
         }
 
         public static int EncodeDecimal32(decimal value, int targetPrecision, int targetScale)
         {
             var dec = new DecimalAccessor(value);
-            int scale = dec.Scale;
+            int scale = (int)dec.Scale;
 
             CheckConditions(value, scale, targetPrecision, targetScale);
 
             int scaleAdjustment = targetScale - scale;
-            int maxValue = Pow10Int32(targetPrecision - scaleAdjustment) - 1;
-            int unscaledValue = dec.Low;
+            uint maxValue = Pow10Int32(targetPrecision - scaleAdjustment) - 1;
+            uint unscaledValue = dec.Low;
 
             if (dec.High > 0 || dec.Mid > 0 || unscaledValue > maxValue)
             {
                 ThrowValueTooBig(value, targetPrecision);
             }
 
-            int factor = Pow10Int32(scaleAdjustment);
-            int result = checked(unscaledValue * factor);
+            uint factor = Pow10Int32(scaleAdjustment);
+            int result = checked((int)(unscaledValue * factor));
 
             return dec.IsNegative ? result * -1 : result;
         }
@@ -107,21 +108,21 @@ namespace Kudu.Client.Util
         public static long EncodeDecimal64(decimal value, int targetPrecision, int targetScale)
         {
             var dec = new DecimalAccessor(value);
-            int scale = dec.Scale;
+            int scale = (int)dec.Scale;
 
             CheckConditions(value, scale, targetPrecision, targetScale);
 
             int scaleAdjustment = targetScale - scale;
-            long maxValue = Pow10Int64(targetPrecision - scaleAdjustment) - 1;
-            long unscaledValue = ToLong(dec.Low, dec.Mid);
+            ulong maxValue = Pow10Int64(targetPrecision - scaleAdjustment) - 1;
+            ulong unscaledValue = ToLong(dec.Low, dec.Mid);
 
             if (dec.High > 0 || unscaledValue > maxValue)
             {
                 ThrowValueTooBig(value, targetPrecision);
             }
 
-            long factor = Pow10Int64(scaleAdjustment);
-            long result = checked(unscaledValue * factor);
+            ulong factor = Pow10Int64(scaleAdjustment);
+            long result = checked((long)(unscaledValue * factor));
 
             return dec.IsNegative ? result * -1 : result;
         }
@@ -129,20 +130,20 @@ namespace Kudu.Client.Util
         public static BigInteger EncodeDecimal128(decimal value, int targetPrecision, int targetScale)
         {
             var dec = new DecimalAccessor(value);
-            int scale = dec.Scale;
+            int scale = (int)dec.Scale;
 
             CheckConditions(value, scale, targetPrecision, targetScale);
 
-            var scaleAdjustment = targetScale - dec.Scale;
+            var scaleAdjustment = targetScale - scale;
             var maxValue = BigInteger.Pow(10, targetPrecision - scaleAdjustment) - 1;
 
-            Span<int> data = stackalloc int[3];
+            Span<uint> data = stackalloc uint[3];
             data[0] = dec.Low;
             data[1] = dec.Mid;
             data[2] = dec.High;
 
             var unscaledValue = new BigInteger(
-                MemoryMarshal.Cast<int, byte>(data),
+                MemoryMarshal.Cast<uint, byte>(data),
                 isUnsigned: true, isBigEndian: false);
 
             if (unscaledValue > maxValue)
@@ -156,11 +157,11 @@ namespace Kudu.Client.Util
             return dec.IsNegative ? result * -1 : result;
         }
 
-        private static long ToLong(int lower, int upper)
+        private static ulong ToLong(uint lower, uint upper)
         {
-            long b = (uint)upper;
+            ulong b = upper;
             b <<= 32;
-            b |= (uint)lower;
+            b |= lower;
             return b;
         }
 
@@ -171,11 +172,6 @@ namespace Kudu.Client.Util
                 throw new ArgumentException(
                     $"Value scale {scale} can't be coerced to target scale {targetScale}.");
             }
-
-            if (targetScale > targetPrecision)
-            {
-                ThrowValueTooBig(value, targetPrecision);
-            }
         }
 
         private static void ThrowValueTooBig(decimal value, int targetPrecision)
@@ -184,9 +180,9 @@ namespace Kudu.Client.Util
                 $"Value {value} (after scale coercion) can't be coerced to target precision {targetPrecision}.");
         }
 
-        private static int Pow10Int32(int value) => Pow10Cache32[value];
+        private static uint Pow10Int32(int value) => Pow10Cache32[value];
 
-        private static long Pow10Int64(int value) => Pow10Cache64[value];
+        private static ulong Pow10Int64(int value) => Pow10Cache64[value];
 
         /// <summary>
         /// Provides access to the inner fields of a decimal.
@@ -196,13 +192,13 @@ namespace Kudu.Client.Util
         private readonly struct DecimalAccessor
         {
             [FieldOffset(0)]
-            public readonly int Flags;
+            public readonly uint Flags;
             [FieldOffset(4)]
-            public readonly int High;
+            public readonly uint High;
             [FieldOffset(8)]
-            public readonly int Low;
+            public readonly uint Low;
             [FieldOffset(12)]
-            public readonly int Mid;
+            public readonly uint Mid;
 
             [FieldOffset(0)]
             public readonly decimal Decimal;
@@ -218,7 +214,7 @@ namespace Kudu.Client.Util
             /// of 10 to divide the Decimal value by. The scale
             /// byte must contain a value between 0 and 28 inclusive.
             /// </summary>
-            public int Scale => (Flags & 0x00FF0000) >> 16;
+            public uint Scale => (Flags & 0x00FF0000) >> 16;
 
             public bool IsNegative => (Flags & 0x80000000) > 0;
         }
