@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Numerics;
 using Kudu.Client.Builder;
 using Kudu.Client.Protocol;
 using Kudu.Client.Util;
@@ -323,12 +324,20 @@ namespace Kudu.Client
                 DataType.Double => KuduEncoder.DecodeDouble(value).ToString(),
                 DataType.String => $@"""{KuduEncoder.DecodeString(value)}""",
                 DataType.Binary => BitConverter.ToString(value),
-                DataType.Decimal32 => throw new NotImplementedException(),
-                DataType.Decimal64 => throw new NotImplementedException(),
-                DataType.Decimal128 => throw new NotImplementedException(),
+                DataType.Decimal32 => DecodeDecimal(value).ToString(),
+                DataType.Decimal64 => DecodeDecimal(value).ToString(),
+                DataType.Decimal128 => DecodeDecimal(value).ToString(),
 
                 _ => throw new Exception($"Unknown column type {Column.Type}")
             };
+        }
+
+        private decimal DecodeDecimal(ReadOnlySpan<byte> value)
+        {
+            int precision = Column.TypeAttributes.Precision;
+            int scale = Column.TypeAttributes.Scale;
+
+            return KuduEncoder.DecodeDecimal(value, precision, scale);
         }
 
         /// <summary>
@@ -390,6 +399,20 @@ namespace Kudu.Client
             //                            "integer value out of range for %s column: %s",
             //                            column.getType(), value);
 
+            return NewComparisonPredicate(column, op, value, minValue, maxValue);
+        }
+
+        /// <summary>
+        /// Creates a new comparison predicate on an integer or timestamp column.
+        /// </summary>
+        /// <param name="column">The column schema.</param>
+        /// <param name="op">The comparison operation.</param>
+        /// <param name="value">The value to compare against.</param>
+        /// <param name="minValue">The minimum value for the column.</param>
+        /// <param name="maxValue">The maximum value for the column.</param>
+        private static KuduPredicate NewComparisonPredicate(
+            ColumnSchema column, ComparisonOp op, long value, long minValue, long maxValue)
+        {
             if (op == ComparisonOp.LessEqual)
             {
                 if (value == maxValue)
@@ -427,7 +450,7 @@ namespace Kudu.Client
                 ComparisonOp.Less when value == minValue => None(column),
                 ComparisonOp.Less => new KuduPredicate(PredicateType.Range, column, null, bytes),
 
-                _ => throw new Exception()
+                _ => throw new Exception($"Unknown ComparisonOp {op}")
             };
         }
 
@@ -557,6 +580,107 @@ namespace Kudu.Client
         }
 
         /// <summary>
+        /// Creates a new comparison predicate on a decimal column.
+        /// </summary>
+        /// <param name="column">The column schema.</param>
+        /// <param name="op">The comparison operation.</param>
+        /// <param name="value">The value to compare against.</param>
+        public static KuduPredicate NewComparisonPredicate(
+            ColumnSchema column, ComparisonOp op, decimal value)
+        {
+            //checkColumn(column, Type.DECIMAL);
+            var typeAttributes = column.TypeAttributes;
+            int precision = typeAttributes.Precision;
+            int scale = typeAttributes.Scale;
+
+            long maxValue;
+            long longValue;
+
+            switch (column.Type)
+            {
+                case DataType.Decimal32:
+                    maxValue = DecimalUtil.MaxDecimal32(precision);
+                    longValue = DecimalUtil.EncodeDecimal32(value, precision, scale);
+                    break;
+
+                case DataType.Decimal64:
+                    maxValue = DecimalUtil.MaxDecimal64(precision);
+                    longValue = DecimalUtil.EncodeDecimal64(value, precision, scale);
+                    break;
+
+                case DataType.Decimal128:
+                    return NewComparisonPredicate(column, op,
+                        DecimalUtil.EncodeDecimal128(value, precision, scale),
+                        DecimalUtil.MaxDecimal128(precision) * -1,
+                        DecimalUtil.MaxDecimal128(precision));
+
+                default:
+                    throw new Exception($"Unknown column type {column.Type}");
+            }
+
+            //Preconditions.checkArgument(value.compareTo(maxValue) <= 0 && value.compareTo(minValue) >= 0,
+            //    "Decimal value out of range for %s column: %s",
+            //    column.getType(), value);
+            //BigDecimal smallestValue = DecimalUtil.smallestValue(scale);
+
+            long minValue = maxValue * -1;
+
+            return NewComparisonPredicate(column, op, longValue, minValue, maxValue);
+        }
+
+        /// <summary>
+        /// Creates a new comparison predicate on an integer or timestamp column.
+        /// </summary>
+        /// <param name="column">The column schema.</param>
+        /// <param name="op">The comparison operation.</param>
+        /// <param name="value">The value to compare against.</param>
+        /// <param name="minValue">TODO</param>
+        /// <param name="maxValue">TODO</param>
+        private static KuduPredicate NewComparisonPredicate(
+            ColumnSchema column, ComparisonOp op, BigInteger value, BigInteger minValue, BigInteger maxValue)
+        {
+            if (op == ComparisonOp.LessEqual)
+            {
+                if (value == maxValue)
+                {
+                    // If the value can't be incremented because it is at the top end of the
+                    // range, then substitute the predicate with an IS NOT NULL predicate.
+                    // This has the same effect as an inclusive upper bound on the maximum
+                    // value. If the column is not nullable then the IS NOT NULL predicate
+                    // is ignored.
+                    return NewIsNotNullPredicate(column);
+                }
+                value += 1;
+                op = ComparisonOp.Less;
+            }
+            else if (op == ComparisonOp.Greater)
+            {
+                if (value == maxValue)
+                {
+                    return None(column);
+                }
+                value += 1;
+                op = ComparisonOp.GreaterEqual;
+            }
+
+            var bytes = KuduEncoder.EncodeInt128(value);
+
+            return op switch
+            {
+                ComparisonOp.GreaterEqual when value == minValue => NewIsNotNullPredicate(column),
+                ComparisonOp.GreaterEqual when value == maxValue => EqualPredicate(column, bytes),
+                ComparisonOp.GreaterEqual => new KuduPredicate(PredicateType.Range, column, bytes, null),
+
+                ComparisonOp.Equal => EqualPredicate(column, bytes),
+
+                ComparisonOp.Less when value == minValue => None(column),
+                ComparisonOp.Less => new KuduPredicate(PredicateType.Range, column, null, bytes),
+
+                _ => throw new Exception($"Unknown ComparisonOp {op}")
+            };
+        }
+
+        /// <summary>
         /// Creates a new comparison predicate on a string column.
         /// </summary>
         /// <param name="column">The column schema.</param>
@@ -568,7 +692,7 @@ namespace Kudu.Client
             CheckColumn(column, DataType.String);
 
             var bytes = KuduEncoder.EncodeString(value);
-            return NewComparisonPredicate(column, op, bytes);
+            return NewComparisonPredicateNoCheck(column, op, bytes);
         }
 
         /// <summary>
@@ -580,13 +704,24 @@ namespace Kudu.Client
         public static KuduPredicate NewComparisonPredicate(
             ColumnSchema column, ComparisonOp op, byte[] value)
         {
-            //checkColumn(column, Type.BINARY);
+            CheckColumn(column, DataType.Binary);
 
+            return NewComparisonPredicateNoCheck(column, op, value);
+        }
+
+        /// <summary>
+        /// Creates a new comparison predicate on a binary or string column.
+        /// </summary>
+        /// <param name="column">The column schema.</param>
+        /// <param name="op">The comparison operation.</param>
+        /// <param name="value">The value to compare against.</param>
+        private static KuduPredicate NewComparisonPredicateNoCheck(
+            ColumnSchema column, ComparisonOp op, byte[] value)
+        {
             if (op == ComparisonOp.LessEqual)
             {
                 Array.Resize(ref value, value.Length + 1);
                 op = ComparisonOp.Less;
-
             }
             else if (op == ComparisonOp.Greater)
             {
@@ -604,7 +739,7 @@ namespace Kudu.Client
                 ComparisonOp.Less when value.Length == 0 => None(column),
                 ComparisonOp.Less => new KuduPredicate(PredicateType.Range, column, null, value),
 
-                _ => throw new Exception()
+                _ => throw new Exception($"Unknown ComparisonOp {op}")
             };
         }
 
@@ -640,9 +775,7 @@ namespace Kudu.Client
         public static KuduPredicate NewIsNullPredicate(ColumnSchema column)
         {
             if (!column.IsNullable)
-            {
                 return None(column);
-            }
 
             return new KuduPredicate(PredicateType.IsNull, column, null, null);
         }
@@ -662,6 +795,15 @@ namespace Kudu.Client
                 IEnumerable<double> x => GetZ(x, KuduEncoder.EncodeDouble),
                 IEnumerable<string> x => GetZ(x, KuduEncoder.EncodeString),
                 IEnumerable<byte[]> x => GetZ(x, y => y),
+                IEnumerable<decimal> x when column.Type == DataType.Decimal32 =>
+                GetZ(x, i => KuduEncoder.EncodeDecimal32(
+                    i, column.TypeAttributes.Precision, column.TypeAttributes.Scale)),
+                IEnumerable<decimal> x when column.Type == DataType.Decimal64 =>
+                GetZ(x, i => KuduEncoder.EncodeDecimal64(
+                    i, column.TypeAttributes.Precision, column.TypeAttributes.Scale)),
+                IEnumerable<decimal> x when column.Type == DataType.Decimal128 =>
+                GetZ(x, i => KuduEncoder.EncodeDecimal128(
+                    i, column.TypeAttributes.Precision, column.TypeAttributes.Scale)),
 
                 _ => throw new Exception()
             };
@@ -717,8 +859,10 @@ namespace Kudu.Client
                 DataType.Int8 => KuduEncoder.EncodeInt8((sbyte)value),
                 DataType.Int16 => KuduEncoder.EncodeInt16((short)value),
                 DataType.Int32 => KuduEncoder.EncodeInt32((int)value),
+                DataType.Decimal32 => KuduEncoder.EncodeInt32((int)value),
                 DataType.Int64 => KuduEncoder.EncodeInt64(value),
                 DataType.UnixtimeMicros => KuduEncoder.EncodeInt64(value),
+                DataType.Decimal64 => KuduEncoder.EncodeInt64(value),
                 _ => throw new Exception()
             };
         }
@@ -754,8 +898,7 @@ namespace Kudu.Client
                 case DataType.Binary:
                     return a.AsSpan().SequenceCompareTo(b);
                 case DataType.Decimal128:
-                    throw new NotImplementedException();
-                //return Bytes.getBigInteger(a).compareTo(Bytes.getBigInteger(b));
+                    return KuduEncoder.DecodeInt128(a).CompareTo(KuduEncoder.DecodeInt128(b));
                 default:
                     throw new Exception($"Unknown column type {column.Type}");
             }
@@ -766,7 +909,6 @@ namespace Kudu.Client
         /// </summary>
         /// <param name="a">The value which would be incremented.</param>
         /// <param name="b">The target value.</param>
-        /// <returns></returns>
         private bool AreConsecutive(ReadOnlySpan<byte> a, ReadOnlySpan<byte> b)
         {
             switch (Column.Type)
@@ -823,10 +965,10 @@ namespace Kudu.Client
                     }
                 case DataType.Decimal128:
                     {
-                        //BigInteger m = Bytes.getBigInteger(a);
-                        //BigInteger n = Bytes.getBigInteger(b);
-                        //return m.compareTo(n) < 0 && m.add(BigInteger.ONE).equals(n);
-                        throw new NotImplementedException();
+                        BigInteger m = KuduEncoder.DecodeInt128(a);
+                        BigInteger n = KuduEncoder.DecodeInt128(b);
+
+                        return m < n && m + BigInteger.One == n;
                     }
                 default:
                     throw new Exception($"Unknown column type {Column.Type}");

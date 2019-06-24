@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Buffers.Binary;
+using System.Numerics;
 using System.Text;
 
 namespace Kudu.Client.Util
@@ -48,6 +49,22 @@ namespace Kudu.Client.Util
             return buffer;
         }
 
+        public static byte[] EncodeInt128(BigInteger value)
+        {
+            var buffer = new byte[16];
+            var abs = BigInteger.Abs(value);
+            abs.TryWriteBytes(buffer, out int written, isUnsigned: true, isBigEndian: false);
+
+            if (value.Sign == -1)
+            {
+                // TODO: Use C# 8 range here: written..^0
+                var slice = buffer.AsSpan(written, 16 - written);
+                slice.Fill(0xff);
+            }
+
+            return buffer;
+        }
+
         public static byte[] EncodeFloat(float value)
         {
             int bits = value.AsInt();
@@ -58,6 +75,24 @@ namespace Kudu.Client.Util
         {
             long bits = value.AsLong();
             return EncodeInt64(bits);
+        }
+
+        public static byte[] EncodeDecimal32(decimal value, int precision, int scale)
+        {
+            int intVal = DecimalUtil.EncodeDecimal32(value, precision, scale);
+            return EncodeInt32(intVal);
+        }
+
+        public static byte[] EncodeDecimal64(decimal value, int precision, int scale)
+        {
+            long longVal = DecimalUtil.EncodeDecimal64(value, precision, scale);
+            return EncodeInt64(longVal);
+        }
+
+        public static byte[] EncodeDecimal128(decimal value, int precision, int scale)
+        {
+            BigInteger intVal = DecimalUtil.EncodeDecimal128(value, precision, scale);
+            return EncodeInt128(intVal);
         }
 
         public static byte[] EncodeString(string source) =>
@@ -78,6 +113,9 @@ namespace Kudu.Client.Util
         public static long DecodeInt64(ReadOnlySpan<byte> source) =>
             BinaryPrimitives.ReadInt64LittleEndian(source);
 
+        public static BigInteger DecodeInt128(ReadOnlySpan<byte> source) =>
+            new BigInteger(source.Slice(0, 16), isUnsigned: false, isBigEndian: false);
+
         public static DateTime DecodeTimestamp(ReadOnlySpan<byte> source)
         {
             long micros = DecodeInt64(source);
@@ -94,6 +132,29 @@ namespace Kudu.Client.Util
         {
             long value = DecodeInt64(source);
             return value.AsDouble();
+        }
+
+        public static decimal DecodeDecimal(ReadOnlySpan<byte> source, int precision, int scale)
+        {
+            int size = DecimalUtil.PrecisionToSize(precision);
+
+            switch (size)
+            {
+                case DecimalUtil.Decimal32Size:
+                    int intVal = DecodeInt32(source);
+                    return DecimalUtil.DecodeDecimal32(intVal, scale);
+
+                case DecimalUtil.Decimal64Size:
+                    long longVal = DecodeInt64(source);
+                    return DecimalUtil.DecodeDecimal64(longVal, scale);
+
+                case DecimalUtil.Decimal128Size:
+                    BigInteger bigIntVal = DecodeInt128(source);
+                    return DecimalUtil.DecodeDecimal128(bigIntVal, scale);
+
+                default:
+                    throw new Exception($"Unsupported decimal type size: {size}.");
+            }
         }
 
         public static string DecodeString(ReadOnlySpan<byte> source) =>

@@ -1,5 +1,4 @@
-﻿using System.Buffers.Binary;
-using Kudu.Client.Builder;
+﻿using Kudu.Client.Builder;
 using Kudu.Client.Util;
 using Xunit;
 
@@ -16,6 +15,15 @@ namespace Kudu.Client.Tests
         private readonly ColumnSchema doubleCol = CreateColumnSchema("double", DataType.Double);
         private readonly ColumnSchema stringCol = CreateColumnSchema("string", DataType.String);
         private readonly ColumnSchema binaryCol = CreateColumnSchema("binary", DataType.Binary);
+
+        private readonly ColumnSchema decimal32Col = CreateColumnSchema("decimal32", DataType.Decimal32,
+            new ColumnTypeAttributes(DecimalUtil.MaxDecimal32Precision, 2));
+
+        private readonly ColumnSchema decimal64Col = CreateColumnSchema("decimal64", DataType.Decimal64,
+            new ColumnTypeAttributes(DecimalUtil.MaxDecimal64Precision, 2));
+
+        private readonly ColumnSchema decimal128Col = CreateColumnSchema("decimal128", DataType.Decimal128,
+            new ColumnTypeAttributes(DecimalUtil.MaxDecimal128Precision, 2));
 
         /// <summary>
         /// Tests merges on all types of integer predicates.
@@ -708,11 +716,11 @@ namespace Kudu.Client.Tests
         public void TestAllTypesMerge()
         {
             TestMerge(KuduPredicate.NewComparisonPredicate(boolCol, ComparisonOp.GreaterEqual, false),
-              KuduPredicate.NewComparisonPredicate(boolCol, ComparisonOp.Less, true),
-              new KuduPredicate(PredicateType.Equality,
-                                boolCol,
-                                KuduEncoder.EncodeBool(false),
-                                null));
+                      KuduPredicate.NewComparisonPredicate(boolCol, ComparisonOp.Less, true),
+                      new KuduPredicate(PredicateType.Equality,
+                                        boolCol,
+                                        KuduEncoder.EncodeBool(false),
+                                        null));
 
             TestMerge(KuduPredicate.NewComparisonPredicate(boolCol, ComparisonOp.GreaterEqual, false),
                       KuduPredicate.NewComparisonPredicate(boolCol, ComparisonOp.LessEqual, true),
@@ -773,65 +781,40 @@ namespace Kudu.Client.Tests
                       KuduPredicate.NewInListPredicate(doubleCol, new double[] { 14d, 18d, 20d }),
                       KuduPredicate.NewInListPredicate(doubleCol, new double[] { 14d, 18d }));
 
-            //TestMerge(KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.GreaterEqual,
-            //    BigDecimal.valueOf(12345, 2)),
-            //    KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Less,
-            //        BigDecimal.valueOf(67890, 2)),
-            //    new KuduPredicate(PredicateType.Range,
-            //        decimal32Col,
-            //        Bytes.fromBigDecimal(BigDecimal.valueOf(12345, 2),
-            //            DecimalUtil.MAX_DECIMAL32_PRECISION),
-            //        Bytes.fromBigDecimal(BigDecimal.valueOf(67890, 2),
-            //            DecimalUtil.MAX_DECIMAL32_PRECISION)));
+            TestMerge(KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.GreaterEqual, 123.45m),
+                      KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Less, 678.90m),
+                      new KuduPredicate(PredicateType.Range,
+                          decimal32Col,
+                          KuduEncoder.EncodeDecimal32(123.45m, DecimalUtil.MaxDecimal32Precision, 2),
+                          KuduEncoder.EncodeDecimal32(678.90m, DecimalUtil.MaxDecimal32Precision, 2)));
 
-            //TestMerge(KuduPredicate.NewInListPredicate(decimal32Col, ImmutableList.of(
-            //        BigDecimal.valueOf(12345, 2),
-            //        BigDecimal.valueOf(45678, 2))),
-            //    KuduPredicate.NewInListPredicate(decimal32Col, ImmutableList.of(
-            //        BigDecimal.valueOf(45678, 2),
-            //        BigDecimal.valueOf(98765, 2))),
-            //    KuduPredicate.NewInListPredicate(decimal32Col, ImmutableList.of(
-            //        BigDecimal.valueOf(45678, 2))));
+            TestMerge(KuduPredicate.NewInListPredicate(decimal32Col, new decimal[] { 123.45m, 456.78m }),
+                      KuduPredicate.NewInListPredicate(decimal32Col, new decimal[] { 456.78m, 987.65m }),
+                      KuduPredicate.NewInListPredicate(decimal32Col, new decimal[] { 456.78m }));
 
-            //TestMerge(KuduPredicate.NewInListPredicate(decimal64Col, ImmutableList.of(
-            //    BigDecimal.valueOf(12345678910L, 2),
-            //    BigDecimal.valueOf(34567891011L, 2))),
-            //    KuduPredicate.NewInListPredicate(decimal64Col, ImmutableList.of(
-            //        BigDecimal.valueOf(34567891011L, 2),
-            //        BigDecimal.valueOf(98765432111L, 2))),
-            //    KuduPredicate.NewInListPredicate(decimal64Col, ImmutableList.of(
-            //        BigDecimal.valueOf(34567891011L, 2))));
+            TestMerge(KuduPredicate.NewInListPredicate(decimal64Col, new decimal[] { 123456789.10m, 345678910.11m }),
+                      KuduPredicate.NewInListPredicate(decimal64Col, new decimal[] { 345678910.11m, 987654321.11m }),
+                      KuduPredicate.NewInListPredicate(decimal64Col, new decimal[] { 345678910.11m }));
 
-            //TestMerge(KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.GreaterEqual,
-            //    BigDecimal.valueOf(12345678910L, 2)),
-            //    KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.Less,
-            //        BigDecimal.valueOf(67890101112L, 2)),
-            //    new KuduPredicate(PredicateType.Range,
-            //        decimal64Col,
-            //        Bytes.fromBigDecimal(BigDecimal.valueOf(12345678910L, 2),
-            //            DecimalUtil.MAX_DECIMAL64_PRECISION),
-            //        Bytes.fromBigDecimal(BigDecimal.valueOf(67890101112L, 2),
-            //            DecimalUtil.MAX_DECIMAL64_PRECISION)));
+            TestMerge(KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.GreaterEqual, 123456789.10m),
+                      KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.Less, 678901011.12m),
+                      new KuduPredicate(PredicateType.Range,
+                          decimal64Col,
+                          KuduEncoder.EncodeDecimal64(123456789.10m, DecimalUtil.MaxDecimal64Precision, 2),
+                          KuduEncoder.EncodeDecimal64(678901011.12m, DecimalUtil.MaxDecimal64Precision, 2)));
 
-            //TestMerge(KuduPredicate.NewInListPredicate(decimal128Col, ImmutableList.of(
-            //    new BigDecimal("1234567891011121314.15"),
-            //    new BigDecimal("3456789101112131415.16"))),
-            //    KuduPredicate.NewInListPredicate(decimal128Col, ImmutableList.of(
-            //        new BigDecimal("3456789101112131415.16"),
-            //        new BigDecimal("9876543212345678910.11"))),
-            //    KuduPredicate.NewInListPredicate(decimal128Col, ImmutableList.of(
-            //        new BigDecimal("3456789101112131415.16"))));
+            TestMerge(KuduPredicate.NewInListPredicate(decimal128Col,
+                          new decimal[] { 1234567891011121314.15m, 3456789101112131415.16m }),
+                      KuduPredicate.NewInListPredicate(decimal128Col,
+                          new decimal[] { 3456789101112131415.16m, 9876543212345678910.11m }),
+                      KuduPredicate.NewInListPredicate(decimal128Col, new decimal[] { 3456789101112131415.16m }));
 
-            //TestMerge(KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.GreaterEqual,
-            //    new BigDecimal("1234567891011121314.15")),
-            //    KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.Less,
-            //        new BigDecimal("67891011121314151617.18")),
-            //    new KuduPredicate(PredicateType.Range,
-            //        decimal128Col,
-            //        Bytes.fromBigDecimal(new BigDecimal("1234567891011121314.15"),
-            //            DecimalUtil.MAX_DECIMAL128_PRECISION),
-            //        Bytes.fromBigDecimal(new BigDecimal("67891011121314151617.18"),
-            //            DecimalUtil.MAX_DECIMAL128_PRECISION)));
+            TestMerge(KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.GreaterEqual, 1234567891011121314.15m),
+                      KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.Less, 67891011121314151617.18m),
+                      new KuduPredicate(PredicateType.Range,
+                          decimal128Col,
+                          KuduEncoder.EncodeDecimal128(1234567891011121314.15m, DecimalUtil.MaxDecimal128Precision, 2),
+                          KuduEncoder.EncodeDecimal128(67891011121314151617.18m, DecimalUtil.MaxDecimal128Precision, 2)));
 
             TestMerge(KuduPredicate.NewComparisonPredicate(binaryCol, ComparisonOp.GreaterEqual,
                                                            new byte[] { 0, 1, 2, 3, 4, 5, 6 }),
@@ -866,9 +849,15 @@ namespace Kudu.Client.Tests
                          KuduPredicate.NewComparisonPredicate(floatCol, ComparisonOp.Less, 12.345f.NextUp()));
             Assert.Equal(KuduPredicate.NewComparisonPredicate(doubleCol, ComparisonOp.LessEqual, 12.345),
                          KuduPredicate.NewComparisonPredicate(doubleCol, ComparisonOp.Less, 12.345.NextUp()));
-            //Assert.Equal(
-            //    KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.LessEqual, BigDecimal.valueOf(12345, 2)),
-            //    KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Less, BigDecimal.valueOf(12346, 2)));
+            Assert.Equal(
+                KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.LessEqual, 123.45m),
+                KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Less, 123.46m));
+            Assert.Equal(
+                KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.LessEqual, 678901011.12m),
+                KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.Less, 678901011.13m));
+            Assert.Equal(
+                KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.LessEqual, 67891011121314151617.18m),
+                KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.Less, 67891011121314151617.19m));
             Assert.Equal(KuduPredicate.NewComparisonPredicate(stringCol, ComparisonOp.LessEqual, "a"),
                          KuduPredicate.NewComparisonPredicate(stringCol, ComparisonOp.Less, "a\0"));
             Assert.Equal(KuduPredicate.NewComparisonPredicate(binaryCol, ComparisonOp.LessEqual, new byte[] { 10 }),
@@ -889,6 +878,10 @@ namespace Kudu.Client.Tests
                          KuduPredicate.NewComparisonPredicate(doubleCol, ComparisonOp.Less, double.PositiveInfinity));
             Assert.Equal(KuduPredicate.NewComparisonPredicate(doubleCol, ComparisonOp.LessEqual, double.PositiveInfinity),
                          KuduPredicate.NewIsNotNullPredicate(doubleCol));
+            Assert.Equal(KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.LessEqual, 9999999.99m),
+                         KuduPredicate.NewIsNotNullPredicate(decimal32Col));
+            Assert.Equal(KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.LessEqual, 9999999999999999.99m),
+                         KuduPredicate.NewIsNotNullPredicate(decimal64Col));
         }
 
         [Fact]
@@ -906,9 +899,15 @@ namespace Kudu.Client.Tests
                          KuduPredicate.NewComparisonPredicate(floatCol, ComparisonOp.Greater, 12.345f));
             Assert.Equal(KuduPredicate.NewComparisonPredicate(doubleCol, ComparisonOp.GreaterEqual, 12.345.NextUp()),
                          KuduPredicate.NewComparisonPredicate(doubleCol, ComparisonOp.Greater, 12.345));
-            //Assert.Equal(
-            //    KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.GreaterEqual, BigDecimal.valueOf(12346, 2)),
-            //    KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Greater, BigDecimal.valueOf(12345, 2)));
+            Assert.Equal(
+                KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.GreaterEqual, 123.46m),
+                KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Greater, 123.45m));
+            Assert.Equal(
+                KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.GreaterEqual, 678901011.13m),
+                KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.Greater, 678901011.12m));
+            Assert.Equal(
+                KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.GreaterEqual, 67891011121314151617.19m),
+                KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.Greater, 67891011121314151617.18m));
             Assert.Equal(KuduPredicate.NewComparisonPredicate(stringCol, ComparisonOp.GreaterEqual, "a\0"),
                          KuduPredicate.NewComparisonPredicate(stringCol, ComparisonOp.Greater, "a"));
             Assert.Equal(KuduPredicate.NewComparisonPredicate(binaryCol, ComparisonOp.GreaterEqual, new byte[] { 10, 0 }),
@@ -930,6 +929,10 @@ namespace Kudu.Client.Tests
                          KuduPredicate.NewComparisonPredicate(doubleCol, ComparisonOp.Greater, double.MaxValue));
             Assert.Equal(KuduPredicate.None(doubleCol),
                          KuduPredicate.NewComparisonPredicate(doubleCol, ComparisonOp.Greater, double.PositiveInfinity));
+            Assert.Equal(KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Greater, 9999999.99m),
+                         KuduPredicate.None(decimal32Col));
+            Assert.Equal(KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.Greater, 9999999999999999.99m),
+                         KuduPredicate.None(decimal64Col));
         }
 
         [Fact]
@@ -947,15 +950,11 @@ namespace Kudu.Client.Tests
                          KuduPredicate.None(floatCol));
             Assert.Equal(KuduPredicate.NewComparisonPredicate(doubleCol, ComparisonOp.Less, double.NegativeInfinity),
                          KuduPredicate.None(doubleCol));
-            //Assert.Equal(KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Less,
-            //    DecimalUtil.minValue(DecimalUtil.MAX_DECIMAL32_PRECISION, 2)),
-            //    KuduPredicate.None(decimal32Col));
-            //Assert.Equal(KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.Less,
-            //    DecimalUtil.minValue(DecimalUtil.MAX_DECIMAL64_PRECISION, 2)),
-            //    KuduPredicate.None(decimal64Col));
-            //Assert.Equal(KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.Less,
-            //    DecimalUtil.minValue(DecimalUtil.MAX_DECIMAL128_PRECISION, 2)),
-            //    KuduPredicate.None(decimal128Col));
+            Assert.Equal(KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Less, -9999999.99m),
+                         KuduPredicate.None(decimal32Col));
+            Assert.Equal(KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.Less, -9999999999999999.99m),
+                         KuduPredicate.None(decimal64Col));
+            // No test for decimal128, as C#'s decimal can't store a value that large.
             Assert.Equal(KuduPredicate.NewComparisonPredicate(stringCol, ComparisonOp.Less, ""),
                          KuduPredicate.None(stringCol));
             Assert.Equal(KuduPredicate.NewComparisonPredicate(binaryCol, ComparisonOp.Less, new byte[] { }),
@@ -977,15 +976,11 @@ namespace Kudu.Client.Tests
                          KuduPredicate.NewIsNotNullPredicate(floatCol));
             Assert.Equal(KuduPredicate.NewComparisonPredicate(doubleCol, ComparisonOp.GreaterEqual, double.NegativeInfinity),
                          KuduPredicate.NewIsNotNullPredicate(doubleCol));
-            //Assert.Equal(KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.GreaterEqual,
-            //    DecimalUtil.minValue(DecimalUtil.MAX_DECIMAL32_PRECISION, 2)),
-            //    KuduPredicate.NewIsNotNullPredicate(decimal32Col));
-            //Assert.Equal(KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.GreaterEqual,
-            //    DecimalUtil.minValue(DecimalUtil.MAX_DECIMAL64_PRECISION, 2)),
-            //    KuduPredicate.NewIsNotNullPredicate(decimal64Col));
-            //Assert.Equal(KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.GreaterEqual,
-            //    DecimalUtil.minValue(DecimalUtil.MAX_DECIMAL128_PRECISION, 2)),
-            //    KuduPredicate.NewIsNotNullPredicate(decimal128Col));
+            Assert.Equal(KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.GreaterEqual, -9999999.99m),
+                         KuduPredicate.NewIsNotNullPredicate(decimal32Col));
+            Assert.Equal(KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.GreaterEqual, -9999999999999999.99m),
+                         KuduPredicate.NewIsNotNullPredicate(decimal64Col));
+            // No test for decimal128, as C#'s decimal can't store a value that large.
             Assert.Equal(KuduPredicate.NewComparisonPredicate(stringCol, ComparisonOp.GreaterEqual, ""),
                          KuduPredicate.NewIsNotNullPredicate(stringCol));
             Assert.Equal(KuduPredicate.NewComparisonPredicate(binaryCol, ComparisonOp.GreaterEqual, new byte[] { }),
@@ -1003,6 +998,10 @@ namespace Kudu.Client.Tests
                          KuduPredicate.NewComparisonPredicate(floatCol, ComparisonOp.Equal, float.PositiveInfinity));
             Assert.Equal(KuduPredicate.NewComparisonPredicate(doubleCol, ComparisonOp.GreaterEqual, double.PositiveInfinity),
                          KuduPredicate.NewComparisonPredicate(doubleCol, ComparisonOp.Equal, double.PositiveInfinity));
+            Assert.Equal(KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.GreaterEqual, 9999999.99m),
+                         KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Equal, 9999999.99m));
+            Assert.Equal(KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.GreaterEqual, 9999999999999999.99m),
+                         KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.Equal, 9999999999999999.99m));
         }
 
         [Fact]
@@ -1022,15 +1021,15 @@ namespace Kudu.Client.Tests
                          KuduPredicate.NewComparisonPredicate(floatCol, ComparisonOp.Equal, 123.456f).ToString());
             Assert.Equal("`double` = 123.456",
                          KuduPredicate.NewComparisonPredicate(doubleCol, ComparisonOp.Equal, 123.456).ToString());
-            //Assert.Equal("`decimal32` = 123.45",
-            //    KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Equal,
-            //        BigDecimal.valueOf(12345, 2)).toString());
-            //Assert.Equal("`decimal64` = 123456789.10",
-            //    KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.Equal,
-            //        BigDecimal.valueOf(12345678910L, 2)).toString());
-            //Assert.Equal("`decimal128` = 1234567891011121314.15",
-            //    KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.Equal,
-            //        new BigDecimal("1234567891011121314.15")).toString());
+            Assert.Equal("`decimal32` = 123.45",
+                KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Equal,
+                    123.45m).ToString());
+            Assert.Equal("`decimal64` = 123456789.10",
+                KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.Equal,
+                    123456789.10m).ToString());
+            Assert.Equal("`decimal128` = 1234567891011121314.15",
+                KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.Equal,
+                    1234567891011121314.15m).ToString());
             Assert.Equal("`string` = \"my string\"",
                          KuduPredicate.NewComparisonPredicate(stringCol, ComparisonOp.Equal, "my string").ToString());
             Assert.Equal("`binary` = AB-01-CD", KuduPredicate.NewComparisonPredicate(
@@ -1069,22 +1068,39 @@ namespace Kudu.Client.Tests
                 binaryCol, new byte[][] { new byte[] { 0xAB, 0x01, 0xCD }, new byte[] { 0x00 } }).ToString());
         }
 
-        //[Fact]
-        //public void TestDecimalCoercion()
-        //{
-        //    Assert.assertEquals(
-        //        KuduPredicate.NewComparisonPredicate(decimal32Col, LESS, BigDecimal.valueOf(123)),
-        //        KuduPredicate.NewComparisonPredicate(decimal32Col, LESS, BigDecimal.valueOf(12300, 2))
-        //    );
-        //    Assert.assertEquals(
-        //        KuduPredicate.NewComparisonPredicate(decimal32Col, GREATER, BigDecimal.valueOf(123, 1)),
-        //        KuduPredicate.NewComparisonPredicate(decimal32Col, GREATER, BigDecimal.valueOf(1230, 2))
-        //    );
-        //    Assert.assertEquals(
-        //        KuduPredicate.NewComparisonPredicate(decimal32Col, EQUAL, BigDecimal.valueOf(1, 0)),
-        //        KuduPredicate.NewComparisonPredicate(decimal32Col, EQUAL, BigDecimal.valueOf(100, 2))
-        //    );
-        //}
+        [Fact]
+        public void TestDecimalCoercion()
+        {
+            Assert.Equal(
+                KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Less, 123m),
+                KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Less, 123.00m));
+            Assert.Equal(
+                KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Greater, 12.3m),
+                KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Greater, 12.30m));
+            Assert.Equal(
+                KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Equal, 1m),
+                KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Equal, 1.00m));
+
+            Assert.Equal(
+                KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.Less, 123m),
+                KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.Less, 123.00m));
+            Assert.Equal(
+                KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.Greater, 12.3m),
+                KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.Greater, 12.30m));
+            Assert.Equal(
+                KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.Equal, 1m),
+                KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.Equal, 1.00m));
+
+            Assert.Equal(
+                KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.Less, 123m),
+                KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.Less, 123.00m));
+            Assert.Equal(
+                KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.Greater, 12.3m),
+                KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.Greater, 12.30m));
+            Assert.Equal(
+                KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.Equal, 1m),
+                KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.Equal, 1.00m));
+        }
 
         private void TestMerge(KuduPredicate a, KuduPredicate b, KuduPredicate expected)
         {
@@ -1094,13 +1110,9 @@ namespace Kudu.Client.Tests
 
         private KuduPredicate IntRange(int lower, int upper)
         {
-            //Preconditions.checkArgument(lower < upper);
-            // TODO: Use KuduEncoder
-            var kLower = new byte[4];
-            var kUpper = new byte[4];
-            BinaryPrimitives.WriteInt32LittleEndian(kLower, lower);
-            BinaryPrimitives.WriteInt32LittleEndian(kUpper, upper);
-            return new KuduPredicate(PredicateType.Range, intCol, kLower, kUpper);
+            Assert.True(lower < upper);
+            return new KuduPredicate(PredicateType.Range, intCol,
+                KuduEncoder.EncodeInt32(lower), KuduEncoder.EncodeInt32(upper));
         }
 
         private KuduPredicate BoolInList(params bool[] values) =>
@@ -1112,7 +1124,8 @@ namespace Kudu.Client.Tests
         private KuduPredicate StringInList(params string[] values) =>
             KuduPredicate.NewInListPredicate(stringCol, values);
 
-        private static ColumnSchema CreateColumnSchema(string name, DataType dataType) =>
+        private static ColumnSchema CreateColumnSchema(
+            string name, DataType dataType, ColumnTypeAttributes attributes = null) =>
             new ColumnSchema(
                 name,
                 dataType,
@@ -1120,6 +1133,6 @@ namespace Kudu.Client.Tests
                 dataType == DataType.String,
                 EncodingType.AutoEncoding,
                 CompressionType.DefaultCompression,
-                null);
+                attributes);
     }
 }
