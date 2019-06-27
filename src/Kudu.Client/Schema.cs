@@ -115,7 +115,7 @@ namespace Kudu.Client
                 hasNulls |= column.IsNullable;
                 columnsByName.Add(column.Name, i);
                 columnsById.Add((int)column.Id, i);
-                columnsByIndex[i] = new ColumnSchema(columns[i]);
+                columnsByIndex[i] = ColumnSchema.FromProtobuf(columns[i]);
 
                 // TODO: Remove this hack-fix. Kudu throws an exception if columnId is supplied.
                 column.ResetId();

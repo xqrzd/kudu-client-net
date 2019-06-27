@@ -89,7 +89,7 @@ namespace Kudu.Client.Builder
         {
             // TODO: Rework this
             var columns = CreateTableRequest.Schema.Columns
-                .Select(c => new ColumnSchema(c))
+                .Select(c => ColumnSchema.FromProtobuf(c))
                 .ToList();
 
             var schema = new Schema(columns);

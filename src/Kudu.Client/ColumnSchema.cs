@@ -24,10 +24,13 @@ namespace Kudu.Client
 
         public bool IsSigned { get; }
 
-        public ColumnSchema(string name, DataType type,
-            bool isKey, bool isNullable,
-            EncodingType encoding, CompressionType compression,
-            ColumnTypeAttributes typeAttributes)
+        public ColumnSchema(
+            string name, DataType type,
+            bool isKey = false,
+            bool isNullable = false,
+            EncodingType encoding = EncodingType.AutoEncoding,
+            CompressionType compression = CompressionType.DefaultCompression,
+            ColumnTypeAttributes typeAttributes = null)
         {
             Name = name;
             Type = type;
@@ -36,27 +39,6 @@ namespace Kudu.Client
             Encoding = encoding;
             Compression = compression;
             TypeAttributes = typeAttributes;
-
-            Size = Schema.GetTypeSize(Type);
-            IsSigned = Schema.IsSigned(Type);
-        }
-
-        // TODO: Move this to extension method?
-        public ColumnSchema(ColumnSchemaPB columnSchemaPb)
-        {
-            Name = columnSchemaPb.Name;
-            Type = (DataType)columnSchemaPb.Type;
-            IsKey = columnSchemaPb.IsKey;
-            IsNullable = columnSchemaPb.IsNullable;
-            Encoding = (EncodingType)columnSchemaPb.Encoding;
-            Compression = (CompressionType)columnSchemaPb.Compression;
-
-            if (columnSchemaPb.TypeAttributes != null)
-            {
-                TypeAttributes = new ColumnTypeAttributes(
-                    columnSchemaPb.TypeAttributes.Precision,
-                    columnSchemaPb.TypeAttributes.Scale);
-            }
 
             Size = Schema.GetTypeSize(Type);
             IsSigned = Schema.IsSigned(Type);
@@ -80,6 +62,29 @@ namespace Kudu.Client
         public override bool Equals(object obj) => Equals(obj as ColumnSchema);
 
         public override int GetHashCode() => HashCode.Combine(Name, Type);
+
+        public static ColumnSchema FromProtobuf(ColumnSchemaPB columnSchemaPb)
+        {
+            return new ColumnSchema(
+                columnSchemaPb.Name,
+                (DataType)columnSchemaPb.Type,
+                columnSchemaPb.IsKey,
+                columnSchemaPb.IsNullable,
+                (EncodingType)columnSchemaPb.Encoding,
+                (CompressionType)columnSchemaPb.Compression,
+                FromProtobuf(columnSchemaPb.TypeAttributes));
+        }
+
+        private static ColumnTypeAttributes FromProtobuf(
+            ColumnTypeAttributesPB typeAttributesPb)
+        {
+            if (typeAttributesPb is null)
+                return null;
+
+            return new ColumnTypeAttributes(
+                typeAttributesPb.Precision,
+                typeAttributesPb.Scale);
+        }
     }
 
     public class ColumnTypeAttributes
