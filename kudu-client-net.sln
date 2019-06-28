@@ -11,9 +11,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kudu.Client", "src\Kudu.Cli
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kudu.Client.Tests", "test\Kudu.Client.Tests\Kudu.Client.Tests.csproj", "{4F8E3787-0E77-432A-B285-E220264A50B9}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kudu.Client.FunctionalTests", "test\Kudu.Client.FunctionalTests\Kudu.Client.FunctionalTests.csproj", "{A6B3FC57-24DF-49E4-B054-CCAA9F4D80F8}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleApp1", "ConsoleApp1\ConsoleApp1.csproj", "{0DC56D81-25C9-4EE2-8187-1723A13EA3F5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kudu.Client.FunctionalTests", "test\Kudu.Client.FunctionalTests\Kudu.Client.FunctionalTests.csproj", "{A6B3FC57-24DF-49E4-B054-CCAA9F4D80F8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,10 +31,6 @@ Global
 		{A6B3FC57-24DF-49E4-B054-CCAA9F4D80F8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A6B3FC57-24DF-49E4-B054-CCAA9F4D80F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A6B3FC57-24DF-49E4-B054-CCAA9F4D80F8}.Release|Any CPU.Build.0 = Release|Any CPU
-		{0DC56D81-25C9-4EE2-8187-1723A13EA3F5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{0DC56D81-25C9-4EE2-8187-1723A13EA3F5}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{0DC56D81-25C9-4EE2-8187-1723A13EA3F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{0DC56D81-25C9-4EE2-8187-1723A13EA3F5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
