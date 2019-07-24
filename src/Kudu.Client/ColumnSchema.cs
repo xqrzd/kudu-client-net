@@ -24,6 +24,8 @@ namespace Kudu.Client
 
         public bool IsSigned { get; }
 
+        public bool IsFixedSize { get; }
+
         public ColumnSchema(
             string name, DataType type,
             bool isKey = false,
@@ -40,8 +42,9 @@ namespace Kudu.Client
             Compression = compression;
             TypeAttributes = typeAttributes;
 
-            Size = Schema.GetTypeSize(Type);
-            IsSigned = Schema.IsSigned(Type);
+            Size = Schema.GetTypeSize(type);
+            IsSigned = Schema.IsSigned(type);
+            IsFixedSize = !(type == DataType.String || type == DataType.Binary);
         }
 
         public bool Equals(ColumnSchema other)
@@ -62,6 +65,17 @@ namespace Kudu.Client
         public override bool Equals(object obj) => Equals(obj as ColumnSchema);
 
         public override int GetHashCode() => HashCode.Combine(Name, Type);
+
+        public override string ToString()
+        {
+            var typeAttributes = TypeAttributes == null ? "" :
+                $"({TypeAttributes.Precision}, {TypeAttributes.Scale})";
+
+            var nullable = IsNullable ? "?" : "";
+            var key = IsKey ? " PK" : "";
+
+            return $"{Name} {Type}{typeAttributes}{nullable}{key}";
+        }
 
         public static ColumnSchema FromProtobuf(ColumnSchemaPB columnSchemaPb)
         {
