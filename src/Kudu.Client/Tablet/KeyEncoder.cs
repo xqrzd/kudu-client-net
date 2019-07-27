@@ -36,6 +36,19 @@ namespace Kudu.Client.Tablet
             }
         }
 
+        /// <summary>
+        /// Encodes the provided row into a range partition key.
+        /// </summary>
+        /// <param name="row">The row to encode.</param>
+        /// <param name="rangeSchema">The range partition schema.</param>
+        public static byte[] EncodeRangePartitionKey(
+            PartialRow row, RangeSchema rangeSchema)
+        {
+            using var writer = new BufferWriter(256);
+            EncodeColumns(row, rangeSchema.ColumnIds, writer);
+            return writer.Memory.ToArray();
+        }
+
         private static void EncodeColumns(
             PartialRow row, List<int> columnIds, BufferWriter writer)
         {
@@ -65,8 +78,8 @@ namespace Kudu.Client.Tablet
                 var size = column.Size;
                 var slice = writer.GetSpan(size);
 
-                var data = row.GetRowAllocColumn(columnIndex);
-                data.Slice(0, size).CopyTo(slice);
+                var data = row.GetRowAllocColumn(columnIndex, size);
+                data.CopyTo(slice);
 
                 // Row data is little endian, but key encoding is big endian.
                 slice.Reverse();

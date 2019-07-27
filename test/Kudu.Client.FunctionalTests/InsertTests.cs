@@ -41,7 +41,7 @@ namespace Kudu.Client.FunctionalTests
 
             var insert = table.NewInsert();
             var row = insert.Row;
-            row.SetInt(0, 7);
+            row.SetInt32(0, 7);
             row.SetString(1, "test value");
 
             var result = await client.WriteRowAsync(insert);

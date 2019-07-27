@@ -22,6 +22,58 @@ namespace Kudu.Client.Util
         public static void EncodeInt64(Span<byte> destination, long value) =>
             BinaryPrimitives.WriteInt64LittleEndian(destination, value);
 
+        public static void EncodeInt128(Span<byte> destination, BigInteger value)
+        {
+            var abs = BigInteger.Abs(value);
+            abs.TryWriteBytes(destination, out int written, isUnsigned: true, isBigEndian: false);
+
+            if (value.Sign == -1)
+            {
+                // TODO: Use C# 8 range here: written..^0
+                var slice = destination.Slice(written, 16 - written);
+                slice.Fill(0xff);
+            }
+        }
+
+        public static void EncodeDateTime(Span<byte> destination, DateTime value)
+        {
+            long micros = EpochTime.ToUnixEpochMicros(value);
+            EncodeInt64(destination, micros);
+        }
+
+        public static void EncodeFloat(Span<byte> destination, float value)
+        {
+            int intValue = value.AsInt();
+            EncodeInt32(destination, intValue);
+        }
+
+        public static void EncodeDouble(Span<byte> destination, double value)
+        {
+            long longValue = value.AsLong();
+            EncodeInt64(destination, longValue);
+        }
+
+        public static void EncodeDecimal32(
+            Span<byte> destination, decimal value, int precision, int scale)
+        {
+            int encodedValue = DecimalUtil.EncodeDecimal32(value, precision, scale);
+            EncodeInt32(destination, encodedValue);
+        }
+
+        public static void EncodeDecimal64(
+            Span<byte> destination, decimal value, int precision, int scale)
+        {
+            long encodedValue = DecimalUtil.EncodeDecimal64(value, precision, scale);
+            EncodeInt64(destination, encodedValue);
+        }
+
+        public static void EncodeDecimal128(
+            Span<byte> destination, decimal value, int precision, int scale)
+        {
+            BigInteger encodedValue = DecimalUtil.EncodeDecimal128(value, precision, scale);
+            EncodeInt128(destination, encodedValue);
+        }
+
         public static byte[] EncodeBool(bool value) =>
             value ? new byte[] { 1 } : new byte[] { 0 };
 
@@ -52,16 +104,7 @@ namespace Kudu.Client.Util
         public static byte[] EncodeInt128(BigInteger value)
         {
             var buffer = new byte[16];
-            var abs = BigInteger.Abs(value);
-            abs.TryWriteBytes(buffer, out int written, isUnsigned: true, isBigEndian: false);
-
-            if (value.Sign == -1)
-            {
-                // TODO: Use C# 8 range here: written..^0
-                var slice = buffer.AsSpan(written, 16 - written);
-                slice.Fill(0xff);
-            }
-
+            EncodeInt128(buffer, value);
             return buffer;
         }
 

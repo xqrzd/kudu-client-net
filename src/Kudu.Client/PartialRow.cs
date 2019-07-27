@@ -1,13 +1,10 @@
 ﻿using System;
 using System.Buffers.Binary;
-using System.Text;
 using Kudu.Client.Builder;
 using Kudu.Client.Util;
 
 namespace Kudu.Client
 {
-    // TODO: Move this somewhere else.
-    // TODO: A lot of cleanup needed here.
     public class PartialRow
     {
         public Schema Schema { get; }
@@ -18,29 +15,50 @@ namespace Kudu.Client
 
         private readonly byte[][] _varLengthData;
 
-        public PartialRow(Schema schema, RowOperation type)
+        // TODO: Move this to Operation.
+        private readonly RowOperation? _rowOperation;
+
+        public PartialRow(Schema schema, RowOperation? rowOperation = null)
         {
             Schema = schema;
 
             var columnBitmapSize = BitsToBytes(schema.ColumnCount);
-            var headerSize = 1 + columnBitmapSize;
+            var headerSize = columnBitmapSize;
             if (schema.HasNullableColumns)
+            {
                 // nullsBitSet is the same size as the columnBitSet.
+                // Bits for non-nullable columns are ignored.
                 headerSize += columnBitmapSize;
+                _nullOffset = columnBitmapSize;
+            }
 
             _rowAlloc = new byte[headerSize + schema.RowAllocSize];
-            _rowAlloc[0] = (byte)type;
-
-            if (schema.HasNullableColumns)
-                _nullOffset = 1 + columnBitmapSize;
 
             _headerSize = headerSize;
             _varLengthData = new byte[schema.VarLengthColumnCount][];
+            _rowOperation = rowOperation;
         }
 
-        public int RowSize => GetRowSize();
+        internal int RowSize => GetRowSize() + 1; // TODO: Remove this as part of RowOperation.
 
-        public int IndirectDataSize { get; private set; }
+        internal int IndirectDataSize
+        {
+            get
+            {
+                int sum = 0;
+                var varLengthData = _varLengthData;
+
+                for (int i = 0; i < varLengthData.Length; i++)
+                {
+                    var buffer = varLengthData[0];
+
+                    if (buffer != null)
+                        sum += buffer.Length;
+                }
+
+                return sum;
+            }
+        }
 
         // TODO:
         //public int PrimaryKeySize { get; private set; }
@@ -53,6 +71,12 @@ namespace Kudu.Client
             // 1) Row operation
             // 2) Column set bitmap
             // 3) Nullset bitmap
+            if (_rowOperation.HasValue)
+            {
+                buffer[0] = (byte)_rowOperation.Value;
+                buffer = buffer.Slice(1);
+            }
+
             rowAlloc.Slice(0, _headerSize).CopyTo(buffer);
 
             // Advance buffers.
@@ -93,143 +117,224 @@ namespace Kudu.Client
             }
         }
 
-        private bool IsSet(int columnIndex) => BitmapGet(1, columnIndex);
+        private bool IsSet(int columnIndex) => BitmapGet(0, columnIndex);
 
-        private void Set(int columnIndex) => BitmapSet(1, columnIndex);
+        private void Set(int columnIndex) => BitmapSet(0, columnIndex);
 
         private bool IsSetToNull(int columnIndex) =>
             Schema.HasNullableColumns ? BitmapGet(_nullOffset, columnIndex) : false;
 
         private void SetToNull(int columnIndex) => BitmapSet(_nullOffset, columnIndex);
 
+        public void SetNull(string columnName)
+        {
+            int index = Schema.GetColumnIndex(columnName);
+            SetNull(index);
+        }
+
         public void SetNull(int columnIndex)
         {
+            ColumnSchema column = Schema.GetColumn(columnIndex);
+
+            if (!column.IsNullable)
+                throw new ArgumentException($"{column.Name} cannot be set to null.");
+
             Set(columnIndex);
             SetToNull(columnIndex);
         }
 
-        public void SetBool(int columnIndex, bool value)
+        public void SetBool(string columnName, bool value)
         {
-            SetByte(columnIndex, (byte)(value ? 1 : 0));
+            int index = Schema.GetColumnIndex(columnName);
+            SetBool(index, value);
         }
 
-        public void SetSByte(int columnIndex, sbyte value)
+        public void SetBool(int columnIndex, bool value)
         {
-            SetByte(columnIndex, (byte)value);
+            CheckColumn(columnIndex, DataType.Bool);
+            Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 1);
+            KuduEncoder.EncodeBool(span, value);
+        }
+
+        public void SetByte(string columnName, byte value)
+        {
+            int index = Schema.GetColumnIndex(columnName);
+            SetByte(index, value);
         }
 
         public void SetByte(int columnIndex, byte value)
         {
-            Set(columnIndex);
-            _rowAlloc[Schema.GetColumnOffset(columnIndex)] = value;
+            SetSByte(columnIndex, (sbyte)value);
         }
 
-        public void SetShort(int columnIndex, short value)
+        public void SetSByte(string columnName, sbyte value)
         {
-            var span = GetSpanInRowAllocAndSetBitSet(columnIndex);
-            BinaryPrimitives.WriteInt16LittleEndian(span, value);
+            int index = Schema.GetColumnIndex(columnName);
+            SetSByte(index, value);
         }
 
-        public void SetUShort(int columnIndex, ushort value)
+        public void SetSByte(int columnIndex, sbyte value)
         {
-            var span = GetSpanInRowAllocAndSetBitSet(columnIndex);
-            BinaryPrimitives.WriteUInt16LittleEndian(span, value);
+            CheckColumn(columnIndex, DataType.Int8);
+            Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 1);
+            KuduEncoder.EncodeInt8(span, value);
         }
 
-        public void SetInt(int columnIndex, int value)
+        public void SetInt16(string columnName, short value)
         {
-            var span = GetSpanInRowAllocAndSetBitSet(columnIndex);
-            BinaryPrimitives.WriteInt32LittleEndian(span, value);
+            int index = Schema.GetColumnIndex(columnName);
+            SetInt16(index, value);
         }
 
-        public void SetUInt(int columnIndex, uint value)
+        public void SetInt16(int columnIndex, short value)
         {
-            var span = GetSpanInRowAllocAndSetBitSet(columnIndex);
-            BinaryPrimitives.WriteUInt32LittleEndian(span, value);
+            CheckFixedColumnSize(columnIndex, DataType.Int16, 2);
+            Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 2);
+            KuduEncoder.EncodeInt16(span, value);
         }
 
-        public void SetLong(int columnIndex, long value)
+        public void SetInt32(string columnName, int value)
         {
-            var span = GetSpanInRowAllocAndSetBitSet(columnIndex);
-            BinaryPrimitives.WriteInt64LittleEndian(span, value);
+            int index = Schema.GetColumnIndex(columnName);
+            SetInt32(index, value);
         }
 
-        public void SetULong(int columnIndex, ulong value)
+        public void SetInt32(int columnIndex, int value)
         {
-            var span = GetSpanInRowAllocAndSetBitSet(columnIndex);
-            BinaryPrimitives.WriteUInt64LittleEndian(span, value);
+            CheckFixedColumnSize(columnIndex, DataType.Int32, 4);
+            Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 4);
+            KuduEncoder.EncodeInt32(span, value);
+        }
+
+        public void SetInt64(string columnName, long value)
+        {
+            int index = Schema.GetColumnIndex(columnName);
+            SetInt64(index, value);
+        }
+
+        public void SetInt64(int columnIndex, long value)
+        {
+            CheckFixedColumnSize(columnIndex, DataType.Int64, 8);
+            Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 8);
+            KuduEncoder.EncodeInt64(span, value);
+        }
+
+        public void SetDateTime(string columnName, DateTime value)
+        {
+            int index = Schema.GetColumnIndex(columnName);
+            SetDateTime(index, value);
         }
 
         public void SetDateTime(int columnIndex, DateTime value)
         {
-            var micros = EpochTime.ToUnixEpochMicros(value);
-            SetLong(columnIndex, micros);
+            CheckFixedColumnSize(columnIndex, DataType.UnixtimeMicros, 8);
+            Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 8);
+            KuduEncoder.EncodeDateTime(span, value);
+        }
+
+        public void SetFloat(string columnName, float value)
+        {
+            int index = Schema.GetColumnIndex(columnName);
+            SetFloat(index, value);
         }
 
         public void SetFloat(int columnIndex, float value)
         {
-            var intValue = value.AsInt();
-            SetInt(columnIndex, intValue);
+            CheckColumn(columnIndex, DataType.Float);
+            Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 4);
+            KuduEncoder.EncodeFloat(span, value);
+        }
+
+        public void SetDouble(string columnName, double value)
+        {
+            int index = Schema.GetColumnIndex(columnName);
+            SetDouble(index, value);
         }
 
         public void SetDouble(int columnIndex, double value)
         {
-            var longValue = value.AsLong();
-            SetLong(columnIndex, longValue);
+            CheckColumn(columnIndex, DataType.Double);
+            Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 8);
+            KuduEncoder.EncodeDouble(span, value);
+        }
+
+        public void SetDecimal(string columnName, decimal value)
+        {
+            int index = Schema.GetColumnIndex(columnName);
+            SetDecimal(index, value);
         }
 
         public void SetDecimal(int columnIndex, decimal value)
         {
-            var column = Schema.GetColumn(columnIndex);
-            var size = column.Size;
-            var precision = column.TypeAttributes.Precision;
-            var scale = column.TypeAttributes.Scale;
+            ColumnSchema column = Schema.GetColumn(columnIndex);
+            int precision = column.TypeAttributes.Precision;
+            int scale = column.TypeAttributes.Scale;
+            Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, column.Size);
 
-            switch (size)
+            switch (column.Type)
             {
-                case DecimalUtil.Decimal32Size:
-                    {
-                        var encodedValue = DecimalUtil.EncodeDecimal32(value, precision, scale);
-                        SetInt(columnIndex, encodedValue);
-                        break;
-                    }
-                case DecimalUtil.Decimal64Size:
-                    {
-                        var encodedValue = DecimalUtil.EncodeDecimal64(value, precision, scale);
-                        SetLong(columnIndex, encodedValue);
-                        break;
-                    }
-                case DecimalUtil.Decimal128Size:
-                    {
-                        var encodedValue = DecimalUtil.EncodeDecimal128(value, precision, scale);
-                        var span = GetSpanInRowAllocAndSetBitSet(columnIndex);
-                        encodedValue.TryWriteBytes(span, out var written);
-
-                        if (encodedValue.Sign == -1)
-                        {
-                            // TODO: Use C# 8 range here: written..^0
-                            var slice = span.Slice(written, 16 - written);
-                            slice.Fill(0xff);
-                        }
-
-                        break;
-                    }
+                case DataType.Decimal32:
+                    KuduEncoder.EncodeDecimal32(span, value, precision, scale);
+                    break;
+                case DataType.Decimal64:
+                    KuduEncoder.EncodeDecimal64(span, value, precision, scale);
+                    break;
+                case DataType.Decimal128:
+                    KuduEncoder.EncodeDecimal128(span, value, precision, scale);
+                    break;
+                default:
+                    throw new ArgumentException($"Column {column.Name} is not a decimal.");
             }
+        }
+
+        public void SetString(string columnName, string value)
+        {
+            int index = Schema.GetColumnIndex(columnName);
+            SetString(index, value);
         }
 
         public void SetString(int columnIndex, string value)
         {
-            var data = Encoding.UTF8.GetBytes(value);
-            SetBinary(columnIndex, data);
+            CheckColumn(columnIndex, DataType.String);
+            var data = KuduEncoder.EncodeString(value);
+            SetVarLengthData(columnIndex, data);
+        }
+
+        public void SetBinary(string columnName, byte[] value)
+        {
+            int index = Schema.GetColumnIndex(columnName);
+            SetBinary(index, value);
         }
 
         public void SetBinary(int columnIndex, byte[] value)
         {
-            Set(columnIndex);
+            CheckColumn(columnIndex, DataType.Binary);
+            SetVarLengthData(columnIndex, value);
+        }
 
+        private void SetVarLengthData(int columnIndex, byte[] value)
+        {
+            Set(columnIndex);
             var varLenColumnIndex = Schema.GetColumnOffset(columnIndex);
             _varLengthData[varLenColumnIndex] = value;
-            IndirectDataSize += value.Length;
+        }
+
+        private void CheckColumn(int columnIndex, DataType type)
+        {
+            ColumnSchema column = Schema.GetColumn(columnIndex);
+
+            if (column.Type != type)
+                throw new ArgumentException(
+                    $"Can't set {column.Name} ({column.Type}) to {type}");
+        }
+
+        private void CheckFixedColumnSize(int columnIndex, DataType type, int size)
+        {
+            ColumnSchema column = Schema.GetColumn(columnIndex);
+
+            if (!column.IsFixedSize || column.Size != size)
+                throw new ArgumentException(
+                    $"Can't set {column.Name} ({column.Type}) to {type}");
         }
 
         private int GetPositionInRowAllocAndSetBitSet(int columnIndex)
@@ -238,17 +343,16 @@ namespace Kudu.Client
             return Schema.GetColumnOffset(columnIndex);
         }
 
-        private Span<byte> GetSpanInRowAllocAndSetBitSet(int columnIndex)
+        private Span<byte> GetSpanInRowAllocAndSetBitSet(int columnIndex, int dataSize)
         {
             var position = _headerSize + GetPositionInRowAllocAndSetBitSet(columnIndex);
-            // TODO: Include length here, so the span is the correct size.
-            return _rowAlloc.AsSpan(position);
+            return _rowAlloc.AsSpan(position, dataSize);
         }
 
-        internal ReadOnlySpan<byte> GetRowAllocColumn(int columnIndex)
+        internal ReadOnlySpan<byte> GetRowAllocColumn(int columnIndex, int dataSize)
         {
             var position = _headerSize + Schema.GetColumnOffset(columnIndex);
-            return _rowAlloc.AsSpan(position);
+            return _rowAlloc.AsSpan(position, dataSize);
         }
 
         internal ReadOnlySpan<byte> GetVarLengthColumn(int columnIndex)

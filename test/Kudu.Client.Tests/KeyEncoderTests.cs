@@ -43,7 +43,7 @@ namespace Kudu.Client.Tests
             var schema = GetSchema(builder);
 
             var rowA = new PartialRow(schema, RowOperation.Insert);
-            rowA.SetInt(0, 0);
+            rowA.SetInt32(0, 0);
             rowA.SetString(1, "");
             rowA.SetString(2, "");
 
@@ -62,8 +62,8 @@ namespace Kudu.Client.Tests
                 Assert.Equal(expected, writer.Memory.ToArray());
             }
 
-            var rowB = new PartialRow(schema, RowOperation.Insert);
-            rowB.SetInt(0, 1);
+            var rowB = new PartialRow(schema);
+            rowB.SetInt32(0, 1);
             rowB.SetString(1, "");
             rowB.SetString(2, "");
 
@@ -82,8 +82,8 @@ namespace Kudu.Client.Tests
                 Assert.Equal(expected, writer.Memory.ToArray());
             }
 
-            var rowC = new PartialRow(schema, RowOperation.Insert);
-            rowC.SetInt(0, 0);
+            var rowC = new PartialRow(schema);
+            rowC.SetInt32(0, 0);
             rowC.SetString(1, "b");
             rowC.SetString(2, "c");
 
@@ -103,8 +103,8 @@ namespace Kudu.Client.Tests
                 Assert.Equal(expected, writer.Memory.ToArray());
             }
 
-            var rowD = new PartialRow(schema, RowOperation.Insert);
-            rowD.SetInt(0, 1);
+            var rowD = new PartialRow(schema);
+            rowD.SetInt32(0, 1);
             rowD.SetString(1, "b");
             rowD.SetString(2, "c");
 

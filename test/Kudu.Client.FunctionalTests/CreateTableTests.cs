@@ -136,18 +136,18 @@ namespace Kudu.Client.FunctionalTests
                 .SetRangePartitionColumns("column_x")
                 .AddRangePartition((lower, upper) =>
                 {
-                    lower.SetInt(0, 20);
-                    upper.SetInt(0, 21);
+                    lower.SetInt32(0, 20);
+                    upper.SetInt32(0, 21);
                 })
                 .AddRangePartition((lower, upper) =>
                 {
-                    lower.SetInt(0, 30);
-                    upper.SetInt(0, 50);
+                    lower.SetInt32(0, 30);
+                    upper.SetInt32(0, 50);
                 })
                 .AddRangePartition((lower, upper) =>
                 {
-                    lower.SetInt(0, 67);
-                    upper.SetInt(0, 99);
+                    lower.SetInt32(0, 67);
+                    upper.SetInt32(0, 99);
                 });
 
             var table = await client.CreateTableAsync(builder);
