@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Kudu.Client.Builder;
 using Kudu.Client.Protocol;
 
 namespace Kudu.Client
@@ -56,7 +55,7 @@ namespace Kudu.Client
             {
                 var column = columns[i];
 
-                if (column.Type == DataType.String || column.Type == DataType.Binary)
+                if (column.Type == KuduType.String || column.Type == KuduType.Binary)
                 {
                     _columnOffsets[i] = VarLengthColumnCount;
                     VarLengthColumnCount++;
@@ -109,7 +108,7 @@ namespace Kudu.Client
                 else
                 {
                     columnOffsets[i] = size;
-                    size += GetTypeSize((DataType)column.Type);
+                    size += GetTypeSize((KuduType)column.Type);
                 }
 
                 hasNulls |= column.IsNullable;
@@ -151,43 +150,43 @@ namespace Kudu.Client
 
         public int GetColumnIndex(int id) => _columnsById[id];
 
-        public static int GetTypeSize(DataType type)
+        public static int GetTypeSize(KuduType type)
         {
             switch (type)
             {
-                case DataType.String:
-                case DataType.Binary:
+                case KuduType.String:
+                case KuduType.Binary:
                     return 8 + 8; // Offset then string length.
-                case DataType.Bool:
-                case DataType.Int8:
+                case KuduType.Bool:
+                case KuduType.Int8:
                     return 1;
-                case DataType.Int16:
+                case KuduType.Int16:
                     return 2;
-                case DataType.Int32:
-                case DataType.Float:
-                case DataType.Decimal32:
+                case KuduType.Int32:
+                case KuduType.Float:
+                case KuduType.Decimal32:
                     return 4;
-                case DataType.Int64:
-                case DataType.Double:
-                case DataType.UnixtimeMicros:
-                case DataType.Decimal64:
+                case KuduType.Int64:
+                case KuduType.Double:
+                case KuduType.UnixtimeMicros:
+                case KuduType.Decimal64:
                     return 8;
                 //case DataType.Int128: Not supported in Kudu yet.
-                case DataType.Decimal128:
+                case KuduType.Decimal128:
                     return 16;
                 default:
                     throw new ArgumentException();
             }
         }
 
-        public static bool IsSigned(DataType type)
+        public static bool IsSigned(KuduType type)
         {
             switch (type)
             {
-                case DataType.Int8:
-                case DataType.Int16:
-                case DataType.Int32:
-                case DataType.Int64:
+                case KuduType.Int8:
+                case KuduType.Int16:
+                case KuduType.Int32:
+                case KuduType.Int64:
                     //case DataType.Int128: Not supported in Kudu yet.
                     return true;
                 default:

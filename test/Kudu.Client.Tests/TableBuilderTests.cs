@@ -27,7 +27,7 @@ namespace Kudu.Client.Tests
                 .AddColumn(column =>
                 {
                     column.Name = "c1";
-                    column.Type = DataType.Int32;
+                    column.Type = KuduType.Int32;
                     column.IsKey = true;
                     column.IsNullable = false;
                 })

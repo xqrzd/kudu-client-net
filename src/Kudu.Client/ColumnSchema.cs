@@ -8,7 +8,7 @@ namespace Kudu.Client
     {
         public string Name { get; }
 
-        public DataType Type { get; }
+        public KuduType Type { get; }
 
         public bool IsKey { get; }
 
@@ -27,7 +27,7 @@ namespace Kudu.Client
         public bool IsFixedSize { get; }
 
         public ColumnSchema(
-            string name, DataType type,
+            string name, KuduType type,
             bool isKey = false,
             bool isNullable = false,
             EncodingType encoding = EncodingType.AutoEncoding,
@@ -44,7 +44,7 @@ namespace Kudu.Client
 
             Size = Schema.GetTypeSize(type);
             IsSigned = Schema.IsSigned(type);
-            IsFixedSize = !(type == DataType.String || type == DataType.Binary);
+            IsFixedSize = !(type == KuduType.String || type == KuduType.Binary);
         }
 
         public bool Equals(ColumnSchema other)
@@ -81,7 +81,7 @@ namespace Kudu.Client
         {
             return new ColumnSchema(
                 columnSchemaPb.Name,
-                (DataType)columnSchemaPb.Type,
+                (KuduType)columnSchemaPb.Type,
                 columnSchemaPb.IsKey,
                 columnSchemaPb.IsNullable,
                 (EncodingType)columnSchemaPb.Encoding,

@@ -13,7 +13,7 @@ namespace Kudu.Client.Tests
                 .AddColumn(c =>
                 {
                     c.Name = "int8";
-                    c.Type = DataType.Int8;
+                    c.Type = KuduType.Int8;
                     c.IsKey = true;
                 });
 
@@ -30,7 +30,7 @@ namespace Kudu.Client.Tests
             Assert.Equal(0, schema.GetColumnOffset(index: 0));
             var column1 = schema.GetColumn(0);
             Assert.Equal("int8", column1.Name);
-            Assert.Equal(DataType.Int8, column1.Type);
+            Assert.Equal(KuduType.Int8, column1.Type);
             Assert.True(column1.IsKey);
             Assert.False(column1.IsNullable);
             Assert.Equal(EncodingType.AutoEncoding, column1.Encoding);
@@ -47,13 +47,13 @@ namespace Kudu.Client.Tests
                 .AddColumn(c =>
                 {
                     c.Name = "string1";
-                    c.Type = DataType.String;
+                    c.Type = KuduType.String;
                     c.IsKey = true;
                 })
                 .AddColumn(c =>
                 {
                     c.Name = "string2";
-                    c.Type = DataType.String;
+                    c.Type = KuduType.String;
                     c.IsNullable = true;
                 });
 
@@ -70,7 +70,7 @@ namespace Kudu.Client.Tests
             Assert.Equal(0, schema.GetColumnOffset(index: 0));
             var column1 = schema.GetColumn(0);
             Assert.Equal("string1", column1.Name);
-            Assert.Equal(DataType.String, column1.Type);
+            Assert.Equal(KuduType.String, column1.Type);
             Assert.True(column1.IsKey);
             Assert.False(column1.IsNullable);
             Assert.Equal(EncodingType.AutoEncoding, column1.Encoding);
@@ -85,7 +85,7 @@ namespace Kudu.Client.Tests
             Assert.Equal(1, schema.GetColumnOffset(index: 1));
             var column2 = schema.GetColumn(1);
             Assert.Equal("string2", column2.Name);
-            Assert.Equal(DataType.String, column2.Type);
+            Assert.Equal(KuduType.String, column2.Type);
             Assert.False(column2.IsKey);
             Assert.True(column2.IsNullable);
             Assert.Equal(EncodingType.AutoEncoding, column2.Encoding);
@@ -102,41 +102,41 @@ namespace Kudu.Client.Tests
                 .AddColumn(c =>
                 {
                     c.Name = "string";
-                    c.Type = DataType.String;
+                    c.Type = KuduType.String;
                     c.IsKey = true;
                 })
                 .AddColumn(c =>
                 {
                     c.Name = "int32";
-                    c.Type = DataType.Int32;
+                    c.Type = KuduType.Int32;
                     c.IsKey = true;
                 })
                 .AddColumn(c =>
                 {
                     c.Name = "bool";
-                    c.Type = DataType.Bool;
+                    c.Type = KuduType.Bool;
                 })
                 .AddColumn(c =>
                 {
                     c.Name = "bin";
-                    c.Type = DataType.Binary;
+                    c.Type = KuduType.Binary;
                 })
                 .AddColumn(c =>
                 {
                     c.Name = "decimal64";
-                    c.Type = DataType.Decimal64;
+                    c.Type = KuduType.Decimal64;
                     c.Precision = 12;
                     c.Scale = 4;
                 })
                 .AddColumn(c =>
                 {
                     c.Name = "timestamp";
-                    c.Type = DataType.UnixtimeMicros;
+                    c.Type = KuduType.UnixtimeMicros;
                 })
                 .AddColumn(c =>
                 {
                     c.Name = "double";
-                    c.Type = DataType.Double;
+                    c.Type = KuduType.Double;
                 });
 
             var schema = GetSchema(builder);
@@ -151,7 +151,7 @@ namespace Kudu.Client.Tests
             Assert.Equal(0, schema.GetColumnOffset(index: 0));
             var column1 = schema.GetColumn(0);
             Assert.Equal("string", column1.Name);
-            Assert.Equal(DataType.String, column1.Type);
+            Assert.Equal(KuduType.String, column1.Type);
             Assert.True(column1.IsKey);
             Assert.False(column1.IsNullable);
             Assert.Equal(EncodingType.AutoEncoding, column1.Encoding);
@@ -165,7 +165,7 @@ namespace Kudu.Client.Tests
             Assert.Equal(0, schema.GetColumnOffset(index: 1));
             var column2 = schema.GetColumn(1);
             Assert.Equal("int32", column2.Name);
-            Assert.Equal(DataType.Int32, column2.Type);
+            Assert.Equal(KuduType.Int32, column2.Type);
             Assert.True(column2.IsKey);
             Assert.False(column2.IsNullable);
             Assert.Equal(EncodingType.AutoEncoding, column2.Encoding);
@@ -179,7 +179,7 @@ namespace Kudu.Client.Tests
             Assert.Equal(4, schema.GetColumnOffset(index: 2));
             var column3 = schema.GetColumn(2);
             Assert.Equal("bool", column3.Name);
-            Assert.Equal(DataType.Bool, column3.Type);
+            Assert.Equal(KuduType.Bool, column3.Type);
             Assert.False(column3.IsKey);
             Assert.False(column3.IsNullable);
             Assert.Equal(EncodingType.AutoEncoding, column3.Encoding);
@@ -193,7 +193,7 @@ namespace Kudu.Client.Tests
             Assert.Equal(1, schema.GetColumnOffset(index: 3));
             var column4 = schema.GetColumn(3);
             Assert.Equal("bin", column4.Name);
-            Assert.Equal(DataType.Binary, column4.Type);
+            Assert.Equal(KuduType.Binary, column4.Type);
             Assert.False(column4.IsKey);
             Assert.False(column4.IsNullable);
             Assert.Equal(EncodingType.AutoEncoding, column4.Encoding);
@@ -207,7 +207,7 @@ namespace Kudu.Client.Tests
             Assert.Equal(5, schema.GetColumnOffset(index: 4));
             var column5 = schema.GetColumn(4);
             Assert.Equal("decimal64", column5.Name);
-            Assert.Equal(DataType.Decimal64, column5.Type);
+            Assert.Equal(KuduType.Decimal64, column5.Type);
             Assert.False(column5.IsKey);
             Assert.False(column5.IsNullable);
             Assert.Equal(EncodingType.AutoEncoding, column5.Encoding);
@@ -224,7 +224,7 @@ namespace Kudu.Client.Tests
             Assert.Equal(13, schema.GetColumnOffset(index: 5));
             var column6 = schema.GetColumn(5);
             Assert.Equal("timestamp", column6.Name);
-            Assert.Equal(DataType.UnixtimeMicros, column6.Type);
+            Assert.Equal(KuduType.UnixtimeMicros, column6.Type);
             Assert.False(column6.IsKey);
             Assert.False(column6.IsNullable);
             Assert.Equal(EncodingType.AutoEncoding, column6.Encoding);
@@ -240,7 +240,7 @@ namespace Kudu.Client.Tests
             Assert.Equal(21, schema.GetColumnOffset(index: 6));
             var column7 = schema.GetColumn(6);
             Assert.Equal("double", column7.Name);
-            Assert.Equal(DataType.Double, column7.Type);
+            Assert.Equal(KuduType.Double, column7.Type);
             Assert.False(column7.IsKey);
             Assert.False(column7.IsNullable);
             Assert.Equal(EncodingType.AutoEncoding, column7.Encoding);

@@ -1,8 +1,8 @@
 ﻿using Kudu.Client.Protocol;
 
-namespace Kudu.Client.Builder
+namespace Kudu.Client
 {
-    public enum DataType
+    public enum KuduType
     {
         Int8 = DataTypePB.Int8,
         Int16 = DataTypePB.Int16,

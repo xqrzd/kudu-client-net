@@ -16,19 +16,19 @@ namespace Kudu.Client.Tests
                 .AddColumn(c =>
                 {
                     c.Name = "a";
-                    c.Type = DataType.Int32;
+                    c.Type = KuduType.Int32;
                     c.IsKey = true;
                 })
                 .AddColumn(c =>
                 {
                     c.Name = "b";
-                    c.Type = DataType.String;
+                    c.Type = KuduType.String;
                     c.IsKey = true;
                 })
                 .AddColumn(c =>
                 {
                     c.Name = "c";
-                    c.Type = DataType.String;
+                    c.Type = KuduType.String;
                     c.IsKey = true;
                 });
 

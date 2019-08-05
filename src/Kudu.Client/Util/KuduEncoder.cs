@@ -24,8 +24,7 @@ namespace Kudu.Client.Util
 
         public static void EncodeInt128(Span<byte> destination, BigInteger value)
         {
-            var abs = BigInteger.Abs(value);
-            abs.TryWriteBytes(destination, out int written, isUnsigned: true, isBigEndian: false);
+            value.TryWriteBytes(destination, out int written, isUnsigned: false, isBigEndian: false);
 
             if (value.Sign == -1)
             {
@@ -159,7 +158,7 @@ namespace Kudu.Client.Util
         public static BigInteger DecodeInt128(ReadOnlySpan<byte> source) =>
             new BigInteger(source.Slice(0, 16), isUnsigned: false, isBigEndian: false);
 
-        public static DateTime DecodeTimestamp(ReadOnlySpan<byte> source)
+        public static DateTime DecodeDateTime(ReadOnlySpan<byte> source)
         {
             long micros = DecodeInt64(source);
             return EpochTime.FromUnixEpochMicros(micros);
@@ -177,26 +176,24 @@ namespace Kudu.Client.Util
             return value.AsDouble();
         }
 
-        public static decimal DecodeDecimal(ReadOnlySpan<byte> source, int precision, int scale)
+        public static decimal DecodeDecimal(ReadOnlySpan<byte> source, KuduType kuduType, int scale)
         {
-            int size = DecimalUtil.PrecisionToSize(precision);
-
-            switch (size)
+            switch (kuduType)
             {
-                case DecimalUtil.Decimal32Size:
+                case KuduType.Decimal32:
                     int intVal = DecodeInt32(source);
                     return DecimalUtil.DecodeDecimal32(intVal, scale);
 
-                case DecimalUtil.Decimal64Size:
+                case KuduType.Decimal64:
                     long longVal = DecodeInt64(source);
                     return DecimalUtil.DecodeDecimal64(longVal, scale);
 
-                case DecimalUtil.Decimal128Size:
+                case KuduType.Decimal128:
                     BigInteger bigIntVal = DecodeInt128(source);
                     return DecimalUtil.DecodeDecimal128(bigIntVal, scale);
 
                 default:
-                    throw new Exception($"Unsupported decimal type size: {size}.");
+                    throw new Exception($"Unsupported data type: {kuduType}.");
             }
         }
 

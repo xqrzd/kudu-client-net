@@ -2,7 +2,6 @@
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
-using Kudu.Client.Builder;
 using Kudu.Client.Internal;
 using Kudu.Client.Util;
 
@@ -67,7 +66,7 @@ namespace Kudu.Client.Tablet
             var column = schema.GetColumn(columnIndex);
             var type = column.Type;
 
-            if (type == DataType.String || type == DataType.Binary)
+            if (type == KuduType.String || type == KuduType.Binary)
             {
                 var data = row.GetVarLengthColumn(columnIndex);
                 EncodeBinary(data, writer, isLast);

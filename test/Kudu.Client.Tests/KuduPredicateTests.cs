@@ -6,23 +6,23 @@ namespace Kudu.Client.Tests
 {
     public class KuduPredicateTests
     {
-        private readonly ColumnSchema boolCol = CreateColumnSchema("bool", DataType.Bool);
-        private readonly ColumnSchema byteCol = CreateColumnSchema("byte", DataType.Int8);
-        private readonly ColumnSchema shortCol = CreateColumnSchema("short", DataType.Int16);
-        private readonly ColumnSchema intCol = CreateColumnSchema("int", DataType.Int32);
-        private readonly ColumnSchema longCol = CreateColumnSchema("long", DataType.Int64);
-        private readonly ColumnSchema floatCol = CreateColumnSchema("float", DataType.Float);
-        private readonly ColumnSchema doubleCol = CreateColumnSchema("double", DataType.Double);
-        private readonly ColumnSchema stringCol = CreateColumnSchema("string", DataType.String);
-        private readonly ColumnSchema binaryCol = CreateColumnSchema("binary", DataType.Binary);
+        private readonly ColumnSchema boolCol = CreateColumnSchema("bool", KuduType.Bool);
+        private readonly ColumnSchema byteCol = CreateColumnSchema("byte", KuduType.Int8);
+        private readonly ColumnSchema shortCol = CreateColumnSchema("short", KuduType.Int16);
+        private readonly ColumnSchema intCol = CreateColumnSchema("int", KuduType.Int32);
+        private readonly ColumnSchema longCol = CreateColumnSchema("long", KuduType.Int64);
+        private readonly ColumnSchema floatCol = CreateColumnSchema("float", KuduType.Float);
+        private readonly ColumnSchema doubleCol = CreateColumnSchema("double", KuduType.Double);
+        private readonly ColumnSchema stringCol = CreateColumnSchema("string", KuduType.String);
+        private readonly ColumnSchema binaryCol = CreateColumnSchema("binary", KuduType.Binary);
 
-        private readonly ColumnSchema decimal32Col = CreateColumnSchema("decimal32", DataType.Decimal32,
+        private readonly ColumnSchema decimal32Col = CreateColumnSchema("decimal32", KuduType.Decimal32,
             new ColumnTypeAttributes(DecimalUtil.MaxDecimal32Precision, 2));
 
-        private readonly ColumnSchema decimal64Col = CreateColumnSchema("decimal64", DataType.Decimal64,
+        private readonly ColumnSchema decimal64Col = CreateColumnSchema("decimal64", KuduType.Decimal64,
             new ColumnTypeAttributes(DecimalUtil.MaxDecimal64Precision, 2));
 
-        private readonly ColumnSchema decimal128Col = CreateColumnSchema("decimal128", DataType.Decimal128,
+        private readonly ColumnSchema decimal128Col = CreateColumnSchema("decimal128", KuduType.Decimal128,
             new ColumnTypeAttributes(DecimalUtil.MaxDecimal128Precision, 2));
 
         /// <summary>
@@ -1125,12 +1125,12 @@ namespace Kudu.Client.Tests
             KuduPredicate.NewInListPredicate(stringCol, values);
 
         private static ColumnSchema CreateColumnSchema(
-            string name, DataType dataType, ColumnTypeAttributes attributes = null) =>
+            string name, KuduType dataType, ColumnTypeAttributes attributes = null) =>
             new ColumnSchema(
                 name,
                 dataType,
                 false,
-                dataType == DataType.String,
+                dataType == KuduType.String,
                 EncodingType.AutoEncoding,
                 CompressionType.DefaultCompression,
                 attributes);

@@ -22,7 +22,7 @@ namespace Kudu.Client.FunctionalTests
                 .AddColumn(column =>
                 {
                     column.Name = "pk";
-                    column.Type = DataType.Int32;
+                    column.Type = KuduType.Int32;
                     column.IsKey = true;
                     column.IsNullable = false;
                 });

@@ -17,9 +17,9 @@ namespace Kudu.Client.Builder
             set => Column.Name = value;
         }
 
-        public DataType Type
+        public KuduType Type
         {
-            get => (DataType)Column.Type;
+            get => (KuduType)Column.Type;
             set => Column.Type = (DataTypePB)value;
         }
 

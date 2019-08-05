@@ -21,7 +21,7 @@ namespace Kudu.Client.FunctionalTests
                 .AddColumn(column =>
                 {
                     column.Name = "column_x";
-                    column.Type = DataType.Int32;
+                    column.Type = KuduType.Int32;
                     column.IsKey = true;
                     column.IsNullable = false;
                     column.Compression = CompressionType.DefaultCompression;
@@ -31,7 +31,7 @@ namespace Kudu.Client.FunctionalTests
                 {
                     column.Name = "column_y";
                     column.IsNullable = true;
-                    column.Type = DataType.String;
+                    column.Type = KuduType.String;
                     column.Encoding = EncodingType.DictEncoding;
                 });
 
