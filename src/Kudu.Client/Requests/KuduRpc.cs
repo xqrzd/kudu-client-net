@@ -3,7 +3,6 @@ using System.Buffers;
 using System.IO;
 using System.IO.Pipelines;
 using System.Threading.Tasks;
-using Kudu.Client.Connection;
 using Kudu.Client.Protocol.Rpc;
 using ProtoBuf;
 

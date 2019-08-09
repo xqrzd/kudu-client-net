@@ -1,5 +1,4 @@
-﻿using Kudu.Client.Builder;
-using Kudu.Client.Util;
+﻿using Kudu.Client.Util;
 using Xunit;
 
 namespace Kudu.Client.Tests

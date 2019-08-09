@@ -1,6 +1,6 @@
 ﻿using Kudu.Client.Protocol;
 
-namespace Kudu.Client.Connection
+namespace Kudu.Client
 {
     /// <summary>
     /// Policy with which to choose amongst multiple replicas.

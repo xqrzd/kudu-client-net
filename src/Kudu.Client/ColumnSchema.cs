@@ -1,5 +1,4 @@
 ﻿using System;
-using Kudu.Client.Builder;
 using Kudu.Client.Protocol;
 
 namespace Kudu.Client

@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using Kudu.Client.Connection;
 using Kudu.Client.Util;
 
 namespace Kudu.Client.Builder

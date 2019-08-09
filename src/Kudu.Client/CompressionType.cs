@@ -1,6 +1,6 @@
 ﻿using Kudu.Client.Protocol;
 
-namespace Kudu.Client.Builder
+namespace Kudu.Client
 {
     public enum CompressionType
     {
