@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
@@ -33,6 +34,18 @@ namespace Kudu.Client.Tablet
                 var bucket = hash % (uint)hashSchema.NumBuckets;
                 return (int)bucket;
             }
+        }
+
+        /// <summary>
+        /// Encodes a hash bucket into the buffer.
+        /// </summary>
+        /// <param name="bucket">The bucket.</param>
+        /// <param name="bufferWriter">The buffer.</param>
+        public static void EncodeHashBucket(int bucket, IBufferWriter<byte> bufferWriter)
+        {
+            Span<byte> span = bufferWriter.GetSpan(4);
+            BinaryPrimitives.WriteInt32BigEndian(span, bucket);
+            bufferWriter.Advance(4);
         }
 
         /// <summary>

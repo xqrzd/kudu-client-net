@@ -39,6 +39,22 @@ namespace Kudu.Client
             _rowOperation = rowOperation;
         }
 
+        /// <summary>
+        /// Creates a new partial row by deep-copying the data-fields of the provided partial row.
+        /// </summary>
+        /// <param name="row">The partial row to copy.</param>
+        internal PartialRow(PartialRow row)
+        {
+            Schema = row.Schema;
+            _rowAlloc = CloneArray(row._rowAlloc);
+            _headerSize = row._headerSize;
+            _nullOffset = row._nullOffset;
+            _varLengthData = new byte[row._varLengthData.Length][];
+            for (int i = 0; i < _varLengthData.Length; i++)
+                _varLengthData[i] = CloneArray(row._varLengthData[i]);
+            _rowOperation = row._rowOperation;
+        }
+
         internal int RowSize => GetRowSize() + 1; // TODO: Remove this as part of RowOperation.
 
         internal int IndirectDataSize
@@ -783,5 +799,15 @@ namespace Kudu.Client
         }
 
         private static int BitsToBytes(int bits) => (bits + 7) / 8;
+
+        private static byte[] CloneArray(byte[] array)
+        {
+            if (array == null)
+                return null;
+
+            var newArray = new byte[array.Length];
+            array.CopyTo(newArray, 0);
+            return newArray;
+        }
     }
 }

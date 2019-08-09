@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Buffers;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -24,6 +26,56 @@ namespace Kudu.Client.Util
 
         public static void SwapMostSignificantBitBigEndian(this Span<byte> span) =>
             span[0] ^= 1 << 7;
+
+        public static int SequenceCompareTo<T>(this T[] array, ReadOnlySpan<T> other)
+            where T : IComparable<T> => MemoryExtensions.SequenceCompareTo(array, other);
+
+        public static int NextClearBit(this BitArray array, int from)
+        {
+            var length = array.Count;
+
+            for (int i = from; i < length; i++)
+            {
+                if (!array.Get(i))
+                    return i;
+            }
+
+            return Math.Max(from, length);
+        }
+
+        public static int NextSetBit(this BitArray array, int from)
+        {
+            var length = array.Count;
+
+            for (int i = from; i < length; i++)
+            {
+                if (array.Get(i))
+                    return i;
+            }
+
+            return -1;
+        }
+
+        public static int Cardinality(this BitArray array)
+        {
+            int count = 0;
+            var length = array.Count;
+
+            for (int i = 0; i < length; i++)
+            {
+                if (array.Get(i))
+                    count++;
+            }
+
+            return count;
+        }
+
+        internal static ArrayBufferWriter<T> Clone<T>(this ArrayBufferWriter<T> writer)
+        {
+            var newWriter = new ArrayBufferWriter<T>(writer.Capacity);
+            newWriter.Write(writer.WrittenSpan);
+            return newWriter;
+        }
 
         /// <summary>
         /// Obtains the data as a list; if it is *already* a list, the original object is returned without

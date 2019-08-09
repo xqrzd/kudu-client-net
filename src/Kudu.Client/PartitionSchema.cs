@@ -9,11 +9,37 @@ namespace Kudu.Client
 
         public List<HashBucketSchema> HashBucketSchemas { get; }
 
-        public PartitionSchema(RangeSchema rangeSchema, List<HashBucketSchema> hashBucketSchemas)
+        /// <summary>
+        /// Returns true if the partition schema does not include any hash components,
+        /// and the range columns match the table's primary key columns.
+        /// </summary>
+        public bool IsSimpleRangePartitioning { get; }
+
+        public PartitionSchema(
+            RangeSchema rangeSchema,
+            List<HashBucketSchema> hashBucketSchemas,
+            Schema schema)
         {
             RangeSchema = rangeSchema;
             HashBucketSchemas = hashBucketSchemas;
-            // TODO: Calculate IsSimpleRangePartitioning
+
+            bool isSimple = hashBucketSchemas.Count == 0 &&
+                rangeSchema.ColumnIds.Count == schema.PrimaryKeyColumnCount;
+
+            if (isSimple)
+            {
+                int i = 0;
+                foreach (int id in rangeSchema.ColumnIds)
+                {
+                    if (schema.GetColumnIndex(id) != i++)
+                    {
+                        isSimple = false;
+                        break;
+                    }
+                }
+            }
+
+            IsSimpleRangePartitioning = isSimple;
         }
 
         public PartitionSchema(PartitionSchemaPB partitionSchemaPb)

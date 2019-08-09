@@ -32,15 +32,16 @@ namespace Kudu.Client.Tests
                     c.IsKey = true;
                 });
 
+            var schema = GetSchema(builder);
+
             var partitionSchema = new PartitionSchema(
                 new RangeSchema(new List<int> { 0, 1, 2 }),
                 new List<HashBucketSchema>
                 {
                     new HashBucketSchema(new List<int> { 0, 1 }, 32, 0),
                     new HashBucketSchema(new List<int> { 2 }, 32, 42)
-                });
-
-            var schema = GetSchema(builder);
+                },
+                schema);
 
             var rowA = new PartialRow(schema, RowOperation.Insert);
             rowA.SetInt32(0, 0);

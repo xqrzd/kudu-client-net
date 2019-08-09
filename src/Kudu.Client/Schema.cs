@@ -15,6 +15,11 @@ namespace Kudu.Client
         private readonly ColumnSchema[] _columnsByIndex;
 
         /// <summary>
+        /// The primary key columns.
+        /// </summary>
+        private readonly List<ColumnSchema> _primaryKeyColumns;
+
+        /// <summary>
         /// Maps column name to column index.
         /// </summary>
         private readonly Dictionary<string, int> _columnsByName;
@@ -47,6 +52,7 @@ namespace Kudu.Client
             if (hasColumnIds)
                 _columnsById = new Dictionary<int, int>(columns.Count);
 
+            _primaryKeyColumns = new List<ColumnSchema>();
             _columnsByName = new Dictionary<string, int>(columns.Count);
             _columnsById = new Dictionary<int, int>(columns.Count);
             _columnOffsets = new int[columns.Count];
@@ -75,7 +81,8 @@ namespace Kudu.Client
                 if (hasColumnIds)
                     _columnsById.Add(columnIds[i], i);
 
-                // TODO: store primary key columns
+                if (column.IsKey)
+                    _primaryKeyColumns.Add(column);
             }
 
             _columnsByIndex = new ColumnSchema[columns.Count];
@@ -89,6 +96,7 @@ namespace Kudu.Client
             var size = 0;
             var varLenCnt = 0;
             var hasNulls = false;
+            var primaryKeyColumns = new List<ColumnSchema>();
             var columnsByName = new Dictionary<string, int>(columns.Count);
             var columnsById = new Dictionary<int, int>(columns.Count);
             var columnOffsets = new int[columns.Count];
@@ -116,22 +124,26 @@ namespace Kudu.Client
                 columnsById.Add((int)column.Id, i);
                 columnsByIndex[i] = ColumnSchema.FromProtobuf(columns[i]);
 
+                if (column.IsKey)
+                    primaryKeyColumns.Add(columnsByIndex[i]);
+
                 // TODO: Remove this hack-fix. Kudu throws an exception if columnId is supplied.
                 column.ResetId();
-
-                // TODO: store primary key columns
             }
 
             _columnOffsets = columnOffsets;
             _columnsByName = columnsByName;
             _columnsById = columnsById;
             _columnsByIndex = columnsByIndex;
+            _primaryKeyColumns = primaryKeyColumns;
             RowAllocSize = size;
             VarLengthColumnCount = varLenCnt;
             HasNullableColumns = hasNulls;
         }
 
         public int ColumnCount => _columnsByIndex.Length;
+
+        public int PrimaryKeyColumnCount => _primaryKeyColumns.Count;
 
         public int GetColumnIndex(string name) => _columnsByName[name];
 
