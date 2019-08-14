@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Kudu.Client.Connection
 {
-    public class ConnectionCache : IDisposable
+    public class ConnectionCache : IAsyncDisposable
     {
         private readonly IKuduConnectionFactory _connectionFactory;
         private readonly Dictionary<IPEndPoint, Task<KuduConnection>> _connections;
@@ -96,11 +96,6 @@ namespace Kudu.Client.Connection
                 }
                 catch { }
             }
-        }
-
-        public void Dispose()
-        {
-            DisposeAsync().GetAwaiter().GetResult();
         }
     }
 }

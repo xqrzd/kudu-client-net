@@ -10,7 +10,7 @@ namespace Kudu.Client.Tests
         {
             PartialRow row = GetPartialRowWithAllTypes();
 
-            for (int i = 0; i < row.Schema.ColumnCount; i++)
+            for (int i = 0; i < row.Schema.Columns.Count; i++)
                 row.SetMin(i);
 
             Assert.False(row.GetBool("bool"));

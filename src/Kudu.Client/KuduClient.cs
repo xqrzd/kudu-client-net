@@ -15,7 +15,7 @@ using Kudu.Client.Util;
 
 namespace Kudu.Client
 {
-    public class KuduClient : IDisposable
+    public class KuduClient : IAsyncDisposable
     {
         /// <summary>
         /// The number of tablets to fetch from the master in a round trip when
@@ -472,14 +472,9 @@ namespace Kudu.Client
             cache.CacheTabletLocations(tablets, partitionKey);
         }
 
-        public async Task DisposeAsync()
+        public ValueTask DisposeAsync()
         {
-            await _connectionCache.DisposeAsync().ConfigureAwait(false);
-        }
-
-        public void Dispose()
-        {
-            DisposeAsync().GetAwaiter().GetResult();
+            return _connectionCache.DisposeAsync();
         }
 
         public static KuduClient Build(string masterAddresses)

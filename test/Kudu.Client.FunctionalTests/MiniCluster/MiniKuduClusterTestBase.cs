@@ -10,7 +10,7 @@ namespace Kudu.Client.FunctionalTests.MiniCluster
 
         public void Dispose()
         {
-            Client?.Dispose();
+            Client?.DisposeAsync().GetAwaiter().GetResult();
             MiniKuduCluster?.Dispose();
         }
 

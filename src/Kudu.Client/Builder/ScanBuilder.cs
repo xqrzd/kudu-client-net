@@ -6,32 +6,36 @@ namespace Kudu.Client.Builder
 {
     public class ScanBuilder
     {
-        internal KuduClient Client { get; }
-
-        internal KuduTable Table { get; }
+        internal readonly KuduClient Client;
+        internal readonly KuduTable Table;
 
         /// <summary>
         /// Map of column name to predicate.
         /// </summary>
-        internal Dictionary<string, KuduPredicate> Predicates { get; }
+        internal readonly Dictionary<string, KuduPredicate> Predicates;
 
-        internal List<string> ProjectedColumns { get; private set; }
-
-        internal ReadMode ReadMode { get; private set; } = ReadMode.ReadLatest;
-
-        internal ReplicaSelection ReplicaSelection { get; private set; } = ReplicaSelection.LeaderOnly;
-
-        internal int BatchSizeBytes { get; private set; } = 1024 * 1024;
-
-        internal long Limit { get; private set; } = long.MaxValue;
-
-        internal bool CacheBlocks { get; private set; } = true;
+        internal ReadMode ReadMode = ReadMode.ReadLatest;
+        internal bool IsFaultTolerant = false;
+        internal int BatchSizeBytes = 1024 * 1024;
+        internal long Limit = long.MaxValue;
+        internal bool CacheBlocks = true;
+        internal long StartTimestamp = -1;
+        internal long HtTimestamp = -1;
+        internal byte[] LowerBoundPrimaryKey;
+        internal byte[] UpperBoundPrimaryKey;
+        internal byte[] LowerBoundPartitionKey;
+        internal byte[] UpperBoundPartitionKey;
+        internal List<string> ProjectedColumns;
+        internal long ScanRequestTimeout;
+        internal ReplicaSelection ReplicaSelection = ReplicaSelection.LeaderOnly;
+        internal long KeepAlivePeriodMs = 15000;
 
         public ScanBuilder(KuduClient client, KuduTable table)
         {
             Client = client;
             Table = table;
             Predicates = new Dictionary<string, KuduPredicate>();
+            ScanRequestTimeout = -1; // TODO: Pull this from the client.
         }
 
         /// <summary>

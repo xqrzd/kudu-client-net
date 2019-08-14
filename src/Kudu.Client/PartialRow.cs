@@ -22,7 +22,7 @@ namespace Kudu.Client
         {
             Schema = schema;
 
-            var columnBitmapSize = BitsToBytes(schema.ColumnCount);
+            var columnBitmapSize = BitsToBytes(schema.Columns.Count);
             var headerSize = columnBitmapSize;
             if (schema.HasNullableColumns)
             {
@@ -101,7 +101,7 @@ namespace Kudu.Client
 
             int varLengthOffset = 0;
 
-            for (int i = 0; i < Schema.ColumnCount; i++)
+            for (int i = 0; i < Schema.Columns.Count; i++)
             {
                 if (IsSet(i) && !IsSetToNull(i))
                 {
@@ -776,7 +776,7 @@ namespace Kudu.Client
         {
             var size = _headerSize;
 
-            for (int i = 0; i < Schema.ColumnCount; i++)
+            for (int i = 0; i < Schema.Columns.Count; i++)
             {
                 if (IsSet(i) && !IsSetToNull(i))
                 {

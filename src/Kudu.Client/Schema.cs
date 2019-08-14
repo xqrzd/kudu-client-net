@@ -141,7 +141,7 @@ namespace Kudu.Client
             HasNullableColumns = hasNulls;
         }
 
-        public int ColumnCount => _columnsByIndex.Length;
+        public IReadOnlyList<ColumnSchema> Columns => _columnsByIndex;
 
         public int PrimaryKeyColumnCount => _primaryKeyColumns.Count;
 
@@ -161,6 +161,12 @@ namespace Kudu.Client
         public ColumnSchema GetColumn(string name) => GetColumn(GetColumnIndex(name));
 
         public int GetColumnIndex(int id) => _columnsById[id];
+
+        /// <summary>
+        /// Returns true if the column exists.
+        /// </summary>
+        /// <param name="columnName">Column to search for.</param>
+        public bool HasColumn(string columnName) => _columnsByName.ContainsKey(columnName);
 
         public static int GetTypeSize(KuduType type)
         {

@@ -19,7 +19,7 @@ namespace Kudu.Client.Tests
 
             var schema = GetSchema(builder);
 
-            Assert.Equal(1, schema.ColumnCount);
+            Assert.Equal(1, schema.Columns.Count);
             Assert.False(schema.HasNullableColumns);
             Assert.Equal(0, schema.VarLengthColumnCount);
             Assert.Equal(1, schema.RowAllocSize);
@@ -59,7 +59,7 @@ namespace Kudu.Client.Tests
 
             var schema = GetSchema(builder);
 
-            Assert.Equal(2, schema.ColumnCount);
+            Assert.Equal(2, schema.Columns.Count);
             Assert.True(schema.HasNullableColumns);
             Assert.Equal(2, schema.VarLengthColumnCount);
             Assert.Equal(0, schema.RowAllocSize);
@@ -141,7 +141,7 @@ namespace Kudu.Client.Tests
 
             var schema = GetSchema(builder);
 
-            Assert.Equal(7, schema.ColumnCount);
+            Assert.Equal(7, schema.Columns.Count);
             Assert.False(schema.HasNullableColumns);
             Assert.Equal(2, schema.VarLengthColumnCount);
             Assert.Equal(29, schema.RowAllocSize);
