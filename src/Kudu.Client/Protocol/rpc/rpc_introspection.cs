@@ -14,7 +14,7 @@ namespace Kudu.Client.Protocol.Rpc
             => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
 
         [global::ProtoBuf.ProtoMember(1, Name = @"header", IsRequired = true)]
-        public global::Kudu.Client.Protocol.Rpc.RequestHeader Header { get; set; }
+        public RequestHeader Header { get; set; }
 
         [global::ProtoBuf.ProtoMember(2, Name = @"trace_buffer")]
         [global::System.ComponentModel.DefaultValue("")]
@@ -203,14 +203,14 @@ namespace Kudu.Client.Protocol.Rpc
         private ulong? __pbn__ReceiveQueueBytes;
 
         [global::ProtoBuf.ProtoMember(13, Name = @"send_bytes_per_sec")]
-        public int SendBytesPerSec
+        public long SendBytesPerSec
         {
             get { return __pbn__SendBytesPerSec.GetValueOrDefault(); }
             set { __pbn__SendBytesPerSec = value; }
         }
         public bool ShouldSerializeSendBytesPerSec() => __pbn__SendBytesPerSec != null;
         public void ResetSendBytesPerSec() => __pbn__SendBytesPerSec = null;
-        private int? __pbn__SendBytesPerSec;
+        private long? __pbn__SendBytesPerSec;
 
     }
 
@@ -351,7 +351,7 @@ namespace Kudu.Client.Protocol.Rpc
             => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
 
         [global::ProtoBuf.ProtoMember(1, Name = @"header")]
-        public global::Kudu.Client.Protocol.Rpc.RequestHeader Header { get; set; }
+        public RequestHeader Header { get; set; }
 
         [global::ProtoBuf.ProtoMember(2, Name = @"trace")]
         [global::System.ComponentModel.DefaultValue("")]

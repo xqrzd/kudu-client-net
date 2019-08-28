@@ -16,6 +16,17 @@ namespace Kudu.Client.Protocol.Client
         [global::ProtoBuf.ProtoMember(1, Name = @"feature_flags")]
         public global::System.Collections.Generic.List<Feature> FeatureFlags { get; } = new global::System.Collections.Generic.List<Feature>();
 
+        [global::ProtoBuf.ProtoMember(20, Name = @"table_id")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string TableId
+        {
+            get { return __pbn__TableId ?? ""; }
+            set { __pbn__TableId = value; }
+        }
+        public bool ShouldSerializeTableId() => __pbn__TableId != null;
+        public void ResetTableId() => __pbn__TableId = null;
+        private string __pbn__TableId;
+
         [global::ProtoBuf.ProtoMember(2, Name = @"table_name")]
         [global::System.ComponentModel.DefaultValue("")]
         public string TableName
@@ -104,6 +115,16 @@ namespace Kudu.Client.Protocol.Client
         public void ResetSnapTimestamp() => __pbn__SnapTimestamp = null;
         private ulong? __pbn__SnapTimestamp;
 
+        [global::ProtoBuf.ProtoMember(19, Name = @"snap_start_timestamp", DataFormat = global::ProtoBuf.DataFormat.FixedSize)]
+        public ulong SnapStartTimestamp
+        {
+            get { return __pbn__SnapStartTimestamp.GetValueOrDefault(); }
+            set { __pbn__SnapStartTimestamp = value; }
+        }
+        public bool ShouldSerializeSnapStartTimestamp() => __pbn__SnapStartTimestamp != null;
+        public void ResetSnapStartTimestamp() => __pbn__SnapStartTimestamp = null;
+        private ulong? __pbn__SnapStartTimestamp;
+
         [global::ProtoBuf.ProtoMember(12, Name = @"propagated_timestamp", DataFormat = global::ProtoBuf.DataFormat.FixedSize)]
         public ulong PropagatedTimestamp
         {
@@ -166,6 +187,16 @@ namespace Kudu.Client.Protocol.Client
         public bool ShouldSerializeScanRequestTimeoutMs() => __pbn__ScanRequestTimeoutMs != null;
         public void ResetScanRequestTimeoutMs() => __pbn__ScanRequestTimeoutMs = null;
         private long? __pbn__ScanRequestTimeoutMs;
+
+        [global::ProtoBuf.ProtoMember(18, Name = @"keep_alive_period_ms")]
+        public long KeepAlivePeriodMs
+        {
+            get { return __pbn__KeepAlivePeriodMs.GetValueOrDefault(); }
+            set { __pbn__KeepAlivePeriodMs = value; }
+        }
+        public bool ShouldSerializeKeepAlivePeriodMs() => __pbn__KeepAlivePeriodMs != null;
+        public void ResetKeepAlivePeriodMs() => __pbn__KeepAlivePeriodMs = null;
+        private long? __pbn__KeepAlivePeriodMs;
 
         [global::ProtoBuf.ProtoContract()]
         public enum Feature

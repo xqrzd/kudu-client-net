@@ -123,6 +123,9 @@ namespace Kudu.Client.Protocol.Tserver
         public void ResetPropagatedTimestamp() => __pbn__PropagatedTimestamp = null;
         private ulong? __pbn__PropagatedTimestamp;
 
+        [global::ProtoBuf.ProtoMember(6, Name = @"authz_token")]
+        public global::Kudu.Client.Protocol.Security.SignedTokenPB AuthzToken { get; set; }
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -322,6 +325,16 @@ namespace Kudu.Client.Protocol.Tserver
         public void ResetReadMode() => __pbn__ReadMode = null;
         private global::Kudu.Client.Protocol.ReadModePB? __pbn__ReadMode;
 
+        [global::ProtoBuf.ProtoMember(16, Name = @"snap_start_timestamp", DataFormat = global::ProtoBuf.DataFormat.FixedSize)]
+        public ulong SnapStartTimestamp
+        {
+            get { return __pbn__SnapStartTimestamp.GetValueOrDefault(); }
+            set { __pbn__SnapStartTimestamp = value; }
+        }
+        public bool ShouldSerializeSnapStartTimestamp() => __pbn__SnapStartTimestamp != null;
+        public void ResetSnapStartTimestamp() => __pbn__SnapStartTimestamp = null;
+        private ulong? __pbn__SnapStartTimestamp;
+
         [global::ProtoBuf.ProtoMember(6, Name = @"snap_timestamp", DataFormat = global::ProtoBuf.DataFormat.FixedSize)]
         public ulong SnapTimestamp
         {
@@ -384,6 +397,9 @@ namespace Kudu.Client.Protocol.Tserver
         public bool ShouldSerializeRowFormatFlags() => __pbn__RowFormatFlags != null;
         public void ResetRowFormatFlags() => __pbn__RowFormatFlags = null;
         private ulong? __pbn__RowFormatFlags;
+
+        [global::ProtoBuf.ProtoMember(15, Name = @"authz_token")]
+        public global::Kudu.Client.Protocol.Security.SignedTokenPB AuthzToken { get; set; }
 
     }
 
@@ -602,6 +618,9 @@ namespace Kudu.Client.Protocol.Tserver
 
         [global::ProtoBuf.ProtoMember(5, Name = @"columns")]
         public global::System.Collections.Generic.List<global::Kudu.Client.Protocol.ColumnSchemaPB> Columns { get; } = new global::System.Collections.Generic.List<global::Kudu.Client.Protocol.ColumnSchemaPB>();
+
+        [global::ProtoBuf.ProtoMember(6, Name = @"authz_token")]
+        public global::Kudu.Client.Protocol.Security.SignedTokenPB AuthzToken { get; set; }
 
     }
 

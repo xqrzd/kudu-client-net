@@ -352,6 +352,8 @@ namespace Kudu.Client.Protocol.Rpc
             ErrorRequestStale = 6,
             [global::ProtoBuf.ProtoEnum(Name = @"ERROR_UNAVAILABLE")]
             ErrorUnavailable = 7,
+            [global::ProtoBuf.ProtoEnum(Name = @"ERROR_INVALID_AUTHORIZATION_TOKEN")]
+            ErrorInvalidAuthorizationToken = 17,
             [global::ProtoBuf.ProtoEnum(Name = @"FATAL_SERVER_SHUTTING_DOWN")]
             FatalServerShuttingDown = 11,
             [global::ProtoBuf.ProtoEnum(Name = @"FATAL_INVALID_RPC_HEADER")]

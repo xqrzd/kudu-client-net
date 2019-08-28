@@ -48,6 +48,8 @@ namespace Kudu.Client.Protocol.Master
             IncompatibleReplicaManagement = 12,
             [global::ProtoBuf.ProtoEnum(Name = @"HIVE_METASTORE_ERROR")]
             HiveMetastoreError = 13,
+            [global::ProtoBuf.ProtoEnum(Name = @"NOT_AUTHORIZED")]
+            NotAuthorized = 14,
         }
 
     }
@@ -225,6 +227,29 @@ namespace Kudu.Client.Protocol.Master
         public bool ShouldSerializeStateMsg() => __pbn__StateMsg != null;
         public void ResetStateMsg() => __pbn__StateMsg = null;
         private byte[] __pbn__StateMsg;
+
+        [global::ProtoBuf.ProtoMember(10, Name = @"create_timestamp")]
+        public long CreateTimestamp
+        {
+            get { return __pbn__CreateTimestamp.GetValueOrDefault(); }
+            set { __pbn__CreateTimestamp = value; }
+        }
+        public bool ShouldSerializeCreateTimestamp() => __pbn__CreateTimestamp != null;
+        public void ResetCreateTimestamp() => __pbn__CreateTimestamp = null;
+        private long? __pbn__CreateTimestamp;
+
+        [global::ProtoBuf.ProtoMember(11, Name = @"alter_timestamp")]
+        public long AlterTimestamp
+        {
+            get { return __pbn__AlterTimestamp.GetValueOrDefault(); }
+            set { __pbn__AlterTimestamp = value; }
+        }
+        public bool ShouldSerializeAlterTimestamp() => __pbn__AlterTimestamp != null;
+        public void ResetAlterTimestamp() => __pbn__AlterTimestamp = null;
+        private long? __pbn__AlterTimestamp;
+
+        [global::ProtoBuf.ProtoMember(12, Name = @"extra_config")]
+        public global::Kudu.Client.Protocol.TableExtraConfigPB ExtraConfig { get; set; }
 
         [global::ProtoBuf.ProtoContract()]
         public enum State
@@ -566,6 +591,9 @@ namespace Kudu.Client.Protocol.Master
         [global::ProtoBuf.ProtoMember(4, Name = @"replicas")]
         public global::System.Collections.Generic.List<ReplicaPB> Replicas { get; } = new global::System.Collections.Generic.List<ReplicaPB>();
 
+        [global::ProtoBuf.ProtoMember(7, Name = @"interned_replicas")]
+        public global::System.Collections.Generic.List<InternedReplicaPB> InternedReplicas { get; } = new global::System.Collections.Generic.List<InternedReplicaPB>();
+
         [global::ProtoBuf.ProtoMember(5, Name = @"DEPRECATED_stale")]
         public bool DEPRECATEDstale
         {
@@ -585,6 +613,21 @@ namespace Kudu.Client.Protocol.Master
 
             [global::ProtoBuf.ProtoMember(1, Name = @"ts_info", IsRequired = true)]
             public TSInfoPB TsInfo { get; set; }
+
+            [global::ProtoBuf.ProtoMember(2, Name = @"role", IsRequired = true)]
+            public global::Kudu.Client.Protocol.Consensus.RaftPeerPB.Role Role { get; set; } = global::Kudu.Client.Protocol.Consensus.RaftPeerPB.Role.UnknownRole;
+
+        }
+
+        [global::ProtoBuf.ProtoContract()]
+        public partial class InternedReplicaPB : global::ProtoBuf.IExtensible
+        {
+            private global::ProtoBuf.IExtension __pbn__extensionData;
+            global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+                => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+            [global::ProtoBuf.ProtoMember(1, Name = @"ts_info_idx", IsRequired = true)]
+            public uint TsInfoIdx { get; set; }
 
             [global::ProtoBuf.ProtoMember(2, Name = @"role", IsRequired = true)]
             public global::Kudu.Client.Protocol.Consensus.RaftPeerPB.Role Role { get; set; } = global::Kudu.Client.Protocol.Consensus.RaftPeerPB.Role.UnknownRole;
@@ -714,6 +757,10 @@ namespace Kudu.Client.Protocol.Master
         public bool ShouldSerializeOwner() => __pbn__Owner != null;
         public void ResetOwner() => __pbn__Owner = null;
         private string __pbn__Owner;
+
+        [global::ProtoBuf.ProtoMember(9, Name = @"extra_configs")]
+        [global::ProtoBuf.ProtoMap]
+        public global::System.Collections.Generic.Dictionary<string, string> ExtraConfigs { get; } = new global::System.Collections.Generic.Dictionary<string, string>();
 
     }
 
@@ -910,6 +957,17 @@ namespace Kudu.Client.Protocol.Master
         public void ResetReplicaTypeFilter() => __pbn__ReplicaTypeFilter = null;
         private ReplicaTypeFilter? __pbn__ReplicaTypeFilter;
 
+        [global::ProtoBuf.ProtoMember(7, Name = @"intern_ts_infos_in_response")]
+        [global::System.ComponentModel.DefaultValue(false)]
+        public bool InternTsInfosInResponse
+        {
+            get { return __pbn__InternTsInfosInResponse ?? false; }
+            set { __pbn__InternTsInfosInResponse = value; }
+        }
+        public bool ShouldSerializeInternTsInfosInResponse() => __pbn__InternTsInfosInResponse != null;
+        public void ResetInternTsInfosInResponse() => __pbn__InternTsInfosInResponse = null;
+        private bool? __pbn__InternTsInfosInResponse;
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -924,6 +982,9 @@ namespace Kudu.Client.Protocol.Master
 
         [global::ProtoBuf.ProtoMember(2, Name = @"tablet_locations")]
         public global::System.Collections.Generic.List<TabletLocationsPB> TabletLocations { get; } = new global::System.Collections.Generic.List<TabletLocationsPB>();
+
+        [global::ProtoBuf.ProtoMember(4, Name = @"ts_infos")]
+        public global::System.Collections.Generic.List<TSInfoPB> TsInfos { get; } = new global::System.Collections.Generic.List<TSInfoPB>();
 
         [global::ProtoBuf.ProtoMember(3, Name = @"ttl_millis")]
         [global::System.ComponentModel.DefaultValue(36000000)]
@@ -975,6 +1036,10 @@ namespace Kudu.Client.Protocol.Master
         public bool ShouldSerializeModifyExternalCatalogs() => __pbn__ModifyExternalCatalogs != null;
         public void ResetModifyExternalCatalogs() => __pbn__ModifyExternalCatalogs = null;
         private bool? __pbn__ModifyExternalCatalogs;
+
+        [global::ProtoBuf.ProtoMember(6, Name = @"new_extra_configs")]
+        [global::ProtoBuf.ProtoMap]
+        public global::System.Collections.Generic.Dictionary<string, string> NewExtraConfigs { get; } = new global::System.Collections.Generic.Dictionary<string, string>();
 
         [global::ProtoBuf.ProtoContract()]
         public partial class AddColumn : global::ProtoBuf.IExtensible
@@ -1245,6 +1310,13 @@ namespace Kudu.Client.Protocol.Master
         public void ResetTableName() => __pbn__TableName = null;
         private string __pbn__TableName;
 
+        [global::ProtoBuf.ProtoMember(8, Name = @"authz_token")]
+        public global::Kudu.Client.Protocol.Security.SignedTokenPB AuthzToken { get; set; }
+
+        [global::ProtoBuf.ProtoMember(9, Name = @"extra_configs")]
+        [global::ProtoBuf.ProtoMap]
+        public global::System.Collections.Generic.Dictionary<string, string> ExtraConfigs { get; } = new global::System.Collections.Generic.Dictionary<string, string>();
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -1510,6 +1582,27 @@ namespace Kudu.Client.Protocol.Master
     }
 
     [global::ProtoBuf.ProtoContract()]
+    public partial class ResetAuthzCacheRequestPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class ResetAuthzCacheResponsePB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"error")]
+        public MasterErrorPB Error { get; set; }
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
     public enum ReplicaTypeFilter
     {
         [global::ProtoBuf.ProtoEnum(Name = @"UNKNOWN")]
@@ -1533,6 +1626,8 @@ namespace Kudu.Client.Protocol.Master
         ConnectToMaster = 3,
         [global::ProtoBuf.ProtoEnum(Name = @"REPLICA_MANAGEMENT")]
         ReplicaManagement = 4,
+        [global::ProtoBuf.ProtoEnum(Name = @"GENERATE_AUTHZ_TOKEN")]
+        GenerateAuthzToken = 5,
     }
 
 }

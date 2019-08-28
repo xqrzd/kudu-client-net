@@ -135,6 +135,16 @@ namespace Kudu.Client.Protocol
         public void ResetHttpsEnabled() => __pbn__HttpsEnabled = null;
         private bool? __pbn__HttpsEnabled;
 
+        [global::ProtoBuf.ProtoMember(5, Name = @"start_time")]
+        public long StartTime
+        {
+            get { return __pbn__StartTime.GetValueOrDefault(); }
+            set { __pbn__StartTime = value; }
+        }
+        public bool ShouldSerializeStartTime() => __pbn__StartTime != null;
+        public void ResetStartTime() => __pbn__StartTime = null;
+        private long? __pbn__StartTime;
+
     }
 
     [global::ProtoBuf.ProtoContract()]

@@ -136,6 +136,17 @@ namespace Kudu.Client.Protocol
         [global::ProtoBuf.ProtoMember(11, Name = @"type_attributes")]
         public ColumnTypeAttributesPB TypeAttributes { get; set; }
 
+        [global::ProtoBuf.ProtoMember(12, Name = @"comment")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string Comment
+        {
+            get { return __pbn__Comment ?? ""; }
+            set { __pbn__Comment = value; }
+        }
+        public bool ShouldSerializeComment() => __pbn__Comment != null;
+        public void ResetComment() => __pbn__Comment = null;
+        private string __pbn__Comment;
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -218,6 +229,17 @@ namespace Kudu.Client.Protocol
         public bool ShouldSerializeBlockSize() => __pbn__BlockSize != null;
         public void ResetBlockSize() => __pbn__BlockSize = null;
         private int? __pbn__BlockSize;
+
+        [global::ProtoBuf.ProtoMember(9, Name = @"new_comment")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string NewComment
+        {
+            get { return __pbn__NewComment ?? ""; }
+            set { __pbn__NewComment = value; }
+        }
+        public bool ShouldSerializeNewComment() => __pbn__NewComment != null;
+        public void ResetNewComment() => __pbn__NewComment = null;
+        private string __pbn__NewComment;
 
     }
 
@@ -632,6 +654,25 @@ namespace Kudu.Client.Protocol
     }
 
     [global::ProtoBuf.ProtoContract()]
+    public partial class TableExtraConfigPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"history_max_age_sec")]
+        public int HistoryMaxAgeSec
+        {
+            get { return __pbn__HistoryMaxAgeSec.GetValueOrDefault(); }
+            set { __pbn__HistoryMaxAgeSec = value; }
+        }
+        public bool ShouldSerializeHistoryMaxAgeSec() => __pbn__HistoryMaxAgeSec != null;
+        public void ResetHistoryMaxAgeSec() => __pbn__HistoryMaxAgeSec = null;
+        private int? __pbn__HistoryMaxAgeSec;
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
     public enum DataTypePB
     {
         [global::ProtoBuf.ProtoEnum(Name = @"UNKNOWN_DATA")]
@@ -702,6 +743,8 @@ namespace Kudu.Client.Protocol
     {
         [global::ProtoBuf.ProtoEnum(Name = @"NONE")]
         None = 0,
+        [global::ProtoBuf.ProtoEnum(Name = @"DISABLE_HIVE_METASTORE")]
+        DisableHiveMetastore = 3,
         [global::ProtoBuf.ProtoEnum(Name = @"ENABLE_HIVE_METASTORE")]
         EnableHiveMetastore = 1,
         [global::ProtoBuf.ProtoEnum(Name = @"ENABLE_METASTORE_INTEGRATION")]

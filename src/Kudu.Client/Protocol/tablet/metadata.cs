@@ -88,6 +88,16 @@ namespace Kudu.Client.Protocol.Tablet
         public void ResetMaxEncodedKey() => __pbn__MaxEncodedKey = null;
         private byte[] __pbn__MaxEncodedKey;
 
+        [global::ProtoBuf.ProtoMember(10, Name = @"live_row_count")]
+        public long LiveRowCount
+        {
+            get { return __pbn__LiveRowCount.GetValueOrDefault(); }
+            set { __pbn__LiveRowCount = value; }
+        }
+        public bool ShouldSerializeLiveRowCount() => __pbn__LiveRowCount != null;
+        public void ResetLiveRowCount() => __pbn__LiveRowCount = null;
+        private long? __pbn__LiveRowCount;
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -163,6 +173,19 @@ namespace Kudu.Client.Protocol.Tablet
 
         [global::ProtoBuf.ProtoMember(15, Name = @"data_dir_group")]
         public global::Kudu.Client.Protocol.DataDirGroupPB DataDirGroup { get; set; }
+
+        [global::ProtoBuf.ProtoMember(16, Name = @"supports_live_row_count")]
+        public bool SupportsLiveRowCount
+        {
+            get { return __pbn__SupportsLiveRowCount.GetValueOrDefault(); }
+            set { __pbn__SupportsLiveRowCount = value; }
+        }
+        public bool ShouldSerializeSupportsLiveRowCount() => __pbn__SupportsLiveRowCount != null;
+        public void ResetSupportsLiveRowCount() => __pbn__SupportsLiveRowCount = null;
+        private bool? __pbn__SupportsLiveRowCount;
+
+        [global::ProtoBuf.ProtoMember(17, Name = @"extra_config")]
+        public global::Kudu.Client.Protocol.TableExtraConfigPB ExtraConfig { get; set; }
 
     }
 

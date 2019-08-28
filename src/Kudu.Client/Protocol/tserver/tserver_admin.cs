@@ -43,6 +43,9 @@ namespace Kudu.Client.Protocol.Tserver
         public void ResetNewTableName() => __pbn__NewTableName = null;
         private string __pbn__NewTableName;
 
+        [global::ProtoBuf.ProtoMember(6, Name = @"new_extra_config")]
+        public global::Kudu.Client.Protocol.TableExtraConfigPB NewExtraConfig { get; set; }
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -124,6 +127,9 @@ namespace Kudu.Client.Protocol.Tserver
 
         [global::ProtoBuf.ProtoMember(7, Name = @"config", IsRequired = true)]
         public global::Kudu.Client.Protocol.Consensus.RaftConfigPB Config { get; set; }
+
+        [global::ProtoBuf.ProtoMember(11, Name = @"extra_config")]
+        public global::Kudu.Client.Protocol.TableExtraConfigPB ExtraConfig { get; set; }
 
     }
 

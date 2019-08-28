@@ -212,6 +212,9 @@ namespace Kudu.Client.Protocol.Tablet
         public void ResetEstimatedOnDiskSize() => __pbn__EstimatedOnDiskSize = null;
         private long? __pbn__EstimatedOnDiskSize;
 
+        [global::ProtoBuf.ProtoMember(10, Name = @"data_dirs")]
+        public global::System.Collections.Generic.List<byte[]> DataDirs { get; } = new global::System.Collections.Generic.List<byte[]>();
+
     }
 
 }
