@@ -10,13 +10,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Pipelines.Sockets.Unofficial" Version="2.0.22" />
-    <PackageReference Include="protobuf-net" Version="3.0.0-alpha.43" />
-    <PackageReference Include="System.IO.Pipelines" Version="4.6.0-preview8.19405.3" />
+    <PackageReference Include="Pipelines.Sockets.Unofficial" Version="2.0.25" />
+    <PackageReference Include="protobuf-net" Version="3.0.0-alpha.58" />
+    <PackageReference Include="System.IO.Pipelines" Version="4.6.0-rc1.19456.4" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)'=='netcoreapp2.1'">
-    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="1.0.0-preview8.19405.3" />
+  <ItemGroup Condition="'$(TargetFramework)'=='netcoreapp2.1' OR '$(TargetFramework)'=='netstandard2.0' OR '$(TargetFramework)'=='netstandard2.1' ">
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="1.0.0-rc1.19456.4" />
   </ItemGroup>
 
   <ItemGroup>

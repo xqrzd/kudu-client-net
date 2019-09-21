@@ -2,15 +2,14 @@
 
 namespace Kudu.Client.Requests
 {
-    public class WriteRequest : KuduRpc<WriteRequestPB, WriteResponsePB>
+    public class WriteRequest : KuduTabletRpc<WriteRequestPB, WriteResponsePB>
     {
-        public override string ServiceName => TabletServerServiceName;
-
         public override string MethodName => "Write";
 
-        public WriteRequest(WriteRequestPB request)
+        public WriteRequest(WriteRequestPB request, string tableId)
         {
             Request = request;
+            TableId = tableId;
         }
     }
 }

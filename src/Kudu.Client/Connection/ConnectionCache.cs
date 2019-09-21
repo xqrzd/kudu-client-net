@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Kudu.Client.Exceptions;
 
 namespace Kudu.Client.Connection
 {
@@ -11,7 +12,7 @@ namespace Kudu.Client.Connection
     {
         private readonly IKuduConnectionFactory _connectionFactory;
         private readonly Dictionary<IPEndPoint, Task<KuduConnection>> _connections;
-        private bool _disposed;
+        private volatile bool _disposed;
 
         public ConnectionCache(IKuduConnectionFactory connectionFactory)
         {
@@ -19,79 +20,94 @@ namespace Kudu.Client.Connection
             _connections = new Dictionary<IPEndPoint, Task<KuduConnection>>();
         }
 
-        public Task<KuduConnection> GetConnectionAsync(
+        public async Task<KuduConnection> GetConnectionAsync(
             ServerInfo serverInfo, CancellationToken cancellationToken = default)
         {
-            var endpoint = serverInfo.Endpoint;
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(ConnectionCache));
+
+            IPEndPoint endpoint = serverInfo.Endpoint;
+            Task<KuduConnection> connectionTask;
 
             lock (_connections)
             {
-                if (_disposed)
-                    throw new ObjectDisposedException(nameof(ConnectionCache));
-
-                if (_connections.TryGetValue(endpoint, out var connection))
+                if (!_connections.TryGetValue(endpoint, out connectionTask))
                 {
-                    // Don't hand out connections we know are faulted, create a new one instead.
-                    // The client may still get a faulted connection (if the task hasn't completed yet),
-                    // but in that case, the client is responsible for retrying.
-                    if (!connection.IsFaulted)
-                        return connection;
+                    connectionTask = ConnectAsync(serverInfo, cancellationToken);
+                    _connections.Add(endpoint, connectionTask);
                 }
+            }
 
-                var task = ConnectAsync(serverInfo, cancellationToken);
-                _connections[endpoint] = task;
-                return task;
+            try
+            {
+                return await connectionTask.ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                // Failed to negotiate a new connection.
+                RemoveFaultedConnection(serverInfo, skipTaskStatusCheck: false);
+
+                // The upper-level caller should handle the exception and retry using a new connection.
+                throw new RecoverableException(
+                    KuduStatus.IllegalState("Connection is disconnected."), ex);
             }
         }
 
         private async Task<KuduConnection> ConnectAsync(
-            ServerInfo serverInfo, CancellationToken cancellationToken)
+            ServerInfo serverInfo, CancellationToken cancellationToken = default)
         {
-            var connection = await _connectionFactory
+            KuduConnection connection = await _connectionFactory
                 .ConnectAsync(serverInfo, cancellationToken).ConfigureAwait(false);
 
-            // Once we have a KuduConnection, register a callback when it's closed,
-            // so we can remove it from the connection cache.
-            connection.OnDisconnected(RemoveConnection, serverInfo);
+            connection.OnDisconnected((exception, state) => RemoveFaultedConnection(
+                (ServerInfo)state, skipTaskStatusCheck: true), serverInfo);
 
             return connection;
         }
 
-        private void RemoveConnection(Exception ex, object state)
+        private void RemoveFaultedConnection(ServerInfo serverInfo, bool skipTaskStatusCheck)
         {
-            var serverInfo = (ServerInfo)state;
+            IPEndPoint endpoint = serverInfo.Endpoint;
 
             lock (_connections)
             {
-                // We're here because the connection's OnConnectionClosed
-                // was raised. Remove this connection from the cache, so the
-                // next time someone requests a connection they get a new one.
-                if (_connections.Remove(serverInfo.Endpoint))
+                if (skipTaskStatusCheck)
                 {
-                    Console.WriteLine($"Connection disconnected, removing from cache {serverInfo.HostPort} {ex}");
+                    _connections.Remove(endpoint);
                 }
-
-                // Note that connections clean themselves up when disconnected,
-                // so we don't need to dispose the connection here.
+                else
+                {
+                    if (_connections.TryGetValue(endpoint, out Task<KuduConnection> connectionTask))
+                    {
+                        // Someone else might have already replaced the faulted connection.
+                        // Confirm that the connection we're about to remove is faulted.
+                        if (connectionTask.IsFaulted)
+                        {
+                            _connections.Remove(endpoint);
+                        }
+                    }
+                }
             }
         }
 
         public async ValueTask DisposeAsync()
         {
+            _disposed = true;
             List<Task<KuduConnection>> connections;
 
             lock (_connections)
             {
                 connections = _connections.Values.ToList();
                 _connections.Clear();
-                _disposed = true;
             }
 
             foreach (var connectionTask in connections)
             {
                 try
                 {
-                    var connection = await connectionTask.ConfigureAwait(false);
+                    // TODO: Cancellation token support so we can cancel
+                    // any connections still in the negotiation phase?
+                    KuduConnection connection = await connectionTask.ConfigureAwait(false);
                     await connection.StopAsync().ConfigureAwait(false);
                 }
                 catch { }

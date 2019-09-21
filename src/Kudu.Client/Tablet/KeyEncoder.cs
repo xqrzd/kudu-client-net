@@ -10,6 +10,25 @@ namespace Kudu.Client.Tablet
 {
     public static partial class KeyEncoder
     {
+        /// <summary>
+        /// Encodes the primary key of the row.
+        /// </summary>
+        /// <param name="row">The row to encode.</param>
+        public static byte[] EncodePrimaryKey(PartialRow row)
+        {
+            var schema = row.Schema;
+            int primaryKeyColumnCount = schema.PrimaryKeyColumnCount;
+            using var writer = new BufferWriter(256);
+
+            for (int columnIdx = 0; columnIdx < primaryKeyColumnCount; columnIdx++)
+            {
+                bool isLast = columnIdx + 1 == primaryKeyColumnCount;
+                EncodeColumn(row, columnIdx, isLast, writer);
+            }
+
+            return writer.Memory.ToArray();
+        }
+
         public static void EncodePartitionKey(
             PartialRow row, PartitionSchema partitionSchema, BufferWriter writer)
         {
@@ -27,13 +46,11 @@ namespace Kudu.Client.Tablet
 
         public static int GetHashBucket(PartialRow row, HashBucketSchema hashSchema)
         {
-            using (var writer = new BufferWriter(256))
-            {
-                EncodeColumns(row, hashSchema.ColumnIds, writer);
-                var hash = Murmur2.Hash64(writer.Memory.Span, hashSchema.Seed);
-                var bucket = hash % (uint)hashSchema.NumBuckets;
-                return (int)bucket;
-            }
+            using var writer = new BufferWriter(256);
+            EncodeColumns(row, hashSchema.ColumnIds, writer);
+            var hash = Murmur2.Hash64(writer.Memory.Span, hashSchema.Seed);
+            var bucket = hash % (uint)hashSchema.NumBuckets;
+            return (int)bucket;
         }
 
         /// <summary>

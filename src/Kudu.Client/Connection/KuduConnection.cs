@@ -17,18 +17,19 @@ namespace Kudu.Client.Connection
     {
         private readonly IDuplexPipe _ioPipe;
         private readonly SemaphoreSlim _singleWriter;
-        private readonly Dictionary<int, InflightMessage> _inflightMessages;
+        private readonly Dictionary<int, InflightRpc> _inflightRpcs;
         private readonly Task _receiveTask;
 
         private int _nextCallId;
         private bool _closed;
         private Exception _closedException;
+        private DisconnectedCallback _disconnectedCallback;
 
         public KuduConnection(IDuplexPipe ioPipe)
         {
             _ioPipe = ioPipe;
             _singleWriter = new SemaphoreSlim(1, 1);
-            _inflightMessages = new Dictionary<int, InflightMessage>();
+            _inflightRpcs = new Dictionary<int, InflightRpc>();
             _nextCallId = 0;
 
             _receiveTask = ReceiveAsync();
@@ -36,30 +37,44 @@ namespace Kudu.Client.Connection
 
         public void OnDisconnected(Action<Exception, object> callback, object state)
         {
-            _ioPipe.Input.OnWriterCompleted(callback, state);
+            lock (_inflightRpcs)
+            {
+                _disconnectedCallback = new DisconnectedCallback(callback, state);
+
+                if (_closed)
+                {
+                    // Guarantee the disconnected callback is invoked if
+                    // the connection is already closed.
+                    InvokeDisconnectedCallback(_closedException);
+                }
+            }
         }
 
         public async Task SendReceiveAsync(RequestHeader header, KuduRpc rpc)
         {
-            var message = new InflightMessage(rpc);
-            lock (_inflightMessages)
+            var message = new InflightRpc(rpc);
+
+            lock (_inflightRpcs)
             {
                 if (_closed)
                 {
-                    // This connection is closed. The RPC needs to be retried
-                    // on another connection.
-                    throw _closedException;
+                    // The upper-level caller should handle the exception
+                    // and retry using a new connection.
+                    throw new RecoverableException(
+                        KuduStatus.IllegalState("Connection is disconnected."), _closedException);
                 }
 
                 header.CallId = _nextCallId++;
 
-                _inflightMessages.Add(header.CallId, message);
+                _inflightRpcs.Add(header.CallId, message);
             }
+
             await SendAsync(header, rpc).ConfigureAwait(false);
+
             await message.Task.ConfigureAwait(false);
         }
 
-        private async ValueTask<FlushResult> SendAsync(RequestHeader header, KuduRpc rpc)
+        private async ValueTask SendAsync(RequestHeader header, KuduRpc rpc)
         {
             // TODO: Use PipeWriter once protobuf-net supports it.
             using (var stream = new RecyclableMemoryStream())
@@ -74,18 +89,18 @@ namespace Kudu.Client.Connection
                 // bytes we already allocated to store the length.
                 BinaryPrimitives.WriteUInt32BigEndian(stream.AsSpan(), (uint)stream.Length - 4);
 
-                return await WriteAsync(stream.AsMemory()).ConfigureAwait(false);
+                await WriteAsync(stream.AsMemory()).ConfigureAwait(false);
             }
         }
 
-        private async ValueTask<FlushResult> WriteAsync(ReadOnlyMemory<byte> source)
+        private async ValueTask WriteAsync(ReadOnlyMemory<byte> source)
         {
             // TODO: CancellationToken support.
             PipeWriter output = _ioPipe.Output;
             await _singleWriter.WaitAsync().ConfigureAwait(false);
             try
             {
-                return await output.WriteAsync(source).ConfigureAwait(false);
+                await output.WriteAsync(source).ConfigureAwait(false);
             }
             finally
             {
@@ -102,7 +117,7 @@ namespace Kudu.Client.Connection
             {
                 while (true)
                 {
-                    var result = await input.ReadAsync().ConfigureAwait(false);
+                    ReadResult result = await input.ReadAsync().ConfigureAwait(false);
 
                     if (result.IsCanceled || result.IsCompleted)
                         break;
@@ -128,7 +143,7 @@ namespace Kudu.Client.Connection
             {
                 if (KuduProtocol.TryParseMessage(ref buffer, parserContext))
                 {
-                    var header = parserContext.Header;
+                    ResponseHeader header = parserContext.Header;
                     var messageLength = parserContext.ProtobufMessageLength;
                     var messageProtobuf = buffer.Slice(0, messageLength);
                     var success = TryGetRpc(header, messageProtobuf, out var message);
@@ -158,7 +173,7 @@ namespace Kudu.Client.Connection
 
         private async Task ProcessSidecarsAsync(
             PipeReader input,
-            InflightMessage message,
+            InflightRpc message,
             ResponseHeader header,
             int length)
         {
@@ -177,13 +192,13 @@ namespace Kudu.Client.Connection
             }
         }
 
-        private bool TryGetRpc(ResponseHeader header, ReadOnlySequence<byte> buffer, out InflightMessage message)
+        private bool TryGetRpc(ResponseHeader header, ReadOnlySequence<byte> buffer, out InflightRpc message)
         {
             bool success;
 
-            lock (_inflightMessages)
+            lock (_inflightRpcs)
             {
-                success = _inflightMessages.Remove(header.CallId, out message);
+                success = _inflightRpcs.Remove(header.CallId, out message);
             }
 
             if (!success)
@@ -215,15 +230,17 @@ namespace Kudu.Client.Connection
         {
             var closedException = new ConnectionClosedException(_ioPipe.ToString(), exception);
 
-            lock (_inflightMessages)
+            lock (_inflightRpcs)
             {
                 _closed = true;
                 _closedException = closedException;
 
-                foreach (var inflightMessage in _inflightMessages.Values)
+                foreach (var inflightMessage in _inflightRpcs.Values)
                     inflightMessage.CompleteWithError(closedException);
 
-                _inflightMessages.Clear();
+                InvokeDisconnectedCallback(closedException);
+
+                _inflightRpcs.Clear();
             }
 
             (_ioPipe as IDisposable)?.Dispose();
@@ -246,11 +263,19 @@ namespace Kudu.Client.Connection
             return _receiveTask;
         }
 
-        private sealed class InflightMessage : TaskCompletionSource<KuduRpc>
+        /// <summary>
+        /// The caller must hold the _inflightMessages lock.
+        /// </summary>
+        private void InvokeDisconnectedCallback(Exception exception)
+        {
+            try { _disconnectedCallback.Invoke(exception); } catch { }
+        }
+
+        private sealed class InflightRpc : TaskCompletionSource<KuduRpc>
         {
             public KuduRpc Rpc { get; }
 
-            public InflightMessage(KuduRpc rpc)
+            public InflightRpc(KuduRpc rpc)
                 : base(TaskCreationOptions.RunContinuationsAsynchronously)
             {
                 Rpc = rpc;
@@ -259,6 +284,20 @@ namespace Kudu.Client.Connection
             public void Complete() => TrySetResult(Rpc);
 
             public void CompleteWithError(Exception exception) => TrySetException(exception);
+        }
+
+        private readonly struct DisconnectedCallback
+        {
+            private readonly Action<Exception, object> _callback;
+            private readonly object _state;
+
+            public DisconnectedCallback(Action<Exception, object> callback, object state)
+            {
+                _callback = callback;
+                _state = state;
+            }
+
+            public void Invoke(Exception exception) => _callback?.Invoke(exception, _state);
         }
     }
 }

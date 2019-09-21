@@ -7,6 +7,7 @@ using System.Text;
 using Kudu.Client.Connection;
 using Kudu.Client.Protocol;
 using Kudu.Client.Protocol.Rpc;
+using ProtoBuf;
 
 namespace Kudu.Client.Util
 {
@@ -102,6 +103,11 @@ namespace Kudu.Client.Util
         {
             return negotiatePb.SupportedFeatures != null &&
                 negotiatePb.SupportedFeatures.Contains(flag);
+        }
+
+        public static T Deserialize<T>(this ProtoReader source, ref ProtoReader.State state)
+        {
+            return (T)source.Model.Deserialize(source, ref state, null, typeof(T));
         }
     }
 }

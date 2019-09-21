@@ -40,7 +40,8 @@ namespace Kudu.Client.Connection
                     }
                 case ParseStep.ReadHeader:
                     {
-                        if (TryParseResponseHeader(ref buffer, parserContext.HeaderLength, out parserContext.Header))
+                        if (TryParseResponseHeader(
+                            ref buffer, parserContext.HeaderLength, out parserContext.Header))
                         {
                             goto case ParseStep.ReadMainMessageLength;
                         }
@@ -84,7 +85,7 @@ namespace Kudu.Client.Connection
         }
 
         private static bool TryParseResponseHeader(
-            ref ReadOnlySequence<byte> buffer, uint length, out ResponseHeader header)
+            ref ReadOnlySequence<byte> buffer, long length, out ResponseHeader header)
         {
             if (buffer.Length < length)
             {
@@ -92,19 +93,22 @@ namespace Kudu.Client.Connection
                 return false;
             }
 
-            var slice = buffer.Slice(0, length);
-            var reader = ProtoReader.Create(out var state, slice, RuntimeTypeModel.Default);
-            var obj = RuntimeTypeModel.Default.Deserialize(reader, ref state, null, typeof(ResponseHeader));
+            ReadOnlySequence<byte> slice = buffer.Slice(0, length);
+            using var reader = ProtoReader.Create(
+                out var state, slice, RuntimeTypeModel.Default);
+
+            header = reader.Deserialize<ResponseHeader>(ref state);
             buffer = buffer.Slice(length);
-            header = (ResponseHeader)obj;
+
             return true;
         }
 
         public static ErrorStatusPB ParseError(ReadOnlySequence<byte> buffer)
         {
-            var reader = ProtoReader.Create(out var state, buffer, RuntimeTypeModel.Default);
-            var obj = RuntimeTypeModel.Default.Deserialize(reader, ref state, null, typeof(ErrorStatusPB));
-            return (ErrorStatusPB)obj;
+            using var reader = ProtoReader.Create(
+                out var state, buffer, RuntimeTypeModel.Default);
+
+            return reader.Deserialize<ErrorStatusPB>(ref state);
         }
     }
 }

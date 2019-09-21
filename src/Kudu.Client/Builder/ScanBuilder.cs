@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using Kudu.Client.Tablet;
 using Kudu.Client.Util;
 
 namespace Kudu.Client.Builder
@@ -19,16 +20,16 @@ namespace Kudu.Client.Builder
         internal int BatchSizeBytes = 1024 * 1024;
         internal long Limit = long.MaxValue;
         internal bool CacheBlocks = true;
-        internal long StartTimestamp = -1;
+        internal long StartTimestamp = -1; // Not currently exposed.
         internal long HtTimestamp = -1;
         internal byte[] LowerBoundPrimaryKey;
         internal byte[] UpperBoundPrimaryKey;
-        internal byte[] LowerBoundPartitionKey;
-        internal byte[] UpperBoundPartitionKey;
+        internal byte[] LowerBoundPartitionKey; // Not currently exposed.
+        internal byte[] UpperBoundPartitionKey; // Not currently exposed.
         internal List<string> ProjectedColumns;
-        internal long ScanRequestTimeout;
+        internal long ScanRequestTimeout; // TODO: Expose this, and expose as TimeSpan?
         internal ReplicaSelection ReplicaSelection = ReplicaSelection.LeaderOnly;
-        internal long KeepAlivePeriodMs = 15000;
+        internal long KeepAlivePeriodMs = 15000; // TODO: Expose this.
 
         public ScanBuilder(KuduClient client, KuduTable table)
         {
@@ -82,6 +83,28 @@ namespace Kudu.Client.Builder
         }
 
         /// <summary>
+        /// Make scans resumable at another tablet server if current server fails if
+        /// isFaultTolerant is true.
+        ///
+        /// Scans are by default non fault-tolerant, and scans will fail
+        /// if scanning an individual tablet fails (for example, if a tablet server
+        /// crashes in the middle of a tablet scan). If isFaultTolerant is set to true,
+        /// scans will be resumed at another tablet server in the case of failure.
+        ///
+        /// Fault-tolerant scans typically have lower throughput than non
+        /// fault-tolerant scans. Fault tolerant scans use READ_AT_SNAPSHOT read mode.
+        /// If no snapshot timestamp is provided, the server will pick one.
+        /// </summary>
+        /// <param name="isFaultTolerant">Indicates if scan is fault-tolerant.</param>
+        public ScanBuilder SetFaultTolerant(bool isFaultTolerant)
+        {
+            IsFaultTolerant = isFaultTolerant;
+            if (isFaultTolerant)
+                ReadMode = ReadMode.ReadAtSnapshot;
+            return this;
+        }
+
+        /// <summary>
         /// Sets the maximum number of bytes returned by the scanner, on each batch.
         /// The default is 1MB. Kudu may actually return more than this many bytes
         /// because it will not truncate a rowResult in the middle.
@@ -112,6 +135,51 @@ namespace Kudu.Client.Builder
         public ScanBuilder SetCacheBlocks(bool cacheBlocks)
         {
             CacheBlocks = cacheBlocks;
+            return this;
+        }
+
+        /// <summary>
+        /// Sets the timestamp the scan must be executed at, in microseconds since the Unix epoch.
+        /// None is used by default. Requires that the ReadMode is READ_AT_SNAPSHOT.
+        /// </summary>
+        /// <param name="timestamp">A long representing an instant in microseconds since the unix epoch.</param>
+        public ScanBuilder SnapshotTimestampMicros(long timestamp)
+        {
+            HtTimestamp = HybridTimeUtil.PhysicalAndLogicalToHTTimestamp(timestamp, 0);
+            return this;
+        }
+
+        /// <summary>
+        /// Add a lower bound (inclusive) primary key for the scan.
+        /// If any bound is already added, this bound is intersected with that one.
+        /// </summary>
+        /// <param name="row">A partial row with specified key columns.</param>
+        public ScanBuilder LowerBound(PartialRow row)
+        {
+            byte[] startPrimaryKey = KeyEncoder.EncodePrimaryKey(row);
+
+            if (LowerBoundPrimaryKey.Length == 0 ||
+                startPrimaryKey.SequenceCompareTo(LowerBoundPrimaryKey) > 0)
+            {
+                LowerBoundPrimaryKey = startPrimaryKey;
+            }
+            return this;
+        }
+
+        /// <summary>
+        /// Add an upper bound (exclusive) primary key for the scan.
+        /// If any bound is already added, this bound is intersected with that one.
+        /// </summary>
+        /// <param name="row">A partial row with specified key columns.</param>
+        public ScanBuilder ExclusiveUpperBound(PartialRow row)
+        {
+            byte[] endPrimaryKey = KeyEncoder.EncodePrimaryKey(row);
+
+            if (UpperBoundPrimaryKey.Length == 0 ||
+                endPrimaryKey.SequenceCompareTo(UpperBoundPrimaryKey) < 0)
+            {
+                UpperBoundPrimaryKey = endPrimaryKey;
+            }
             return this;
         }
 
