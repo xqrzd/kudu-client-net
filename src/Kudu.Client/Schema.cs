@@ -39,6 +39,11 @@ namespace Kudu.Client
         /// </summary>
         public int RowAllocSize { get; }
 
+        /// <summary>
+        /// Get the size a row built using this schema would be
+        /// </summary>
+        public int RowSize { get; }
+
         public int VarLengthColumnCount { get; }
 
         public bool HasNullableColumns { get; }
@@ -87,6 +92,7 @@ namespace Kudu.Client
 
             _columnsByIndex = new ColumnSchema[columns.Count];
             columns.CopyTo(_columnsByIndex);
+            RowSize = GetRowSize(_columnsByIndex);
         }
 
         public Schema(SchemaPB schema)
@@ -139,6 +145,7 @@ namespace Kudu.Client
             RowAllocSize = size;
             VarLengthColumnCount = varLenCnt;
             HasNullableColumns = hasNulls;
+            RowSize = GetRowSize(columnsByIndex);
         }
 
         public IReadOnlyList<ColumnSchema> Columns => _columnsByIndex;
@@ -211,5 +218,28 @@ namespace Kudu.Client
                     return false;
             }
         }
+
+        /// <summary>
+        /// Gives the size in bytes for a single row given the specified schema
+        /// </summary>
+        /// <param name="columns">The row's columns.</param>
+        private static int GetRowSize(ColumnSchema[] columns)
+        {
+            int totalSize = 0;
+            bool hasNullables = false;
+            foreach (ColumnSchema column in columns)
+            {
+                totalSize += column.Size;
+                hasNullables |= column.IsNullable;
+            }
+            if (hasNullables)
+            {
+                totalSize += BitsToBytes(columns.Length);
+            }
+            return totalSize;
+        }
+
+        // TODO: Move this to shared location.
+        private static int BitsToBytes(int bits) => (bits + 7) / 8;
     }
 }

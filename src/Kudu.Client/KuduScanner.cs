@@ -68,7 +68,8 @@ namespace Kudu.Client
     {
         private readonly KuduClient _client;
         private readonly KuduTable _table;
-        private readonly List<ColumnSchemaPB> _schema;
+        private readonly List<ColumnSchemaPB> _columns;
+        private readonly Schema _schema;
         private readonly PartitionPruner _partitionPruner;
         private readonly Dictionary<string, KuduPredicate> _predicates;
         private readonly CancellationToken _cancellationToken;
@@ -169,26 +170,30 @@ namespace Kudu.Client
 
             // Map the column names to actual columns in the table schema.
             // If the user set this to 'null', we scan all columns.
-            _schema = new List<ColumnSchemaPB>();
+            _columns = new List<ColumnSchemaPB>();
+            var columns = new List<ColumnSchema>();
             if (projectedNames != null)
             {
                 foreach (string columnName in projectedNames)
                 {
                     ColumnSchema originalColumn = table.Schema.GetColumn(columnName);
-                    _schema.Add(ToColumnSchemaPb(originalColumn));
+                    _columns.Add(ToColumnSchemaPb(originalColumn));
+                    columns.Add(originalColumn);
                 }
             }
             else
             {
                 foreach (ColumnSchema columnSchema in table.Schema.Columns)
                 {
-                    _schema.Add(ToColumnSchemaPb(columnSchema));
+                    _columns.Add(ToColumnSchemaPb(columnSchema));
+                    columns.Add(columnSchema);
                 }
             }
+            _schema = new Schema(columns);
             // This is a diff scan so add the IS_DELETED column.
             if (startTimestamp != KuduClient.NoTimestamp)
             {
-                _schema.Add(GenerateIsDeletedColumn(table.Schema));
+                _columns.Add(GenerateIsDeletedColumn(table.Schema));
             }
 
             // If the partition pruner has pruned all partitions, then the scan can be
@@ -236,13 +241,39 @@ namespace Kudu.Client
             };
         }
 
-        public ValueTask DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
-            return default;
+            if (!_closed)
+            {
+                // Getting a null tablet here without being in a closed state
+                // means we were in between tablets.
+                if (_tablet != null)
+                {
+                    ScanRequest rpc = GetCloseRequest();
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+                    try
+                    {
+                        await _client.SendRpcToTabletAsync(rpc, cts.Token)
+                            .ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        // TODO: Log warning.
+                        Console.WriteLine($"Error closing scanner: {ex}");
+                    }
+                }
+
+                _closed = true;
+                Invalidate();
+            }
         }
 
         public async ValueTask<bool> MoveNextAsync()
         {
+            // TODO: Catch OperationCancelledException, and call DisposeAsync()
+            // Only wait a small amount of time to cancel the scan on the server.
+
             if (_closed)
             {
                 // We're already done scanning.
@@ -346,22 +377,25 @@ namespace Kudu.Client
             };
         }
 
-        private ScanRequest2 GetOpenRequest()
+        private ScanRequest GetOpenRequest()
         {
             //checkScanningNotStarted();
-            return new ScanRequest2(this, State.Opening);
+            return new ScanRequest(this, State.Opening);
         }
 
-        private ScanRequest2 GetNextRowsRequest()
+        private ScanRequest GetNextRowsRequest()
         {
             //checkScanningNotStarted();
-            return new ScanRequest2(this, State.Next);
+            return new ScanRequest(this, State.Next);
+        }
+
+        private ScanRequest GetCloseRequest()
+        {
+            return new ScanRequest(this, State.Closing);
         }
 
         private void ScanFinished()
         {
-            Console.WriteLine($"Done scanning tablet {_tablet.TabletId} for partition {_tablet.Partition} with scanner id {BitConverter.ToString(_scannerId)}");
-
             Partition partition = _tablet.Partition;
             _partitionPruner.RemovePartitionKeyRange(partition.PartitionKeyEnd);
             // Stop scanning if we have scanned until or past the end partition key, or
@@ -372,6 +406,8 @@ namespace Kudu.Client
                 _closed = true; // The scanner is closed on the other side at this point.
                 return;
             }
+
+            Console.WriteLine($"Done scanning tablet {_tablet.TabletId} for partition {_tablet.Partition} with scanner id {BitConverter.ToString(_scannerId)}");
 
             _scannerId = null;
             _sequenceId = 0;
@@ -390,12 +426,14 @@ namespace Kudu.Client
             _tablet = null;
         }
 
-        private class ScanRequest2 : KuduTabletRpc
+        private class ScanRequest : KuduTabletRpc
         {
             private readonly KuduScanEnumerator _scanner;
             private readonly State _state;
 
-            public ScanRequest2(KuduScanEnumerator scanner, State state)
+            private ScanResponsePB _responsePB;
+
+            public ScanRequest(KuduScanEnumerator scanner, State state)
             {
                 _scanner = scanner;
                 _state = state;
@@ -423,7 +461,7 @@ namespace Kudu.Client
                 {
                     var newRequest = request.NewScanRequest = new NewScanRequestPB();
                     newRequest.Limit = (ulong)(_scanner._limit - _scanner._numRowsReturned);
-                    newRequest.ProjectedColumns.AddRange(_scanner._schema);
+                    newRequest.ProjectedColumns.AddRange(_scanner._columns);
                     newRequest.TabletId = Tablet.TabletId.ToUtf8ByteArray();
                     newRequest.OrderMode = _scanner._orderMode;
                     newRequest.CacheBlocks = _scanner._cacheBlocks;
@@ -505,6 +543,8 @@ namespace Kudu.Client
 
                 // TODO: Error handling
 
+                _responsePB = resp;
+
                 Response = new ScanResponse<ResultSet>(
                     resp.ScannerId,
                     resp.Data.NumRows,
@@ -543,7 +583,34 @@ namespace Kudu.Client
                     reader.AdvanceTo(buffer.Start, buffer.End);
                 }
 
-                Response.Data = new ResultSet(original, Response.NumRows);
+                var rowsSidecar = _responsePB.Data.RowsSidecar;
+
+                if (_responsePB.Data.ShouldSerializeIndirectDataSidecar())
+                {
+                    var indirectDataSidecar = _responsePB.Data.IndirectDataSidecar;
+
+                    var rs = header.SidecarOffsets[rowsSidecar]; //TODO: adjust these
+                    var id = header.SidecarOffsets[indirectDataSidecar] - rs;
+
+                    data = original;
+
+                    var slice1 = data.Slice(0, (int)id);
+                    var slice2 = data.Slice((int)id);
+
+                    Response.Data = new ResultSet(
+                        _scanner._schema,
+                        Response.NumRows,
+                        slice1,
+                        slice2);
+                }
+                else
+                {
+                    Response.Data = new ResultSet(
+                        _scanner._schema,
+                        Response.NumRows,
+                        original,
+                        default);
+                }
             }
         }
 
