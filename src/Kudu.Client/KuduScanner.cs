@@ -54,7 +54,6 @@ namespace Kudu.Client
                 _scanBuilder.BatchSizeBytes,
                 _partitionPruner,
                 _scanBuilder.ReplicaSelection,
-                _scanBuilder.KeepAlivePeriodMs,
                 cancellationToken);
         }
 
@@ -82,16 +81,14 @@ namespace Kudu.Client
         private readonly long _limit;
         private readonly bool _cacheBlocks;
         private readonly long _startTimestamp;
-        private readonly long _keepAlivePeriodMs;
+        private readonly long _lowerBoundPropagationTimestamp = KuduClient.NoTimestamp;
 
         private readonly byte[] _startPrimaryKey;
         private readonly byte[] _endPrimaryKey;
 
         private bool _closed;
-        private bool _hasMore = true;
         private long _numRowsReturned;
         private long _htTimestamp;
-        private long _lowerBoundPropagationTimestamp = KuduClient.NoTimestamp;
         private uint _sequenceId;
         private byte[] _scannerId;
         private byte[] _lastPrimaryKey;
@@ -119,7 +116,6 @@ namespace Kudu.Client
             int batchSizeBytes,
             PartitionPruner partitionPruner,
             ReplicaSelection replicaSelection,
-            long keepAlivePeriodMs,
             CancellationToken cancellationToken)
         {
             //    checkArgument(batchSizeBytes >= 0, "Need non-negative number of bytes, " +
@@ -200,12 +196,10 @@ namespace Kudu.Client
             // short circuited without contacting any tablet servers.
             if (!_partitionPruner.HasMorePartitionKeyRanges)
             {
-                _hasMore = false;
                 _closed = true;
             }
 
             _replicaSelection = replicaSelection;
-            _keepAlivePeriodMs = keepAlivePeriodMs;
 
             // For READ_YOUR_WRITES scan mode, get the latest observed timestamp
             // and store it. Always use this one as the propagated timestamp for
@@ -339,7 +333,6 @@ namespace Kudu.Client
 
                 _scannerId = resp.ScannerId;
                 _sequenceId++;
-                _hasMore = resp.HasMoreResults;
 
                 return resp.NumRows > 0;
             }
@@ -362,7 +355,6 @@ namespace Kudu.Client
                     return resp.NumRows > 0;
                 }
                 _sequenceId++;
-                _hasMore = resp.HasMoreResults;
                 return resp.NumRows > 0;
             }
         }
@@ -402,7 +394,6 @@ namespace Kudu.Client
             // if we have fulfilled the limit.
             if (!_partitionPruner.HasMorePartitionKeyRanges || _numRowsReturned >= _limit)
             {
-                _hasMore = false;
                 _closed = true; // The scanner is closed on the other side at this point.
                 return;
             }

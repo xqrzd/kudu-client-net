@@ -29,7 +29,6 @@ namespace Kudu.Client.Builder
         internal List<string> ProjectedColumns;
         internal long ScanRequestTimeout; // TODO: Expose this, and expose as TimeSpan?
         internal ReplicaSelection ReplicaSelection = ReplicaSelection.LeaderOnly;
-        internal long KeepAlivePeriodMs = 15000; // TODO: Expose this.
 
         public ScanBuilder(KuduClient client, KuduTable table)
         {
