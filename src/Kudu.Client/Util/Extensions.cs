@@ -104,10 +104,5 @@ namespace Kudu.Client.Util
             return negotiatePb.SupportedFeatures != null &&
                 negotiatePb.SupportedFeatures.Contains(flag);
         }
-
-        public static T Deserialize<T>(this ProtoReader source, ref ProtoReader.State state)
-        {
-            return (T)source.Model.Deserialize(source, ref state, null, typeof(T));
-        }
     }
 }

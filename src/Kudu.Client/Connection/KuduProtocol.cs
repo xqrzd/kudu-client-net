@@ -94,10 +94,9 @@ namespace Kudu.Client.Connection
             }
 
             ReadOnlySequence<byte> slice = buffer.Slice(0, length);
-            using var reader = ProtoReader.Create(
-                out var state, slice, RuntimeTypeModel.Default);
+            using var reader = ProtoReader.State.Create(slice, RuntimeTypeModel.Default);
 
-            header = reader.Deserialize<ResponseHeader>(ref state);
+            header = reader.DeserializeRoot<ResponseHeader>();
             buffer = buffer.Slice(length);
 
             return true;
@@ -105,10 +104,9 @@ namespace Kudu.Client.Connection
 
         public static ErrorStatusPB ParseError(ReadOnlySequence<byte> buffer)
         {
-            using var reader = ProtoReader.Create(
-                out var state, buffer, RuntimeTypeModel.Default);
+            using var reader = ProtoReader.State.Create(buffer, RuntimeTypeModel.Default);
 
-            return reader.Deserialize<ErrorStatusPB>(ref state);
+            return reader.DeserializeRoot<ErrorStatusPB>();
         }
     }
 }
