@@ -56,6 +56,11 @@ namespace Kudu.Client
             _requestTracker = new RequestTracker(Guid.NewGuid().ToString("N"));
         }
 
+        /// <summary>
+        /// The last timestamp received from a server. Used for CLIENT_PROPAGATED
+        /// external consistency. Note that the returned timestamp is encoded and
+        /// cannot be interpreted as a raw timestamp.
+        /// </summary>
         public long LastPropagatedTimestamp
         {
             get
@@ -473,72 +478,68 @@ namespace Kudu.Client
             cache.CacheTabletLocations(tablets, partitionKey);
         }
 
-        private async Task ConnectToClusterAsync(CancellationToken cancellationToken = default)
+        private async Task ConnectToClusterAsync(CancellationToken cancellationToken)
         {
             List<HostAndPort> masterAddresses = _options.MasterAddresses;
-            var tasks = new List<Task<ConnectToMasterResponse>>(masterAddresses.Count);
-            var masters = new List<ServerInfo>(masterAddresses.Count);
+            var tasks = new HashSet<Task<ConnectToMasterResponse>>(masterAddresses.Count);
+            var foundMasters = new List<ServerInfo>(masterAddresses.Count);
             int leaderIndex = -1;
 
+            using var cts = new CancellationTokenSource();
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
+                cts.Token, cancellationToken);
+
+            // Attempt to connect to all configured masters in parallel.
             foreach (var address in masterAddresses)
             {
-                var task = ConnectToMasterAsync(address, cancellationToken);
+                var task = ConnectToMasterAsync(address, linkedCts.Token);
                 tasks.Add(task);
             }
 
-            try
+            while (tasks.Count > 0)
             {
-                await Task.WhenAll(tasks).ConfigureAwait(false);
-            }
-            catch { }
+                var task = await Task.WhenAny(tasks).ConfigureAwait(false);
+                tasks.Remove(task);
 
-            foreach (var task in tasks)
-            {
-                if (task.IsCompletedSuccessfully)
+                if (!TryGetConnectResponse(task,
+                    out ServerInfo serverInfo,
+                    out ConnectToMasterResponsePB responsePb))
                 {
-                    ConnectToMasterResponsePB response = task.Result.ResponsePB;
-                    ServerInfo serverInfo = task.Result.ServerInfo;
-
-                    if (response.Error == null)
-                    {
-                        if (response.Role == RaftPeerPB.Role.Leader)
-                        {
-                            leaderIndex = masters.Count;
-
-                            _location = response.ClientLocation;
-
-                            var hmsConfig = response.HmsConfig;
-                            if (hmsConfig != null)
-                            {
-                                _hiveMetastoreConfig = new HiveMetastoreConfig(
-                                    hmsConfig.HmsUris,
-                                    hmsConfig.HmsSaslEnabled,
-                                    hmsConfig.HmsUuid);
-                            }
-                        }
-
-                        masters.Add(serverInfo);
-                    }
-                    else
-                    {
-                        // Log warning.
-                        Console.WriteLine("Unable to connect to master: " +
-                            response.Error.Status.Message);
-                    }
+                    // Failed to connect to this master.
+                    // We only need to connect to the leader.
+                    continue;
                 }
-                else
+
+                foundMasters.Add(serverInfo);
+
+                if (responsePb.Role == RaftPeerPB.Role.Leader)
                 {
-                    // Log warning.
-                    Console.WriteLine("Unable to connect to master: " +
-                        task.Exception.Message);
+                    leaderIndex = foundMasters.Count - 1;
+
+                    _location = responsePb.ClientLocation;
+
+                    var hmsConfig = responsePb.HmsConfig;
+                    if (hmsConfig != null)
+                    {
+                        _hiveMetastoreConfig = new HiveMetastoreConfig(
+                            hmsConfig.HmsUris,
+                            hmsConfig.HmsSaslEnabled,
+                            hmsConfig.HmsUuid);
+                    }
+
+                    // Found the leader, that's all we really care about.
+                    // Wait a few more seconds to get any followers.
+                    cts.CancelAfter(TimeSpan.FromSeconds(3));
                 }
             }
 
             if (leaderIndex == -1)
-                new NoLeaderFoundException(
+            {
+                throw new NoLeaderFoundException(
                     KuduStatus.ServiceUnavailable("Unable to find the leader master."));
+            }
 
-            _masterCache = new ServerInfoCache(masters, leaderIndex);
+            _masterCache = new ServerInfoCache(foundMasters, leaderIndex);
             _hasConnectedToMaster = true;
         }
 
@@ -552,6 +553,40 @@ namespace Kudu.Client
             await SendRpcAsync(rpc, serverInfo, cancellationToken).ConfigureAwait(false);
 
             return new ConnectToMasterResponse(rpc.Response, serverInfo);
+        }
+
+        private static bool TryGetConnectResponse(
+            Task<ConnectToMasterResponse> task,
+            out ServerInfo serverInfo,
+            out ConnectToMasterResponsePB responsePb)
+        {
+            serverInfo = null;
+            responsePb = null;
+
+            if (!task.IsCompletedSuccessfully)
+            {
+                // TODO: Log warning.
+                Console.WriteLine("Unable to connect to cluster: " +
+                    task.Exception.Message);
+
+                return false;
+            }
+
+            ConnectToMasterResponse response = task.Result;
+
+            if (response.ResponsePB.Error != null)
+            {
+                // TODO: Log warning.
+                Console.WriteLine("Error connecting to cluster: " +
+                    response.ResponsePB.Error.Status.Message);
+
+                return false;
+            }
+
+            serverInfo = response.ServerInfo;
+            responsePb = response.ResponsePB;
+
+            return true;
         }
 
         /// <summary>
