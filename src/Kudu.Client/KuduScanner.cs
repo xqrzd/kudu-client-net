@@ -20,13 +20,15 @@ namespace Kudu.Client
     public class KuduScanner : IAsyncEnumerable<ResultSet>
     {
         private readonly ScanBuilder _scanBuilder;
-        private readonly PartitionPruner _partitionPruner;
 
         public KuduScanner(ScanBuilder scanBuilder)
         {
             _scanBuilder = scanBuilder;
+        }
 
-            _partitionPruner = PartitionPruner.Create(
+        public KuduScanEnumerator GetAsyncEnumerator(CancellationToken cancellationToken = default)
+        {
+            var partitionPruner = PartitionPruner.Create(
                 _scanBuilder.Table.Schema,
                 _scanBuilder.Table.PartitionSchema,
                 _scanBuilder.Predicates,
@@ -34,10 +36,7 @@ namespace Kudu.Client
                 _scanBuilder.UpperBoundPrimaryKey,
                 _scanBuilder.LowerBoundPartitionKey,
                 _scanBuilder.UpperBoundPartitionKey);
-        }
 
-        public KuduScanEnumerator GetAsyncEnumerator(CancellationToken cancellationToken = default)
-        {
             return new KuduScanEnumerator(
                 _scanBuilder.Client,
                 _scanBuilder.Table,
@@ -52,7 +51,7 @@ namespace Kudu.Client
                 _scanBuilder.StartTimestamp,
                 _scanBuilder.HtTimestamp,
                 _scanBuilder.BatchSizeBytes,
-                _partitionPruner,
+                partitionPruner,
                 _scanBuilder.ReplicaSelection,
                 cancellationToken);
         }

@@ -506,7 +506,8 @@ namespace Kudu.Client
                     out ConnectToMasterResponsePB responsePb))
                 {
                     // Failed to connect to this master.
-                    // We only need to connect to the leader.
+                    // Failures are fine here, as long as we can
+                    // connect to the leader.
                     continue;
                 }
 

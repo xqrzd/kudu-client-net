@@ -7,7 +7,6 @@ using System.Text;
 using Kudu.Client.Connection;
 using Kudu.Client.Protocol;
 using Kudu.Client.Protocol.Rpc;
-using ProtoBuf;
 
 namespace Kudu.Client.Util
 {
