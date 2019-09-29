@@ -19,6 +19,12 @@ namespace Kudu.Client
             _indirectData = indirectData;
         }
 
+        public int GetInt32(string columnName)
+        {
+            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            return GetInt32(columnIndex);
+        }
+
         public int GetInt32(int columnIndex)
         {
             //checkValidColumn(columnIndex);
@@ -29,6 +35,26 @@ namespace Kudu.Client
             ReadOnlySpan<byte> data = _rowData.Slice(position, 4);
 
             return KuduEncoder.DecodeInt32(data);
+        }
+
+        public int? GetNullableInt32(string columnName)
+        {
+            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            return GetNullableInt32(columnIndex);
+        }
+
+        public int? GetNullableInt32(int columnIndex)
+        {
+            if (IsNull(columnIndex))
+                return null;
+
+            return GetInt32(columnIndex);
+        }
+
+        public string GetString(string columnName)
+        {
+            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            return GetString(columnIndex);
         }
 
         public string GetString(int columnIndex)
@@ -47,6 +73,18 @@ namespace Kudu.Client
             ReadOnlySpan<byte> data = _indirectData.Slice(offset, length);
 
             return KuduEncoder.DecodeString(data);
+        }
+
+        public bool IsNull(int columnIndex)
+        {
+            int nullBitSetOffset = _resultSet.GetNullBitSetOffset();
+            bool isNull = BitmapGet(nullBitSetOffset, columnIndex);
+            return isNull;
+        }
+
+        private bool BitmapGet(int offset, int index)
+        {
+            return (_rowData[offset + (index / 8)] & (1 << (index % 8))) != 0;
         }
     }
 }

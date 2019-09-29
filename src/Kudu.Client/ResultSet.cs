@@ -10,6 +10,7 @@ namespace Kudu.Client
         private readonly ReadOnlyMemory<byte> _indirectData;
         private readonly int[] _columnOffsets;
         private readonly int _rowSize;
+        private readonly bool _hasNullableColumns;
 
         public int Count { get; }
 
@@ -28,13 +29,16 @@ namespace Kudu.Client
             if (schema.HasNullableColumns)
             {
                 columnOffsetsSize++;
+                _hasNullableColumns = true;
             }
-            int[] columnOffsets = new int[columnOffsetsSize];
+
+            var columnOffsets = new int[columnOffsetsSize];
             // Empty projection, usually used for quick row counting.
             if (columnOffsetsSize == 0)
             {
                 return;
             }
+
             int currentOffset = 0;
             columnOffsets[0] = currentOffset;
             // Pre-compute the columns offsets in rowData for easier lookups later.
@@ -56,13 +60,23 @@ namespace Kudu.Client
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => new RowResult(
                 this,
-                _rowAlloc.Span.Slice(index * _rowSize),
+                _rowAlloc.Span.Slice(index * _rowSize, _rowSize),
                 _indirectData.Span);
         }
 
         internal int GetOffset(int columnIndex)
         {
             return _columnOffsets[columnIndex];
+        }
+
+        internal int GetNullBitSetOffset()
+        {
+            return _columnOffsets[_columnOffsets.Length - 1];
+        }
+
+        internal int GetColumnIndex(string columnName)
+        {
+            return _schema.GetColumnIndex(columnName);
         }
 
         public Enumerator GetEnumerator() => new Enumerator(this);
