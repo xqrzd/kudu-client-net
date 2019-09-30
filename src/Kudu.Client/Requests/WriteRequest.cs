@@ -6,10 +6,11 @@ namespace Kudu.Client.Requests
     {
         public override string MethodName => "Write";
 
-        public WriteRequest(WriteRequestPB request, string tableId)
+        public WriteRequest(WriteRequestPB request, string tableId, byte[] partitionKey)
         {
             Request = request;
             TableId = tableId;
+            PartitionKey = partitionKey;
         }
     }
 }

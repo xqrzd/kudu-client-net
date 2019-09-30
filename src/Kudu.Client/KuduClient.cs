@@ -231,12 +231,15 @@ namespace Kudu.Client
             if (tablet == null)
                 throw new Exception("The requested tablet does not exist");
 
-            var rpc = new WriteRequest(new WriteRequestPB
-            {
-                TabletId = tablet.TabletId.ToUtf8ByteArray(),
-                Schema = table.SchemaPb.Schema,
-                RowOperations = rowOperations
-            }, table.TableId);
+            var rpc = new WriteRequest(
+                new WriteRequestPB
+                {
+                    TabletId = tablet.TabletId.ToUtf8ByteArray(),
+                    Schema = table.SchemaPb.Schema,
+                    RowOperations = rowOperations
+                },
+                table.TableId,
+                tablet.Partition.PartitionKeyStart);
 
             // TODO: Avoid double tablet lookup.
             await SendRpcToTabletAsync(rpc).ConfigureAwait(false);
@@ -312,12 +315,15 @@ namespace Kudu.Client
                 IndirectData = indirectData
             };
 
-            var rpc = new WriteRequest(new WriteRequestPB
-            {
-                TabletId = tablet.TabletId.ToUtf8ByteArray(),
-                Schema = table.SchemaPb.Schema,
-                RowOperations = rowOperations
-            }, table.TableId);
+            var rpc = new WriteRequest(
+                new WriteRequestPB
+                {
+                    TabletId = tablet.TabletId.ToUtf8ByteArray(),
+                    Schema = table.SchemaPb.Schema,
+                    RowOperations = rowOperations
+                },
+                table.TableId,
+                tablet.Partition.PartitionKeyStart);
 
             await SendRpcToTabletAsync(rpc).ConfigureAwait(false);
             var result = rpc.Response;
