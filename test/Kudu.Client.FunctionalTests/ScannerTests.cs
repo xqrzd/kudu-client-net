@@ -7,12 +7,18 @@ using Xunit;
 
 namespace Kudu.Client.FunctionalTests
 {
-    public class ScannerTests : MiniKuduClusterTestBase
+    [MiniKuduClusterTest]
+    public class ScannerTests
     {
         [SkippableFact]
         public async Task Scan()
         {
-            var client = GetKuduClient();
+            using var miniCluster = new MiniKuduClusterBuilder()
+                .NumMasters(3)
+                .NumTservers(3)
+                .Create();
+
+            await using var client = miniCluster.CreateClient();
 
             var tableName = Guid.NewGuid().ToString();
             var builder = new TableBuilder()

@@ -7,12 +7,18 @@ using Xunit;
 
 namespace Kudu.Client.FunctionalTests
 {
-    public class CreateTableTests : MiniKuduClusterTestBase
+    [MiniKuduClusterTest]
+    public class CreateTableTests
     {
         [SkippableFact]
         public async Task CreateTableWithHashPartitions()
         {
-            var client = GetKuduClient();
+            using var miniCluster = new MiniKuduClusterBuilder()
+                .NumMasters(3)
+                .NumTservers(3)
+                .Create();
+
+            await using var client = miniCluster.CreateClient();
 
             var tableName = Guid.NewGuid().ToString();
             var builder = new TableBuilder()
@@ -115,7 +121,12 @@ namespace Kudu.Client.FunctionalTests
         [SkippableFact]
         public async Task CreateTableWithRangePartitions()
         {
-            var client = GetKuduClient();
+            using var miniCluster = new MiniKuduClusterBuilder()
+                .NumMasters(3)
+                .NumTservers(3)
+                .Create();
+
+            await using var client = miniCluster.CreateClient();
 
             var tableName = Guid.NewGuid().ToString();
             var builder = new TableBuilder()

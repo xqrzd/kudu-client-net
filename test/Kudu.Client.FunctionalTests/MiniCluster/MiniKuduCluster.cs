@@ -15,7 +15,7 @@ namespace Kudu.Client.FunctionalTests.MiniCluster
 {
     public class MiniKuduCluster : IDisposable
     {
-        private readonly string _clusterRoot;
+        private readonly CreateClusterRequestPB _createClusterRequestPB;
 
         // Control shell process.
         private Process _miniCluster;
@@ -30,10 +30,9 @@ namespace Kudu.Client.FunctionalTests.MiniCluster
 
         private readonly Dictionary<HostAndPort, DaemonInfo> _tabletServers;
 
-        public MiniKuduCluster()
+        public MiniKuduCluster(CreateClusterRequestPB createClusterRequestPB)
         {
-            var directoryName = $"mini-kudu-cluster-{Path.GetFileNameWithoutExtension(Path.GetRandomFileName())}";
-            _clusterRoot = Path.Combine(Path.GetTempPath(), directoryName);
+            _createClusterRequestPB = createClusterRequestPB;
 
             _masterServers = new Dictionary<HostAndPort, DaemonInfo>();
             _tabletServers = new Dictionary<HostAndPort, DaemonInfo>();
@@ -41,7 +40,7 @@ namespace Kudu.Client.FunctionalTests.MiniCluster
 
         public void Start()
         {
-            Directory.CreateDirectory(_clusterRoot);
+            Directory.CreateDirectory(_createClusterRequestPB.ClusterRoot);
 
             // TODO: Redirect standard error, and use async reads.
             var kuduExe = KuduBinaryLocator.FindBinary("kudu");
@@ -62,12 +61,7 @@ namespace Kudu.Client.FunctionalTests.MiniCluster
 
             var createClusterRequest = new ControlShellRequestPB
             {
-                CreateCluster = new CreateClusterRequestPB
-                {
-                    ClusterRoot = _clusterRoot,
-                    NumMasters = 3,
-                    NumTservers = 3
-                }
+                CreateCluster = _createClusterRequestPB
             };
 
             SendRequestToCluster(createClusterRequest);
@@ -127,12 +121,12 @@ namespace Kudu.Client.FunctionalTests.MiniCluster
 
             try
             {
-                Directory.Delete(_clusterRoot, true);
+                Directory.Delete(_createClusterRequestPB.ClusterRoot, true);
             }
             catch { }
         }
 
-        public KuduClient GetKuduClient()
+        public KuduClient CreateClient()
         {
             var options = new KuduClientOptions
             {
