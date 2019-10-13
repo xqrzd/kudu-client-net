@@ -50,9 +50,12 @@ namespace Kudu.Client.FunctionalTests
             row.SetInt32(0, 7);
             row.SetString(1, "test value");
 
-            var result = await client.WriteRowAsync(insert);
-            Assert.Empty(result.PerRowErrors);
-            Assert.NotEqual(0UL, result.Timestamp);
+            var results = await client.WriteRowAsync(new[] { insert });
+            Assert.Collection(results, r =>
+            {
+                Assert.Empty(r.PerRowErrors);
+                Assert.NotEqual(0UL, r.Timestamp);
+            });
 
             var scanner = client.NewScanBuilder(table)
                 .SetProjectedColumns("column_x", "column_y")

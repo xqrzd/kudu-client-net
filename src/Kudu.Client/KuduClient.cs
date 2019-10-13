@@ -6,6 +6,7 @@ using Kudu.Client.Builder;
 using Kudu.Client.Connection;
 using Kudu.Client.Exceptions;
 using Kudu.Client.Internal;
+using Kudu.Client.Protocol;
 using Kudu.Client.Protocol.Consensus;
 using Kudu.Client.Protocol.Master;
 using Kudu.Client.Protocol.Rpc;
@@ -212,53 +213,15 @@ namespace Kudu.Client
             return new KuduTable(response);
         }
 
-        public async Task<WriteResponsePB> WriteRowAsync(Operation operation)
-        {
-            var row = operation.Row;
-            var table = operation.Table;
-            var rows = new byte[row.RowSize];
-            var indirectData = new byte[row.IndirectDataSize];
-
-            row.WriteTo(rows, indirectData);
-
-            var rowOperations = new Protocol.RowOperationsPB
-            {
-                Rows = rows,
-                IndirectData = indirectData
-            };
-
-            var tablet = await GetRowTabletAsync(table, row).ConfigureAwait(false);
-            if (tablet == null)
-                throw new Exception("The requested tablet does not exist");
-
-            var rpc = new WriteRequest(
-                new WriteRequestPB
-                {
-                    TabletId = tablet.TabletId.ToUtf8ByteArray(),
-                    Schema = table.SchemaPb.Schema,
-                    RowOperations = rowOperations
-                },
-                table.TableId,
-                tablet.Partition.PartitionKeyStart);
-
-            // TODO: Avoid double tablet lookup.
-            await SendRpcToTabletAsync(rpc).ConfigureAwait(false);
-            var result = rpc.Response;
-
-            if (result.Error != null)
-                throw new TabletServerException(result.Error);
-
-            return result;
-        }
-
-        public async Task<WriteResponsePB[]> WriteRowAsync(IEnumerable<Operation> operations)
+        public async Task<WriteResponsePB[]> WriteRowAsync(
+            IEnumerable<Operation> operations,
+            ExternalConsistencyMode externalConsistencyMode = ExternalConsistencyMode.ClientPropagated)
         {
             var operationsByTablet = new Dictionary<RemoteTablet, List<Operation>>();
 
             foreach (var operation in operations)
             {
-                var tablet = await GetRowTabletAsync(operation.Table, operation.Row)
-                    .ConfigureAwait(false);
+                var tablet = await GetRowTabletAsync(operation).ConfigureAwait(false);
 
                 if (tablet != null)
                 {
@@ -282,15 +245,23 @@ namespace Kudu.Client
 
             foreach (var tabletOperations in operationsByTablet)
             {
-                var task = WriteRowAsync(tabletOperations.Value, tabletOperations.Key);
+                var task = WriteRowAsync(
+                    tabletOperations.Value,
+                    tabletOperations.Key,
+                    externalConsistencyMode);
+
                 tasks[i++] = task;
             }
 
             var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+            // TODO: Save timestamp.
             return results;
         }
 
-        private async Task<WriteResponsePB> WriteRowAsync(List<Operation> operations, RemoteTablet tablet)
+        private async Task<WriteResponsePB> WriteRowAsync(
+            List<Operation> operations,
+            RemoteTablet tablet,
+            ExternalConsistencyMode externalConsistencyMode)
         {
             var table = operations[0].Table;
 
@@ -309,19 +280,29 @@ namespace Kudu.Client
                 indirectData = indirectBuffer.Memory.ToArray();
             }
 
-            var rowOperations = new Protocol.RowOperationsPB
+            var rowOperations = new RowOperationsPB
             {
                 Rows = rowData,
                 IndirectData = indirectData
             };
 
+            var request = new WriteRequestPB
+            {
+                TabletId = tablet.TabletId.ToUtf8ByteArray(),
+                Schema = table.SchemaPb.Schema,
+                RowOperations = rowOperations,
+                ExternalConsistencyMode = (ExternalConsistencyModePB)externalConsistencyMode
+            };
+
+            long lastPropagatedTimestamp = LastPropagatedTimestamp;
+            if (lastPropagatedTimestamp != NoTimestamp)
+            {
+                // TODO: This could be different from the one set by SendRpcToTabletAsync()
+                request.PropagatedTimestamp = (ulong)lastPropagatedTimestamp;
+            }
+
             var rpc = new WriteRequest(
-                new WriteRequestPB
-                {
-                    TabletId = tablet.TabletId.ToUtf8ByteArray(),
-                    Schema = table.SchemaPb.Schema,
-                    RowOperations = rowOperations
-                },
+                request,
                 table.TableId,
                 tablet.Partition.PartitionKeyStart);
 
@@ -337,6 +318,13 @@ namespace Kudu.Client
         public ScanBuilder NewScanBuilder(KuduTable table)
         {
             return new ScanBuilder(this, table);
+        }
+
+        public IKuduSession NewSession(KuduSessionOptions options)
+        {
+            var session = new KuduSession(this, options);
+            session.StartProcessing();
+            return session;
         }
 
         private async Task<KuduTable> OpenTableAsync(TableIdentifierPB tableIdentifier)
@@ -385,8 +373,11 @@ namespace Kudu.Client
             }
         }
 
-        private ValueTask<RemoteTablet> GetRowTabletAsync(KuduTable table, PartialRow row)
+        internal ValueTask<RemoteTablet> GetRowTabletAsync(Operation operation)
         {
+            var table = operation.Table;
+            var row = operation.Row;
+
             using var writer = new BufferWriter(256);
             KeyEncoder.EncodePartitionKey(row, table.PartitionSchema, writer);
             var partitionKey = writer.Memory.Span;

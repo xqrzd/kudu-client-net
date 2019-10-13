@@ -11,12 +11,16 @@
 
   <ItemGroup>
     <PackageReference Include="Pipelines.Sockets.Unofficial" Version="2.0.25" />
-    <PackageReference Include="protobuf-net" Version="3.0.0-alpha.146.g00620fbe1a" />
+    <PackageReference Include="protobuf-net" Version="3.0.0-alpha.75" />
     <PackageReference Include="System.IO.Pipelines" Version="4.6.0" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)'=='netcoreapp2.1' OR '$(TargetFramework)'=='netstandard2.0' ">
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="1.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)'=='netcoreapp2.1' OR '$(TargetFramework)'=='netstandard2.0' OR '$(TargetFramework)'=='netstandard2.1' ">
+    <PackageReference Include="System.Threading.Channels" Version="4.6.0" />
   </ItemGroup>
 
   <ItemGroup>
