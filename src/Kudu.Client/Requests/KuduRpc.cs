@@ -68,19 +68,6 @@ namespace Kudu.Client.Requests
         {
             Serializer.SerializeWithLengthPrefix(stream, value, PrefixStyle.Base128);
         }
-
-        public static T Parse<T>(ReadOnlySequence<byte> buffer)
-        {
-            // TODO: This commented code has a parsing bug for fragmented sequences.
-            //using var reader = ProtoReader.Create(
-            //    out var state, buffer, RuntimeTypeModel.Default);
-
-            //return reader.Deserialize<T>(ref state);
-
-            var array = buffer.ToArray();
-            var stream = new MemoryStream(array);
-            return Serializer.Deserialize<T>(stream);
-        }
     }
 
     public abstract class KuduMasterRpc : KuduRpc
@@ -101,7 +88,7 @@ namespace Kudu.Client.Requests
 
         public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
         {
-            Response = Parse<TResponse>(buffer);
+            Response = Serializer.Deserialize<TResponse>(buffer);
         }
     }
 
@@ -133,7 +120,7 @@ namespace Kudu.Client.Requests
 
         public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
         {
-            Response = Parse<TResponse>(buffer);
+            Response = Serializer.Deserialize<TResponse>(buffer);
         }
     }
 }

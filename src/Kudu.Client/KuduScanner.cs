@@ -529,7 +529,7 @@ namespace Kudu.Client
 
             public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
             {
-                var resp = Parse<ScanResponsePB>(buffer);
+                var resp = Serializer.Deserialize<ScanResponsePB>(buffer);
 
                 // TODO: Error handling
 
