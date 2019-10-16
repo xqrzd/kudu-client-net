@@ -2,7 +2,6 @@
 using Kudu.Client.Protocol.Rpc;
 using Kudu.Client.Util;
 using ProtoBuf;
-using ProtoBuf.Meta;
 
 namespace Kudu.Client.Connection
 {
@@ -93,20 +92,12 @@ namespace Kudu.Client.Connection
                 return false;
             }
 
-            ReadOnlySequence<byte> slice = buffer.Slice(0, length);
-            using var reader = ProtoReader.State.Create(slice, RuntimeTypeModel.Default);
+            var slice = buffer.Slice(0, length);
+            header = Serializer.Deserialize<ResponseHeader>(slice);
 
-            header = reader.DeserializeRoot<ResponseHeader>();
             buffer = buffer.Slice(length);
 
             return true;
-        }
-
-        public static ErrorStatusPB ParseError(ReadOnlySequence<byte> buffer)
-        {
-            using var reader = ProtoReader.State.Create(buffer, RuntimeTypeModel.Default);
-
-            return reader.DeserializeRoot<ErrorStatusPB>();
         }
     }
 }

@@ -208,7 +208,7 @@ namespace Kudu.Client.Connection
 
             if (header.IsError)
             {
-                var error = KuduProtocol.ParseError(buffer);
+                var error = Serializer.Deserialize<ErrorStatusPB>(buffer);
                 var exception = new RpcException(error);
 
                 message.CompleteWithError(exception);
