@@ -1,4 +1,5 @@
-﻿using Kudu.Client.Protocol.Rpc;
+﻿using System.Buffers;
+using Kudu.Client.Protocol.Rpc;
 
 namespace Kudu.Client.Connection
 {
@@ -14,13 +15,13 @@ namespace Kudu.Client.Connection
         /// <summary>
         /// RPC Header protobuf length (variable encoding).
         /// </summary>
-        public uint HeaderLength;
+        public int HeaderLength;
 
         /// <summary>
         /// Main message length (variable encoding).
         /// Includes the size of any sidecars.
         /// </summary>
-        public uint MainMessageLength;
+        public int MainMessageLength;
 
         /// <summary>
         /// RPC Header protobuf.
@@ -28,14 +29,19 @@ namespace Kudu.Client.Connection
         public ResponseHeader Header;
 
         /// <summary>
+        /// Raw buffer of the main protobuf message.
+        /// </summary>
+        public ReadOnlySequence<byte> MainProtobufMessage;
+
+        /// <summary>
         /// Gets the size of the main message protobuf.
         /// </summary>
         public int ProtobufMessageLength => Header.SidecarOffsets == null ?
-            (int)MainMessageLength : (int)Header.SidecarOffsets[0];
+            MainMessageLength : (int)Header.SidecarOffsets[0];
 
         public bool HasSidecars => Header.SidecarOffsets != null;
 
-        public int SidecarLength => (int)MainMessageLength - (int)Header.SidecarOffsets[0];
+        public int SidecarLength => MainMessageLength - (int)Header.SidecarOffsets[0];
     }
 
     public enum ParseStep

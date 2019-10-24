@@ -17,7 +17,7 @@ namespace Kudu.Client.Builder
 
         internal ReadMode ReadMode = ReadMode.ReadLatest;
         internal bool IsFaultTolerant = false;
-        internal int BatchSizeBytes = 1024 * 1024;
+        internal int? BatchSizeBytes;
         internal long Limit = long.MaxValue;
         internal bool CacheBlocks = true;
         internal long StartTimestamp = -1; // Not currently exposed.

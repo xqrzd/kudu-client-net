@@ -26,7 +26,7 @@ namespace Kudu.Client.Connection
             writerScheduler: DedicatedThreadPoolPipeScheduler.Default,
             pauseWriterThreshold: 1024 * 1024 * 256,  // 256MB
             resumeWriterThreshold: 1024 * 1024 * 128, // 128MB
-            minimumSegmentSize: 1024 * 128,
+            minimumSegmentSize: 1024 * 256,
             useSynchronizationContext: false);
 
         // TODO: Allow users to supply in pipe options.

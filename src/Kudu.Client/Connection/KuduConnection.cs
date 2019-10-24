@@ -110,19 +110,21 @@ namespace Kudu.Client.Connection
 
         private async Task ReceiveAsync()
         {
-            PipeReader input = _ioPipe.Input;
+            var input = _ioPipe.Input;
             var parserContext = new ParserContext();
 
             try
             {
                 while (true)
                 {
-                    ReadResult result = await input.ReadAsync().ConfigureAwait(false);
+                    var result = await input.ReadAsync().ConfigureAwait(false);
 
                     if (result.IsCanceled || result.IsCompleted)
                         break;
 
-                    await ParseAsync(input, result.Buffer, parserContext).ConfigureAwait(false);
+                    var buffer = result.Buffer;
+
+                    await ParseAsync(input, buffer, parserContext).ConfigureAwait(false);
                 }
 
                 input.Complete();
@@ -136,88 +138,137 @@ namespace Kudu.Client.Connection
             }
         }
 
-        private Task ParseAsync(
-            PipeReader input, ReadOnlySequence<byte> buffer, ParserContext parserContext)
+        private Task ParseAsync(PipeReader input, ReadOnlySequence<byte> buffer, ParserContext parserContext)
         {
+            var reader = new SequenceReader<byte>(buffer);
+
             do
             {
-                if (KuduProtocol.TryParseMessage(ref buffer, parserContext))
+                if (KuduProtocol.TryParseMessage(ref reader, parserContext))
                 {
-                    ResponseHeader header = parserContext.Header;
-                    var messageLength = parserContext.ProtobufMessageLength;
-                    var messageProtobuf = buffer.Slice(0, messageLength);
-                    var success = TryGetRpc(header, messageProtobuf, out var message);
-                    buffer = buffer.Slice(messageLength);
+                    var header = parserContext.Header;
+                    var callId = header.CallId;
+                    var rpc = GetRpc(header);
 
-                    if (success)
+                    if (header.IsError)
                     {
+                        var exception = KuduProtocol.GetRpcError(parserContext);
+                        CompleteRpc(callId, exception);
+                    }
+                    else
+                    {
+                        rpc.Rpc.ParseProtobuf(parserContext.MainProtobufMessage);
+
                         if (parserContext.HasSidecars)
                         {
-                            input.AdvanceTo(buffer.Start);
+                            input.AdvanceTo(reader.Position);
 
                             var length = parserContext.SidecarLength;
-                            return ProcessSidecarsAsync(input, message, header, length);
+                            return ProcessSidecarsAsync(input, rpc, header, length);
                         }
                         else
                         {
-                            message.Complete();
+                            CompleteRpc(callId);
                         }
                     }
                 }
-            } while (parserContext.Step == ParseStep.NotStarted && buffer.Length >= 4);
+            } while (parserContext.Step == ParseStep.NotStarted && reader.Remaining >= 4);
 
-            input.AdvanceTo(buffer.Start, buffer.End);
+            input.AdvanceTo(reader.Position, buffer.End);
 
             return Task.CompletedTask;
         }
 
         private async Task ProcessSidecarsAsync(
             PipeReader input,
-            InflightRpc message,
+            InflightRpc rpc,
             ResponseHeader header,
             int length)
         {
             try
             {
-                await message.Rpc.ParseSidecarsAsync(header, input, length).ConfigureAwait(false);
-                message.Complete();
+                AdjustSidecarOffsets(header);
+                await rpc.Rpc.ParseSidecarsAsync(header, input, length).ConfigureAwait(false);
+                CompleteRpc(header.CallId);
             }
             catch (Exception ex)
             {
-                // We've already dequeued the message from _inflightMessages,
-                // so we can't rely on the connection shutdown to mark this
-                // rpc as failed.
-                message.CompleteWithError(ex);
+                CompleteRpc(header.CallId, ex);
+
+                // TODO: We probably don't need to burn this entire connection
+                // just because we had an error parsing sidecars.
+
+                // Ideally we could just read any remaining data and continue.
                 throw;
             }
         }
 
-        private bool TryGetRpc(ResponseHeader header, ReadOnlySequence<byte> buffer, out InflightRpc message)
+        /// <summary>
+        /// Make sidecar offsets zero-based.
+        /// </summary>
+        /// <param name="header">The header to adjust.</param>
+        private void AdjustSidecarOffsets(ResponseHeader header)
+        {
+            uint[] sidecars = header.SidecarOffsets;
+            uint offset = sidecars[0];
+
+            for (int i = 0; i < sidecars.Length; i++)
+            {
+                sidecars[i] -= offset;
+            }
+        }
+
+        private InflightRpc GetRpc(ResponseHeader header)
         {
             bool success;
+            InflightRpc rpc;
 
             lock (_inflightRpcs)
             {
-                success = _inflightRpcs.Remove(header.CallId, out message);
+                success = _inflightRpcs.TryGetValue(header.CallId, out rpc);
             }
 
             if (!success)
             {
-                throw new Exception($"Unable to find inflight message {header.CallId}");
+                // If we get a bad RPC ID back, we are probably somehow misaligned from
+                // the server. So, we disconnect the connection.
+
+                throw new NonRecoverableException(KuduStatus.IllegalState(
+                    $"[peer {_ioPipe}] invalid callID: {header.CallId}"));
             }
 
-            if (header.IsError)
-            {
-                var error = Serializer.Deserialize<ErrorStatusPB>(buffer);
-                var exception = new RpcException(error);
+            return rpc;
+        }
 
-                message.CompleteWithError(exception);
-                return false;
-            }
-            else
+        private void CompleteRpc(int callId)
+        {
+            bool success;
+            InflightRpc rpc;
+
+            lock (_inflightRpcs)
             {
-                message.Rpc.ParseProtobuf(buffer);
-                return true;
+                success = _inflightRpcs.Remove(callId, out rpc);
+            }
+
+            if (success)
+            {
+                rpc.TrySetResult(null);
+            }
+        }
+
+        private void CompleteRpc(int callId, Exception exception)
+        {
+            bool success;
+            InflightRpc rpc;
+
+            lock (_inflightRpcs)
+            {
+                success = _inflightRpcs.Remove(callId, out rpc);
+            }
+
+            if (success)
+            {
+                rpc.TrySetException(exception);
             }
         }
 
@@ -236,7 +287,7 @@ namespace Kudu.Client.Connection
                 _closedException = closedException;
 
                 foreach (var inflightMessage in _inflightRpcs.Values)
-                    inflightMessage.CompleteWithError(closedException);
+                    inflightMessage.TrySetException(closedException);
 
                 InvokeDisconnectedCallback(closedException);
 
@@ -271,7 +322,7 @@ namespace Kudu.Client.Connection
             try { _disconnectedCallback.Invoke(exception); } catch { }
         }
 
-        private sealed class InflightRpc : TaskCompletionSource<KuduRpc>
+        private sealed class InflightRpc : TaskCompletionSource<object>
         {
             public KuduRpc Rpc { get; }
 
@@ -280,10 +331,6 @@ namespace Kudu.Client.Connection
             {
                 Rpc = rpc;
             }
-
-            public void Complete() => TrySetResult(Rpc);
-
-            public void CompleteWithError(Exception exception) => TrySetException(exception);
         }
 
         private readonly struct DisconnectedCallback

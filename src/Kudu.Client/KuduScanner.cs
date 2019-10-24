@@ -6,6 +6,7 @@ using System.IO.Pipelines;
 using System.Threading;
 using System.Threading.Tasks;
 using Kudu.Client.Builder;
+using Kudu.Client.Exceptions;
 using Kudu.Client.Protocol;
 using Kudu.Client.Protocol.Rpc;
 using Kudu.Client.Protocol.Tserver;
@@ -112,7 +113,7 @@ namespace Kudu.Client
             bool cacheBlocks,
             byte[] startPrimaryKey, byte[] endPrimaryKey,
             long startTimestamp, long htTimestamp,
-            int batchSizeBytes,
+            int? batchSizeBytes,
             PartitionPruner partitionPruner,
             ReplicaSelection replicaSelection,
             CancellationToken cancellationToken)
@@ -159,7 +160,6 @@ namespace Kudu.Client
             _endPrimaryKey = endPrimaryKey ?? Array.Empty<byte>();
             _startTimestamp = startTimestamp;
             _htTimestamp = htTimestamp;
-            _batchSizeBytes = batchSizeBytes;
             _lastPrimaryKey = Array.Empty<byte>();
             _cancellationToken = cancellationToken;
 
@@ -185,6 +185,7 @@ namespace Kudu.Client
                 }
             }
             _schema = new Schema(columns);
+            _batchSizeBytes = batchSizeBytes ?? GetScannerBatchSizeEstimate(_schema);
             // This is a diff scan so add the IS_DELETED column.
             if (startTimestamp != KuduClient.NoTimestamp)
             {
@@ -236,6 +237,12 @@ namespace Kudu.Client
 
         public async ValueTask DisposeAsync()
         {
+            if (Current != null)
+            {
+                Current.Dispose();
+                Current = null;
+            }
+
             if (!_closed)
             {
                 // Getting a null tablet here without being in a closed state
@@ -266,6 +273,12 @@ namespace Kudu.Client
         {
             // TODO: Catch OperationCancelledException, and call DisposeAsync()
             // Only wait a small amount of time to cancel the scan on the server.
+
+            if (Current != null)
+            {
+                Current.Dispose();
+                Current = null;
+            }
 
             if (_closed)
             {
@@ -397,7 +410,7 @@ namespace Kudu.Client
                 return;
             }
 
-            Console.WriteLine($"Done scanning tablet {_tablet.TabletId} for partition {_tablet.Partition} with scanner id {BitConverter.ToString(_scannerId)}");
+            //Console.WriteLine($"Done scanning tablet {_tablet.TabletId} for partition {_tablet.Partition} with scanner id {BitConverter.ToString(_scannerId)}");
 
             _scannerId = null;
             _sequenceId = 0;
@@ -534,73 +547,145 @@ namespace Kudu.Client
                 // TODO: Error handling
 
                 _responsePB = resp;
-
-                Response = new ScanResponse<ResultSet>(
-                    resp.ScannerId,
-                    resp.Data.NumRows,
-                    resp.HasMoreResults,
-                    resp.ShouldSerializeSnapTimestamp() ? (long)resp.SnapTimestamp : KuduClient.NoTimestamp,
-                    resp.ShouldSerializePropagatedTimestamp() ? (long)resp.PropagatedTimestamp : KuduClient.NoTimestamp,
-                    resp.LastPrimaryKey);
             }
 
             public override async Task ParseSidecarsAsync(
                 ResponseHeader header, PipeReader reader, int length)
             {
+                // Allocate buffers for sidecars.
+                var sidecars = AllocateSidecars(header, length);
+                var nextSidecarIndex = 0;
+                var currentSidecar = sidecars[nextSidecarIndex++].Memory;
+
                 long remaining = length;
+                long remainingSidecarLength = currentSidecar.Length;
 
-                var original = new byte[length];
-                Memory<byte> data = original;
-
-                while (remaining > 0)
+                try
                 {
-                    var result = await reader.ReadAsync().ConfigureAwait(false);
-                    var buffer = result.Buffer;
+                    // Fill sidecars.
+                    while (remaining > 0)
+                    {
+                        // Don't pass the cancellation token. Even if the scan
+                        // is cancelled, we still need to consume all the data.
+                        var result = await reader.ReadAsync().ConfigureAwait(false);
 
-                    // TODO:
-                    if (result.IsCanceled || result.IsCompleted)
-                        break;
+                        if (result.IsCanceled || result.IsCompleted)
+                            break;
 
-                    var maxRead = Math.Min(remaining, length);
-                    var read = Math.Min(buffer.Length, maxRead);
+                        var buffer = result.Buffer;
 
-                    buffer.Slice(0, read).CopyTo(data.Span);
-                    data = data.Slice((int)read);
+                        do
+                        {
+                            if (currentSidecar.Length == 0)
+                            {
+                                currentSidecar = sidecars[nextSidecarIndex++].Memory;
+                                remainingSidecarLength = currentSidecar.Length;
+                            }
 
-                    buffer = buffer.Slice(read);
-                    remaining -= read;
+                            // How much data can we copy from the buffer?
+                            var bytesToRead = Math.Min(buffer.Length, remainingSidecarLength);
+                            buffer.Slice(0, bytesToRead).CopyTo(currentSidecar.Span);
 
-                    reader.AdvanceTo(buffer.Start, buffer.End);
+                            remaining -= bytesToRead;
+                            remainingSidecarLength -= bytesToRead;
+                            currentSidecar = currentSidecar.Slice((int)bytesToRead);
+
+                            buffer = buffer.Slice(bytesToRead);
+                        }
+                        while (remaining > 0 && buffer.Length > 0);
+
+                        reader.AdvanceTo(buffer.Start, buffer.End);
+                    }
+                }
+                finally
+                {
+                    if (remaining > 0)
+                    {
+                        foreach (var sidecar in sidecars)
+                            sidecar.Dispose();
+
+                        throw new NonRecoverableException(KuduStatus.IllegalState(
+                            $"Unable to read all sidecar data ({remaining}/{length})"));
+                    }
                 }
 
-                var rowsSidecar = _responsePB.Data.RowsSidecar;
+                var response = _responsePB;
 
-                if (_responsePB.Data.ShouldSerializeIndirectDataSidecar())
+                var rowData = sidecars[response.Data.RowsSidecar];
+                IMemoryOwner<byte> indirectData = null;
+
+                if (response.Data.ShouldSerializeIndirectDataSidecar())
                 {
-                    var indirectDataSidecar = _responsePB.Data.IndirectDataSidecar;
-
-                    var rs = header.SidecarOffsets[rowsSidecar]; //TODO: adjust these
-                    var id = header.SidecarOffsets[indirectDataSidecar] - rs;
-
-                    data = original;
-
-                    var slice1 = data.Slice(0, (int)id);
-                    var slice2 = data.Slice((int)id);
-
-                    Response.Data = new ResultSet(
-                        _scanner._schema,
-                        Response.NumRows,
-                        slice1,
-                        slice2);
+                    indirectData = sidecars[response.Data.IndirectDataSidecar];
                 }
-                else
+
+                var resultSet = new ResultSet(
+                    _scanner._schema,
+                    response.Data.NumRows,
+                    rowData,
+                    indirectData);
+
+                Response = new ScanResponse<ResultSet>(
+                    response.ScannerId,
+                    resultSet,
+                    response.Data.NumRows,
+                    response.HasMoreResults,
+                    response.ShouldSerializeSnapTimestamp() ? (long)response.SnapTimestamp : KuduClient.NoTimestamp,
+                    response.ShouldSerializePropagatedTimestamp() ? (long)response.PropagatedTimestamp : KuduClient.NoTimestamp,
+                    response.LastPrimaryKey);
+            }
+
+            private static List<ArrayMemoryPoolBuffer<byte>> AllocateSidecars(
+                ResponseHeader header, int length)
+            {
+                var sidecars = new List<ArrayMemoryPoolBuffer<byte>>();
+                int total = 0;
+                for (int i = 0; i < header.SidecarOffsets.Length; i++)
                 {
-                    Response.Data = new ResultSet(
-                        _scanner._schema,
-                        Response.NumRows,
-                        original,
-                        default);
+                    var offset = header.SidecarOffsets[i];
+                    int size;
+                    if (i + 1 >= header.SidecarOffsets.Length)
+                    {
+                        size = length - total;
+                    }
+                    else
+                    {
+                        var next = header.SidecarOffsets[i + 1];
+                        size = (int)(next - offset);
+                    }
+
+                    var sidecar = new ArrayMemoryPoolBuffer<byte>(size);
+                    sidecars.Add(sidecar);
+
+                    total += size;
                 }
+
+                if (total != length)
+                {
+                    foreach (var sidecar in sidecars)
+                        sidecar.Dispose();
+
+                    throw new NonRecoverableException(KuduStatus.IllegalState(
+                        $"Expected {length} sidecar bytes, computed {total}"));
+                }
+
+                return sidecars;
+            }
+        }
+
+        private static int GetScannerBatchSizeEstimate(Schema schema)
+        {
+            if (schema.VarLengthColumnCount == 0)
+            {
+                // No variable length data, we can do an
+                // exact ideal estimate here.
+                return 1024 * 1024 - schema.RowSize;
+            }
+            else
+            {
+                // Assume everything evens out.
+                // Most of the time it probably does.
+                return 1024 * 1024;
             }
         }
 
@@ -609,6 +694,42 @@ namespace Kudu.Client
             Opening,
             Next,
             Closing
+        }
+
+        private sealed class ArrayMemoryPoolBuffer<T> : IMemoryOwner<T>
+        {
+            private readonly int _length;
+            private T[] _array;
+
+            public ArrayMemoryPoolBuffer(int size)
+            {
+                _length = size;
+                _array = ArrayPool<T>.Shared.Rent(size);
+            }
+
+            public Memory<T> Memory
+            {
+                get
+                {
+                    T[] array = _array;
+                    if (array == null)
+                    {
+                        throw new ObjectDisposedException(nameof(ArrayMemoryPoolBuffer<T>));
+                    }
+
+                    return new Memory<T>(array, 0, _length);
+                }
+            }
+
+            public void Dispose()
+            {
+                T[] array = _array;
+                if (array != null)
+                {
+                    _array = null;
+                    ArrayPool<T>.Shared.Return(array);
+                }
+            }
         }
     }
 }

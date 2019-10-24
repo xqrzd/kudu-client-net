@@ -1,13 +1,14 @@
 ﻿using System;
+using System.Buffers;
 using System.Runtime.CompilerServices;
 
 namespace Kudu.Client
 {
-    public class ResultSet
+    public class ResultSet : IDisposable
     {
         private readonly Schema _schema;
-        private readonly ReadOnlyMemory<byte> _rowAlloc;
-        private readonly ReadOnlyMemory<byte> _indirectData;
+        private readonly IMemoryOwner<byte> _rowAlloc;
+        private readonly IMemoryOwner<byte> _indirectData;
         private readonly int[] _columnOffsets;
         private readonly int _rowSize;
         private readonly bool _hasNullableColumns;
@@ -17,8 +18,8 @@ namespace Kudu.Client
         public ResultSet(
             Schema schema,
             int numRows,
-            ReadOnlyMemory<byte> rowAlloc,
-            ReadOnlyMemory<byte> indirectData)
+            IMemoryOwner<byte> rowAlloc,
+            IMemoryOwner<byte> indirectData)
         {
             _schema = schema;
             _rowAlloc = rowAlloc;
@@ -55,13 +56,19 @@ namespace Kudu.Client
             _rowSize = schema.RowSize;
         }
 
+        public void Dispose()
+        {
+            _rowAlloc.Dispose();
+            _indirectData?.Dispose();
+        }
+
         public RowResult this[int index]
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => new RowResult(
                 this,
-                _rowAlloc.Span.Slice(index * _rowSize, _rowSize),
-                _indirectData.Span);
+                _rowAlloc.Memory.Span.Slice(index * _rowSize, _rowSize),
+                _indirectData != null ? _indirectData.Memory.Span : default);
         }
 
         internal int GetOffset(int columnIndex)

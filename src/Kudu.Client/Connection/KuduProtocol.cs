@@ -1,20 +1,21 @@
 ﻿using System.Buffers;
+using Kudu.Client.Exceptions;
 using Kudu.Client.Protocol.Rpc;
 using Kudu.Client.Util;
 using ProtoBuf;
 
 namespace Kudu.Client.Connection
 {
-    public static class KuduProtocol
+    internal static class KuduProtocol
     {
         public static bool TryParseMessage(
-            ref ReadOnlySequence<byte> buffer, ParserContext parserContext)
+            ref SequenceReader<byte> reader, ParserContext parserContext)
         {
             switch (parserContext.Step)
             {
                 case ParseStep.NotStarted:
                     {
-                        if (buffer.TryReadInt32BigEndian(out parserContext.TotalMessageLength))
+                        if (reader.TryReadBigEndian(out parserContext.TotalMessageLength))
                         {
                             goto case ParseStep.ReadHeaderLength;
                         }
@@ -26,7 +27,7 @@ namespace Kudu.Client.Connection
                     }
                 case ParseStep.ReadHeaderLength:
                     {
-                        if (buffer.TryReadVarintUInt32(out parserContext.HeaderLength))
+                        if (reader.TryReadVarint(out parserContext.HeaderLength))
                         {
                             goto case ParseStep.ReadHeader;
                         }
@@ -39,8 +40,8 @@ namespace Kudu.Client.Connection
                     }
                 case ParseStep.ReadHeader:
                     {
-                        if (TryParseResponseHeader(
-                            ref buffer, parserContext.HeaderLength, out parserContext.Header))
+                        if (TryParseResponseHeader(ref reader,
+                            parserContext.HeaderLength, out parserContext.Header))
                         {
                             goto case ParseStep.ReadMainMessageLength;
                         }
@@ -53,7 +54,7 @@ namespace Kudu.Client.Connection
                     }
                 case ParseStep.ReadMainMessageLength:
                     {
-                        if (buffer.TryReadVarintUInt32(out parserContext.MainMessageLength))
+                        if (reader.TryReadVarint(out parserContext.MainMessageLength))
                         {
                             goto case ParseStep.ReadProtobufMessage;
                         }
@@ -67,12 +68,17 @@ namespace Kudu.Client.Connection
                 case ParseStep.ReadProtobufMessage:
                     {
                         var messageLength = parserContext.ProtobufMessageLength;
-                        if (buffer.Length < messageLength)
+                        if (reader.Remaining < messageLength)
                         {
                             // Not enough data to parse main protobuf message.
                             parserContext.Step = ParseStep.ReadProtobufMessage;
                             break;
                         }
+
+                        parserContext.MainProtobufMessage = reader.Sequence
+                            .Slice(reader.Position, messageLength);
+
+                        reader.Advance(messageLength);
 
                         parserContext.Step = ParseStep.NotStarted;
 
@@ -83,19 +89,26 @@ namespace Kudu.Client.Connection
             return false;
         }
 
-        private static bool TryParseResponseHeader(
-            ref ReadOnlySequence<byte> buffer, long length, out ResponseHeader header)
+        public static RpcException GetRpcError(ParserContext parserContext)
         {
-            if (buffer.Length < length)
+            var buffer = parserContext.MainProtobufMessage;
+            var error = Serializer.Deserialize<ErrorStatusPB>(buffer);
+            return new RpcException(error);
+        }
+
+        private static bool TryParseResponseHeader(
+            ref SequenceReader<byte> reader, long length, out ResponseHeader header)
+        {
+            if (reader.Remaining < length)
             {
                 header = null;
                 return false;
             }
 
-            var slice = buffer.Slice(0, length);
+            var slice = reader.Sequence.Slice(reader.Position, length);
             header = Serializer.Deserialize<ResponseHeader>(slice);
 
-            buffer = buffer.Slice(length);
+            reader.Advance(length);
 
             return true;
         }

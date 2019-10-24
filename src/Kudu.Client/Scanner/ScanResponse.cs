@@ -13,7 +13,7 @@
         /// <summary>
         /// The actual payload of the response.
         /// </summary>
-        public T Data { get; set; }
+        public T Data { get; }
 
         /// <summary>
         /// Number of rows returned by the scanner.
@@ -53,6 +53,7 @@
 
         public ScanResponse(
             byte[] scannerId,
+            T data,
             int numRows,
             bool hasMoreResults,
             long scanTimestamp,
@@ -60,6 +61,7 @@
             byte[] lastPrimaryKey)
         {
             ScannerId = scannerId;
+            Data = data;
             NumRows = numRows;
             HasMoreResults = hasMoreResults;
             ScanTimestamp = scanTimestamp;
