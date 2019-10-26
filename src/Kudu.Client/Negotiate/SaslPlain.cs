@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Net;
 using System.Text;
+using Kudu.Client.Util;
 
 namespace Kudu.Client.Negotiate
 {

@@ -9,6 +9,7 @@ using Kudu.Client.Exceptions;
 using Kudu.Client.Internal;
 using Kudu.Client.Protocol.Rpc;
 using Kudu.Client.Requests;
+using Kudu.Client.Util;
 using ProtoBuf;
 
 namespace Kudu.Client.Connection
@@ -242,15 +243,7 @@ namespace Kudu.Client.Connection
 
         private void CompleteRpc(int callId)
         {
-            bool success;
-            InflightRpc rpc;
-
-            lock (_inflightRpcs)
-            {
-                success = _inflightRpcs.Remove(callId, out rpc);
-            }
-
-            if (success)
+            if (TryRemoveRpc(callId, out var rpc))
             {
                 rpc.TrySetResult(null);
             }
@@ -258,17 +251,17 @@ namespace Kudu.Client.Connection
 
         private void CompleteRpc(int callId, Exception exception)
         {
-            bool success;
-            InflightRpc rpc;
-
-            lock (_inflightRpcs)
-            {
-                success = _inflightRpcs.Remove(callId, out rpc);
-            }
-
-            if (success)
+            if (TryRemoveRpc(callId, out var rpc))
             {
                 rpc.TrySetException(exception);
+            }
+        }
+
+        private bool TryRemoveRpc(int callId, out InflightRpc rpc)
+        {
+            lock (_inflightRpcs)
+            {
+                return _inflightRpcs.Remove(callId, out rpc);
             }
         }
 

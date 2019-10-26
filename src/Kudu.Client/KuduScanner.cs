@@ -373,11 +373,25 @@ namespace Kudu.Client
 
         private ColumnSchemaPB ToColumnSchemaPb(ColumnSchema columnSchema)
         {
+            // TODO: Move this to shared location.
             return new ColumnSchemaPB
             {
                 Name = columnSchema.Name,
                 Type = (DataTypePB)columnSchema.Type,
-                IsNullable = columnSchema.IsNullable
+                IsNullable = columnSchema.IsNullable,
+                // Se isKey to false on the passed ColumnSchema.
+                // This allows out of order key columns in projections.
+                IsKey = false,
+                // TODO: Default values
+                // TODO: Block size
+                Encoding = (EncodingTypePB)columnSchema.Encoding,
+                Compression = (CompressionTypePB)columnSchema.Compression,
+                TypeAttributes = columnSchema.TypeAttributes == null ? null : new ColumnTypeAttributesPB
+                {
+                    Precision = columnSchema.TypeAttributes.Precision,
+                    Scale = columnSchema.TypeAttributes.Scale
+                }
+                // TODO: Comment
             };
         }
 

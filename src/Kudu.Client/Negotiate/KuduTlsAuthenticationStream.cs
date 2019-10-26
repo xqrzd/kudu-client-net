@@ -40,10 +40,12 @@ namespace Kudu.Client.Negotiate
             return SendHandshakeAsync(new ReadOnlyMemory<byte>(buffer, offset, count), cancellationToken).AsTask();
         }
 
+#if !NETSTANDARD2_0
         public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
             return SendHandshakeAsync(buffer, cancellationToken);
         }
+#endif
 
         public override int Read(byte[] buffer, int offset, int count)
         {
@@ -55,10 +57,12 @@ namespace Kudu.Client.Negotiate
             return Task.FromResult(ReadHandshake(new Memory<byte>(buffer, offset, count)));
         }
 
+#if !NETSTANDARD2_0
         public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
             return new ValueTask<int>(ReadHandshake(buffer));
         }
+#endif
 
         public override void Flush()
         {

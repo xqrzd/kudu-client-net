@@ -4,6 +4,7 @@ using System.IO;
 
 namespace Kudu.Client.Internal
 {
+    // TODO: Remove this class when IBufferWriter stuff is done.
     public sealed class RecyclableMemoryStream : Stream
     {
         private byte[] _buffer;
@@ -85,7 +86,11 @@ namespace Kudu.Client.Internal
             return Read(slice);
         }
 
-        public override int Read(Span<byte> buffer)
+        public
+#if !NETSTANDARD2_0
+            override
+#endif
+            int Read(Span<byte> buffer)
         {
             var desiredLength = buffer.Length;
             var maxCanRead = _length - _position;
@@ -111,7 +116,11 @@ namespace Kudu.Client.Internal
             Write(slice);
         }
 
-        public override void Write(ReadOnlySpan<byte> buffer)
+        public
+#if !NETSTANDARD2_0
+            override
+#endif
+            void Write(ReadOnlySpan<byte> buffer)
         {
             // Make sure there's space for the buffer.
             EnsureCapacity(buffer.Length);

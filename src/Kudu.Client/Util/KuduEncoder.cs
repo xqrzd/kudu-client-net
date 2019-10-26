@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Buffers.Binary;
-using System.Numerics;
 using System.Text;
 
 namespace Kudu.Client.Util
@@ -22,16 +21,10 @@ namespace Kudu.Client.Util
         public static void EncodeInt64(Span<byte> destination, long value) =>
             BinaryPrimitives.WriteInt64LittleEndian(destination, value);
 
-        public static void EncodeInt128(Span<byte> destination, BigInteger value)
+        public static void EncodeInt128(Span<byte> destination, KuduInt128 value)
         {
-            value.TryWriteBytes(destination, out int written, isUnsigned: false, isBigEndian: false);
-
-            if (value.Sign == -1)
-            {
-                // TODO: Use C# 8 range here: written..^0
-                var slice = destination.Slice(written, 16 - written);
-                slice.Fill(0xff);
-            }
+            BinaryPrimitives.WriteUInt64LittleEndian(destination, value.Low);
+            BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(8), value.High);
         }
 
         public static void EncodeDateTime(Span<byte> destination, DateTime value)
@@ -69,7 +62,7 @@ namespace Kudu.Client.Util
         public static void EncodeDecimal128(
             Span<byte> destination, decimal value, int precision, int scale)
         {
-            BigInteger encodedValue = DecimalUtil.EncodeDecimal128(value, precision, scale);
+            var encodedValue = DecimalUtil.EncodeDecimal128(value, precision, scale);
             EncodeInt128(destination, encodedValue);
         }
 
@@ -100,7 +93,7 @@ namespace Kudu.Client.Util
             return buffer;
         }
 
-        public static byte[] EncodeInt128(BigInteger value)
+        public static byte[] EncodeInt128(KuduInt128 value)
         {
             var buffer = new byte[16];
             EncodeInt128(buffer, value);
@@ -133,7 +126,7 @@ namespace Kudu.Client.Util
 
         public static byte[] EncodeDecimal128(decimal value, int precision, int scale)
         {
-            BigInteger intVal = DecimalUtil.EncodeDecimal128(value, precision, scale);
+            var intVal = DecimalUtil.EncodeDecimal128(value, precision, scale);
             return EncodeInt128(intVal);
         }
 
@@ -155,8 +148,13 @@ namespace Kudu.Client.Util
         public static long DecodeInt64(ReadOnlySpan<byte> source) =>
             BinaryPrimitives.ReadInt64LittleEndian(source);
 
-        public static BigInteger DecodeInt128(ReadOnlySpan<byte> source) =>
-            new BigInteger(source.Slice(0, 16), isUnsigned: false, isBigEndian: false);
+        public static KuduInt128 DecodeInt128(ReadOnlySpan<byte> source)
+        {
+            var low = BinaryPrimitives.ReadUInt64LittleEndian(source);
+            var high = BinaryPrimitives.ReadInt64LittleEndian(source.Slice(8));
+
+            return new KuduInt128(high, low);
+        }
 
         public static DateTime DecodeDateTime(ReadOnlySpan<byte> source)
         {
@@ -189,8 +187,8 @@ namespace Kudu.Client.Util
                     return DecimalUtil.DecodeDecimal64(longVal, scale);
 
                 case KuduType.Decimal128:
-                    BigInteger bigIntVal = DecodeInt128(source);
-                    return DecimalUtil.DecodeDecimal128(bigIntVal, scale);
+                    KuduInt128 int128Val = DecodeInt128(source);
+                    return DecimalUtil.DecodeDecimal128(int128Val, scale);
 
                 default:
                     throw new Exception($"Unsupported data type: {kuduType}.");

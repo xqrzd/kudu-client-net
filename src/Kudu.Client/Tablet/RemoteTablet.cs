@@ -61,7 +61,7 @@ namespace Kudu.Client.Tablet
                 // Sort so that we have a consistent iteration order.
                 .OrderBy(e => e);
 
-            return $"{TabletId}@[{string.Join(',', tabletServers)}]";
+            return $"{TabletId}@[{string.Join(",", tabletServers)}]";
         }
     }
 }

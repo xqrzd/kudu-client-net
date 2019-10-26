@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Buffers.Binary;
-using System.Numerics;
 using Kudu.Client.Util;
 
 namespace Kudu.Client
@@ -597,7 +596,7 @@ namespace Kudu.Client
                     break;
                 case KuduType.Decimal128:
                     {
-                        BigInteger min = DecimalUtil.MinDecimal128(column.TypeAttributes.Precision);
+                        KuduInt128 min = DecimalUtil.MinDecimal128(column.TypeAttributes.Precision);
                         Span<byte> span = GetSpanInRowAllocAndSetBitSet(index, 16);
                         KuduEncoder.EncodeInt128(span, min);
                         break;

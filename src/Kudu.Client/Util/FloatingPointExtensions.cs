@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Runtime.InteropServices;
 
 namespace Kudu.Client.Util
 {
@@ -13,14 +12,15 @@ namespace Kudu.Client.Util
         /// <param name="value">A floating-point number.</param>
         public static int AsInt(this float value)
         {
-            // TODO: Use BitConverter.SingleToInt32Bits() on every platform except .NET Standard 2.0
-
             // All NaN values are collapsed to a single "canonical" NaN value.
             if (float.IsNaN(value))
                 return 0x7fc00000;
 
-            FloatUnion union = value;
-            return union.IntValue;
+#if NETSTANDARD2_0
+            return Netstandard2Extensions.SingleToInt32Bits(value);
+#else
+            return BitConverter.SingleToInt32Bits(value);
+#endif
         }
 
         /// <summary>
@@ -31,7 +31,11 @@ namespace Kudu.Client.Util
         /// </summary>
         public static float AsFloat(this int value)
         {
+#if NETSTANDARD2_0
+            return Netstandard2Extensions.Int32BitsToSingle(value);
+#else
             return BitConverter.Int32BitsToSingle(value);
+#endif
         }
 
         /// <summary>
@@ -70,8 +74,13 @@ namespace Kudu.Client.Util
             if (float.IsNaN(value) || float.IsInfinity(value))
                 return value;
 
+#if NETSTANDARD2_0
+            int bits = Netstandard2Extensions.SingleToInt32Bits(value + 0.0f);
+            return Netstandard2Extensions.Int32BitsToSingle(bits + ((bits >= 0) ? 1 : -1));
+#else
             int bits = BitConverter.SingleToInt32Bits(value + 0.0f);
             return BitConverter.Int32BitsToSingle(bits + ((bits >= 0) ? 1 : -1));
+#endif
         }
 
         /// <summary>
@@ -86,22 +95,6 @@ namespace Kudu.Client.Util
 
             long bits = BitConverter.DoubleToInt64Bits(value + 0.0d);
             return BitConverter.Int64BitsToDouble(bits + ((bits >= 0L) ? 1L : -1L));
-        }
-
-        [StructLayout(LayoutKind.Explicit)]
-        private struct FloatUnion
-        {
-            [FieldOffset(0)]
-            public float FloatValue;
-
-            [FieldOffset(0)]
-            public int IntValue;
-
-            public static implicit operator FloatUnion(int value) =>
-                new FloatUnion { IntValue = value };
-
-            public static implicit operator FloatUnion(float value) =>
-                new FloatUnion { FloatValue = value };
         }
     }
 }

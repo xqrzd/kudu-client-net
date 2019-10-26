@@ -609,7 +609,7 @@ namespace Kudu.Client
                 case KuduType.Decimal128:
                     return NewComparisonPredicate(column, op,
                         DecimalUtil.EncodeDecimal128(value, precision, scale),
-                        DecimalUtil.MaxDecimal128(precision) * -1,
+                        DecimalUtil.MinDecimal128(precision),
                         DecimalUtil.MaxDecimal128(precision));
 
                 default:
@@ -635,7 +635,7 @@ namespace Kudu.Client
         /// <param name="minValue">TODO</param>
         /// <param name="maxValue">TODO</param>
         private static KuduPredicate NewComparisonPredicate(
-            ColumnSchema column, ComparisonOp op, BigInteger value, BigInteger minValue, BigInteger maxValue)
+            ColumnSchema column, ComparisonOp op, KuduInt128 value, KuduInt128 minValue, KuduInt128 maxValue)
         {
             if (op == ComparisonOp.LessEqual)
             {
@@ -963,10 +963,10 @@ namespace Kudu.Client
                     }
                 case KuduType.Decimal128:
                     {
-                        BigInteger m = KuduEncoder.DecodeInt128(a);
-                        BigInteger n = KuduEncoder.DecodeInt128(b);
+                        KuduInt128 m = KuduEncoder.DecodeInt128(a);
+                        KuduInt128 n = KuduEncoder.DecodeInt128(b);
 
-                        return m < n && m + BigInteger.One == n;
+                        return m < n && (m + 1) == n;
                     }
                 default:
                     throw new Exception($"Unknown column type {Column.Type}");

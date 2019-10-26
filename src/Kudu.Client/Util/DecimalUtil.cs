@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Numerics;
 using System.Runtime.InteropServices;
 
 namespace Kudu.Client.Util
@@ -86,18 +85,18 @@ namespace Kudu.Client.Util
         public static int EncodeDecimal32(decimal value, int targetPrecision, int targetScale)
         {
             var dec = new DecimalAccessor(value);
-            int scale = (int)dec.Scale;
+            var scale = (int)dec.Scale;
 
             CheckConditions(value, scale, targetPrecision, targetScale);
 
             int scaleAdjustment = targetScale - scale;
-            uint maxValue = Pow10Int32(targetPrecision - scaleAdjustment) - 1;
+            uint maxValue = PowerOf10Int32(targetPrecision - scaleAdjustment) - 1;
             uint unscaledValue = dec.Low;
 
             if (dec.High > 0 || dec.Mid > 0 || unscaledValue > maxValue)
                 ThrowValueTooBig(value, targetPrecision);
 
-            uint factor = Pow10Int32(scaleAdjustment);
+            uint factor = PowerOf10Int32(scaleAdjustment);
             int result = checked((int)(unscaledValue * factor));
 
             return dec.IsNegative ? result * -1 : result;
@@ -106,49 +105,41 @@ namespace Kudu.Client.Util
         public static long EncodeDecimal64(decimal value, int targetPrecision, int targetScale)
         {
             var dec = new DecimalAccessor(value);
-            int scale = (int)dec.Scale;
+            var scale = (int)dec.Scale;
 
             CheckConditions(value, scale, targetPrecision, targetScale);
 
             int scaleAdjustment = targetScale - scale;
-            ulong maxValue = Pow10Int64(targetPrecision - scaleAdjustment) - 1;
+            ulong maxValue = PowerOf10Int64(targetPrecision - scaleAdjustment) - 1;
             ulong unscaledValue = ToLong(dec.Low, dec.Mid);
 
             if (dec.High > 0 || unscaledValue > maxValue)
                 ThrowValueTooBig(value, targetPrecision);
 
-            ulong factor = Pow10Int64(scaleAdjustment);
+            ulong factor = PowerOf10Int64(scaleAdjustment);
             long result = checked((long)(unscaledValue * factor));
 
             return dec.IsNegative ? result * -1 : result;
         }
 
-        public static BigInteger EncodeDecimal128(decimal value, int targetPrecision, int targetScale)
+        public static KuduInt128 EncodeDecimal128(decimal value, int targetPrecision, int targetScale)
         {
             var dec = new DecimalAccessor(value);
-            int scale = (int)dec.Scale;
+            var scale = (int)dec.Scale;
 
             CheckConditions(value, scale, targetPrecision, targetScale);
 
-            var scaleAdjustment = targetScale - scale;
-            var maxValue = BigInteger.Pow(10, targetPrecision - scaleAdjustment) - 1;
-
-            Span<uint> data = stackalloc uint[3];
-            data[0] = dec.Low;
-            data[1] = dec.Mid;
-            data[2] = dec.High;
-
-            var unscaledValue = new BigInteger(
-                MemoryMarshal.Cast<uint, byte>(data),
-                isUnsigned: true, isBigEndian: false);
+            int scaleAdjustment = targetScale - scale;
+            var maxValue = KuduInt128.PowerOf10(targetPrecision - scaleAdjustment) - 1;
+            var unscaledValue = new KuduInt128(dec.Low, dec.Mid, dec.High, 0);
 
             if (unscaledValue > maxValue)
                 ThrowValueTooBig(value, targetPrecision);
 
-            var factor = BigInteger.Pow(10, scaleAdjustment);
+            var factor = KuduInt128.PowerOf10(scaleAdjustment);
             var result = unscaledValue * factor;
 
-            return dec.IsNegative ? result * -1 : result;
+            return dec.IsNegative ? result.Negate() : result;
         }
 
         public static decimal DecodeDecimal32(int value, int scale)
@@ -165,27 +156,30 @@ namespace Kudu.Client.Util
             return new decimal(low, high, 0, value < 0, (byte)scale);
         }
 
-        public static decimal DecodeDecimal128(BigInteger value, int scale)
+        public static decimal DecodeDecimal128(KuduInt128 value, int scale)
         {
-            Span<byte> bytes = stackalloc byte[16];
-            var abs = BigInteger.Abs(value);
-            abs.TryWriteBytes(bytes, out _, isUnsigned: true, isBigEndian: false);
+            var abs = value.Abs();
 
-            Span<uint> parts = MemoryMarshal.Cast<byte, uint>(bytes);
-            var dec = new DecimalAccessor
-            {
-                Low = parts[0],
-                Mid = parts[1],
-                High = parts[2],
-                Scale = (uint)scale,
-                IsNegative = value < BigInteger.Zero
-            };
+            uint low = (uint)(abs.Low & uint.MaxValue);
+            uint mid = (uint)(abs.Low >> 32);
 
-            if (parts[3] > 0)
+            uint high = (uint)(abs.High & uint.MaxValue);
+            uint extraHigh = (uint)(abs.High >> 32);
+
+            if (extraHigh > 0)
             {
                 // Uh oh
                 // What to do here? Throw an exception or truncate?
             }
+
+            var dec = new DecimalAccessor
+            {
+                Low = low,
+                Mid = mid,
+                High = high,
+                Scale = (uint)scale,
+                IsNegative = value < 0
+            };
 
             return dec.Decimal;
         }
@@ -199,7 +193,7 @@ namespace Kudu.Client.Util
                 throw new ArgumentOutOfRangeException(nameof(precision),
                     $"Max precision for decimal32 is {MaxDecimal32Precision}");
 
-            return (int)Pow10Int32(precision) - 1;
+            return (int)PowerOf10Int32(precision) - 1;
         }
 
         public static long MinDecimal64(int precision) =>
@@ -211,19 +205,19 @@ namespace Kudu.Client.Util
                 throw new ArgumentOutOfRangeException(nameof(precision),
                     $"Max precision for decimal64 is {MaxDecimal64Precision}");
 
-            return (long)Pow10Int64(precision) - 1;
+            return (long)PowerOf10Int64(precision) - 1;
         }
 
-        public static BigInteger MinDecimal128(int precision) =>
-            MaxDecimal128(precision) * -1;
+        public static KuduInt128 MinDecimal128(int precision) =>
+            MaxDecimal128(precision).Negate();
 
-        public static BigInteger MaxDecimal128(int precision)
+        public static KuduInt128 MaxDecimal128(int precision)
         {
             if (precision > MaxDecimal128Precision)
                 throw new ArgumentOutOfRangeException(nameof(precision),
                     $"Max precision for decimal128 is {MaxDecimal128Precision}");
 
-            return BigInteger.Pow(10, precision) - 1;
+            return KuduInt128.PowerOf10(precision) - 1;
         }
 
         private static ulong ToLong(uint low, uint high)
@@ -251,9 +245,9 @@ namespace Kudu.Client.Util
                 $"Value {value} (after scale coercion) can't be coerced to target precision {targetPrecision}.");
         }
 
-        private static uint Pow10Int32(int value) => Pow10Cache32[value];
+        private static uint PowerOf10Int32(int value) => Pow10Cache32[value];
 
-        private static ulong Pow10Int64(int value) => Pow10Cache64[value];
+        private static ulong PowerOf10Int64(int value) => Pow10Cache64[value];
 
         /// <summary>
         /// Provides access to the inner fields of a decimal.

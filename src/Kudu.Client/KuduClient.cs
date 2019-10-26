@@ -478,7 +478,7 @@ namespace Kudu.Client
         private async Task ConnectToClusterAsync(CancellationToken cancellationToken)
         {
             List<HostAndPort> masterAddresses = _options.MasterAddresses;
-            var tasks = new HashSet<Task<ConnectToMasterResponse>>(masterAddresses.Count);
+            var tasks = new HashSet<Task<ConnectToMasterResponse>>();
             var foundMasters = new List<ServerInfo>(masterAddresses.Count);
             int leaderIndex = -1;
 
@@ -561,7 +561,13 @@ namespace Kudu.Client
             serverInfo = null;
             responsePb = null;
 
-            if (!task.IsCompletedSuccessfully)
+#if NETSTANDARD2_0
+            var success = task.IsCompleted && !(task.IsCanceled || task.IsFaulted);
+#else
+            var success = task.IsCompletedSuccessfully;
+#endif
+
+            if (!success)
             {
                 // TODO: Log warning.
                 Console.WriteLine("Unable to connect to cluster: " +
