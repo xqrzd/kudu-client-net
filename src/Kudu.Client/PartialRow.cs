@@ -695,9 +695,35 @@ namespace Kudu.Client
                             return true;
                         }
                     case KuduType.Decimal32:
+                        {
+                            int existing = KuduEncoder.DecodeInt32(data);
+                            int precision = column.TypeAttributes.Precision;
+                            if (existing == DecimalUtil.MaxDecimal32(precision))
+                                return false;
+
+                            KuduEncoder.EncodeInt32(data, existing + 1);
+                            return true;
+                        }
                     case KuduType.Decimal64:
+                        {
+                            long existing = KuduEncoder.DecodeInt64(data);
+                            int precision = column.TypeAttributes.Precision;
+                            if (existing == DecimalUtil.MaxDecimal64(precision))
+                                return false;
+
+                            KuduEncoder.EncodeInt64(data, existing + 1);
+                            return true;
+                        }
                     case KuduType.Decimal128:
-                        throw new NotImplementedException();
+                        {
+                            KuduInt128 existing = KuduEncoder.DecodeInt128(data);
+                            int precision = column.TypeAttributes.Precision;
+                            if (existing == DecimalUtil.MaxDecimal128(precision))
+                                return false;
+
+                            KuduEncoder.EncodeInt128(data, existing + 1);
+                            return true;
+                        }
                     default:
                         throw new Exception($"Unsupported data type {type}");
                 }

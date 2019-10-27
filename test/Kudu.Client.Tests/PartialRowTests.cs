@@ -82,7 +82,29 @@ namespace Kudu.Client.Tests
             Assert.Equal(double.PositiveInfinity, row.GetDouble(doubleIndex));
             Assert.False(row.IncrementColumn(doubleIndex));
 
-            // TODO: Decimal
+            // Decimal32
+            int decimalIndex32 = row.Schema.GetColumnIndex("decimal32");
+            // Decimal with precision 5, scale 3 has a max of 99.999
+            row.SetDecimal(decimalIndex32, 99.998m);
+            Assert.True(row.IncrementColumn(decimalIndex32));
+            Assert.Equal(99.999m, row.GetDecimal(decimalIndex32));
+            Assert.False(row.IncrementColumn(decimalIndex32));
+
+            // Decimal64
+            int decimalIndex64 = row.Schema.GetColumnIndex("decimal64");
+            // Decimal with precision 5, scale 3 has a max of 99.999
+            row.SetDecimal(decimalIndex64, 99.998m);
+            Assert.True(row.IncrementColumn(decimalIndex64));
+            Assert.Equal(99.999m, row.GetDecimal(decimalIndex64));
+            Assert.False(row.IncrementColumn(decimalIndex64));
+
+            // Decimal128
+            int decimalIndex128 = row.Schema.GetColumnIndex("decimal128");
+            // Decimal with precision 5, scale 3 has a max of 99.999
+            row.SetDecimal(decimalIndex128, 99.998m);
+            Assert.True(row.IncrementColumn(decimalIndex128));
+            Assert.Equal(99.999m, row.GetDecimal(decimalIndex128));
+            Assert.False(row.IncrementColumn(decimalIndex128));
 
             // String
             int stringIndex = row.Schema.GetColumnIndex("string");

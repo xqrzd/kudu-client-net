@@ -12,12 +12,6 @@ namespace Kudu.Client.Util
         [FieldOffset(8)]
         public readonly ulong Low;
 
-        public KuduInt128(uint part1, uint part2, uint part3, int part4)
-        {
-            Low = ((ulong)part2 << 32) | part1;
-            High = ((long)part4 << 32) | part3;
-        }
-
         public KuduInt128(long high, ulong low)
         {
             Low = low;
@@ -36,6 +30,12 @@ namespace Kudu.Client.Util
                 High = -1;
                 Low = (ulong)value;
             }
+        }
+
+        public KuduInt128(uint part1, uint part2, uint part3, int part4)
+        {
+            Low = ((ulong)part2 << 32) | part1;
+            High = ((long)part4 << 32) | part3;
         }
 
         public KuduInt128 Negate()
@@ -58,7 +58,7 @@ namespace Kudu.Client.Util
         }
 
         public static bool operator ==(KuduInt128 a, KuduInt128 b) =>
-                a.High == b.High && a.Low == b.Low;
+            a.High == b.High && a.Low == b.Low;
 
         public static bool operator !=(KuduInt128 a, KuduInt128 b) =>
             a.High != b.High || a.Low != b.Low;
