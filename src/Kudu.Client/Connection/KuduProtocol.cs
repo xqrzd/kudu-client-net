@@ -89,11 +89,11 @@ namespace Kudu.Client.Connection
             return false;
         }
 
-        public static RpcException GetRpcError(ParserContext parserContext)
+        public static ErrorStatusPB GetRpcError(ParserContext parserContext)
         {
             var buffer = parserContext.MainProtobufMessage;
             var error = Serializer.Deserialize<ErrorStatusPB>(buffer);
-            return new RpcException(error);
+            return error;
         }
 
         private static bool TryParseResponseHeader(

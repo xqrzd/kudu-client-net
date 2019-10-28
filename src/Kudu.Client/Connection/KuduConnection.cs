@@ -36,6 +36,8 @@ namespace Kudu.Client.Connection
             _receiveTask = ReceiveAsync();
         }
 
+        private string LogPrefix => $"[peer {_ioPipe}]";
+
         public void OnDisconnected(Action<Exception, object> callback, object state)
         {
             lock (_inflightRpcs)
@@ -153,7 +155,27 @@ namespace Kudu.Client.Connection
 
                     if (header.IsError)
                     {
-                        var exception = KuduProtocol.GetRpcError(parserContext);
+                        var error = KuduProtocol.GetRpcError(parserContext);
+                        var code = error.Code;
+                        KuduException exception;
+
+                        if (code == ErrorStatusPB.RpcErrorCodePB.ErrorServerTooBusy ||
+                            code == ErrorStatusPB.RpcErrorCodePB.ErrorUnavailable)
+                        {
+                            exception = new RecoverableException(
+                                KuduStatus.ServiceUnavailable(error.Message));
+                        }
+                        else if (code == ErrorStatusPB.RpcErrorCodePB.ErrorInvalidAuthorizationToken)
+                        {
+                            exception = new InvalidAuthzTokenException(
+                                KuduStatus.NotAuthorized(error.Message));
+                        }
+                        else
+                        {
+                            var message = $"{LogPrefix} server sent error {error.Message}";
+                            exception = new RpcRemoteException(KuduStatus.RemoteError(message), error);
+                        }
+
                         CompleteRpc(callId, exception);
                     }
                     else
@@ -235,7 +257,7 @@ namespace Kudu.Client.Connection
                 // the server. So, we disconnect the connection.
 
                 throw new NonRecoverableException(KuduStatus.IllegalState(
-                    $"[peer {_ioPipe}] invalid callID: {header.CallId}"));
+                    $"{LogPrefix} invalid callID: {header.CallId}"));
             }
 
             return rpc;

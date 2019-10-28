@@ -531,14 +531,11 @@ namespace Kudu.Client
                 }
             }
 
-            if (leaderIndex == -1)
+            if (leaderIndex != -1)
             {
-                throw new NoLeaderFoundException(
-                    KuduStatus.ServiceUnavailable("Unable to find the leader master."));
+                _masterCache = new ServerInfoCache(foundMasters, leaderIndex);
+                _hasConnectedToMaster = true;
             }
-
-            _masterCache = new ServerInfoCache(foundMasters, leaderIndex);
-            _hasConnectedToMaster = true;
         }
 
         private async Task<ConnectToMasterResponse> ConnectToMasterAsync(
