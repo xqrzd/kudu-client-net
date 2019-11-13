@@ -276,7 +276,26 @@ namespace Kudu.Client.Negotiate
 
             if (_remoteCertificate != null)
             {
-                // TODO: Verify channel bindings.
+                byte[] expected = _remoteCertificate.GetEndpointChannelBindings();
+
+                if (response.ChannelBindings == null)
+                    throw new Exception("No channel bindings provided by remote peer");
+
+                byte[] provided = response.ChannelBindings;
+                // Kudu supplies a length header in big-endian,
+                // but NegotiateStream expects little-endian.
+                provided.AsSpan(0, 4).Reverse();
+
+                innerStream.AppendToReadQueue(provided);
+
+                Memory<byte> unwrapped = new byte[64];
+                var unwrappedLength = await negotiateStream.ReadAsync(unwrapped, cancellationToken)
+                    .ConfigureAwait(false);
+
+                unwrapped = unwrapped.Slice(0, unwrappedLength);
+
+                if (!unwrapped.Span.SequenceEqual(expected))
+                    throw new Exception("Invalid channel bindings provided by remote peer");
             }
 
             byte[] nonce = null;
