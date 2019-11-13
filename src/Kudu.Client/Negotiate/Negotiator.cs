@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Buffers.Binary;
-using System.Diagnostics;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Pipelines;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Cryptography.X509Certificates;
+using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
 using Kudu.Client.Connection;
@@ -14,6 +16,7 @@ using Kudu.Client.Protocol.Rpc;
 using Kudu.Client.Util;
 using Pipelines.Sockets.Unofficial;
 using ProtoBuf;
+using static Kudu.Client.Protocol.Rpc.NegotiatePB;
 
 namespace Kudu.Client.Negotiate
 {
@@ -42,6 +45,7 @@ namespace Kudu.Client.Negotiate
         private readonly PipeOptions _receivePipeOptions;
 
         private Stream _stream;
+        private X509Certificate2 _remoteCertificate;
 
         public Negotiator(ServerInfo serverInfo, Socket socket,
             PipeOptions sendPipeOptions, PipeOptions receivePipeOptions)
@@ -83,11 +87,14 @@ namespace Kudu.Client.Negotiate
                 }
             }
 
-            var result = await AuthenticateAsync(cancellationToken).ConfigureAwait(false);
+            // Check the negotiated authentication type sent by the server.
+            var chosenAuthnType = ChooseAuthenticationType(features);
+            Console.WriteLine($"Chose authentication type: {chosenAuthnType}");
 
-            Debug.Assert(result.Step == NegotiatePB.NegotiateStep.SaslSuccess);
+            var result = await AuthenticateAsync(chosenAuthnType, cancellationToken)
+                .ConfigureAwait(false);
 
-            await SendConnectionContextAsync(cancellationToken).ConfigureAwait(false);
+            await SendConnectionContextAsync(result.Nonce, cancellationToken).ConfigureAwait(false);
 
             IDuplexPipe pipe;
             if (useTls)
@@ -113,12 +120,22 @@ namespace Kudu.Client.Negotiate
             // The client and server swap RPC feature flags, supported authentication types,
             // and supported SASL mechanisms. This step always takes exactly one round trip.
 
-            var request = new NegotiatePB { Step = NegotiatePB.NegotiateStep.Negotiate };
+            var request = new NegotiatePB { Step = NegotiateStep.Negotiate };
+
+            // Advertise our supported features
             request.SupportedFeatures.Add(RpcFeatureFlag.ApplicationFeatureFlags);
             request.SupportedFeatures.Add(RpcFeatureFlag.Tls);
+
             if (_serverInfo.IsLocal)
                 request.SupportedFeatures.Add(RpcFeatureFlag.TlsAuthenticationOnly);
-            request.SaslMechanisms.Add(new NegotiatePB.SaslMechanism { Mechanism = "PLAIN" });
+
+            // Advertise our authentication types.
+
+            // We always advertise SASL.
+            request.AuthnTypes.Add(new AuthenticationTypePB { sasl = new AuthenticationTypePB.Sasl() });
+
+            // TODO: Advertise token authentication if we have a token.
+            // TODO: Advertise certificate authentication if we have a certificate.
 
             return SendReceiveAsync(request, cancellationToken);
         }
@@ -130,13 +147,45 @@ namespace Kudu.Client.Negotiate
             var sslStream = SslStreamFactory.CreateSslStreamTrustAll(sslInnerStream);
             await sslStream.AuthenticateAsClientAsync(tlsHost).ConfigureAwait(false);
 
+            _remoteCertificate = (X509Certificate2)sslStream.RemoteCertificate;
             Console.WriteLine($"TLS Connected {tlsHost}");
 
             sslInnerStream.ReplaceStream(stream);
             return sslStream;
         }
 
-        private Task<NegotiatePB> AuthenticateAsync(CancellationToken cancellationToken)
+        private AuthenticationType ChooseAuthenticationType(NegotiatePB features)
+        {
+            if (features.AuthnTypes.Count != 1)
+                throw new Exception($"Expected server to reply with one authn type, not {features.AuthnTypes.Count}");
+
+            var authType = features.AuthnTypes[0];
+
+            if (authType.sasl != null)
+            {
+                var serverMechs = new HashSet<string>();
+
+                foreach (var mech in features.SaslMechanisms)
+                {
+                    serverMechs.Add(mech.Mechanism.ToUpper());
+                }
+
+                if (serverMechs.Contains("GSSAPI"))
+                    return AuthenticationType.SaslGssApi;
+
+                if (serverMechs.Contains("PLAIN"))
+                    return AuthenticationType.SaslPlain;
+
+                throw new Exception($"Server supplied unexpected sasl mechanisms {string.Join(",", serverMechs)}");
+            }
+            else
+            {
+                throw new Exception("Server chose bad authn type");
+            }
+        }
+
+        private Task<AuthenticationResult> AuthenticateAsync(
+            AuthenticationType authenticationType, CancellationToken cancellationToken)
         {
             // The client and server now authenticate to each other.
             // There are three authentication types (SASL, token, and TLS/PKI certificate),
@@ -147,21 +196,115 @@ namespace Kudu.Client.Negotiate
             // The server is thus responsible for choosing the authentication type if there are multiple to choose from.
             // Which type is chosen for a particular connection by the server depends on configuration and the available credentials:
 
-            var request = new NegotiatePB { Step = NegotiatePB.NegotiateStep.SaslInitiate };
-            request.SaslMechanisms.Add(new NegotiatePB.SaslMechanism { Mechanism = "PLAIN" });
-            request.Token = SaslPlain.CreateToken(new NetworkCredential("demo", "demo"));
+            return authenticationType switch
+            {
+                AuthenticationType.SaslGssApi => AuthenticateSaslGssApiAsync(cancellationToken),
+                AuthenticationType.SaslPlain => AuthenticateSaslPlainAsync(cancellationToken),
 
-            return SendReceiveAsync(request, cancellationToken);
+                _ => throw new Exception($"Unsupported authentication type {authenticationType}"),
+            };
         }
 
-        private Task SendConnectionContextAsync(CancellationToken cancellationToken)
+        private async Task<AuthenticationResult> AuthenticateSaslPlainAsync(CancellationToken cancellationToken)
+        {
+            var request = new NegotiatePB { Step = NegotiateStep.SaslInitiate };
+            request.SaslMechanisms.Add(new SaslMechanism { Mechanism = "PLAIN" });
+            request.Token = SaslPlain.CreateToken(new NetworkCredential("demo", "demo"));
+
+            await SendReceiveAsync(request, cancellationToken).ConfigureAwait(false);
+            return new AuthenticationResult();
+        }
+
+        private async Task<AuthenticationResult> AuthenticateSaslGssApiAsync(CancellationToken cancellationToken)
+        {
+            using var innerStream = new KuduGssApiAuthenticationStream(this);
+            using var negotiateStream = new NegotiateStream(innerStream);
+
+            // TODO: Allow user to pass in target name.
+            var targetName = $"kudu/{_serverInfo.HostPort.Host}";
+
+            Console.WriteLine($"Using target name: {targetName}");
+
+            await negotiateStream.AuthenticateAsClientAsync(
+                CredentialCache.DefaultNetworkCredentials,
+                targetName,
+                ProtectionLevel.EncryptAndSign,
+                TokenImpersonationLevel.Identification).ConfigureAwait(false);
+
+            Console.WriteLine($"NegotiateStream authentication success!" +
+                $"\n\tIsAuthenticated: {negotiateStream.IsAuthenticated} " +
+                $"\n\tIsEncrypted: {negotiateStream.IsEncrypted} " +
+                $"\n\tIsSigned: {negotiateStream.IsSigned}" +
+                $"\n\tIsMutuallyAuthenticated: {negotiateStream.IsMutuallyAuthenticated} " +
+                $"\n\tRemoteIdentity: {negotiateStream.RemoteIdentity?.Name} " +
+                $"\n\tAuthenticationType: {negotiateStream.RemoteIdentity?.AuthenticationType} ");
+
+            innerStream.CompleteNegotiate();
+
+            var tokenResponse = await SendGssApiTokenAsync(
+                NegotiateStep.SaslResponse,
+                Array.Empty<byte>(),
+                cancellationToken).ConfigureAwait(false);
+
+            var token = tokenResponse.Token;
+            // NegotiateStream expects a little-endian length header.
+            var newToken = new byte[token.Length + 4];
+            BinaryPrimitives.WriteInt32LittleEndian(newToken, token.Length);
+            token.CopyTo(newToken.AsSpan(4));
+
+            innerStream.AppendToReadQueue(newToken);
+
+            var decryptedToken = new Memory<byte>(new byte[token.Length * 2]);
+            var decryptedTokenLength = await negotiateStream.ReadAsync(
+                decryptedToken, cancellationToken).ConfigureAwait(false);
+            decryptedToken = decryptedToken.Slice(0, decryptedTokenLength);
+
+            await negotiateStream.WriteAsync(decryptedToken, cancellationToken)
+                .ConfigureAwait(false);
+
+            var encryptedToken = innerStream.ReadEncodedBuffer();
+            // Remove the little-endian length header added by NegotiateStream.
+            encryptedToken = encryptedToken.Slice(4);
+
+            var response = await SendGssApiTokenAsync(
+                NegotiateStep.SaslResponse,
+                encryptedToken,
+                cancellationToken).ConfigureAwait(false);
+
+            if (response.Step != NegotiateStep.SaslSuccess)
+                throw new Exception($"Negotiate failed, expected step {NegotiateStep.SaslSuccess}, got {response.Step}");
+
+            if (_remoteCertificate != null)
+            {
+                // TODO: Verify channel bindings.
+            }
+
+            byte[] nonce = null;
+
+            if (response.Nonce != null)
+            {
+                await negotiateStream.WriteAsync(response.Nonce, cancellationToken)
+                    .ConfigureAwait(false);
+
+                var encryptedNonce = innerStream.ReadEncodedBuffer();
+                nonce = encryptedNonce.ToArray();
+
+                // NegotiateStream writes a little-endian length header,
+                // but Kudu is expecting big-endian.
+                nonce.AsSpan(0, 4).Reverse();
+            }
+
+            return new AuthenticationResult(nonce);
+        }
+
+        private Task SendConnectionContextAsync(byte[] nonce, CancellationToken cancellationToken)
         {
             // Once the SASL negotiation is complete, before the first request, the client sends the
             // server a special call with call_id -3. The body of this call is a ConnectionContextPB.
             // The server should not respond to this call.
 
             var header = new RequestHeader { CallId = ConnectionContextCallId };
-            var request = new ConnectionContextPB();
+            var request = new ConnectionContextPB { EncodedNonce = nonce };
 
             return SendAsync(header, request, cancellationToken);
         }
@@ -170,9 +313,26 @@ namespace Kudu.Client.Negotiate
         {
             var request = new NegotiatePB
             {
-                Step = NegotiatePB.NegotiateStep.TlsHandshake,
+                Step = NegotiateStep.TlsHandshake,
                 TlsHandshake = tlsHandshake
             };
+
+            return SendReceiveAsync(request, cancellationToken);
+        }
+
+        internal Task<NegotiatePB> SendGssApiTokenAsync(
+            NegotiateStep step, ReadOnlyMemory<byte> saslToken, CancellationToken cancellationToken)
+        {
+            var request = new NegotiatePB
+            {
+                Step = step,
+                Token = saslToken.ToArray()
+            };
+
+            if (step == NegotiateStep.SaslInitiate)
+            {
+                request.SaslMechanisms.Add(new SaslMechanism { Mechanism = "GSSAPI" });
+            }
 
             return SendReceiveAsync(request, cancellationToken);
         }
@@ -187,20 +347,19 @@ namespace Kudu.Client.Negotiate
 
         private async Task SendAsync<TInput>(RequestHeader header, TInput body, CancellationToken cancellationToken)
         {
-            using (var stream = new RecyclableMemoryStream())
-            {
-                // Make space to write the length of the entire message.
-                stream.GetMemory(4);
+            using var stream = new RecyclableMemoryStream();
 
-                Serializer.SerializeWithLengthPrefix(stream, header, PrefixStyle.Base128);
-                Serializer.SerializeWithLengthPrefix(stream, body, PrefixStyle.Base128);
+            // Make space to write the length of the entire message.
+            stream.GetMemory(4);
 
-                // Go back and write the length of the entire message, minus the 4
-                // bytes we already allocated to store the length.
-                BinaryPrimitives.WriteUInt32BigEndian(stream.AsSpan(), (uint)stream.Length - 4);
+            Serializer.SerializeWithLengthPrefix(stream, header, PrefixStyle.Base128);
+            Serializer.SerializeWithLengthPrefix(stream, body, PrefixStyle.Base128);
 
-                await _stream.WriteAsync(stream.AsMemory(), cancellationToken).ConfigureAwait(false);
-            }
+            // Go back and write the length of the entire message, minus the 4
+            // bytes we already allocated to store the length.
+            BinaryPrimitives.WriteUInt32BigEndian(stream.AsSpan(), (uint)stream.Length - 4);
+
+            await _stream.WriteAsync(stream.AsMemory(), cancellationToken).ConfigureAwait(false);
         }
 
         private async Task<NegotiatePB> ReceiveAsync(CancellationToken cancellationToken)
@@ -214,6 +373,7 @@ namespace Kudu.Client.Negotiate
 
             var ms = new MemoryStream(buffer);
             var header = Serializer.DeserializeWithLengthPrefix<ResponseHeader>(ms, PrefixStyle.Base128);
+
             if (header.CallId != SaslNegotiationCallId)
                 throw new Exception($"Negotiate failed, expected {SaslNegotiationCallId}, got {header.CallId}");
             var response = Serializer.DeserializeWithLengthPrefix<NegotiatePB>(ms, PrefixStyle.Base128);
@@ -228,6 +388,24 @@ namespace Kudu.Client.Negotiate
                 var read = await _stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
                 buffer = buffer.Slice(read);
             } while (buffer.Length > 0);
+        }
+
+        private enum AuthenticationType
+        {
+            SaslGssApi,
+            SaslPlain,
+            Token,
+            Certificate
+        }
+
+        private readonly struct AuthenticationResult
+        {
+            public byte[] Nonce { get; }
+
+            public AuthenticationResult(byte[] nonce)
+            {
+                Nonce = nonce;
+            }
         }
     }
 }

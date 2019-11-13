@@ -11,7 +11,7 @@
 
   <ItemGroup>
     <PackageReference Include="Pipelines.Sockets.Unofficial" Version="2.1.0" />
-    <PackageReference Include="protobuf-net" Version="3.0.0-alpha.103" />
+    <PackageReference Include="protobuf-net" Version="3.0.0-alpha.122" />
     <PackageReference Include="System.IO.Pipelines" Version="4.6.0" />
   </ItemGroup>
 
