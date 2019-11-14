@@ -62,15 +62,6 @@ namespace Kudu.Client
             _indirectData?.Dispose();
         }
 
-        public RowResult this[int index]
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => new RowResult(
-                this,
-                _rowAlloc.Memory.Span.Slice(index * _rowSize, _rowSize),
-                _indirectData != null ? _indirectData.Memory.Span : default);
-        }
-
         internal int GetOffset(int columnIndex)
         {
             return _columnOffsets[columnIndex];
@@ -91,11 +82,18 @@ namespace Kudu.Client
         public ref struct Enumerator
         {
             private readonly ResultSet _resultSet;
+            private readonly ReadOnlySpan<byte> _rowData;
+            private readonly ReadOnlySpan<byte> _indirectData;
+            private readonly int _rowSize;
             private int _index;
 
             internal Enumerator(ResultSet resultSet)
             {
                 _resultSet = resultSet;
+                _rowData = resultSet._rowAlloc.Memory.Span;
+                _indirectData = resultSet._indirectData != null ?
+                    resultSet._indirectData.Memory.Span : default;
+                _rowSize = resultSet._rowSize;
                 _index = -1;
             }
 
@@ -115,7 +113,11 @@ namespace Kudu.Client
             public RowResult Current
             {
                 [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                get => _resultSet[_index];
+                get
+                {
+                    var rowData = _rowData.Slice(_index * _rowSize, _rowSize);
+                    return new RowResult(_resultSet, rowData, _indirectData);
+                }
             }
         }
     }

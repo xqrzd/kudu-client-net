@@ -69,9 +69,12 @@ namespace Kudu.Client.FunctionalTests
             static void CheckResults(ResultSet rows)
             {
                 Assert.Equal(1, rows.Count);
-                var row = rows[0];
-                Assert.Equal(7, row.GetInt32(0));
-                Assert.Equal("test value", row.GetString(1));
+
+                foreach (var row in rows)
+                {
+                    Assert.Equal(7, row.GetInt32(0));
+                    Assert.Equal("test value", row.GetString(1));
+                }
             }
         }
     }
