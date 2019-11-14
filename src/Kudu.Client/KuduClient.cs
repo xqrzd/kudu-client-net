@@ -28,8 +28,6 @@ namespace Kudu.Client
         private const int MaxRpcAttempts = 100;
 
         public const long NoTimestamp = -1;
-        public const long DefaultOperationTimeoutMs = 30000;
-        public const long DefaultKeepAlivePeriodMs = 15000; // 25% of the default scanner ttl.
 
         private readonly KuduClientOptions _options;
         private readonly IKuduConnectionFactory _connectionFactory;
@@ -892,7 +890,7 @@ namespace Kudu.Client
             return new KuduClientBuilder(masterAddresses);
         }
 
-        public static KuduClientBuilder NewClientBuilder(IReadOnlyList<HostAndPort> masterAddresses)
+        public static KuduClientBuilder NewBuilder(IReadOnlyList<HostAndPort> masterAddresses)
         {
             return new KuduClientBuilder(masterAddresses);
         }

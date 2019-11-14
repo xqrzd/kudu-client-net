@@ -40,7 +40,7 @@ namespace Kudu.Client
         public int RowAllocSize { get; }
 
         /// <summary>
-        /// Get the size a row built using this schema would be
+        /// Get the size a row built using this schema would be.
         /// </summary>
         public int RowSize { get; }
 

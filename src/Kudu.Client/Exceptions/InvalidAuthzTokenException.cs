@@ -10,7 +10,6 @@
         public InvalidAuthzTokenException(KuduStatus status)
             : base(status)
         {
-
         }
     }
 }
