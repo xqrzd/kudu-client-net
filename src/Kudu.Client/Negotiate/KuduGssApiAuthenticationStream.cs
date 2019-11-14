@@ -19,9 +19,11 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net.Security;
 using System.Threading;
 using System.Threading.Tasks;
 using Kudu.Client.Protocol.Rpc;
+using Kudu.Client.Util;
 using static Kudu.Client.Protocol.Rpc.NegotiatePB;
 
 namespace Kudu.Client.Negotiate
@@ -35,6 +37,7 @@ namespace Kudu.Client.Negotiate
         private const int DefaultMinorV = 0;
 
         private readonly Negotiator _negotiator;
+        private NegotiateStream _negotiateStream;
 
         private bool _negotiatePhase;
         private NegotiatePB _negotiatePB;
@@ -109,28 +112,32 @@ namespace Kudu.Client.Negotiate
             throw new NotImplementedException();
         }
 
-        public void CompleteNegotiate()
+        public void CompleteNegotiate(NegotiateStream negotiateStream)
         {
             _negotiatePhase = false;
+            _negotiateStream = negotiateStream;
         }
 
-        public void AppendToReadQueue(ReadOnlyMemory<byte> buffer)
+        public Memory<byte> EncryptBuffer(ReadOnlyMemory<byte> buffer)
         {
-            if (_readQueue.Length == 0)
-            {
-                _readQueue = buffer;
-            }
-            else
-            {
-                throw new NotImplementedException();
-            }
-        }
+            _negotiateStream.Write(buffer.Span);
 
-        public ReadOnlyMemory<byte> ReadEncodedBuffer()
-        {
-            var buffer = _writeQueue;
+            // Capture the value NegotiateStream just wrote and return it.
+            var value = _writeQueue;
             _writeQueue = default;
-            return buffer;
+            return value.ToArray();
+        }
+
+        public Memory<byte> DecryptBuffer(ReadOnlyMemory<byte> buffer)
+        {
+            // Setup NegotiateStream's inner stream (this)
+            // to read the given buffer;
+            _readQueue = buffer;
+
+            Memory<byte> decryptedBuffer = new byte[buffer.Length * 2];
+            var read = _negotiateStream.Read(decryptedBuffer.Span);
+
+            return decryptedBuffer.Slice(0, read);
         }
 
         private async ValueTask WriteAsyncInternal(
@@ -154,6 +161,7 @@ namespace Kudu.Client.Negotiate
                     throw new Exception($"NegotiateStream trying to write {buffer.Length} bytes but according to frame header we only have {_leftToWrite} left!");
 
                 // TODO: Handle the case where we don't get the entire buffer.
+                // TODO: Move this to a separate method.
                 _negotiatePB = await _negotiator
                     .SendGssApiTokenAsync(NegotiateStep.SaslInitiate, buffer, cancellationToken)
                     .ConfigureAwait(false);
@@ -163,14 +171,7 @@ namespace Kudu.Client.Negotiate
             }
             else
             {
-                if (_writeQueue.Length == 0)
-                {
-                    _writeQueue = buffer;
-                }
-                else
-                {
-                    throw new NotImplementedException();
-                }
+                _writeQueue = buffer;
             }
         }
 

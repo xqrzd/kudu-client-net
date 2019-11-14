@@ -30,7 +30,20 @@ namespace Kudu.Client.Util
             var read = await stream.ReadAsync(tempBuffer, 0, tempBuffer.Length, cancellationToken)
                 .ConfigureAwait(false);
 
-            tempBuffer.CopyTo(buffer);
+            tempBuffer.AsMemory(0, read).CopyTo(buffer);
+            return read;
+        }
+
+        public static void Write(this Stream stream, ReadOnlySpan<byte> buffer)
+        {
+            stream.Write(buffer.ToArray(), 0, buffer.Length);
+        }
+
+        public static int Read(this Stream stream, Span<byte> buffer)
+        {
+            var tempBuffer = new byte[buffer.Length];
+            var read = stream.Read(tempBuffer, 0, tempBuffer.Length);
+            tempBuffer.AsSpan(0, read).CopyTo(buffer);
             return read;
         }
 

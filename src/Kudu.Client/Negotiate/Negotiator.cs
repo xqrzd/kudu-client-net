@@ -227,8 +227,8 @@ namespace Kudu.Client.Negotiate
 
         private async Task<AuthenticationResult> AuthenticateSaslGssApiAsync(CancellationToken cancellationToken)
         {
-            using var innerStream = new KuduGssApiAuthenticationStream(this);
-            using var negotiateStream = new NegotiateStream(innerStream);
+            using var gssApiStream = new KuduGssApiAuthenticationStream(this);
+            using var negotiateStream = new NegotiateStream(gssApiStream);
 
             var targetName = _options.KerberosSpn ?? $"kudu/{_serverInfo.HostPort.Host}";
 
@@ -248,7 +248,7 @@ namespace Kudu.Client.Negotiate
                 $"\n\tRemoteIdentity: {negotiateStream.RemoteIdentity?.Name} " +
                 $"\n\tAuthenticationType: {negotiateStream.RemoteIdentity?.AuthenticationType} ");
 
-            innerStream.CompleteNegotiate();
+            gssApiStream.CompleteNegotiate(negotiateStream);
 
             var tokenResponse = await SendGssApiTokenAsync(
                 NegotiateStep.SaslResponse,
@@ -261,17 +261,9 @@ namespace Kudu.Client.Negotiate
             BinaryPrimitives.WriteInt32LittleEndian(newToken, token.Length);
             token.CopyTo(newToken.AsSpan(4));
 
-            innerStream.AppendToReadQueue(newToken);
+            var decryptedToken = gssApiStream.DecryptBuffer(newToken);
+            var encryptedToken = gssApiStream.EncryptBuffer(decryptedToken);
 
-            var decryptedToken = new Memory<byte>(new byte[token.Length * 2]);
-            var decryptedTokenLength = await negotiateStream.ReadAsync(
-                decryptedToken, cancellationToken).ConfigureAwait(false);
-            decryptedToken = decryptedToken.Slice(0, decryptedTokenLength);
-
-            await negotiateStream.WriteAsync(decryptedToken, cancellationToken)
-                .ConfigureAwait(false);
-
-            var encryptedToken = innerStream.ReadEncodedBuffer();
             // Remove the little-endian length header added by NegotiateStream.
             encryptedToken = encryptedToken.Slice(4);
 
@@ -295,13 +287,7 @@ namespace Kudu.Client.Negotiate
                 // but NegotiateStream expects little-endian.
                 provided.AsSpan(0, 4).Reverse();
 
-                innerStream.AppendToReadQueue(provided);
-
-                Memory<byte> unwrapped = new byte[64];
-                var unwrappedLength = await negotiateStream.ReadAsync(unwrapped, cancellationToken)
-                    .ConfigureAwait(false);
-
-                unwrapped = unwrapped.Slice(0, unwrappedLength);
+                var unwrapped = gssApiStream.DecryptBuffer(provided);
 
                 if (!unwrapped.Span.SequenceEqual(expected))
                     throw new Exception("Invalid channel bindings provided by remote peer");
@@ -311,11 +297,7 @@ namespace Kudu.Client.Negotiate
 
             if (response.Nonce != null)
             {
-                await negotiateStream.WriteAsync(response.Nonce, cancellationToken)
-                    .ConfigureAwait(false);
-
-                var encryptedNonce = innerStream.ReadEncodedBuffer();
-                nonce = encryptedNonce.ToArray();
+                nonce = gssApiStream.EncryptBuffer(response.Nonce).ToArray();
 
                 // NegotiateStream writes a little-endian length header,
                 // but Kudu is expecting big-endian.
