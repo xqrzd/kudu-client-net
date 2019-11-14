@@ -51,7 +51,7 @@ namespace Kudu.Client
         public KuduClient(KuduClientOptions options)
         {
             _options = options;
-            _connectionFactory = new KuduConnectionFactory();
+            _connectionFactory = new KuduConnectionFactory(options);
             _connectionCache = new ConnectionCache(_connectionFactory);
             _tableLocations = new Dictionary<string, TableLocationsCache>();
             _requestTracker = new RequestTracker(Guid.NewGuid().ToString("N"));
@@ -477,7 +477,7 @@ namespace Kudu.Client
 
         private async Task ConnectToClusterAsync(CancellationToken cancellationToken)
         {
-            List<HostAndPort> masterAddresses = _options.MasterAddresses;
+            var masterAddresses = _options.MasterAddresses;
             var tasks = new HashSet<Task<ConnectToMasterResponse>>();
             var foundMasters = new List<ServerInfo>(masterAddresses.Count);
             int leaderIndex = -1;
@@ -887,22 +887,14 @@ namespace Kudu.Client
             throw new NonRecoverableException(statusTimedOut, cause);
         }
 
-        public static KuduClient Build(string masterAddresses)
+        public static KuduClientBuilder NewBuilder(string masterAddresses)
         {
-            var masters = masterAddresses.Split(',');
+            return new KuduClientBuilder(masterAddresses);
+        }
 
-            var options = new KuduClientOptions
-            {
-                MasterAddresses = new List<HostAndPort>(masters.Length)
-            };
-
-            foreach (var master in masters)
-            {
-                var hostPort = EndpointParser.TryParse(master.Trim(), 7051);
-                options.MasterAddresses.Add(hostPort);
-            }
-
-            return new KuduClient(options);
+        public static KuduClientBuilder NewClientBuilder(IReadOnlyList<HostAndPort> masterAddresses)
+        {
+            return new KuduClientBuilder(masterAddresses);
         }
 
         private readonly struct ConnectToMasterResponse

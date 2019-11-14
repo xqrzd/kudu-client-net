@@ -11,6 +11,7 @@ using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
 using Kudu.Client.Connection;
+using Kudu.Client.Exceptions;
 using Kudu.Client.Internal;
 using Kudu.Client.Protocol.Rpc;
 using Kudu.Client.Util;
@@ -39,21 +40,18 @@ namespace Kudu.Client.Negotiate
         private const int ConnectionContextCallId = -3;
         private const int SaslNegotiationCallId = -33;
 
+        private readonly KuduClientOptions _options;
         private readonly ServerInfo _serverInfo;
         private readonly Socket _socket;
-        private readonly PipeOptions _sendPipeOptions;
-        private readonly PipeOptions _receivePipeOptions;
 
         private Stream _stream;
         private X509Certificate2 _remoteCertificate;
 
-        public Negotiator(ServerInfo serverInfo, Socket socket,
-            PipeOptions sendPipeOptions, PipeOptions receivePipeOptions)
+        public Negotiator(KuduClientOptions options, ServerInfo serverInfo, Socket socket)
         {
+            _options = options;
             _serverInfo = serverInfo;
             _socket = socket;
-            _sendPipeOptions = sendPipeOptions;
-            _receivePipeOptions = receivePipeOptions;
         }
 
         public async Task<KuduConnection> NegotiateAsync(CancellationToken cancellationToken = default)
@@ -72,8 +70,7 @@ namespace Kudu.Client.Negotiate
             // Always use TLS if the server supports it.
             if (features.HasRpcFeature(RpcFeatureFlag.Tls))
             {
-                // TODO: Allow user to supply this in.
-                var tlsHost = _serverInfo.HostPort.Host;
+                var tlsHost = _options.TlsHost ?? _serverInfo.HostPort.Host;
 
                 // If we negotiated TLS, then we want to start the TLS handshake;
                 // otherwise, we can move directly to the authentication phase.
@@ -100,13 +97,15 @@ namespace Kudu.Client.Negotiate
             if (useTls)
             {
                 pipe = StreamConnection.GetDuplex(_stream,
-                    _sendPipeOptions, _receivePipeOptions,
+                    _options.SendPipeOptions,
+                    _options.ReceivePipeOptions,
                     name: _serverInfo.ToString());
             }
             else
             {
                 pipe = SocketConnection.Create(_socket,
-                    _sendPipeOptions, _receivePipeOptions,
+                    _options.SendPipeOptions,
+                    _options.ReceivePipeOptions,
                     name: _serverInfo.ToString());
             }
 
@@ -157,7 +156,10 @@ namespace Kudu.Client.Negotiate
         private AuthenticationType ChooseAuthenticationType(NegotiatePB features)
         {
             if (features.AuthnTypes.Count != 1)
-                throw new Exception($"Expected server to reply with one authn type, not {features.AuthnTypes.Count}");
+            {
+                throw new NonRecoverableException(KuduStatus.IllegalState(
+                    $"Expected server to reply with one authn type, not {features.AuthnTypes.Count}"));
+            }
 
             var authType = features.AuthnTypes[0];
 
@@ -166,9 +168,7 @@ namespace Kudu.Client.Negotiate
                 var serverMechs = new HashSet<string>();
 
                 foreach (var mech in features.SaslMechanisms)
-                {
                     serverMechs.Add(mech.Mechanism.ToUpper());
-                }
 
                 if (serverMechs.Contains("GSSAPI"))
                     return AuthenticationType.SaslGssApi;
@@ -176,11 +176,21 @@ namespace Kudu.Client.Negotiate
                 if (serverMechs.Contains("PLAIN"))
                     return AuthenticationType.SaslPlain;
 
-                throw new Exception($"Server supplied unexpected sasl mechanisms {string.Join(",", serverMechs)}");
+                throw new NonRecoverableException(KuduStatus.IllegalState(
+                    $"Server supplied unexpected sasl mechanisms {string.Join(",", serverMechs)}"));
+            }
+            else if (authType.certificate != null)
+            {
+                return AuthenticationType.Certificate;
+            }
+            else if (authType.token != null)
+            {
+                return AuthenticationType.Token;
             }
             else
             {
-                throw new Exception("Server chose bad authn type");
+                throw new NonRecoverableException(
+                    KuduStatus.IllegalState("Server chose bad authn type"));
             }
         }
 
@@ -220,8 +230,7 @@ namespace Kudu.Client.Negotiate
             using var innerStream = new KuduGssApiAuthenticationStream(this);
             using var negotiateStream = new NegotiateStream(innerStream);
 
-            // TODO: Allow user to pass in target name.
-            var targetName = $"kudu/{_serverInfo.HostPort.Host}";
+            var targetName = _options.KerberosSpn ?? $"kudu/{_serverInfo.HostPort.Host}";
 
             Console.WriteLine($"Using target name: {targetName}");
 

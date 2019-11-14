@@ -128,12 +128,7 @@ namespace Kudu.Client.FunctionalTests.MiniCluster
 
         public KuduClient CreateClient()
         {
-            var options = new KuduClientOptions
-            {
-                MasterAddresses = _masterServers.Keys.ToList()
-            };
-
-            return new KuduClient(options);
+            return KuduClient.NewClientBuilder(_masterServers.Keys.ToList()).Build();
         }
 
         private ControlShellResponsePB SendRequestToCluster(ControlShellRequestPB req)

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO.Pipelines;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -13,30 +12,19 @@ namespace Kudu.Client.Connection
 {
     public class KuduConnectionFactory : IKuduConnectionFactory
     {
-        private static readonly PipeOptions DefaultSendOptions = new PipeOptions(
-            readerScheduler: DedicatedThreadPoolPipeScheduler.Default,
-            writerScheduler: DedicatedThreadPoolPipeScheduler.Default,
-            pauseWriterThreshold: 1024 * 1024 * 4,  // 4MB
-            resumeWriterThreshold: 1024 * 1024 * 2, // 2MB
-            minimumSegmentSize: 4096,
-            useSynchronizationContext: false);
+        private readonly KuduClientOptions _options;
 
-        private static readonly PipeOptions DefaultReceiveOptions = new PipeOptions(
-            readerScheduler: DedicatedThreadPoolPipeScheduler.Default,
-            writerScheduler: DedicatedThreadPoolPipeScheduler.Default,
-            pauseWriterThreshold: 1024 * 1024 * 256,  // 256MB
-            resumeWriterThreshold: 1024 * 1024 * 128, // 128MB
-            minimumSegmentSize: 1024 * 256,
-            useSynchronizationContext: false);
-
-        // TODO: Allow users to supply in pipe options.
+        public KuduConnectionFactory(KuduClientOptions options)
+        {
+            _options = options;
+        }
 
         public async Task<KuduConnection> ConnectAsync(
             ServerInfo serverInfo, CancellationToken cancellationToken = default)
         {
             var socket = await ConnectAsync(serverInfo.Endpoint).ConfigureAwait(false);
 
-            var negotiator = new Negotiator(serverInfo, socket, DefaultSendOptions, DefaultReceiveOptions);
+            var negotiator = new Negotiator(_options, serverInfo, socket);
             return await negotiator.NegotiateAsync(cancellationToken).ConfigureAwait(false);
         }
 
