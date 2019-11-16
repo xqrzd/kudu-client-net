@@ -11,9 +11,12 @@ namespace Kudu.Client
         private readonly IMemoryOwner<byte> _indirectData;
         private readonly int[] _columnOffsets;
         private readonly int _rowSize;
-        private readonly bool _hasNullableColumns;
 
         public int Count { get; }
+
+        internal bool HasNullableColumns { get; }
+
+        internal int NullBitSetOffset { get; }
 
         public ResultSet(
             Schema schema,
@@ -30,7 +33,7 @@ namespace Kudu.Client
             if (schema.HasNullableColumns)
             {
                 columnOffsetsSize++;
-                _hasNullableColumns = true;
+                HasNullableColumns = true;
             }
 
             var columnOffsets = new int[columnOffsetsSize];
@@ -54,6 +57,7 @@ namespace Kudu.Client
 
             _columnOffsets = columnOffsets;
             _rowSize = schema.RowSize;
+            NullBitSetOffset = columnOffsets.Length - 1;
         }
 
         public void Dispose()
@@ -67,15 +71,17 @@ namespace Kudu.Client
             return _columnOffsets[columnIndex];
         }
 
-        internal int GetNullBitSetOffset()
-        {
-            return _columnOffsets[_columnOffsets.Length - 1];
-        }
-
         internal int GetColumnIndex(string columnName)
         {
             return _schema.GetColumnIndex(columnName);
         }
+
+        internal ColumnSchema GetColumnSchema(int columnIndex)
+        {
+            return _schema.GetColumn(columnIndex);
+        }
+
+        public override string ToString() => $"{Count} rows";
 
         public Enumerator GetEnumerator() => new Enumerator(this);
 
