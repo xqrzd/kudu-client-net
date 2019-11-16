@@ -168,7 +168,10 @@ namespace Kudu.Client.Util
 
         public override bool Equals(object obj)
         {
-            return base.Equals(obj);
+            if (obj is KuduInt128 other)
+                return Equals(other);
+
+            return false;
         }
 
         public override int GetHashCode() => HashCode.Combine(High, Low);
