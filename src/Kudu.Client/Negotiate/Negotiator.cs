@@ -146,7 +146,7 @@ namespace Kudu.Client.Negotiate
             var sslStream = SslStreamFactory.CreateSslStreamTrustAll(sslInnerStream);
             await sslStream.AuthenticateAsClientAsync(tlsHost).ConfigureAwait(false);
 
-            _remoteCertificate = (X509Certificate2)sslStream.RemoteCertificate;
+            _remoteCertificate = new X509Certificate2(sslStream.RemoteCertificate);
             Console.WriteLine($"TLS Connected {tlsHost}");
 
             sslInnerStream.ReplaceStream(stream);
