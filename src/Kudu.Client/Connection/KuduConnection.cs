@@ -23,7 +23,7 @@ namespace Kudu.Client.Connection
 
         private int _nextCallId;
         private bool _closed;
-        private Exception _closedException;
+        private RecoverableException _closedException;
         private DisconnectedCallback _disconnectedCallback;
 
         public KuduConnection(IDuplexPipe ioPipe)
@@ -48,7 +48,7 @@ namespace Kudu.Client.Connection
                 {
                     // Guarantee the disconnected callback is invoked if
                     // the connection is already closed.
-                    InvokeDisconnectedCallback(_closedException);
+                    InvokeDisconnectedCallback();
                 }
             }
         }
@@ -63,8 +63,7 @@ namespace Kudu.Client.Connection
                 {
                     // The upper-level caller should handle the exception
                     // and retry using a new connection.
-                    throw new RecoverableException(
-                        KuduStatus.IllegalState("Connection is disconnected."), _closedException);
+                    throw _closedException;
                 }
 
                 header.CallId = _nextCallId++;
@@ -427,7 +426,8 @@ namespace Kudu.Client.Connection
         /// <param name="exception"></param>
         private void Shutdown(Exception exception = null)
         {
-            var closedException = new ConnectionClosedException(_ioPipe.ToString(), exception);
+            var closedException = new RecoverableException(KuduStatus.IllegalState(
+                $"Connection {_ioPipe} is disconnected."), exception);
 
             lock (_inflightRpcs)
             {
@@ -437,7 +437,7 @@ namespace Kudu.Client.Connection
                 foreach (var inflightMessage in _inflightRpcs.Values)
                     inflightMessage.TrySetException(closedException);
 
-                InvokeDisconnectedCallback(closedException);
+                InvokeDisconnectedCallback();
 
                 _inflightRpcs.Clear();
             }
@@ -465,9 +465,13 @@ namespace Kudu.Client.Connection
         /// <summary>
         /// The caller must hold the _inflightMessages lock.
         /// </summary>
-        private void InvokeDisconnectedCallback(Exception exception)
+        private void InvokeDisconnectedCallback()
         {
-            try { _disconnectedCallback.Invoke(exception); } catch { }
+            try
+            {
+                _disconnectedCallback.Invoke(_closedException.InnerException);
+            }
+            catch { }
         }
 
         private sealed class InflightRpc : TaskCompletionSource<object>
