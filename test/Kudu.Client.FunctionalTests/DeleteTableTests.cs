@@ -38,7 +38,8 @@ namespace Kudu.Client.FunctionalTests
 
             await client.DeleteTableAsync(tableName);
 
-            await Assert.ThrowsAsync<MasterException>(() => client.DeleteTableAsync(tableName));
+            await Assert.ThrowsAsync<NonRecoverableException>(
+                () => client.DeleteTableAsync(tableName));
         }
     }
 }
