@@ -1,17 +1,45 @@
 ﻿using System;
 using System.Buffers;
 using System.IO;
-using System.IO.Pipelines;
-using System.Threading.Tasks;
-using Kudu.Client.Protocol.Rpc;
+using Kudu.Client.Connection;
+using Kudu.Client.Protocol.Master;
 using Kudu.Client.Protocol.Security;
+using Kudu.Client.Protocol.Tserver;
 using Kudu.Client.Tablet;
 using ProtoBuf;
 
 namespace Kudu.Client.Requests
 {
     // TODO: These types need a lot of refactoring.
-    public abstract class KuduRpc
+    public abstract class KuduRpc : IDisposable
+    {
+        //void WriteRequest(IBufferWriter<byte> writer);
+        public abstract void Serialize(Stream stream);
+
+        public abstract void ParseProtobuf(ReadOnlySequence<byte> buffer);
+
+        // TODO: Use separate class/struct for this.
+        // This method would allocate several sidecars.
+        // If at any point parsing fails, we need to cleanup these.
+        public virtual void BeginProcessingSidecars(KuduSidecarOffsets sidecars)
+        {
+        }
+
+        public virtual void ParseSidecarSegment(ReadOnlySequence<byte> buffer)
+        {
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+        }
+    }
+
+    public abstract class KuduRpc<T> : KuduRpc
     {
         // Service names.
         protected const string MasterServiceName = "kudu.master.MasterService";
@@ -51,48 +79,27 @@ namespace Kudu.Client.Requests
 
         public virtual ReplicaSelection ReplicaSelection => ReplicaSelection.LeaderOnly;
 
-        // TODO: Include numAttempts, externalConsistencyMode, etc.
+        public virtual T Output { get; protected set; }
 
-        // TODO: Eventually change this method to
-        // public abstract void WriteRequest(IBufferWriter<byte> writer);
-        public abstract void WriteRequest(Stream stream);
-
-        public abstract void ParseProtobuf(ReadOnlySequence<byte> buffer);
-
-        public virtual Task ParseSidecarsAsync(ResponseHeader header, PipeReader reader, int length)
-        {
-            throw new NotImplementedException();
-        }
-
-        public static void Serialize<T>(Stream stream, T value)
+        public static void Serialize<TInput>(Stream stream, TInput value)
         {
             Serializer.SerializeWithLengthPrefix(stream, value, PrefixStyle.Base128);
         }
+
+        public static T Deserialize(ReadOnlySequence<byte> buffer)
+        {
+            return Serializer.Deserialize<T>(buffer);
+        }
     }
 
-    public abstract class KuduMasterRpc : KuduRpc
+    public abstract class KuduMasterRpc<T> : KuduRpc<T>
     {
         public override string ServiceName => MasterServiceName;
+
+        public MasterErrorPB Error { get; protected set; }
     }
 
-    public abstract class KuduMasterRpc<TRequest, TResponse> : KuduMasterRpc
-    {
-        public TRequest Request { get; set; }
-
-        public TResponse Response { get; set; }
-
-        public override void WriteRequest(Stream stream)
-        {
-            Serialize(stream, Request);
-        }
-
-        public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
-        {
-            Response = Serializer.Deserialize<TResponse>(buffer);
-        }
-    }
-
-    public abstract class KuduTabletRpc : KuduRpc
+    public abstract class KuduTabletRpc<T> : KuduRpc<T>
     {
         public override string ServiceName => TabletServerServiceName;
 
@@ -105,22 +112,7 @@ namespace Kudu.Client.Requests
         public string TableId { get; protected set; }
 
         public RemoteTablet Tablet { get; internal set; }
-    }
 
-    public abstract class KuduTabletRpc<TRequest, TResponse> : KuduTabletRpc
-    {
-        public TRequest Request { get; set; }
-
-        public TResponse Response { get; set; }
-
-        public override void WriteRequest(Stream stream)
-        {
-            Serialize(stream, Request);
-        }
-
-        public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
-        {
-            Response = Serializer.Deserialize<TResponse>(buffer);
-        }
+        public TabletServerErrorPB Error { get; protected set; }
     }
 }

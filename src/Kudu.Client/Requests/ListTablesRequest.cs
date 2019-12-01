@@ -1,15 +1,32 @@
-﻿using Kudu.Client.Protocol.Master;
+﻿using System.Buffers;
+using System.IO;
+using Kudu.Client.Protocol.Master;
 
 namespace Kudu.Client.Requests
 {
-    public class ListTablesRequest
-        : KuduMasterRpc<ListTablesRequestPB, ListTablesResponsePB>
+    public class ListTablesRequest : KuduMasterRpc<ListTablesResponsePB>
     {
+        private readonly ListTablesRequestPB _request;
+
         public override string MethodName => "ListTables";
 
-        public ListTablesRequest(ListTablesRequestPB request)
+        public ListTablesRequest(string nameFilter = null)
         {
-            Request = request;
+            _request = new ListTablesRequestPB
+            {
+                NameFilter = nameFilter
+            };
+        }
+
+        public override void Serialize(Stream stream)
+        {
+            Serialize(stream, _request);
+        }
+
+        public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
+        {
+            Output = Deserialize(buffer);
+            Error = Output.Error;
         }
     }
 }

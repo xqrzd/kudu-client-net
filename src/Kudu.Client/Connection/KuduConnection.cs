@@ -53,7 +53,7 @@ namespace Kudu.Client.Connection
             }
         }
 
-        public async Task SendReceiveAsync(RequestHeader header, KuduRpc rpc)
+        public async Task<T> SendReceiveAsync<T>(RequestHeader header, KuduRpc<T> rpc)
         {
             var message = new InflightRpc(rpc);
 
@@ -72,9 +72,13 @@ namespace Kudu.Client.Connection
                 _inflightRpcs.Add(header.CallId, message);
             }
 
-            await SendAsync(header, rpc).ConfigureAwait(false);
+            using (rpc)
+            {
+                await SendAsync(header, rpc).ConfigureAwait(false);
+                await message.Task.ConfigureAwait(false);
 
-            await message.Task.ConfigureAwait(false);
+                return rpc.Output;
+            }
         }
 
         private async ValueTask SendAsync(RequestHeader header, KuduRpc rpc)
@@ -86,7 +90,7 @@ namespace Kudu.Client.Connection
                 stream.GetMemory(4);
 
                 Serializer.SerializeWithLengthPrefix(stream, header, PrefixStyle.Base128);
-                rpc.WriteRequest(stream);
+                rpc.Serialize(stream);
 
                 // Go back and write the length of the entire message, minus the 4
                 // bytes we already allocated to store the length.
@@ -121,13 +125,14 @@ namespace Kudu.Client.Connection
                 while (true)
                 {
                     var result = await input.ReadAsync().ConfigureAwait(false);
+                    var buffer = result.Buffer;
 
                     if (result.IsCanceled || result.IsCompleted)
                         break;
 
-                    var buffer = result.Buffer;
+                    ParseMessages(buffer, parserContext, out var consumed);
 
-                    await ParseAsync(input, buffer, parserContext).ConfigureAwait(false);
+                    input.AdvanceTo(consumed, buffer.End);
                 }
 
                 input.Complete();
@@ -141,89 +146,217 @@ namespace Kudu.Client.Connection
             }
         }
 
-        private Task ParseAsync(PipeReader input, ReadOnlySequence<byte> buffer, ParserContext parserContext)
+        private void ParseMessages(
+            ReadOnlySequence<byte> buffer,
+            ParserContext parserContext,
+            out SequencePosition consumed)
         {
             var reader = new SequenceReader<byte>(buffer);
 
             do
             {
-                if (KuduProtocol.TryParseMessage(ref reader, parserContext))
+                if (TryParseMessage(ref reader, parserContext))
                 {
                     var header = parserContext.Header;
                     var callId = header.CallId;
-                    var rpc = GetRpc(header);
 
                     if (header.IsError)
                     {
-                        var error = KuduProtocol.GetRpcError(parserContext);
-                        var code = error.Code;
-                        KuduException exception;
-
-                        if (code == ErrorStatusPB.RpcErrorCodePB.ErrorServerTooBusy ||
-                            code == ErrorStatusPB.RpcErrorCodePB.ErrorUnavailable)
-                        {
-                            exception = new RecoverableException(
-                                KuduStatus.ServiceUnavailable(error.Message));
-                        }
-                        else if (code == ErrorStatusPB.RpcErrorCodePB.ErrorInvalidAuthorizationToken)
-                        {
-                            exception = new InvalidAuthzTokenException(
-                                KuduStatus.NotAuthorized(error.Message));
-                        }
-                        else
-                        {
-                            var message = $"{LogPrefix} server sent error {error.Message}";
-                            exception = new RpcRemoteException(KuduStatus.RemoteError(message), error);
-                        }
-
+                        var exception = GetException(parserContext.Error);
                         CompleteRpc(callId, exception);
                     }
                     else
                     {
-                        rpc.Rpc.ParseProtobuf(parserContext.MainProtobufMessage);
-
-                        if (parserContext.HasSidecars)
-                        {
-                            input.AdvanceTo(reader.Position);
-
-                            var length = parserContext.SidecarLength;
-                            return ProcessSidecarsAsync(input, rpc, header, length);
-                        }
-                        else
-                        {
-                            CompleteRpc(callId);
-                        }
+                        CompleteRpc(callId);
                     }
+
+                    parserContext.Reset();
                 }
             } while (parserContext.Step == ParseStep.NotStarted && reader.Remaining >= 4);
 
-            input.AdvanceTo(reader.Position, buffer.End);
-
-            return Task.CompletedTask;
+            consumed = reader.Position;
         }
 
-        private async Task ProcessSidecarsAsync(
-            PipeReader input,
-            InflightRpc rpc,
-            ResponseHeader header,
-            int length)
+        private bool TryParseMessage(
+            ref SequenceReader<byte> reader, ParserContext parserContext)
         {
-            try
+            switch (parserContext.Step)
             {
-                AdjustSidecarOffsets(header);
-                await rpc.Rpc.ParseSidecarsAsync(header, input, length).ConfigureAwait(false);
-                CompleteRpc(header.CallId);
+                case ParseStep.NotStarted:
+                    {
+                        if (reader.TryReadBigEndian(out parserContext.TotalMessageLength))
+                        {
+                            goto case ParseStep.ReadHeaderLength;
+                        }
+                        else
+                        {
+                            // Not enough data to read message size.
+                            break;
+                        }
+                    }
+                case ParseStep.ReadHeaderLength:
+                    {
+                        if (reader.TryReadVarint(out parserContext.HeaderLength))
+                        {
+                            goto case ParseStep.ReadHeader;
+                        }
+                        else
+                        {
+                            // Not enough data to read header length.
+                            parserContext.Step = ParseStep.ReadHeaderLength;
+                            break;
+                        }
+                    }
+                case ParseStep.ReadHeader:
+                    {
+                        if (TryParseResponseHeader(ref reader,
+                            parserContext.HeaderLength, out parserContext.Header))
+                        {
+                            parserContext.Rpc = GetRpc(parserContext.Header).Rpc;
+                            goto case ParseStep.ReadMainMessageLength;
+                        }
+                        else
+                        {
+                            // Not enough data to read header.
+                            parserContext.Step = ParseStep.ReadHeader;
+                            break;
+                        }
+                    }
+                case ParseStep.ReadMainMessageLength:
+                    {
+                        if (reader.TryReadVarint(out parserContext.MainMessageLength))
+                        {
+                            goto case ParseStep.ReadProtobufMessage;
+                        }
+                        else
+                        {
+                            // Not enough data to read main message length.
+                            parserContext.Step = ParseStep.ReadMainMessageLength;
+                            break;
+                        }
+                    }
+                case ParseStep.ReadProtobufMessage:
+                    {
+                        var messageLength = parserContext.ProtobufMessageLength;
+                        if (reader.Remaining < messageLength)
+                        {
+                            // Not enough data to parse main protobuf message.
+                            parserContext.Step = ParseStep.ReadProtobufMessage;
+                            break;
+                        }
+
+                        var mainProtobufMessage = reader.Sequence.Slice(
+                            reader.Position, messageLength);
+
+                        if (parserContext.Header.IsError)
+                        {
+                            parserContext.Error = GetRpcError(mainProtobufMessage);
+                        }
+                        else
+                        {
+                            parserContext.Rpc.ParseProtobuf(mainProtobufMessage);
+                        }
+
+                        reader.Advance(messageLength);
+
+                        if (parserContext.HasSidecars)
+                        {
+                            parserContext.RemainingSidecarLength = parserContext.SidecarLength;
+                            goto case ParseStep.BeginSidecars;
+                        }
+                        else
+                        {
+                            return true;
+                        }
+                    }
+                case ParseStep.BeginSidecars:
+                    {
+                        AdjustSidecarOffsets(parserContext.Header);
+
+                        var sidecars = new KuduSidecarOffsets(
+                            parserContext.Header.SidecarOffsets,
+                            parserContext.RemainingSidecarLength);
+
+                        parserContext.Rpc.BeginProcessingSidecars(sidecars);
+                        parserContext.Step = ParseStep.ReadSidecars;
+
+                        goto case ParseStep.ReadSidecars;
+                    }
+                case ParseStep.ReadSidecars:
+                    {
+                        var readAmount = Math.Min(
+                            reader.Remaining, parserContext.RemainingSidecarLength);
+
+                        var slice = reader.Sequence.Slice(
+                            reader.Position, readAmount);
+
+                        parserContext.Rpc.ParseSidecarSegment(slice);
+
+                        reader.Advance(readAmount);
+
+                        parserContext.RemainingSidecarLength -= (int)readAmount;
+                        if (parserContext.RemainingSidecarLength == 0)
+                        {
+                            return true;
+                        }
+
+                        break;
+                    }
             }
-            catch (Exception ex)
+
+            return false;
+        }
+
+        private static bool TryParseResponseHeader(
+            ref SequenceReader<byte> reader, long length, out ResponseHeader header)
+        {
+            if (reader.Remaining < length)
             {
-                CompleteRpc(header.CallId, ex);
-
-                // TODO: We probably don't need to burn this entire connection
-                // just because we had an error parsing sidecars.
-
-                // Ideally we could just read any remaining data and continue.
-                throw;
+                header = null;
+                return false;
             }
+
+            var slice = reader.Sequence.Slice(reader.Position, length);
+            header = Serializer.Deserialize<ResponseHeader>(slice);
+
+            reader.Advance(length);
+
+            return true;
+        }
+
+        private static ErrorStatusPB GetRpcError(ReadOnlySequence<byte> buffer)
+        {
+            return Serializer.Deserialize<ErrorStatusPB>(buffer);
+        }
+
+        private Exception GetException(ErrorStatusPB error)
+        {
+            var code = error.Code;
+            KuduException exception;
+
+            if (code == ErrorStatusPB.RpcErrorCodePB.ErrorServerTooBusy ||
+                code == ErrorStatusPB.RpcErrorCodePB.ErrorUnavailable)
+            {
+                exception = new RecoverableException(
+                    KuduStatus.ServiceUnavailable(error.Message));
+            }
+            else if (code == ErrorStatusPB.RpcErrorCodePB.FatalInvalidAuthenticationToken)
+            {
+                exception = new InvalidAuthnTokenException(
+                    KuduStatus.NotAuthorized(error.Message));
+            }
+            else if (code == ErrorStatusPB.RpcErrorCodePB.ErrorInvalidAuthorizationToken)
+            {
+                exception = new InvalidAuthzTokenException(
+                    KuduStatus.NotAuthorized(error.Message));
+            }
+            else
+            {
+                var message = $"{LogPrefix} server sent error {error.Message}";
+                exception = new RpcRemoteException(KuduStatus.RemoteError(message), error);
+            }
+
+            return exception;
         }
 
         /// <summary>

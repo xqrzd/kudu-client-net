@@ -34,6 +34,7 @@ namespace Kudu.Client
         private readonly ConnectionCache _connectionCache;
         private readonly Dictionary<string, TableLocationsCache> _tableLocations;
         private readonly RequestTracker _requestTracker;
+        private readonly uint? _defaultOperationTimeoutMs;
 
         private volatile bool _hasConnectedToMaster;
         private volatile string _location;
@@ -53,6 +54,9 @@ namespace Kudu.Client
             _connectionCache = new ConnectionCache(_connectionFactory);
             _tableLocations = new Dictionary<string, TableLocationsCache>();
             _requestTracker = new RequestTracker(Guid.NewGuid().ToString("N"));
+
+            if (options.DefaultOperationTimeout.TotalMilliseconds > 0)
+                _defaultOperationTimeoutMs = (uint)options.DefaultOperationTimeout.TotalMilliseconds;
         }
 
         /// <summary>
@@ -112,17 +116,11 @@ namespace Kudu.Client
         public async Task<KuduTable> CreateTableAsync(TableBuilder table)
         {
             var rpc = new CreateTableRequest(table.Build());
+            var response = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
 
-            await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
-            var result = rpc.Response;
+            await WaitForTableDoneAsync(response.TableId).ConfigureAwait(false);
 
-            // TODO: Handle errors elsewhere?
-            if (result.Error != null)
-                throw new MasterException(result.Error);
-
-            await WaitForTableDoneAsync(result.TableId).ConfigureAwait(false);
-
-            var tableIdentifier = new TableIdentifierPB { TableId = result.TableId };
+            var tableIdentifier = new TableIdentifierPB { TableId = response.TableId };
             return await OpenTableAsync(tableIdentifier).ConfigureAwait(false);
         }
 
@@ -135,35 +133,23 @@ namespace Kudu.Client
         /// </param>
         public async Task DeleteTableAsync(string tableName, bool modifyExternalCatalogs = true)
         {
-            var rpc = new DeleteTableRequest(new DeleteTableRequestPB
+            var request = new DeleteTableRequestPB
             {
                 Table = new TableIdentifierPB { TableName = tableName },
                 ModifyExternalCatalogs = modifyExternalCatalogs
-            });
+            };
+
+            var rpc = new DeleteTableRequest(request);
 
             await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
-            var result = rpc.Response;
-
-            // TODO: Handle errors elsewhere?
-            if (result.Error != null)
-                throw new MasterException(result.Error);
         }
 
         public async Task<List<ListTablesResponsePB.TableInfo>> GetTablesAsync(string nameFilter = null)
         {
-            var rpc = new ListTablesRequest(new ListTablesRequestPB
-            {
-                NameFilter = nameFilter
-            });
+            var rpc = new ListTablesRequest(nameFilter);
+            var response = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
 
-            await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
-            var result = rpc.Response;
-
-            // TODO: Handle errors elsewhere?
-            if (result.Error != null)
-                throw new MasterException(result.Error);
-
-            return result.Tables;
+            return response.Tables;
         }
 
         public async Task<List<RemoteTablet>> GetTableLocationsAsync(
@@ -172,18 +158,15 @@ namespace Kudu.Client
         {
             // TODO: rate-limit master lookups.
 
-            var rpc = new GetTableLocationsRequest(new GetTableLocationsRequestPB
+            var request = new GetTableLocationsRequestPB
             {
                 Table = new TableIdentifierPB { TableId = tableId.ToUtf8ByteArray() },
                 PartitionKeyStart = partitionKey,
                 MaxReturnedLocations = fetchBatchSize
-            });
+            };
 
-            await SendRpcToMasterAsync(rpc, cancellationToken).ConfigureAwait(false);
-            var result = rpc.Response;
-
-            if (result.Error != null)
-                throw new MasterException(result.Error);
+            var rpc = new GetTableLocationsRequest(request);
+            var result = await SendRpcToMasterAsync(rpc, cancellationToken).ConfigureAwait(false);
 
             var tabletLocations = new List<RemoteTablet>(result.TabletLocations.Count);
 
@@ -304,13 +287,7 @@ namespace Kudu.Client
                 table.TableId,
                 tablet.Partition.PartitionKeyStart);
 
-            await SendRpcToTabletAsync(rpc).ConfigureAwait(false);
-            var result = rpc.Response;
-
-            if (result.Error != null)
-                throw new TabletServerException(result.Error);
-
-            return result;
+            return await SendRpcToTabletAsync(rpc).ConfigureAwait(false);
         }
 
         public ScanBuilder NewScanBuilder(KuduTable table)
@@ -334,34 +311,24 @@ namespace Kudu.Client
 
         private async Task<GetTableSchemaResponsePB> GetTableSchemaAsync(TableIdentifierPB tableIdentifier)
         {
-            var rpc = new GetTableSchemaRequest(new GetTableSchemaRequestPB
-            {
-                Table = tableIdentifier
-            });
+            var request = new GetTableSchemaRequestPB { Table = tableIdentifier };
+            var rpc = new GetTableSchemaRequest(request);
 
-            await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
-            var result = rpc.Response;
-
-            if (result.Error != null)
-                throw new MasterException(result.Error);
-
-            return result;
+            return await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
         }
 
         private async Task WaitForTableDoneAsync(byte[] tableId)
         {
-            var rpc = new IsCreateTableDoneRequest(new IsCreateTableDoneRequestPB
+            var request = new IsCreateTableDoneRequestPB
             {
                 Table = new TableIdentifierPB { TableId = tableId }
-            });
+            };
+
+            var rpc = new IsCreateTableDoneRequest(request);
 
             while (true)
             {
-                await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
-                var result = rpc.Response;
-
-                if (result.Error != null)
-                    throw new MasterException(result.Error);
+                var result = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
 
                 if (result.Done)
                     break;
@@ -543,9 +510,10 @@ namespace Kudu.Client
                 "master", location: null, hostPort).ConfigureAwait(false);
 
             var rpc = new ConnectToMasterRequest();
-            await SendRpcAsync(rpc, serverInfo, cancellationToken).ConfigureAwait(false);
+            var response = await SendRpcAsync(rpc, serverInfo, cancellationToken)
+                .ConfigureAwait(false);
 
-            return new ConnectToMasterResponse(rpc.Response, serverInfo);
+            return new ConnectToMasterResponse(response, serverInfo);
         }
 
         private static bool TryGetConnectResponse(
@@ -589,13 +557,13 @@ namespace Kudu.Client
         }
 
         /// <summary>
-        /// Sends the provided <see cref="KuduRpc"/> to the server identified by
-        /// RPC's table, partition key, and replica selection.
+        /// Sends the provided <see cref="KuduTabletRpc{T}"/> to the server
+        /// identified by RPC's table, partition key, and replica selection.
         /// </summary>
         /// <param name="rpc">The RPC to send.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
-        public async Task SendRpcToTabletAsync(
-            KuduTabletRpc rpc, CancellationToken cancellationToken = default)
+        public async Task<T> SendRpcToTabletAsync<T>(
+            KuduTabletRpc<T> rpc, CancellationToken cancellationToken = default)
         {
             if (CannotRetryRequest(rpc, cancellationToken))
             {
@@ -616,7 +584,8 @@ namespace Kudu.Client
 
             string tableId = rpc.TableId;
             byte[] partitionKey = rpc.PartitionKey;
-            RemoteTablet tablet = await GetTabletAsync(tableId, partitionKey).ConfigureAwait(false);
+            RemoteTablet tablet = await GetTabletAsync(tableId, partitionKey)
+                .ConfigureAwait(false);
             // TODO: Consider caching non-covered tablet ranges?
 
             // If we found a tablet, we'll try to find the TS to talk to.
@@ -627,8 +596,8 @@ namespace Kudu.Client
                 {
                     rpc.Tablet = tablet;
 
-                    await SendRpcAsync(rpc, serverInfo, cancellationToken).ConfigureAwait(false);
-                    return;
+                    return await SendRpcAsync(rpc, serverInfo, cancellationToken)
+                        .ConfigureAwait(false);
                 }
             }
 
@@ -642,11 +611,11 @@ namespace Kudu.Client
             // 2) The tablet is known, but we do not have an active client for the
             //    leader replica.
 
-            await SendRpcToTabletAsync(rpc, cancellationToken).ConfigureAwait(false);
+            return await SendRpcToTabletAsync(rpc, cancellationToken).ConfigureAwait(false);
         }
 
-        public async Task SendRpcToMasterAsync(
-            KuduMasterRpc rpc, CancellationToken cancellationToken = default)
+        public async Task<T> SendRpcToMasterAsync<T>(
+            KuduMasterRpc<T> rpc, CancellationToken cancellationToken = default)
         {
             if (CannotRetryRequest(rpc, cancellationToken))
             {
@@ -668,12 +637,12 @@ namespace Kudu.Client
             ServerInfo serverInfo = GetMasterServerInfo(rpc.ReplicaSelection);
             if (serverInfo != null)
             {
-                await SendRpcAsync(rpc, serverInfo, cancellationToken).ConfigureAwait(false);
+                return await SendRpcAsync(rpc, serverInfo, cancellationToken).ConfigureAwait(false);
             }
             else
             {
                 await ConnectToClusterAsync(cancellationToken).ConfigureAwait(false);
-                await SendRpcToMasterAsync(rpc, cancellationToken).ConfigureAwait(false);
+                return await SendRpcToMasterAsync(rpc, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -687,15 +656,15 @@ namespace Kudu.Client
             return _masterCache?.GetServerInfo(replicaSelection, _location);
         }
 
-        private Task HandleRetryableErrorAsync(
-            KuduMasterRpc rpc, KuduException ex, CancellationToken cancellationToken)
+        private Task<T> HandleRetryableErrorAsync<T>(
+            KuduMasterRpc<T> rpc, KuduException ex, CancellationToken cancellationToken)
         {
             // TODO: we don't always need to sleep, maybe another replica can serve this RPC.
             return DelayedSendRpcAsync(rpc, ex, cancellationToken);
         }
 
-        private Task HandleRetryableErrorAsync(
-            KuduTabletRpc rpc, KuduException ex, CancellationToken cancellationToken)
+        private Task<T> HandleRetryableErrorAsync<T>(
+             KuduTabletRpc<T> rpc, KuduException ex, CancellationToken cancellationToken)
         {
             // TODO: we don't always need to sleep, maybe another replica can serve this RPC.
             return DelayedSendRpcAsync(rpc, ex, cancellationToken);
@@ -703,14 +672,14 @@ namespace Kudu.Client
 
         /// <summary>
         /// This methods enable putting RPCs on hold for a period of time determined by
-        /// <see cref="DelayRpcAsync(KuduRpc, CancellationToken)"/>. If the RPC is out of
-        /// time/retries, an exception is thrown.
+        /// <see cref="DelayRpcAsync{T}(KuduRpc{T}, CancellationToken)"/>. If the RPC is
+        /// out of time/retries, an exception is thrown.
         /// </summary>
         /// <param name="rpc">The RPC to retry later.</param>
         /// <param name="exception">The reason why we need to retry.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
-        private async Task DelayedSendRpcAsync(
-            KuduMasterRpc rpc, KuduException exception, CancellationToken cancellationToken)
+        private async Task<T> DelayedSendRpcAsync<T>(
+            KuduMasterRpc<T> rpc, KuduException exception, CancellationToken cancellationToken)
         {
             if (CannotRetryRequest(rpc, cancellationToken))
             {
@@ -723,19 +692,19 @@ namespace Kudu.Client
             // on hold but we won't be doing this for the moment. Regions in HBase can move a lot,
             // we're not expecting this in Kudu.
             await DelayRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
-            await SendRpcToMasterAsync(rpc, cancellationToken).ConfigureAwait(false);
+            return await SendRpcToMasterAsync(rpc, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
         /// This methods enable putting RPCs on hold for a period of time determined by
-        /// <see cref="DelayRpcAsync(KuduRpc, CancellationToken)"/>. If the RPC is out of
-        /// time/retries, an exception is thrown.
+        /// <see cref="DelayRpcAsync{T}(KuduRpc{T}, CancellationToken)"/>. If the RPC is
+        /// out of time/retries, an exception is thrown.
         /// </summary>
         /// <param name="rpc">The RPC to retry later.</param>
         /// <param name="exception">The reason why we need to retry.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
-        private async Task DelayedSendRpcAsync(
-            KuduTabletRpc rpc, KuduException exception, CancellationToken cancellationToken)
+        private async Task<T> DelayedSendRpcAsync<T>(
+            KuduTabletRpc<T> rpc, KuduException exception, CancellationToken cancellationToken)
         {
             if (CannotRetryRequest(rpc, cancellationToken))
             {
@@ -748,62 +717,145 @@ namespace Kudu.Client
             // on hold but we won't be doing this for the moment. Regions in HBase can move a lot,
             // we're not expecting this in Kudu.
             await DelayRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
-            await SendRpcToTabletAsync(rpc, cancellationToken).ConfigureAwait(false);
+            return await SendRpcToTabletAsync(rpc, cancellationToken).ConfigureAwait(false);
         }
 
-        private async Task SendRpcAsync(
-            KuduMasterRpc rpc, ServerInfo serverInfo,
+        private async Task<T> SendRpcAsync<T>(
+            KuduMasterRpc<T> rpc, ServerInfo serverInfo,
             CancellationToken cancellationToken = default)
         {
             try
             {
-                KuduConnection connection = await _connectionCache.GetConnectionAsync(
-                    serverInfo, cancellationToken).ConfigureAwait(false);
+                var result = await SendRpcGenericAsync(rpc, serverInfo, cancellationToken)
+                    .ConfigureAwait(false);
 
-                RequestHeader header = CreateRequestHeader(rpc);
+                if (rpc.Error != null)
+                {
+                    var code = rpc.Error.Status.Code;
+                    var status = KuduStatus.FromMasterErrorPB(rpc.Error);
+                    if (rpc.Error.code == MasterErrorPB.Code.NotTheLeader)
+                    {
+                        //client.handleNotLeader(rpc, new RecoverableException(status), connection.getServerInfo());
+                    }
+                    else if (code == AppStatusPB.ErrorCode.ServiceUnavailable)
+                    {
+                        // TODO: This is a crutch until we either don't have to retry RPCs going to the
+                        // same server or use retry policies.
+                        //client.handleRetryableError(rpc, new RecoverableException(status));
+                    }
+                    else
+                    {
+                        throw new NonRecoverableException(status);
+                    }
+                }
 
-                // TODO: Remaining exception handling...
-                await connection.SendReceiveAsync(header, rpc).ConfigureAwait(false);
+                return result;
             }
             catch (RecoverableException ex)
             {
-                // This is to handle RecoverableException(Status.IllegalState()) from
-                // Connection.enqueueMessage() if the connection turned into the TERMINATED state.
+                Console.WriteLine("Retrying..." + ex);
 
-                Console.WriteLine("Retrying...");
-
-                await HandleRetryableErrorAsync(rpc, ex, cancellationToken)
+                return await HandleRetryableErrorAsync(rpc, ex, cancellationToken)
                     .ConfigureAwait(false);
             }
         }
 
-        private async Task SendRpcAsync(
-            KuduTabletRpc rpc, ServerInfo serverInfo,
+        private async Task<T> SendRpcAsync<T>(
+            KuduTabletRpc<T> rpc, ServerInfo serverInfo,
             CancellationToken cancellationToken = default)
         {
             try
             {
-                KuduConnection connection = await _connectionCache.GetConnectionAsync(
-                    serverInfo, cancellationToken).ConfigureAwait(false);
+                var result = await SendRpcGenericAsync(rpc, serverInfo, cancellationToken)
+                    .ConfigureAwait(false);
 
-                RequestHeader header = CreateRequestHeader(rpc);
+                if (rpc.Error != null)
+                {
+                    var errCode = rpc.Error.code;
+                    var errStatusCode = rpc.Error.Status.Code;
+                    var status = KuduStatus.FromTabletServerErrorPB(rpc.Error);
+                    if (errCode == TabletServerErrorPB.Code.TabletNotFound)
+                    {
+                        //client.handleTabletNotFound(
+                        //    rpc, new RecoverableException(status), connection.getServerInfo());
+                        // we're not calling rpc.callback() so we rely on the client to retry that RPC
+                    }
+                    else if (errCode == TabletServerErrorPB.Code.TabletNotRunning ||
+                        errStatusCode == AppStatusPB.ErrorCode.ServiceUnavailable)
+                    {
+                        //client.handleRetryableError(rpc, new RecoverableException(status));
+                        // The following two error codes are an indication that the tablet isn't a leader.
+                    }
+                    else if (errStatusCode == AppStatusPB.ErrorCode.IllegalState ||
+                        errStatusCode == AppStatusPB.ErrorCode.Aborted)
+                    {
+                        //client.handleNotLeader(rpc, new RecoverableException(status), connection.getServerInfo());
+                    }
+                    else
+                    {
+                        throw new NonRecoverableException(status);
+                    }
+                }
 
-                // TODO: Remaining exception handling...
-                await connection.SendReceiveAsync(header, rpc).ConfigureAwait(false);
+                return result;
             }
             catch (RecoverableException ex)
             {
-                // This is to handle RecoverableException(Status.IllegalState()) from
-                // Connection.enqueueMessage() if the connection turned into the TERMINATED state.
+                Console.WriteLine("Retrying..." + ex);
 
-                Console.WriteLine("Retrying...");
-
-                await HandleRetryableErrorAsync(rpc, ex, cancellationToken)
+                return await HandleRetryableErrorAsync(rpc, ex, cancellationToken)
                     .ConfigureAwait(false);
             }
         }
 
-        private RequestHeader CreateRequestHeader(KuduRpc rpc)
+        private async Task<T> SendRpcGenericAsync<T>(
+            KuduRpc<T> rpc, ServerInfo serverInfo,
+            CancellationToken cancellationToken = default)
+        {
+            // This might throw a RecoverableException. That's fine, we'll handle
+            // it in whatever method called this one.
+            KuduConnection connection = await _connectionCache.GetConnectionAsync(
+                serverInfo, cancellationToken).ConfigureAwait(false);
+
+            RequestHeader header = CreateRequestHeader(rpc);
+
+            try
+            {
+                return await connection.SendReceiveAsync(header, rpc)
+                    .ConfigureAwait(false);
+            }
+            catch (InvalidAuthnTokenException)
+            {
+                Console.WriteLine("HandleInvalidAuthnToken");
+                throw;
+            }
+            catch (InvalidAuthzTokenException)
+            {
+                Console.WriteLine("HandleInvalidAuthzToken");
+                throw;
+            }
+            catch (RecoverableException ex)
+            {
+                if (ex.Status.IsServiceUnavailable)
+                {
+                    //client.handleRetryableError(rpc, exception);
+                }
+                else
+                {
+                    // If we don't really know anything about the exception, invalidate
+                    // the location for the tablet, opening the possibility of retrying
+                    // on a different server.
+                    //client.handleTabletNotFound(rpc, exception, connection.getServerInfo());
+
+                    //invalidateTabletCache(rpc.getTablet(), info, ex.getMessage());
+                    //handleRetryableError(rpc, ex);
+                }
+
+                throw;
+            }
+        }
+
+        private RequestHeader CreateRequestHeader<T>(KuduRpc<T> rpc)
         {
             // The callId is set by KuduConnection.SendReceiveAsync().
             var header = new RequestHeader
@@ -825,7 +877,8 @@ namespace Kudu.Client
                 //rpc.AuthzToken = client.GetAuthzToken(rpc.Table.TableId);
             }
 
-            // TODO: Set timeout
+            if (_defaultOperationTimeoutMs.HasValue)
+                header.TimeoutMillis = _defaultOperationTimeoutMs.Value;
 
             if (rpc.IsRequestTracked)
             {
@@ -846,8 +899,8 @@ namespace Kudu.Client
             return header;
         }
 
-        private async Task DelayRpcAsync(
-            KuduRpc rpc, CancellationToken cancellationToken = default)
+        private async Task DelayRpcAsync<T>(
+            KuduRpc<T> rpc, CancellationToken cancellationToken = default)
         {
             int attemptCount = rpc.Attempt;
 
@@ -869,12 +922,12 @@ namespace Kudu.Client
         /// </summary>
         /// <param name="rpc">The RPC we're going to attempt to execute.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
-        private static bool CannotRetryRequest(KuduRpc rpc, CancellationToken cancellationToken)
+        private static bool CannotRetryRequest<T>(KuduRpc<T> rpc, CancellationToken cancellationToken)
         {
             return rpc.Attempt > MaxRpcAttempts || cancellationToken.IsCancellationRequested;
         }
 
-        private static void ThrowTooManyAttemptsOrTimeoutException(KuduRpc rpc, KuduException cause)
+        private static void ThrowTooManyAttemptsOrTimeoutException<T>(KuduRpc<T> rpc, KuduException cause)
         {
             string message = rpc.Attempt > MaxRpcAttempts ?
                 "Too many attempts." :

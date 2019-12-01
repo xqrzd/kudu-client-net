@@ -2,13 +2,12 @@
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Pipelines;
 using System.Threading;
 using System.Threading.Tasks;
 using Kudu.Client.Builder;
+using Kudu.Client.Connection;
 using Kudu.Client.Exceptions;
 using Kudu.Client.Protocol;
-using Kudu.Client.Protocol.Rpc;
 using Kudu.Client.Protocol.Tserver;
 using Kudu.Client.Requests;
 using Kudu.Client.Scanner;
@@ -249,7 +248,7 @@ namespace Kudu.Client
                 // means we were in between tablets.
                 if (_tablet != null)
                 {
-                    ScanRequest rpc = GetCloseRequest();
+                    var rpc = GetCloseRequest();
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
                     try
@@ -289,12 +288,10 @@ namespace Kudu.Client
             {
                 // We need to open the scanner first.
                 var rpc = GetOpenRequest();
-                await _client.SendRpcToTabletAsync(rpc, _cancellationToken)
+                var resp = await _client.SendRpcToTabletAsync(rpc, _cancellationToken)
                     .ConfigureAwait(false);
 
                 _tablet = rpc.Tablet;
-
-                var resp = rpc.Response;
 
                 if (_htTimestamp == KuduClient.NoTimestamp &&
                     resp.ScanTimestamp != KuduClient.NoTimestamp)
@@ -351,12 +348,10 @@ namespace Kudu.Client
             else
             {
                 var rpc = GetNextRowsRequest();
-                await _client.SendRpcToTabletAsync(rpc, _cancellationToken)
+                var resp = await _client.SendRpcToTabletAsync(rpc, _cancellationToken)
                     .ConfigureAwait(false);
 
                 _tablet = rpc.Tablet;
-
-                var resp = rpc.Response;
 
                 _numRowsReturned += resp.NumRows;
                 Current = resp.Data;
@@ -395,21 +390,24 @@ namespace Kudu.Client
             };
         }
 
-        private ScanRequest GetOpenRequest()
+        private ScanRequest<ResultSet> GetOpenRequest()
         {
             //checkScanningNotStarted();
-            return new ScanRequest(this, State.Opening);
+            var parser = new ResultSetScanParser();
+            return new ScanRequest<ResultSet>(this, parser, State.Opening);
         }
 
-        private ScanRequest GetNextRowsRequest()
+        private ScanRequest<ResultSet> GetNextRowsRequest()
         {
             //checkScanningNotStarted();
-            return new ScanRequest(this, State.Next);
+            var parser = new ResultSetScanParser();
+            return new ScanRequest<ResultSet>(this, parser, State.Next);
         }
 
-        private ScanRequest GetCloseRequest()
+        private ScanRequest<ResultSet> GetCloseRequest()
         {
-            return new ScanRequest(this, State.Closing);
+            var parser = new ResultSetScanParser();
+            return new ScanRequest<ResultSet>(this, parser, State.Closing);
         }
 
         private void ScanFinished()
@@ -443,16 +441,18 @@ namespace Kudu.Client
             _tablet = null;
         }
 
-        private class ScanRequest : KuduTabletRpc
+        private class ScanRequest<T> : KuduTabletRpc<ScanResponse<T>>
         {
             private readonly KuduScanEnumerator _scanner;
+            private readonly IKuduScanParser<T> _parser;
             private readonly State _state;
 
             private ScanResponsePB _responsePB;
 
-            public ScanRequest(KuduScanEnumerator scanner, State state)
+            public ScanRequest(KuduScanEnumerator scanner, IKuduScanParser<T> parser, State state)
             {
                 _scanner = scanner;
+                _parser = parser;
                 _state = state;
                 Tablet = scanner._tablet;
                 TableId = _scanner._table.TableId;
@@ -465,12 +465,9 @@ namespace Kudu.Client
 
             public override ReplicaSelection ReplicaSelection => _scanner._replicaSelection;
 
-            // TODO: This should be generic.
-            public ScanResponse<ResultSet> Response { get; private set; }
-
             // TODO: Authz token
 
-            public override void WriteRequest(Stream stream)
+            public override void Serialize(Stream stream)
             {
                 var request = new ScanRequestPB();
 
@@ -563,127 +560,34 @@ namespace Kudu.Client
                 _responsePB = resp;
             }
 
-            public override async Task ParseSidecarsAsync(
-                ResponseHeader header, PipeReader reader, int length)
+            protected override void Dispose(bool disposing)
             {
-                // Allocate buffers for sidecars.
-                var sidecars = AllocateSidecars(header, length);
-                var nextSidecarIndex = 0;
-                var currentSidecar = sidecars[nextSidecarIndex++].Memory;
-
-                long remaining = length;
-                long remainingSidecarLength = currentSidecar.Length;
-
-                try
-                {
-                    // Fill sidecars.
-                    while (remaining > 0)
-                    {
-                        // Don't pass the cancellation token. Even if the scan
-                        // is cancelled, we still need to consume all the data.
-                        var result = await reader.ReadAsync().ConfigureAwait(false);
-
-                        if (result.IsCanceled || result.IsCompleted)
-                            break;
-
-                        var buffer = result.Buffer;
-
-                        do
-                        {
-                            if (currentSidecar.Length == 0)
-                            {
-                                currentSidecar = sidecars[nextSidecarIndex++].Memory;
-                                remainingSidecarLength = currentSidecar.Length;
-                            }
-
-                            // How much data can we copy from the buffer?
-                            var bytesToRead = Math.Min(buffer.Length, remainingSidecarLength);
-                            buffer.Slice(0, bytesToRead).CopyTo(currentSidecar.Span);
-
-                            remaining -= bytesToRead;
-                            remainingSidecarLength -= bytesToRead;
-                            currentSidecar = currentSidecar.Slice((int)bytesToRead);
-
-                            buffer = buffer.Slice(bytesToRead);
-                        }
-                        while (remaining > 0 && buffer.Length > 0);
-
-                        reader.AdvanceTo(buffer.Start, buffer.End);
-                    }
-                }
-                finally
-                {
-                    if (remaining > 0)
-                    {
-                        foreach (var sidecar in sidecars)
-                            sidecar.Dispose();
-
-                        throw new NonRecoverableException(KuduStatus.IllegalState(
-                            $"Unable to read all sidecar data ({remaining}/{length})"));
-                    }
-                }
-
-                var response = _responsePB;
-
-                var rowData = sidecars[response.Data.RowsSidecar];
-                IMemoryOwner<byte> indirectData = null;
-
-                if (response.Data.ShouldSerializeIndirectDataSidecar())
-                {
-                    indirectData = sidecars[response.Data.IndirectDataSidecar];
-                }
-
-                var resultSet = new ResultSet(
-                    _scanner._schema,
-                    response.Data.NumRows,
-                    rowData,
-                    indirectData);
-
-                Response = new ScanResponse<ResultSet>(
-                    response.ScannerId,
-                    resultSet,
-                    response.Data.NumRows,
-                    response.HasMoreResults,
-                    response.ShouldSerializeSnapTimestamp() ? (long)response.SnapTimestamp : KuduClient.NoTimestamp,
-                    response.ShouldSerializePropagatedTimestamp() ? (long)response.PropagatedTimestamp : KuduClient.NoTimestamp,
-                    response.LastPrimaryKey);
+                _parser.Dispose();
             }
 
-            private static List<ArrayMemoryPoolBuffer<byte>> AllocateSidecars(
-                ResponseHeader header, int length)
+            public override ScanResponse<T> Output
             {
-                var sidecars = new List<ArrayMemoryPoolBuffer<byte>>();
-                int total = 0;
-                for (int i = 0; i < header.SidecarOffsets.Length; i++)
+                get
                 {
-                    var offset = header.SidecarOffsets[i];
-                    int size;
-                    if (i + 1 >= header.SidecarOffsets.Length)
-                    {
-                        size = length - total;
-                    }
-                    else
-                    {
-                        var next = header.SidecarOffsets[i + 1];
-                        size = (int)(next - offset);
-                    }
-
-                    var sidecar = new ArrayMemoryPoolBuffer<byte>(size);
-                    sidecars.Add(sidecar);
-
-                    total += size;
+                    return new ScanResponse<T>(
+                        _responsePB.ScannerId,
+                        _parser.Output,
+                        _responsePB.Data.NumRows,
+                        _responsePB.HasMoreResults,
+                        _responsePB.ShouldSerializeSnapTimestamp() ? (long)_responsePB.SnapTimestamp : KuduClient.NoTimestamp,
+                        _responsePB.ShouldSerializePropagatedTimestamp() ? (long)_responsePB.PropagatedTimestamp : KuduClient.NoTimestamp,
+                        _responsePB.LastPrimaryKey);
                 }
+            }
 
-                if (total != length)
-                {
-                    foreach (var sidecar in sidecars)
-                        sidecar.Dispose();
+            public override void BeginProcessingSidecars(KuduSidecarOffsets sidecars)
+            {
+                _parser.BeginProcessingSidecars(_scanner._schema, _responsePB, sidecars);
+            }
 
-                    throw new NonRecoverableException(KuduStatus.IllegalState(
-                        $"Expected {length} sidecar bytes, computed {total}"));
-                }
-
-                return sidecars;
+            public override void ParseSidecarSegment(ReadOnlySequence<byte> buffer)
+            {
+                _parser.ParseSidecarSegment(buffer);
             }
         }
 
@@ -708,42 +612,6 @@ namespace Kudu.Client
             Opening,
             Next,
             Closing
-        }
-
-        private sealed class ArrayMemoryPoolBuffer<T> : IMemoryOwner<T>
-        {
-            private readonly int _length;
-            private T[] _array;
-
-            public ArrayMemoryPoolBuffer(int size)
-            {
-                _length = size;
-                _array = ArrayPool<T>.Shared.Rent(size);
-            }
-
-            public Memory<T> Memory
-            {
-                get
-                {
-                    T[] array = _array;
-                    if (array == null)
-                    {
-                        throw new ObjectDisposedException(nameof(ArrayMemoryPoolBuffer<T>));
-                    }
-
-                    return new Memory<T>(array, 0, _length);
-                }
-            }
-
-            public void Dispose()
-            {
-                T[] array = _array;
-                if (array != null)
-                {
-                    _array = null;
-                    ArrayPool<T>.Shared.Return(array);
-                }
-            }
         }
     }
 }
