@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Kudu.Client.Util
 {
-    internal static class SequenceReaderExtensions
+    public static class SequenceReaderExtensions
     {
         public static bool TryReadUtf8String(
             ref this SequenceReader<byte> reader, int length, out string value)

@@ -25,7 +25,7 @@ namespace Kudu.Client.Requests
         {
         }
 
-        public virtual void ParseSidecarSegment(ReadOnlySequence<byte> buffer)
+        public virtual void ParseSidecarSegment(ref SequenceReader<byte> reader)
         {
         }
 

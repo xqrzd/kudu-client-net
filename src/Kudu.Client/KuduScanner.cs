@@ -585,9 +585,9 @@ namespace Kudu.Client
                 _parser.BeginProcessingSidecars(_scanner._schema, _responsePB, sidecars);
             }
 
-            public override void ParseSidecarSegment(ReadOnlySequence<byte> buffer)
+            public override void ParseSidecarSegment(ref SequenceReader<byte> reader)
             {
-                _parser.ParseSidecarSegment(buffer);
+                _parser.ParseSidecarSegment(ref reader);
             }
         }
 

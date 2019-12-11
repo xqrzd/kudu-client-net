@@ -14,6 +14,6 @@ namespace Kudu.Client.Scanner
             ScanResponsePB scanResponse,
             KuduSidecarOffsets sidecars);
 
-        void ParseSidecarSegment(ReadOnlySequence<byte> buffer);
+        void ParseSidecarSegment(ref SequenceReader<byte> reader);
     }
 }

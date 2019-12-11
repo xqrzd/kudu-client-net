@@ -4,12 +4,14 @@
 
 #if NETSTANDARD2_0 || NETCOREAPP2_1
 
+using System;
+using System.Buffers;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
-namespace System.Buffers
+namespace Kudu.Client
 {
-    internal ref partial struct SequenceReader<T> where T : unmanaged, IEquatable<T>
+    public ref partial struct SequenceReader<T> where T : unmanaged, IEquatable<T>
     {
         /// <summary>
         /// Try to read everything up to the given <paramref name="delimiter"/>.

@@ -76,8 +76,10 @@ namespace Kudu.Client.Scanner
             remainingSidecarLength = currentSidecar.Length;
         }
 
-        public void ParseSidecarSegment(ReadOnlySequence<byte> buffer)
+        public void ParseSidecarSegment(ref SequenceReader<byte> reader)
         {
+            var buffer = reader.Sequence.Slice(reader.Position);
+
             do
             {
                 if (currentSidecar.Length == 0)
@@ -95,6 +97,7 @@ namespace Kudu.Client.Scanner
                 currentSidecar = currentSidecar.Slice((int)bytesToRead);
 
                 buffer = buffer.Slice(bytesToRead);
+                reader.Advance(bytesToRead);
             }
             while (remaining > 0 && buffer.Length > 0);
 

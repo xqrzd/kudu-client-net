@@ -283,17 +283,15 @@ namespace Kudu.Client.Connection
                     }
                 case ParseStep.ReadSidecars:
                     {
-                        var readAmount = Math.Min(
-                            reader.Remaining, parserContext.RemainingSidecarLength);
+                        var remaining = reader.Remaining;
 
-                        var slice = reader.Sequence.Slice(
-                            reader.Position, readAmount);
+                        if (remaining == 0)
+                            break;
 
-                        parserContext.Rpc.ParseSidecarSegment(slice);
+                        parserContext.Rpc.ParseSidecarSegment(ref reader);
+                        remaining -= reader.Remaining;
+                        parserContext.RemainingSidecarLength -= (int)remaining;
 
-                        reader.Advance(readAmount);
-
-                        parserContext.RemainingSidecarLength -= (int)readAmount;
                         if (parserContext.RemainingSidecarLength == 0)
                         {
                             return true;
