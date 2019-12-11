@@ -685,6 +685,22 @@ namespace Kudu.Client
         }
 
         /// <summary>
+        /// Moves the reader to the end of the sequence.
+        /// </summary>
+        public void AdvanceToEnd()
+        {
+            if (_moreData)
+            {
+                Consumed = Length;
+                CurrentSpan = default;
+                CurrentSpanIndex = 0;
+                _currentPosition = Sequence.End;
+                _nextPosition = default;
+                _moreData = false;
+            }
+        }
+
+        /// <summary>
         /// Check to see if the given <paramref name="next"/> value is next.
         /// </summary>
         /// <param name="next">The value to compare the next items to.</param>
