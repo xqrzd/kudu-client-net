@@ -14,7 +14,7 @@ namespace Kudu.Client.Util
 
         private static HashAlgorithm GetHashForChannelBinding(X509Certificate2 cert)
         {
-            // https://github.com/dotnet/corefx/blob/master/src/System.Net.Security/src/System/Net/Security/Pal.Managed/EndpointChannelBindingToken.cs
+            // https://github.com/dotnet/runtime/blob/master/src/libraries/System.Net.Security/src/System/Net/Security/Pal.Managed/EndpointChannelBindingToken.cs
             var signatureAlgorithm = cert.SignatureAlgorithm;
             switch (signatureAlgorithm.Value)
             {
