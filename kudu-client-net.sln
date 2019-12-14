@@ -7,11 +7,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{6F55103C-C07
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{4D3A1F26-C778-411F-BEF9-57FE1965DEC5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kudu.Client", "src\Kudu.Client\Kudu.Client.csproj", "{12053CAC-611C-4AC6-AACE-65B4D7CFF871}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Knet.Kudu.Client", "src\Knet.Kudu.Client\Knet.Kudu.Client.csproj", "{12053CAC-611C-4AC6-AACE-65B4D7CFF871}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kudu.Client.Tests", "test\Kudu.Client.Tests\Kudu.Client.Tests.csproj", "{4F8E3787-0E77-432A-B285-E220264A50B9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Knet.Kudu.Client.Tests", "test\Knet.Kudu.Client.Tests\Knet.Kudu.Client.Tests.csproj", "{4F8E3787-0E77-432A-B285-E220264A50B9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kudu.Client.FunctionalTests", "test\Kudu.Client.FunctionalTests\Kudu.Client.FunctionalTests.csproj", "{A6B3FC57-24DF-49E4-B054-CCAA9F4D80F8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Knet.Kudu.Client.FunctionalTests", "test\Knet.Kudu.Client.FunctionalTests\Knet.Kudu.Client.FunctionalTests.csproj", "{A6B3FC57-24DF-49E4-B054-CCAA9F4D80F8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

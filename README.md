@@ -11,4 +11,4 @@ This client is still under development and isn't ready for general use.
 
 ## Quickstart
 
-Code examples are coming. In the meantime, take a look at the [functional tests](test/Kudu.Client.FunctionalTests/CreateTableTests.cs).
+Code examples are coming. In the meantime, take a look at the [functional tests](test/Knet.Kudu.Client.FunctionalTests/CreateTableTests.cs).
