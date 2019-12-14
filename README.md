@@ -8,6 +8,7 @@ Kudu provides a combination of fast inserts/updates and efficient columnar scans
 
 ## Project Status
 This client is still under development and isn't ready for general use.
+Issue [#17](/../../issues/17) tracks the remaining work for the first release.
 
 ## Quickstart
 
