@@ -524,13 +524,7 @@ namespace Knet.Kudu.Client
             serverInfo = null;
             responsePb = null;
 
-#if NETSTANDARD2_0
-            var success = task.IsCompleted && !(task.IsCanceled || task.IsFaulted);
-#else
-            var success = task.IsCompletedSuccessfully;
-#endif
-
-            if (!success)
+            if (!task.IsCompletedSuccessfully())
             {
                 // TODO: Log warning.
                 Console.WriteLine("Unable to connect to cluster: " +

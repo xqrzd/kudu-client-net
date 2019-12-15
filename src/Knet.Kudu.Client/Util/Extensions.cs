@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Protocol.Rpc;
@@ -29,6 +30,15 @@ namespace Knet.Kudu.Client.Util
 
         public static int SequenceCompareTo<T>(this T[] array, ReadOnlySpan<T> other)
             where T : IComparable<T> => MemoryExtensions.SequenceCompareTo(array, other);
+
+        public static bool IsCompletedSuccessfully(this Task task)
+        {
+#if NETSTANDARD2_0
+            return task.IsCompleted && !(task.IsCanceled || task.IsFaulted);
+#else
+            return task.IsCompletedSuccessfully;
+#endif
+        }
 
         public static int NextClearBit(this BitArray array, int from)
         {
