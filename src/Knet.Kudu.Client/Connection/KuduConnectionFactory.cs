@@ -13,10 +13,12 @@ namespace Knet.Kudu.Client.Connection
     public class KuduConnectionFactory : IKuduConnectionFactory
     {
         private readonly KuduClientOptions _options;
+        private readonly HashSet<IPAddress> _localIPs;
 
         public KuduConnectionFactory(KuduClientOptions options)
         {
             _options = options;
+            _localIPs = GetLocalAddresses();
         }
 
         public async Task<KuduConnection> ConnectAsync(
@@ -55,6 +57,11 @@ namespace Knet.Kudu.Client.Connection
             return new ServerInfo(uuid, hostPort, endpoint, location, isLocal);
         }
 
+        private bool IsLocal(IPAddress ipAddress)
+        {
+            return IPAddress.IsLoopback(ipAddress) || _localIPs.Contains(ipAddress);
+        }
+
         private static async Task<Socket> ConnectAsync(IPEndPoint endpoint)
         {
             var socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
@@ -64,15 +71,9 @@ namespace Knet.Kudu.Client.Connection
             return socket;
         }
 
-        private static bool IsLocal(IPAddress ipAddress)
+        private static HashSet<IPAddress> GetLocalAddresses()
         {
-            List<IPAddress> localIPs = GetLocalAddresses();
-            return IPAddress.IsLoopback(ipAddress) || localIPs.Contains(ipAddress);
-        }
-
-        private static List<IPAddress> GetLocalAddresses()
-        {
-            var addresses = new List<IPAddress>();
+            var addresses = new HashSet<IPAddress>();
 
             // Dns.GetHostAddresses(Dns.GetHostName()) returns incomplete results on Linux.
             // https://github.com/dotnet/corefx/issues/32611
