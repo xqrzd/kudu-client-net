@@ -11,8 +11,8 @@ namespace Knet.Kudu.Client
         private readonly IReadOnlyList<HostAndPort> _masterAddresses;
         private string _kerberosSpn;
         private string _tlsHost;
-        private TimeSpan _defaultAdminOperationTimeout;
-        private TimeSpan _defaultOperationTimeout;
+        private TimeSpan _defaultAdminOperationTimeout = TimeSpan.FromSeconds(30);
+        private TimeSpan _defaultOperationTimeout = TimeSpan.FromSeconds(30);
         private PipeOptions _sendPipeOptions;
         private PipeOptions _receivePipeOptions;
 
@@ -28,8 +28,6 @@ namespace Knet.Kudu.Client
             }
 
             _masterAddresses = results;
-            _defaultAdminOperationTimeout = TimeSpan.FromSeconds(30);
-            _defaultOperationTimeout = TimeSpan.FromSeconds(30);
         }
 
         public KuduClientBuilder(IReadOnlyList<HostAndPort> masterAddresses)
