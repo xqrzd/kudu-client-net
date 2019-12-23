@@ -47,8 +47,6 @@ namespace Knet.Kudu.Client.Requests
 
         internal long SequenceId { get; set; }
 
-        public bool IsMasterRpc => ServiceName == MasterServiceName;
-
         public virtual ReplicaSelection ReplicaSelection => ReplicaSelection.LeaderOnly;
 
         //void WriteRequest(IBufferWriter<byte> writer);
