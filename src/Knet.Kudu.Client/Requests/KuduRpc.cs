@@ -13,34 +13,6 @@ namespace Knet.Kudu.Client.Requests
     // TODO: These types need a lot of refactoring.
     public abstract class KuduRpc : IDisposable
     {
-        //void WriteRequest(IBufferWriter<byte> writer);
-        public abstract void Serialize(Stream stream);
-
-        public abstract void ParseProtobuf(ReadOnlySequence<byte> buffer);
-
-        // TODO: Use separate class/struct for this.
-        // This method would allocate several sidecars.
-        // If at any point parsing fails, we need to cleanup these.
-        public virtual void BeginProcessingSidecars(KuduSidecarOffsets sidecars)
-        {
-        }
-
-        public virtual void ParseSidecarSegment(ref SequenceReader<byte> reader)
-        {
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-        }
-    }
-
-    public abstract class KuduRpc<T> : KuduRpc
-    {
         // Service names.
         protected const string MasterServiceName = "kudu.master.MasterService";
         protected const string TabletServerServiceName = "kudu.tserver.TabletServerService";
@@ -79,6 +51,34 @@ namespace Knet.Kudu.Client.Requests
 
         public virtual ReplicaSelection ReplicaSelection => ReplicaSelection.LeaderOnly;
 
+        //void WriteRequest(IBufferWriter<byte> writer);
+        public abstract void Serialize(Stream stream);
+
+        public abstract void ParseProtobuf(ReadOnlySequence<byte> buffer);
+
+        // TODO: Use separate class/struct for this.
+        // This method would allocate several sidecars.
+        // If at any point parsing fails, we need to cleanup these.
+        public virtual void BeginProcessingSidecars(KuduSidecarOffsets sidecars)
+        {
+        }
+
+        public virtual void ParseSidecarSegment(ref SequenceReader<byte> reader)
+        {
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+        }
+    }
+
+    public abstract class KuduRpc<T> : KuduRpc
+    {
         public virtual T Output { get; protected set; }
 
         public static void Serialize<TInput>(Stream stream, TInput value)
