@@ -140,6 +140,26 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
             daemonInfo.IsRunning = false;
         }
 
+        /// <summary>
+        /// Starts a master identified by a host and port.
+        /// Does nothing if the server was already running.
+        /// </summary>
+        /// <param name="hostPort">Unique host and port identifying the server.</param>
+        public void StartMasterServer(HostAndPort hostPort)
+        {
+            var daemonInfo = GetMasterServer(hostPort);
+            if (daemonInfo.IsRunning)
+                return;
+
+            var request = new ControlShellRequestPB
+            {
+                StartDaemon = new StartDaemonRequestPB { Id = daemonInfo.Id }
+            };
+            SendRequestToCluster(request);
+
+            daemonInfo.IsRunning = true;
+        }
+
         public KuduClient CreateClient()
         {
             return KuduClient.NewBuilder(_masterServers.Keys.ToList()).Build();
