@@ -108,6 +108,11 @@ namespace Knet.Kudu.Client.Connection
             {
                 await output.WriteAsync(source).ConfigureAwait(false);
             }
+            catch (Exception ex)
+            {
+                throw new RecoverableException(KuduStatus.IllegalState(
+                    $"Connection {_ioPipe} is disconnected."), ex);
+            }
             finally
             {
                 _singleWriter.Release();
@@ -441,7 +446,9 @@ namespace Knet.Kudu.Client.Connection
             }
 
             (_ioPipe as IDisposable)?.Dispose();
-            _singleWriter.Dispose();
+            // TODO: There may still be pending tasks waiting to
+            // acquire this semaphore.
+            //_singleWriter.Dispose();
         }
 
         public override string ToString() => _ioPipe.ToString();
