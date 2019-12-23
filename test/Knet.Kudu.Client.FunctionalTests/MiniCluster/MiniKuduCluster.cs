@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protocol.Tools;
@@ -27,7 +26,6 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
         private Stream _miniClusterStdout;
 
         private readonly Dictionary<HostAndPort, DaemonInfo> _masterServers;
-
         private readonly Dictionary<HostAndPort, DaemonInfo> _tabletServers;
 
         public MiniKuduCluster(CreateClusterRequestPB createClusterRequestPB)
@@ -98,10 +96,6 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
                 var daemonInfo = new DaemonInfo(tserver.Id, true);
                 _tabletServers.Add(hostPort, daemonInfo);
             }
-
-            // Hack-fix because this client doesn't have fault tolerance yet.
-            // A master leader might not have been elected yet.
-            Thread.Sleep(2000);
         }
 
         public void Shutdown()
@@ -126,9 +120,41 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
             catch { }
         }
 
+        /// <summary>
+        /// Kills a master identified identified by an host and port.
+        /// Does nothing if the master was already dead.
+        /// </summary>
+        /// <param name="hostPort">Unique host and port identifying the server.</param>
+        public void KillMasterServer(HostAndPort hostPort)
+        {
+            var daemonInfo = GetMasterServer(hostPort);
+            if (!daemonInfo.IsRunning)
+                return;
+
+            var request = new ControlShellRequestPB
+            {
+                StopDaemon = new StopDaemonRequestPB { Id = daemonInfo.Id }
+            };
+            SendRequestToCluster(request);
+
+            daemonInfo.IsRunning = false;
+        }
+
         public KuduClient CreateClient()
         {
             return KuduClient.NewBuilder(_masterServers.Keys.ToList()).Build();
+        }
+
+        /// <summary>
+        /// Returns a master server identified by an address.
+        /// </summary>
+        /// <param name="hostPort">Unique host and port identifying the server.</param>
+        private DaemonInfo GetMasterServer(HostAndPort hostPort)
+        {
+            if (_masterServers.TryGetValue(hostPort, out var info))
+                return info;
+
+            throw new Exception($"Master server {hostPort} not found");
         }
 
         private ControlShellResponsePB SendRequestToCluster(ControlShellRequestPB req)
