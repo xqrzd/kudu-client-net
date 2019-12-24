@@ -12,7 +12,10 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
             _options = new CreateClusterRequestPB();
         }
 
-        public MiniKuduCluster Create()
+        /// <summary>
+        /// Builds and starts a new <see cref="MiniKuduCluster"/>.
+        /// </summary>
+        public MiniKuduCluster Build()
         {
             if (string.IsNullOrWhiteSpace(_options.ClusterRoot))
             {
@@ -35,6 +38,26 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
         public MiniKuduClusterBuilder NumTservers(int numTservers)
         {
             _options.NumTservers = numTservers;
+            return this;
+        }
+
+        /// <summary>
+        /// Adds a new flag to be passed to the Master daemons on start.
+        /// </summary>
+        /// <param name="flag">The flag to pass.</param>
+        public MiniKuduClusterBuilder AddMasterServerFlag(string flag)
+        {
+            _options.ExtraMasterFlags.Add(flag);
+            return this;
+        }
+
+        /// <summary>
+        /// Adds a new flag to be passed to the Tablet Server daemons on start.
+        /// </summary>
+        /// <param name="flag">The flag to pass.</param>
+        public MiniKuduClusterBuilder AddTabletServerFlag(string flag)
+        {
+            _options.ExtraTserverFlags.Add(flag);
             return this;
         }
     }

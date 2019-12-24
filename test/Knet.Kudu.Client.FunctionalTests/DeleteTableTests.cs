@@ -17,7 +17,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             using var miniCluster = new MiniKuduClusterBuilder()
                 .NumMasters(3)
                 .NumTservers(3)
-                .Create();
+                .Build();
 
             await using var client = miniCluster.CreateClient();
 
