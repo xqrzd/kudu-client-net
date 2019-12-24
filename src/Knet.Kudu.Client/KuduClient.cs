@@ -440,6 +440,19 @@ namespace Knet.Kudu.Client
             cache.CacheTabletLocations(tablets, partitionKey);
         }
 
+        private void RemoveTabletFromCache(RemoteTablet tablet)
+        {
+            TableLocationsCache cache;
+
+            lock (_tableLocations)
+            {
+                if (!_tableLocations.TryGetValue(tablet.TableId, out cache))
+                    return;
+            }
+
+            cache.RemoveTablet(tablet.Partition.PartitionKeyStart);
+        }
+
         private async Task ConnectToClusterAsync(RequestTimeoutTracker timeoutTracker)
         {
             var masterAddresses = _options.MasterAddresses;
@@ -751,9 +764,9 @@ namespace Knet.Kudu.Client
                     }
                     else if (code == AppStatusPB.ErrorCode.ServiceUnavailable)
                     {
-                        // TODO: This is a crutch until we either don't have to retry RPCs going to the
-                        // same server or use retry policies.
-                        //client.handleRetryableError(rpc, new RecoverableException(status));
+                        // TODO: This is a crutch until we either don't have to retry
+                        // RPCs going to the same server or use retry policies.
+                        throw new RecoverableException(status);
                     }
                     else
                     {
@@ -773,8 +786,6 @@ namespace Knet.Kudu.Client
                     // it'll be handled later.
                     throw;
                 }
-
-                //Console.WriteLine("Retrying master RPC...\r\n" + ex.Message);
 
                 return await HandleRetryableErrorAsync(rpc, ex, timeoutTracker)
                     .ConfigureAwait(false);
@@ -796,13 +807,13 @@ namespace Knet.Kudu.Client
                     var errCode = rpc.Error.code;
                     var errStatusCode = rpc.Error.Status.Code;
                     var status = KuduStatus.FromTabletServerErrorPB(rpc.Error);
+
                     if (errCode == TabletServerErrorPB.Code.TabletNotFound)
                     {
-                        // We're handling a tablet server that's telling us it doesn't have
-                        // the tablet we're asking for.
-
-                        //client.handleTabletNotFound(
-                        //    rpc, new RecoverableException(status), connection.getServerInfo());
+                        // We're handling a tablet server that's telling us it doesn't
+                        // have the tablet we're asking for.
+                        RemoveTabletFromCache(rpc.Tablet);
+                        throw new RecoverableException(status);
                     }
                     else if (errCode == TabletServerErrorPB.Code.TabletNotRunning ||
                         errStatusCode == AppStatusPB.ErrorCode.ServiceUnavailable)
@@ -812,8 +823,10 @@ namespace Knet.Kudu.Client
                     else if (errStatusCode == AppStatusPB.ErrorCode.IllegalState ||
                         errStatusCode == AppStatusPB.ErrorCode.Aborted)
                     {
-                        // The following two error codes are an indication that the tablet isn't a leader.
-                        //client.handleNotLeader(rpc, new RecoverableException(status), connection.getServerInfo());
+                        // These two error codes are an indication that the tablet
+                        // isn't a leader.
+                        RemoveTabletFromCache(rpc.Tablet);
+                        throw new RecoverableException(status);
                     }
                     else
                     {
@@ -825,8 +838,6 @@ namespace Knet.Kudu.Client
             }
             catch (RecoverableException ex)
             {
-                //Console.WriteLine("Retrying tablet RPC...\r\n" + ex);
-
                 return await HandleRetryableErrorAsync(rpc, ex, timeoutTracker)
                     .ConfigureAwait(false);
             }
@@ -868,16 +879,12 @@ namespace Knet.Kudu.Client
 
                     if (rpc is KuduTabletRpc<T> tabletRpc)
                     {
+                        RemoveTabletFromCache(tabletRpc.Tablet);
                     }
                     else if (rpc is KuduMasterRpc<T>)
                     {
                         _masterCache = null;
                     }
-
-                    //client.handleTabletNotFound(rpc, exception, connection.getServerInfo());
-
-                    //invalidateTabletCache(rpc.getTablet(), info, ex.getMessage());
-                    //handleRetryableError(rpc, ex);
                 }
 
                 throw;
