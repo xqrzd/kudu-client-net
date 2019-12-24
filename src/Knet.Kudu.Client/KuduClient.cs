@@ -106,9 +106,8 @@ namespace Knet.Kudu.Client
 
             async ValueTask<HiveMetastoreConfig> ConnectAsync(CancellationToken cancellationToken)
             {
-                // TODO: This needs retry logic.
-                var timeoutTracker = new RequestTimeoutTracker(cancellationToken);
-                await ConnectToClusterAsync(timeoutTracker).ConfigureAwait(false);
+                var rpc = new ConnectToMasterRequest2();
+                await SendRpcToMasterAsync(rpc, cancellationToken).ConfigureAwait(false);
                 return _hiveMetastoreConfig;
             }
         }
