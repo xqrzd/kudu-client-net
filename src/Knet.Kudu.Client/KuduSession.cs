@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -44,6 +45,7 @@ namespace Knet.Kudu.Client
 
         public async ValueTask DisposeAsync()
         {
+            // TODO: Handle pending flushes.
             _writer.TryComplete();
 
             if (_consumeTask != null)
@@ -86,6 +88,8 @@ namespace Knet.Kudu.Client
                 }
 
                 await flushTcs.Task.ConfigureAwait(false);
+                // TODO: After this we should have a new _flushCts for next time,
+                // *except* if the passed cancellationToken was cancelled.
             }
             finally
             {
@@ -106,7 +110,7 @@ namespace Knet.Kudu.Client
 
             while (!channelCompletionTask.IsCompleted)
             {
-                await FillQueueAsync(queue).ConfigureAwait(false);
+                bool flush = await DequeueAsync(queue).ConfigureAwait(false);
 
                 if (queue.Count == 0)
                 {
@@ -114,26 +118,35 @@ namespace Knet.Kudu.Client
                     // 1) A flush was triggered when the queue was empty.
                     // 2) The session was disposed when the queue was empty.
 
-                    ReleasePendingFlush();
+                    if (flush)
+                    {
+                        CompletePendingFlush();
+                    }
+
                     continue;
                 }
 
                 await SendAsync(queue).ConfigureAwait(false);
 
-                if (queue.Count < batchSize)
+                if (flush)
                 {
-                    ReleasePendingFlush();
+                    CompletePendingFlush();
                 }
 
                 queue.Clear();
             }
         }
 
-        private async Task FillQueueAsync(List<Operation> queue)
+        private async Task<bool> DequeueAsync(List<Operation> queue)
         {
             ChannelReader<Operation> reader = _reader;
+            CancellationToken flushToken = _flushCts.Token;
+            bool flushRequested = flushToken.IsCancellationRequested;
             int capacity = _options.BatchSize;
 
+            // First try to quickly drain any existing items
+            // in the queue, before we start waiting for new
+            // items to be added.
             while (queue.Count < capacity &&
                 reader.TryRead(out var operation))
             {
@@ -141,17 +154,22 @@ namespace Knet.Kudu.Client
             }
 
             if (queue.Count == capacity)
-                return;
+            {
+                // We can't complete a pending flush here, because we
+                // don't know if there are more items in the queue.
+                return false;
+            }
 
             try
             {
-                CancellationToken flushToken = _flushCts.Token;
+                if (queue.Count == 0)
+                {
+                    // Wait indefinitely for the first operation.
+                    Operation operation = await reader.ReadAsync(flushToken)
+                        .ConfigureAwait(false);
 
-                // Wait indefinitely for the first operation.
-                Operation operation = await reader.ReadAsync(flushToken)
-                    .ConfigureAwait(false);
-
-                queue.Add(operation);
+                    queue.Add(operation);
+                }
 
                 using var timeout = new CancellationTokenSource(_options.FlushInterval);
                 using var both = CancellationTokenSource.CreateLinkedTokenSource(
@@ -160,24 +178,35 @@ namespace Knet.Kudu.Client
 
                 while (queue.Count < capacity)
                 {
-                    operation = await reader.ReadAsync(cancellationToken)
+                    Operation operation = await reader.ReadAsync(cancellationToken)
                         .ConfigureAwait(false);
 
                     queue.Add(operation);
                 }
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException) when (flushToken.IsCancellationRequested)
+            {
+                while (queue.Count < capacity &&
+                    reader.TryRead(out var operation))
+                {
+                    queue.Add(operation);
+                }
+                flushRequested = true;
+            }
             catch (ChannelClosedException) { }
             catch (Exception ex)
             {
                 // TODO: Log warning.
                 Console.WriteLine($"Unexpected exception reading session queue: {ex}");
             }
+
+            return flushRequested && queue.Count < capacity;
         }
 
-        private void ReleasePendingFlush()
+        private void CompletePendingFlush()
         {
             var flushCts = _flushCts;
+            Debug.Assert(flushCts.IsCancellationRequested);
             if (flushCts.IsCancellationRequested)
             {
                 // Make a new CancellationToken before releasing the
