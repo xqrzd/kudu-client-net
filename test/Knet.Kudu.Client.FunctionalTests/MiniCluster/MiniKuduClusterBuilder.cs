@@ -9,7 +9,11 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
 
         public MiniKuduClusterBuilder()
         {
-            _options = new CreateClusterRequestPB();
+            _options = new CreateClusterRequestPB
+            {
+                NumMasters = 3,
+                NumTservers = 3
+            };
         }
 
         /// <summary>
@@ -27,6 +31,12 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
             var miniCluster = new MiniKuduCluster(_options);
             miniCluster.Start();
             return miniCluster;
+        }
+
+        public KuduTestHarness BuildHarness()
+        {
+            var miniCluster = Build();
+            return new KuduTestHarness(miniCluster, disposeMiniCluster: true);
         }
 
         public MiniKuduClusterBuilder NumMasters(int numMasters)

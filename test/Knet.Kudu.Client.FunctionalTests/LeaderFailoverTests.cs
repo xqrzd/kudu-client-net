@@ -19,12 +19,12 @@ namespace Knet.Kudu.Client.FunctionalTests
         [InlineData(false)]
         public async Task TestFailover(bool restart)
         {
-            using var miniCluster = new MiniKuduClusterBuilder()
+            await using var harness = new MiniKuduClusterBuilder()
                 .NumMasters(3)
                 .NumTservers(3)
-                .Build();
+                .BuildHarness();
 
-            await using var client = miniCluster.CreateClient();
+            await using var client = harness.CreateClient();
 
             var builder = ClientTestUtil.GetBasicSchema()
                 .SetTableName("LeaderFailoverTest")
@@ -49,9 +49,9 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(3, numRows);
 
             if (restart)
-                RestartLeaderMaster(miniCluster, client);
+                await harness.RestartLeaderMasterAsync();
             else
-                KillLeaderMasterServer(miniCluster, client);
+                await harness.KillLeaderMasterServerAsync();
 
             var rows2 = Enumerable.Range(3, 3)
                 .Select(i => ClientTestUtil.CreateBasicSchemaInsert(table, i));
@@ -66,22 +66,6 @@ namespace Knet.Kudu.Client.FunctionalTests
             }
 
             Assert.Equal(6, numRows2);
-        }
-
-        // TODO: Move this to a shared class.
-        private void KillLeaderMasterServer(
-            MiniKuduCluster miniCluster, KuduClient client)
-        {
-            var leader = client.GetMasterServerInfo(ReplicaSelection.LeaderOnly);
-            miniCluster.KillMasterServer(leader.HostPort);
-        }
-
-        private void RestartLeaderMaster(
-            MiniKuduCluster miniCluster, KuduClient client)
-        {
-            var leader = client.GetMasterServerInfo(ReplicaSelection.LeaderOnly);
-            miniCluster.KillMasterServer(leader.HostPort);
-            miniCluster.StartMasterServer(leader.HostPort);
         }
     }
 }

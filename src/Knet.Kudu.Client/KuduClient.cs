@@ -151,6 +151,21 @@ namespace Knet.Kudu.Client
             return response.Tables;
         }
 
+        /// <summary>
+        /// Get the list of running tablet servers.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public async Task<List<ListTabletServersResponsePB.Entry>> GetTabletServersAsync(
+            CancellationToken cancellationToken = default)
+        {
+            var rpc = new ListTabletServersRequest();
+            var response = await SendRpcToMasterAsync(rpc, cancellationToken)
+                .ConfigureAwait(false);
+
+            // TODO: Create managed wrapper for this response.
+            return response.Servers;
+        }
+
         public async Task<List<RemoteTablet>> GetTableLocationsAsync(
             string tableId, byte[] partitionKey, uint fetchBatchSize,
             CancellationToken cancellationToken = default)
@@ -690,9 +705,35 @@ namespace Knet.Kudu.Client
             return tablet.GetServerInfo(replicaSelection, _location);
         }
 
-        internal ServerInfo GetMasterServerInfo(ReplicaSelection replicaSelection)
+        private ServerInfo GetMasterServerInfo(ReplicaSelection replicaSelection)
         {
             return _masterCache?.GetServerInfo(replicaSelection, _location);
+        }
+
+        internal async ValueTask<HostAndPort> FindLeaderMasterServerAsync(
+            CancellationToken cancellationToken = default)
+        {
+            // Consult the cache to determine the current leader master.
+            //
+            // If one isn't found, issue an RPC that retries until the leader master
+            // is discovered. We don't need the RPC's results; it's just a simple way to
+            // wait until a leader master is elected.
+
+            var serverInfo = GetMasterServerInfo(ReplicaSelection.LeaderOnly);
+            if (serverInfo == null)
+            {
+                // If there's no leader master, this will time out and throw an exception.
+                await GetTabletServersAsync(cancellationToken).ConfigureAwait(false);
+
+                serverInfo = GetMasterServerInfo(ReplicaSelection.LeaderOnly);
+                if (serverInfo == null)
+                {
+                    throw new NonRecoverableException(KuduStatus.IllegalState(
+                        "Master leader could not be found"));
+                }
+            }
+
+            return serverInfo.HostPort;
         }
 
         private Task<T> HandleRetryableErrorAsync<T>(

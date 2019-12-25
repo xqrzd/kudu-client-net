@@ -10,6 +10,8 @@ namespace Knet.Kudu.Client.FunctionalTests
     public class MasterFailoverTests
     {
         [SkippableTheory]
+        [InlineData(KillBefore.CreateClient, true)]
+        [InlineData(KillBefore.CreateClient, false)]
         [InlineData(KillBefore.CreateTable, true)]
         [InlineData(KillBefore.CreateTable, false)]
         [InlineData(KillBefore.OpenTable, true)]
@@ -18,18 +20,18 @@ namespace Knet.Kudu.Client.FunctionalTests
         [InlineData(KillBefore.ScanTable, false)]
         public async Task TestMasterFailover(KillBefore killBefore, bool restart)
         {
-            using var miniCluster = new MiniKuduClusterBuilder()
+            await using var harness = new MiniKuduClusterBuilder()
                 .NumMasters(3)
                 .NumTservers(3)
-                .Build();
+                .BuildHarness();
 
-            await using var client = miniCluster.CreateClient();
+            if (killBefore == KillBefore.CreateClient)
+                await DoAction();
 
-            // Hack-fix to discover which master is the leader.
-            await client.GetTablesAsync();
+            await using var client = harness.CreateClient();
 
             if (killBefore == KillBefore.CreateTable)
-                DoAction();
+                await DoAction();
 
             var tableName = $"TestMasterFailover-killBefore={killBefore}";
             var builder = new TableBuilder()
@@ -57,12 +59,12 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(tableName, table.TableName);
 
             if (killBefore == KillBefore.OpenTable)
-                DoAction();
+                await DoAction();
 
             var table2 = await client.OpenTableAsync(tableName);
 
             if (killBefore == KillBefore.ScanTable)
-                DoAction();
+                await DoAction();
 
             var scanner = client.NewScanBuilder(table2)
                 .Build();
@@ -72,29 +74,13 @@ namespace Knet.Kudu.Client.FunctionalTests
                 Assert.Equal(0, resultSet.Count);
             }
 
-            void DoAction()
+            ValueTask DoAction()
             {
                 if (restart)
-                    RestartLeaderMaster(miniCluster, client);
+                    return harness.RestartLeaderMasterAsync();
                 else
-                    KillLeaderMasterServer(miniCluster, client);
+                    return harness.KillLeaderMasterServerAsync();
             }
-        }
-
-        // TODO: Move this to a shared class.
-        private void KillLeaderMasterServer(
-            MiniKuduCluster miniCluster, KuduClient client)
-        {
-            var leader = client.GetMasterServerInfo(ReplicaSelection.LeaderOnly);
-            miniCluster.KillMasterServer(leader.HostPort);
-        }
-
-        private void RestartLeaderMaster(
-            MiniKuduCluster miniCluster, KuduClient client)
-        {
-            var leader = client.GetMasterServerInfo(ReplicaSelection.LeaderOnly);
-            miniCluster.KillMasterServer(leader.HostPort);
-            miniCluster.StartMasterServer(leader.HostPort);
         }
 
         public enum KillBefore
