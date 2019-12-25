@@ -94,6 +94,19 @@ namespace Knet.Kudu.Client.Tablet
             }
         }
 
+        public void RemoveTablet(ReadOnlySpan<byte> partitionKeyStart)
+        {
+            _lock.EnterWriteLock();
+            try
+            {
+                _cache.Delete(partitionKeyStart);
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
+        }
+
         public void ClearCache()
         {
             _lock.EnterWriteLock();

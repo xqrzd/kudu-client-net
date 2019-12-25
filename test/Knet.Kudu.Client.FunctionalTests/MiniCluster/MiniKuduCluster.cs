@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protocol.Tools;
@@ -27,7 +26,6 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
         private Stream _miniClusterStdout;
 
         private readonly Dictionary<HostAndPort, DaemonInfo> _masterServers;
-
         private readonly Dictionary<HostAndPort, DaemonInfo> _tabletServers;
 
         public MiniKuduCluster(CreateClusterRequestPB createClusterRequestPB)
@@ -98,10 +96,6 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
                 var daemonInfo = new DaemonInfo(tserver.Id, true);
                 _tabletServers.Add(hostPort, daemonInfo);
             }
-
-            // Hack-fix because this client doesn't have fault tolerance yet.
-            // A master leader might not have been elected yet.
-            Thread.Sleep(2000);
         }
 
         public void Shutdown()
@@ -129,6 +123,152 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
         public KuduClient CreateClient()
         {
             return KuduClient.NewBuilder(_masterServers.Keys.ToList()).Build();
+        }
+
+        /// <summary>
+        /// Starts a master server identified by a host and port.
+        /// Does nothing if the server was already running.
+        /// </summary>
+        /// <param name="hostPort">Unique host and port identifying the server.</param>
+        public void StartMasterServer(HostAndPort hostPort)
+        {
+            var daemonInfo = GetMasterServer(hostPort);
+            if (daemonInfo.IsRunning)
+                return;
+
+            var request = new ControlShellRequestPB
+            {
+                StartDaemon = new StartDaemonRequestPB { Id = daemonInfo.Id }
+            };
+            SendRequestToCluster(request);
+
+            daemonInfo.IsRunning = true;
+        }
+
+        /// <summary>
+        /// Kills a master server identified identified by an host and port.
+        /// Does nothing if the master was already dead.
+        /// </summary>
+        /// <param name="hostPort">Unique host and port identifying the server.</param>
+        public void KillMasterServer(HostAndPort hostPort)
+        {
+            var daemonInfo = GetMasterServer(hostPort);
+            if (!daemonInfo.IsRunning)
+                return;
+
+            var request = new ControlShellRequestPB
+            {
+                StopDaemon = new StopDaemonRequestPB { Id = daemonInfo.Id }
+            };
+            SendRequestToCluster(request);
+
+            daemonInfo.IsRunning = false;
+        }
+
+        /// <summary>
+        /// Starts a tablet server identified by a host and port.
+        /// Does nothing if the server was already running.
+        /// </summary>
+        /// <param name="hostPort">Unique host and port identifying the server.</param>
+        public void StartTabletServer(HostAndPort hostPort)
+        {
+            var daemonInfo = GetTabletServer(hostPort);
+            if (daemonInfo.IsRunning)
+                return;
+
+            var request = new ControlShellRequestPB
+            {
+                StartDaemon = new StartDaemonRequestPB { Id = daemonInfo.Id }
+            };
+            SendRequestToCluster(request);
+
+            daemonInfo.IsRunning = true;
+        }
+
+        /// <summary>
+        /// Kills a tablet server identified identified by an host and port.
+        /// Does nothing if the master was already dead.
+        /// </summary>
+        /// <param name="hostPort">Unique host and port identifying the server.</param>
+        public void KillTabletServer(HostAndPort hostPort)
+        {
+            var daemonInfo = GetTabletServer(hostPort);
+            if (!daemonInfo.IsRunning)
+                return;
+
+            var request = new ControlShellRequestPB
+            {
+                StopDaemon = new StopDaemonRequestPB { Id = daemonInfo.Id }
+            };
+            SendRequestToCluster(request);
+
+            daemonInfo.IsRunning = false;
+        }
+
+        /// <summary>
+        /// Starts all the master servers.
+        /// Does nothing to the servers that are already running.
+        /// </summary>
+        public void StartAllMasterServers()
+        {
+            foreach (var hostPort in _masterServers.Keys)
+                StartMasterServer(hostPort);
+        }
+
+        /// <summary>
+        /// Kills all the master servers.
+        /// Does nothing to the servers that are already dead.
+        /// </summary>
+        public void KillAllMasterServers()
+        {
+            foreach (var hostPort in _masterServers.Keys)
+                KillMasterServer(hostPort);
+        }
+
+        /// <summary>
+        /// Starts all the tablet servers.
+        /// Does nothing to the servers that are already running.
+        /// </summary>
+        public void StartAllTabletServers()
+        {
+            foreach (var hostPort in _tabletServers.Keys)
+                StartTabletServer(hostPort);
+        }
+
+        /// <summary>
+        /// Kills all the tablet servers.
+        /// Does nothing to the servers that are already dead.
+        /// </summary>
+        public void KillAllTabletServers()
+        {
+            foreach (var hostPort in _tabletServers.Keys)
+                KillTabletServer(hostPort);
+        }
+
+        // TODO: Set daemon flags (when Kudu 1.11 proto files are generated).
+
+        /// <summary>
+        /// Returns a master server identified by an address.
+        /// </summary>
+        /// <param name="hostPort">Unique host and port identifying the server.</param>
+        private DaemonInfo GetMasterServer(HostAndPort hostPort)
+        {
+            if (_masterServers.TryGetValue(hostPort, out var info))
+                return info;
+
+            throw new Exception($"Master server {hostPort} not found");
+        }
+
+        /// <summary>
+        /// Returns a tablet server identified by an address.
+        /// </summary>
+        /// <param name="hostPort">Unique host and port identifying the server.</param>
+        private DaemonInfo GetTabletServer(HostAndPort hostPort)
+        {
+            if (_tabletServers.TryGetValue(hostPort, out var info))
+                return info;
+
+            throw new Exception($"Tablet server {hostPort} not found");
         }
 
         private ControlShellResponsePB SendRequestToCluster(ControlShellRequestPB req)
