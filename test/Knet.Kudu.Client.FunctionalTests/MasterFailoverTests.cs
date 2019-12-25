@@ -71,7 +71,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             await foreach (var resultSet in scanner)
             {
-                Assert.Equal(0, resultSet.Count);
+                Assert.True(false, "Scanner returned rows, but no rows were written");
             }
 
             ValueTask DoAction()
