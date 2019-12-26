@@ -80,7 +80,7 @@ namespace Knet.Kudu.Client
 
         public void WriteTo(Span<byte> buffer, Span<byte> indirectData)
         {
-            ReadOnlySpan<byte> rowAlloc = _rowAlloc.AsSpan();
+            ReadOnlySpan<byte> rowAlloc = _rowAlloc;
 
             // Write the header. This includes,
             // 1) Row operation

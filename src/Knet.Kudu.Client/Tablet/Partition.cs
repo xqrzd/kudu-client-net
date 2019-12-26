@@ -95,8 +95,8 @@ namespace Knet.Kudu.Client.Tablet
             if (ReferenceEquals(this, other))
                 return true;
 
-            return PartitionKeyStart.AsSpan().SequenceEqual(other.PartitionKeyStart) &&
-                PartitionKeyEnd.AsSpan().SequenceEqual(other.PartitionKeyEnd);
+            return PartitionKeyStart.SequenceEqual(other.PartitionKeyStart) &&
+                PartitionKeyEnd.SequenceEqual(other.PartitionKeyEnd);
         }
 
         /// <summary>
@@ -108,7 +108,7 @@ namespace Knet.Kudu.Client.Tablet
         /// </summary>
         /// <param name="other">The other partition of the same table.</param>
         public int CompareTo(Partition other) =>
-            PartitionKeyStart.AsSpan().SequenceCompareTo(other.PartitionKeyStart);
+            PartitionKeyStart.SequenceCompareTo(other.PartitionKeyStart);
 
         /// <summary>
         /// Equality only holds for partitions from the same table. Partition equality only takes into

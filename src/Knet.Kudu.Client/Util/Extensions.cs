@@ -31,6 +31,9 @@ namespace Knet.Kudu.Client.Util
         public static int SequenceCompareTo<T>(this T[] array, ReadOnlySpan<T> other)
             where T : IComparable<T> => MemoryExtensions.SequenceCompareTo(array, other);
 
+        public static bool SequenceEqual<T>(this T[] array, ReadOnlySpan<T> other)
+            where T : IEquatable<T> => MemoryExtensions.SequenceEqual(array, other);
+
         public static bool IsCompletedSuccessfully(this Task task)
         {
 #if NETSTANDARD2_0

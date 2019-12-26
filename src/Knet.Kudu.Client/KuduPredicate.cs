@@ -70,8 +70,8 @@ namespace Knet.Kudu.Client
 
             return Type == other.Type &&
                 Column.Equals(other.Column) &&
-                Lower.AsSpan().SequenceEqual(other.Lower) &&
-                Upper.AsSpan().SequenceEqual(other.Upper) &&
+                Lower.SequenceEqual(other.Lower) &&
+                Upper.SequenceEqual(other.Upper) &&
                 InListEquals(other.InListValues);
         }
 
@@ -893,7 +893,7 @@ namespace Knet.Kudu.Client
                     return KuduEncoder.DecodeDouble(a).CompareTo(KuduEncoder.DecodeDouble(b));
                 case KuduType.String:
                 case KuduType.Binary:
-                    return a.AsSpan().SequenceCompareTo(b);
+                    return a.SequenceCompareTo(b);
                 case KuduType.Decimal128:
                     return KuduEncoder.DecodeInt128(a).CompareTo(KuduEncoder.DecodeInt128(b));
                 default:
