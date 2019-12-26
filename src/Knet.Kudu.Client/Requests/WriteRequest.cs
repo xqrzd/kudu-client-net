@@ -15,10 +15,14 @@ namespace Knet.Kudu.Client.Requests
             _request = request;
             TableId = tableId;
             PartitionKey = partitionKey;
+            NeedsAuthzToken = true;
         }
 
         public override void Serialize(Stream stream)
         {
+            if (AuthzToken != null)
+                _request.AuthzToken = AuthzToken;
+
             Serialize(stream, _request);
         }
 

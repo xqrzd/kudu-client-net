@@ -75,12 +75,39 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
         }
 
         /// <summary>
+        /// Starts all the master servers.
+        /// Does nothing to the servers that are already running.
+        /// </summary>
+        public void StartAllMasterServers()
+        {
+            _miniCluster.StartAllMasterServers();
+        }
+
+        /// <summary>
+        /// Kills all the master servers.
+        /// Does nothing to the servers that are already dead.
+        /// </summary>
+        public void KillAllMasterServers()
+        {
+            _miniCluster.KillAllMasterServers();
+        }
+
+        /// <summary>
         /// Starts all the tablet servers.
         /// Does nothing to the servers that are already running.
         /// </summary>
         public void StartAllTabletServers()
         {
             _miniCluster.StartAllTabletServers();
+        }
+
+        /// <summary>
+        /// Kills all the tablet servers.
+        /// Does nothing to the servers that are already dead.
+        /// </summary>
+        public void KillAllTabletServers()
+        {
+            _miniCluster.KillAllTabletServers();
         }
 
         /// <summary>
