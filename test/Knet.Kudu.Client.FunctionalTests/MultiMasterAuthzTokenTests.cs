@@ -120,8 +120,6 @@ namespace Knet.Kudu.Client.FunctionalTests
                     if (flush)
                         await session.FlushAsync();
                 }
-
-                await session.FlushAsync();
             }
 
             async Task ScanTableAsync()
