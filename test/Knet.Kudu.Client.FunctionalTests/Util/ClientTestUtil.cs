@@ -1,4 +1,5 @@
-﻿using Knet.Kudu.Client.Builder;
+﻿using System.Threading.Tasks;
+using Knet.Kudu.Client.Builder;
 
 namespace Knet.Kudu.Client.FunctionalTests.Util
 {
@@ -56,6 +57,17 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
             row.SetString(3, "a string");
             row.SetBool(4, true);
             return insert;
+        }
+
+        public static async Task<int> CountRowsAsync(KuduClient client, KuduTable table)
+        {
+            var scanner = client.NewScanBuilder(table).Build();
+            var rows = 0;
+
+            await foreach (var resultSet in scanner)
+                rows += resultSet.Count;
+
+            return rows;
         }
     }
 }

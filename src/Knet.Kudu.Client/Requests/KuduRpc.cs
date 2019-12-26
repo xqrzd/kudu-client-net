@@ -21,10 +21,6 @@ namespace Knet.Kudu.Client.Requests
 
         public abstract string MethodName { get; }
 
-        public bool NeedsAuthzToken { get; protected set; }
-
-        internal SignedTokenPB AuthzToken { get; set; }
-
         public long PropagatedTimestamp { get; set; } = -1;
 
         /// <summary>
@@ -107,9 +103,16 @@ namespace Knet.Kudu.Client.Requests
         /// </summary>
         public byte[] PartitionKey { get; protected set; }
 
-        public string TableId { get; protected set; }
-
         public RemoteTablet Tablet { get; internal set; }
+
+        public bool NeedsAuthzToken { get; protected set; }
+
+        internal SignedTokenPB AuthzToken { get; set; }
+
+        /// <summary>
+        /// Used to fetch an authz token if needed.
+        /// </summary>
+        public string TableId { get; protected set; }
 
         public TabletServerErrorPB Error { get; protected set; }
     }

@@ -46,7 +46,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             await session.FlushAsync();
 
-            var rowCount = await CountRowsAsync(client, table);
+            var rowCount = await ClientTestUtil.CountRowsAsync(client, table);
             Assert.Equal(rowsPerIteration, rowCount);
 
             int currentRows = rowsPerIteration;
@@ -73,23 +73,12 @@ namespace Knet.Kudu.Client.FunctionalTests
                 if (!restart)
                     harness.StartAllTabletServers();
 
-                rowCount = await CountRowsAsync(client, table);
+                rowCount = await ClientTestUtil.CountRowsAsync(client, table);
                 Assert.Equal(currentRows, rowCount);
             }
 
-            rowCount = await CountRowsAsync(client, table);
+            rowCount = await ClientTestUtil.CountRowsAsync(client, table);
             Assert.Equal(totalRowsToInsert, rowCount);
-        }
-
-        private static async Task<int> CountRowsAsync(KuduClient client, KuduTable table)
-        {
-            var scanner = client.NewScanBuilder(table).Build();
-            var rows = 0;
-
-            await foreach (var resultSet in scanner)
-                rows += resultSet.Count;
-
-            return rows;
         }
     }
 }

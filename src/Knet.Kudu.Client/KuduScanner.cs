@@ -457,6 +457,7 @@ namespace Knet.Kudu.Client
                 Tablet = scanner._tablet;
                 TableId = _scanner._table.TableId;
                 PartitionKey = _scanner._partitionPruner.NextPartitionKey;
+                NeedsAuthzToken = true;
             }
 
             public override string MethodName => "Scan";
@@ -529,10 +530,10 @@ namespace Knet.Kudu.Client
                     {
                         newRequest.ColumnPredicates.Add(predicate.ToProtobuf());
                     }
-                    //if (authzToken != null)
-                    //{
-                    //    newBuilder.setAuthzToken(authzToken);
-                    //}
+                    if (AuthzToken != null)
+                    {
+                        newRequest.AuthzToken = AuthzToken;
+                    }
                     request.BatchSizeBytes = (uint)_scanner._batchSizeBytes;
                 }
                 else if (_state == State.Next)
