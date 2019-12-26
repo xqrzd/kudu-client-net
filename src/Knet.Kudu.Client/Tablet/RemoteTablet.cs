@@ -9,11 +9,11 @@ namespace Knet.Kudu.Client.Tablet
     ///
     /// RemoteTablet's main function is to keep track of where the leader for this
     /// tablet is. For example, an RPC might call GetServerInfo, contact that TS, find
-    /// it's not the leader anymore, and then call DemoteLeader.
+    /// it's not the leader anymore, and then re-fetch the tablet locations.
     ///
-    /// A RemoteTablet's life is expected to be long in a cluster where roles aren't changing often,
-    /// and short when they do since the Kudu client will replace the RemoteTablet it caches with new
-    /// ones after getting tablet locations from the master.
+    /// A RemoteTablet's life is expected to be long in a cluster where roles aren't
+    /// changing often, and short when they do since the Kudu client will replace the
+    /// RemoteTablet it caches with new ones after getting tablet locations from the master.
     /// </summary>
     public class RemoteTablet : IEquatable<RemoteTablet>
     {

@@ -5,13 +5,17 @@ namespace Knet.Kudu.Client.Connection
 {
     public class ServerInfoCache
     {
+        private static readonly int _randomInt = new Random().Next(int.MaxValue);
+
         private readonly List<ServerInfo> _servers;
         private readonly int _leaderIndex;
+        private readonly int _randomIndex;
 
         public ServerInfoCache(List<ServerInfo> servers, int leaderIndex)
         {
             _servers = servers;
             _leaderIndex = leaderIndex;
+            _randomIndex = _randomInt % servers.Count;
         }
 
         /// <summary>
@@ -34,31 +38,58 @@ namespace Knet.Kudu.Client.Connection
         }
 
         /// <summary>
-        /// Get the information on the closest server. If none is closer than
-        /// the others, return the information on a randomly picked server.
-        /// Returns null if this cache doesn't know any servers.
+        /// Get the information on the closest server. Servers are ranked from
+        /// closest to furthest as follows:
+        /// 1) Local servers
+        /// 2) Servers in the same location as the client
+        /// 3) All other servers
         /// </summary>
         /// <param name="location">The location of the client.</param>
         public ServerInfo GetClosestServerInfo(string location = null)
         {
-            ServerInfo last = null;
-            ServerInfo lastInSameLocation = null;
+            // This method returns
+            // 1. a randomly picked server among local servers, if there is a local server, or
+            // 2. a randomly picked server in the same location, if there is a server in the
+            //    same location, or, finally,
+            // 3. a randomly picked server among all tablet servers.
 
-            foreach (var server in _servers)
+            var servers = _servers;
+            int numServers = servers.Count;
+            ServerInfo result = null;
+            Span<byte> localServers = stackalloc byte[numServers];
+            Span<byte> serversInSameLocation = stackalloc byte[numServers];
+            int randomIndex = _randomIndex;
+            byte index = 0;
+            byte localIndex = 0;
+            byte sameLocationIndex = 0;
+
+            foreach (ServerInfo e in servers)
             {
-                last = server;
+                if (e.IsLocal)
+                    localServers[localIndex++] = index;
 
-                if (server.IsLocal)
-                    return server;
+                if (e.InSameLocation(location))
+                    serversInSameLocation[sameLocationIndex++] = index;
 
-                if (server.InSameLocation(location))
-                    lastInSameLocation = server;
+                if (index == randomIndex)
+                    result = e;
+
+                index++;
             }
 
-            if (lastInSameLocation != null)
-                return lastInSameLocation;
+            if (localIndex > 0)
+            {
+                randomIndex = _randomInt % localIndex;
+                return servers[localServers[randomIndex]];
+            }
 
-            return last;
+            if (sameLocationIndex > 0)
+            {
+                randomIndex = _randomInt % sameLocationIndex;
+                return servers[serversInSameLocation[randomIndex]];
+            }
+
+            return result;
         }
 
         /// <summary>
