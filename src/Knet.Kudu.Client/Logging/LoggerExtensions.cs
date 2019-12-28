@@ -13,6 +13,7 @@ namespace Knet.Kudu.Client.Logging
         private static readonly Action<ILogger, MasterErrorPB.Code, AppStatusPB.ErrorCode, string, Exception> _connectToMasterFailed;
         private static readonly Action<ILogger, HostAndPort, IPAddress, string, string, bool, Exception> _connectedToServer;
         private static readonly Action<ILogger, Exception> _exceptionSendingSessionData;
+        private static readonly Action<ILogger, string, Exception> _connectionDisconnected;
 
         static LoggerExtensions()
         {
@@ -40,6 +41,11 @@ namespace Knet.Kudu.Client.Logging
                 eventId: new EventId(5, "ExceptionSendingSessionData"),
                 logLevel: LogLevel.Error,
                 formatString: "Exception occurred while flushing session data, will retry");
+
+            _connectionDisconnected = LoggerMessage.Define<string>(
+                eventId: new EventId(6, "ConnectionDisconnected"),
+                logLevel: LogLevel.Warning,
+                formatString: "Connection ungracefully closed: {Server}");
         }
 
         public static void ExceptionConnectingToMaster(this ILogger logger, Exception ex)
@@ -60,6 +66,11 @@ namespace Knet.Kudu.Client.Logging
         public static void ExceptionSendingSessionData(this ILogger logger, Exception ex)
         {
             _exceptionSendingSessionData(logger, ex);
+        }
+
+        public static void ConnectionDisconnected(this ILogger logger, string server, Exception ex)
+        {
+            _connectionDisconnected(logger, server, ex);
         }
     }
 }

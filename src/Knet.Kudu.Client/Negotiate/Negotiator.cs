@@ -42,6 +42,7 @@ namespace Knet.Kudu.Client.Negotiate
         private const int ConnectionContextCallId = -3;
         private const int SaslNegotiationCallId = -33;
 
+        private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger _logger;
         private readonly KuduClientOptions _options;
         private readonly ServerInfo _serverInfo;
@@ -57,6 +58,7 @@ namespace Knet.Kudu.Client.Negotiate
             ServerInfo serverInfo,
             Socket socket)
         {
+            _loggerFactory = loggerFactory;
             _logger = loggerFactory.CreateLogger<Negotiator>();
             _options = options;
             _serverInfo = serverInfo;
@@ -126,7 +128,7 @@ namespace Knet.Kudu.Client.Negotiate
                 _serverInfo.IsLocal);
 
             var socketConnection = new KuduSocketConnection(_socket, pipe);
-            return new KuduConnection(socketConnection);
+            return new KuduConnection(socketConnection, _loggerFactory);
         }
 
         private Task<NegotiatePB> NegotiateFeaturesAsync(CancellationToken cancellationToken)
