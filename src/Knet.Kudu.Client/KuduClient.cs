@@ -935,7 +935,7 @@ namespace Knet.Kudu.Client
                 KuduConnection connection = await _connectionCache.GetConnectionAsync(
                     serverInfo, cancellationToken).ConfigureAwait(false);
 
-                return await connection.SendReceiveAsync(header, rpc)
+                return await connection.SendReceiveAsync(header, rpc, cancellationToken)
                     .ConfigureAwait(false);
             }
             catch (InvalidAuthnTokenException)

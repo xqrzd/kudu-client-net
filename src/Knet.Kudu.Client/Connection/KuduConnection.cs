@@ -57,7 +57,10 @@ namespace Knet.Kudu.Client.Connection
             }
         }
 
-        public async Task<T> SendReceiveAsync<T>(RequestHeader header, KuduRpc<T> rpc)
+        public async Task<T> SendReceiveAsync<T>(
+            RequestHeader header,
+            KuduRpc<T> rpc,
+            CancellationToken cancellationToken)
         {
             var message = new InflightRpc(rpc);
 
@@ -77,14 +80,17 @@ namespace Knet.Kudu.Client.Connection
 
             using (rpc)
             {
-                await SendAsync(header, rpc).ConfigureAwait(false);
+                await SendAsync(header, rpc, cancellationToken).ConfigureAwait(false);
                 await message.Task.ConfigureAwait(false);
 
                 return rpc.Output;
             }
         }
 
-        private async ValueTask SendAsync(RequestHeader header, KuduRpc rpc)
+        private async ValueTask SendAsync(
+            RequestHeader header,
+            KuduRpc rpc,
+            CancellationToken cancellationToken)
         {
             // TODO: Use PipeWriter once protobuf-net supports it.
             using (var stream = new RecyclableMemoryStream())
@@ -99,18 +105,19 @@ namespace Knet.Kudu.Client.Connection
                 // bytes we already allocated to store the length.
                 BinaryPrimitives.WriteUInt32BigEndian(stream.AsSpan(), (uint)stream.Length - 4);
 
-                await WriteAsync(stream.AsMemory()).ConfigureAwait(false);
+                await WriteAsync(stream.AsMemory(), cancellationToken).ConfigureAwait(false);
             }
         }
 
-        private async ValueTask WriteAsync(ReadOnlyMemory<byte> source)
+        private async ValueTask WriteAsync(
+            ReadOnlyMemory<byte> source,
+            CancellationToken cancellationToken)
         {
-            // TODO: CancellationToken support.
             PipeWriter output = _ioPipe.Output;
-            await _singleWriter.WaitAsync().ConfigureAwait(false);
+            await _singleWriter.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                await output.WriteAsync(source).ConfigureAwait(false);
+                await output.WriteAsync(source, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
