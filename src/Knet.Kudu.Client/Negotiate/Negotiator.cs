@@ -13,8 +13,10 @@ using System.Threading.Tasks;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Internal;
+using Knet.Kudu.Client.Logging;
 using Knet.Kudu.Client.Protocol.Rpc;
 using Knet.Kudu.Client.Util;
+using Microsoft.Extensions.Logging;
 using Pipelines.Sockets.Unofficial;
 using ProtoBuf;
 using static Knet.Kudu.Client.Protocol.Rpc.NegotiatePB;
@@ -40,18 +42,26 @@ namespace Knet.Kudu.Client.Negotiate
         private const int ConnectionContextCallId = -3;
         private const int SaslNegotiationCallId = -33;
 
+        private readonly ILogger _logger;
         private readonly KuduClientOptions _options;
         private readonly ServerInfo _serverInfo;
         private readonly Socket _socket;
+        private readonly NegotiateLoggerMessage _logMessage;
 
         private Stream _stream;
         private X509Certificate2 _remoteCertificate;
 
-        public Negotiator(KuduClientOptions options, ServerInfo serverInfo, Socket socket)
+        public Negotiator(
+            KuduClientOptions options,
+            ILoggerFactory loggerFactory,
+            ServerInfo serverInfo,
+            Socket socket)
         {
+            _logger = loggerFactory.CreateLogger<Negotiator>();
             _options = options;
             _serverInfo = serverInfo;
             _socket = socket;
+            _logMessage = new NegotiateLoggerMessage();
         }
 
         public async Task<KuduConnection> NegotiateAsync(CancellationToken cancellationToken = default)
@@ -86,7 +96,6 @@ namespace Knet.Kudu.Client.Negotiate
 
             // Check the negotiated authentication type sent by the server.
             var chosenAuthnType = ChooseAuthenticationType(features);
-            Console.WriteLine($"Chose authentication type: {chosenAuthnType}");
 
             var result = await AuthenticateAsync(chosenAuthnType, cancellationToken)
                 .ConfigureAwait(false);
@@ -108,6 +117,13 @@ namespace Knet.Kudu.Client.Negotiate
                     _options.ReceivePipeOptions,
                     name: _serverInfo.ToString());
             }
+
+            _logger.ConnectedToServer(
+                _serverInfo.HostPort,
+                _serverInfo.Endpoint.Address,
+                _logMessage.TlsInfo,
+                _logMessage.NegotiateInfo,
+                _serverInfo.IsLocal);
 
             var socketConnection = new KuduSocketConnection(_socket, pipe);
             return new KuduConnection(socketConnection);
@@ -143,14 +159,14 @@ namespace Knet.Kudu.Client.Negotiate
         {
             var authenticationStream = new KuduTlsAuthenticationStream(this);
             var sslInnerStream = new StreamWrapper(authenticationStream);
-            var sslStream = SslStreamFactory.CreateSslStreamTrustAll(sslInnerStream);
-            await sslStream.AuthenticateAsClientAsync(tlsHost).ConfigureAwait(false);
+            var tlsStream = SslStreamFactory.CreateSslStreamTrustAll(sslInnerStream);
+            await tlsStream.AuthenticateAsClientAsync(tlsHost).ConfigureAwait(false);
 
-            _remoteCertificate = new X509Certificate2(sslStream.RemoteCertificate);
-            Console.WriteLine($"TLS Connected {tlsHost}");
+            _remoteCertificate = new X509Certificate2(tlsStream.RemoteCertificate);
+            _logMessage.TlsInfo = GetTlsInfoLogString(tlsStream);
 
             sslInnerStream.ReplaceStream(stream);
-            return sslStream;
+            return tlsStream;
         }
 
         private AuthenticationType ChooseAuthenticationType(NegotiatePB features)
@@ -231,22 +247,13 @@ namespace Knet.Kudu.Client.Negotiate
             using var negotiateStream = new NegotiateStream(gssApiStream);
 
             var targetName = _options.KerberosSpn ?? $"kudu/{_serverInfo.HostPort.Host}";
-
-            Console.WriteLine($"Using target name: {targetName}");
+            _logMessage.NegotiateInfo = $"SaslGssApi [{targetName}]";
 
             await negotiateStream.AuthenticateAsClientAsync(
                 CredentialCache.DefaultNetworkCredentials,
                 targetName,
                 ProtectionLevel.EncryptAndSign,
                 TokenImpersonationLevel.Identification).ConfigureAwait(false);
-
-            Console.WriteLine($"NegotiateStream authentication success!" +
-                $"\n\tIsAuthenticated: {negotiateStream.IsAuthenticated} " +
-                $"\n\tIsEncrypted: {negotiateStream.IsEncrypted} " +
-                $"\n\tIsSigned: {negotiateStream.IsSigned}" +
-                $"\n\tIsMutuallyAuthenticated: {negotiateStream.IsMutuallyAuthenticated} " +
-                $"\n\tRemoteIdentity: {negotiateStream.RemoteIdentity?.Name} " +
-                $"\n\tAuthenticationType: {negotiateStream.RemoteIdentity?.AuthenticationType} ");
 
             gssApiStream.CompleteNegotiate(negotiateStream);
 
@@ -400,6 +407,15 @@ namespace Knet.Kudu.Client.Negotiate
             } while (buffer.Length > 0);
         }
 
+        private static string GetTlsInfoLogString(SslStream tlsStream)
+        {
+#if NETCOREAPP3_0
+            return $"{tlsStream.SslProtocol} [{tlsStream.NegotiatedCipherSuite}]";
+#else
+            return $"{tlsStream.SslProtocol}";
+#endif
+        }
+
         private enum AuthenticationType
         {
             SaslGssApi,
@@ -416,6 +432,13 @@ namespace Knet.Kudu.Client.Negotiate
             {
                 Nonce = nonce;
             }
+        }
+
+        private class NegotiateLoggerMessage
+        {
+            public string TlsInfo { get; set; } = "Plaintext";
+
+            public string NegotiateInfo { get; set; } = "SaslPlain";
         }
     }
 }

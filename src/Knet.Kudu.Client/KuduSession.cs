@@ -4,26 +4,32 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using Knet.Kudu.Client.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client
 {
     public class KuduSession : IKuduSession
     {
+        private readonly ILogger _logger;
         private readonly KuduClient _client;
         private readonly KuduSessionOptions _options;
         private readonly ChannelWriter<Operation> _writer;
         private readonly ChannelReader<Operation> _reader;
         private readonly SemaphoreSlim _singleFlush;
+        private readonly Task _consumeTask;
 
         private volatile CancellationTokenSource _flushCts;
         private volatile TaskCompletionSource<object> _flushTcs;
 
-        private Task _consumeTask;
-
-        public KuduSession(KuduClient client, KuduSessionOptions options)
+        public KuduSession(
+            KuduClient client,
+            KuduSessionOptions options,
+            ILoggerFactory loggerFactory)
         {
             _client = client;
             _options = options;
+            _logger = loggerFactory.CreateLogger<KuduSession>();
 
             var channelOptions = new BoundedChannelOptions(options.Capacity)
             {
@@ -41,6 +47,8 @@ namespace Knet.Kudu.Client
             _flushCts = new CancellationTokenSource();
             _flushTcs = new TaskCompletionSource<object>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
+
+            _consumeTask = ConsumeAsync();
         }
 
         public async ValueTask DisposeAsync()
@@ -48,17 +56,10 @@ namespace Knet.Kudu.Client
             // TODO: Handle pending flushes.
             _writer.TryComplete();
 
-            if (_consumeTask != null)
-                await _consumeTask.ConfigureAwait(false);
+            await _consumeTask.ConfigureAwait(false);
 
             _singleFlush.Dispose();
             _flushCts.Dispose();
-        }
-
-        public void StartProcessing()
-        {
-            if (_consumeTask == null)
-                _consumeTask = ConsumeAsync();
         }
 
         public ValueTask EnqueueAsync(
@@ -194,11 +195,6 @@ namespace Knet.Kudu.Client
                 flushRequested = true;
             }
             catch (ChannelClosedException) { }
-            catch (Exception ex)
-            {
-                // TODO: Log warning.
-                Console.WriteLine($"Unexpected exception reading session queue: {ex}");
-            }
 
             return flushRequested && queue.Count < capacity;
         }
@@ -221,15 +217,20 @@ namespace Knet.Kudu.Client
 
         private async Task SendAsync(List<Operation> queue)
         {
-            try
+            while (true)
             {
-                await _client.WriteRowAsync(queue, _options.ExternalConsistencyMode)
-                    .ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                // TODO: Log warning, or infinite retry?
-                Console.WriteLine($"Unexpected exception writing session data: {ex}");
+                try
+                {
+                    await _client.WriteRowAsync(queue, _options.ExternalConsistencyMode)
+                        .ConfigureAwait(false);
+
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    _logger.ExceptionSendingSessionData(ex);
+                    await Task.Delay(4000).ConfigureAwait(false);
+                }
             }
         }
     }
