@@ -7,9 +7,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Internal;
+using Knet.Kudu.Client.Logging;
 using Knet.Kudu.Client.Protocol.Rpc;
 using Knet.Kudu.Client.Requests;
 using Knet.Kudu.Client.Util;
+using Microsoft.Extensions.Logging;
 using ProtoBuf;
 
 namespace Knet.Kudu.Client.Connection
@@ -17,6 +19,7 @@ namespace Knet.Kudu.Client.Connection
     public class KuduConnection
     {
         private readonly IDuplexPipe _ioPipe;
+        private readonly ILogger _logger;
         private readonly SemaphoreSlim _singleWriter;
         private readonly Dictionary<int, InflightRpc> _inflightRpcs;
         private readonly Task _receiveTask;
@@ -26,9 +29,10 @@ namespace Knet.Kudu.Client.Connection
         private RecoverableException _closedException;
         private DisconnectedCallback _disconnectedCallback;
 
-        public KuduConnection(IDuplexPipe ioPipe)
+        public KuduConnection(IDuplexPipe ioPipe, ILoggerFactory loggerFactory)
         {
             _ioPipe = ioPipe;
+            _logger = loggerFactory.CreateLogger<KuduConnection>();
             _singleWriter = new SemaphoreSlim(1, 1);
             _inflightRpcs = new Dictionary<int, InflightRpc>();
             _nextCallId = 0;
@@ -146,7 +150,6 @@ namespace Knet.Kudu.Client.Connection
             {
                 input.Complete(ex);
                 Shutdown(ex);
-                Console.WriteLine("--> Input stopped (Exception) " + _ioPipe.ToString() + ex.ToString());
             }
         }
 
@@ -430,6 +433,9 @@ namespace Knet.Kudu.Client.Connection
         /// <param name="exception"></param>
         private void Shutdown(Exception exception = null)
         {
+            if (exception != null)
+                _logger.ConnectionDisconnected(_ioPipe.ToString(), exception);
+
             var closedException = new RecoverableException(KuduStatus.IllegalState(
                 $"Connection {_ioPipe} is disconnected."), exception);
 

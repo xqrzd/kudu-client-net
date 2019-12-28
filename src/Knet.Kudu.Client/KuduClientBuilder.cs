@@ -3,12 +3,15 @@ using System.Collections.Generic;
 using System.IO.Pipelines;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Util;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Knet.Kudu.Client
 {
     public class KuduClientBuilder
     {
         private readonly IReadOnlyList<HostAndPort> _masterAddresses;
+        private ILoggerFactory _loggerFactory = NullLoggerFactory.Instance;
         private string _kerberosSpn;
         private string _tlsHost;
         private TimeSpan _defaultAdminOperationTimeout = TimeSpan.FromSeconds(30);
@@ -33,6 +36,12 @@ namespace Knet.Kudu.Client
         public KuduClientBuilder(IReadOnlyList<HostAndPort> masterAddresses)
         {
             _masterAddresses = masterAddresses;
+        }
+
+        public KuduClientBuilder SetLoggerFactory(ILoggerFactory loggerFactory)
+        {
+            _loggerFactory = loggerFactory;
+            return this;
         }
 
         public KuduClientBuilder SetKerberosSpn(string kerberosSpn)
@@ -88,7 +97,7 @@ namespace Knet.Kudu.Client
         public KuduClient Build()
         {
             var options = BuildOptions();
-            return new KuduClient(options);
+            return new KuduClient(options, _loggerFactory);
         }
     }
 }

@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Protocol.Consensus;
 using Knet.Kudu.Client.Protocol.Master;
@@ -20,7 +19,6 @@ namespace Knet.Kudu.Client.Connection
 
             if (addresses.Count == 0)
             {
-                Console.WriteLine($"Received a tablet server with no addresses {uuid}");
                 return Task.FromResult<ServerInfo>(null);
             }
 
@@ -44,20 +42,19 @@ namespace Knet.Kudu.Client.Connection
             var replicas = new List<ServerInfo>(tabletLocations.Replicas.Count);
             int leaderIndex = -1;
 
-            for (int i = 0; i < tabletLocations.Replicas.Count; i++)
+            foreach (var replica in tabletLocations.Replicas)
             {
-                var replica = tabletLocations.Replicas[i];
                 var serverInfo = await connectionFactory.GetServerInfoAsync(replica.TsInfo)
                     .ConfigureAwait(false);
 
-                if (replica.Role == RaftPeerPB.Role.Leader)
-                    leaderIndex = i;
+                if (serverInfo != null)
+                {
+                    if (replica.Role == RaftPeerPB.Role.Leader)
+                        leaderIndex = replicas.Count;
 
-                replicas.Add(serverInfo);
+                    replicas.Add(serverInfo);
+                }
             }
-
-            if (leaderIndex == -1)
-                Console.WriteLine($"No leader provided for tablet {tabletId}");
 
             var cache = new ServerInfoCache(replicas, leaderIndex);
 

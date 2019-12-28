@@ -6,17 +6,20 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Negotiate;
+using Microsoft.Extensions.Logging;
 using Pipelines.Sockets.Unofficial;
 
 namespace Knet.Kudu.Client.Connection
 {
     public class KuduConnectionFactory : IKuduConnectionFactory
     {
+        private readonly ILoggerFactory _loggerFactory;
         private readonly KuduClientOptions _options;
         private readonly HashSet<IPAddress> _localIPs;
 
-        public KuduConnectionFactory(KuduClientOptions options)
+        public KuduConnectionFactory(KuduClientOptions options, ILoggerFactory loggerFactory)
         {
+            _loggerFactory = loggerFactory;
             _options = options;
             _localIPs = GetLocalAddresses();
         }
@@ -26,7 +29,7 @@ namespace Knet.Kudu.Client.Connection
         {
             var socket = await ConnectAsync(serverInfo.Endpoint).ConfigureAwait(false);
 
-            var negotiator = new Negotiator(_options, serverInfo, socket);
+            var negotiator = new Negotiator(_options, _loggerFactory, serverInfo, socket);
             return await negotiator.NegotiateAsync(cancellationToken).ConfigureAwait(false);
         }
 

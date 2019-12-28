@@ -6,6 +6,7 @@ using Knet.Kudu.Client.Builder;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Internal;
+using Knet.Kudu.Client.Logging;
 using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Protocol.Consensus;
 using Knet.Kudu.Client.Protocol.Master;
@@ -15,6 +16,8 @@ using Knet.Kudu.Client.Protocol.Tserver;
 using Knet.Kudu.Client.Requests;
 using Knet.Kudu.Client.Tablet;
 using Knet.Kudu.Client.Util;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Knet.Kudu.Client
 {
@@ -31,6 +34,8 @@ namespace Knet.Kudu.Client
         public const long NoTimestamp = -1;
 
         private readonly KuduClientOptions _options;
+        private readonly ILoggerFactory _loggerFactory;
+        private readonly ILogger _logger;
         private readonly IKuduConnectionFactory _connectionFactory;
         private readonly ConnectionCache _connectionCache;
         private readonly Dictionary<string, TableLocationsCache> _tableLocations;
@@ -50,9 +55,14 @@ namespace Knet.Kudu.Client
         private readonly object _lastPropagatedTimestampLock = new object();
 
         public KuduClient(KuduClientOptions options)
+            : this(options, NullLoggerFactory.Instance) { }
+
+        public KuduClient(KuduClientOptions options, ILoggerFactory loggerFactory)
         {
             _options = options;
-            _connectionFactory = new KuduConnectionFactory(options);
+            _loggerFactory = loggerFactory;
+            _logger = loggerFactory.CreateLogger<KuduClient>();
+            _connectionFactory = new KuduConnectionFactory(options, loggerFactory);
             _connectionCache = new ConnectionCache(_connectionFactory);
             _tableLocations = new Dictionary<string, TableLocationsCache>();
             _requestTracker = new RequestTracker(Guid.NewGuid().ToString("N"));
@@ -308,9 +318,7 @@ namespace Knet.Kudu.Client
 
         public IKuduSession NewSession(KuduSessionOptions options)
         {
-            var session = new KuduSession(this, options);
-            session.StartProcessing();
-            return session;
+            return new KuduSession(this, options, _loggerFactory);
         }
 
         private async Task<KuduTable> OpenTableAsync(TableIdentifierPB tableIdentifier)
@@ -554,7 +562,7 @@ namespace Knet.Kudu.Client
             return new ConnectToMasterResponse(response, serverInfo);
         }
 
-        private static bool TryGetConnectResponse(
+        private bool TryGetConnectResponse(
             Task<ConnectToMasterResponse> task,
             out ServerInfo serverInfo,
             out ConnectToMasterResponsePB responsePb)
@@ -564,10 +572,7 @@ namespace Knet.Kudu.Client
 
             if (!task.IsCompletedSuccessfully())
             {
-                // TODO: Log warning.
-                Console.WriteLine("Unable to connect to cluster: " +
-                    task.Exception.Message);
-
+                _logger.ExceptionConnectingToMaster(task.Exception);
                 return false;
             }
 
@@ -575,10 +580,7 @@ namespace Knet.Kudu.Client
 
             if (response.ResponsePB.Error != null)
             {
-                // TODO: Log warning.
-                Console.WriteLine("Error connecting to cluster: " +
-                    response.ResponsePB.Error.Status.Message);
-
+                _logger.ConnectToMasterFailed(response.ResponsePB.Error);
                 return false;
             }
 
@@ -939,7 +941,6 @@ namespace Knet.Kudu.Client
             catch (InvalidAuthnTokenException)
             {
                 // TODO
-                Console.WriteLine("HandleInvalidAuthnToken");
                 throw;
             }
             catch (InvalidAuthzTokenException)
