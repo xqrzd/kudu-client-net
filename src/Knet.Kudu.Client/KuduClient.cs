@@ -225,13 +225,15 @@ namespace Knet.Kudu.Client
 
         public async Task<WriteResponsePB[]> WriteRowAsync(
             IEnumerable<Operation> operations,
-            ExternalConsistencyMode externalConsistencyMode = ExternalConsistencyMode.ClientPropagated)
+            ExternalConsistencyMode externalConsistencyMode = ExternalConsistencyMode.ClientPropagated,
+            CancellationToken cancellationToken = default)
         {
             var operationsByTablet = new Dictionary<RemoteTablet, List<Operation>>();
 
             foreach (var operation in operations)
             {
-                var tablet = await GetRowTabletAsync(operation).ConfigureAwait(false);
+                var tablet = await GetRowTabletAsync(operation, cancellationToken)
+                    .ConfigureAwait(false);
 
                 if (tablet != null)
                 {
@@ -258,7 +260,8 @@ namespace Knet.Kudu.Client
                 var task = WriteRowAsync(
                     tabletOperations.Value,
                     tabletOperations.Key,
-                    externalConsistencyMode);
+                    externalConsistencyMode,
+                    cancellationToken);
 
                 tasks[i++] = task;
             }
@@ -271,7 +274,8 @@ namespace Knet.Kudu.Client
         private async Task<WriteResponsePB> WriteRowAsync(
             List<Operation> operations,
             RemoteTablet tablet,
-            ExternalConsistencyMode externalConsistencyMode)
+            ExternalConsistencyMode externalConsistencyMode,
+            CancellationToken cancellationToken = default)
         {
             var table = operations[0].Table;
 
@@ -316,7 +320,7 @@ namespace Knet.Kudu.Client
                 table.TableId,
                 tablet.Partition.PartitionKeyStart);
 
-            return await SendRpcToTabletAsync(rpc).ConfigureAwait(false);
+            return await SendRpcToTabletAsync(rpc, cancellationToken).ConfigureAwait(false);
         }
 
         public ScanBuilder NewScanBuilder(KuduTable table)
@@ -379,7 +383,8 @@ namespace Knet.Kudu.Client
             }
         }
 
-        internal ValueTask<RemoteTablet> GetRowTabletAsync(Operation operation)
+        internal ValueTask<RemoteTablet> GetRowTabletAsync(
+            Operation operation, CancellationToken cancellationToken = default)
         {
             var table = operation.Table;
             var row = operation.Row;
@@ -390,7 +395,7 @@ namespace Knet.Kudu.Client
 
             // Note that we don't have to await this method before disposing the writer, as a
             // copy of partitionKey will be made if the method cannot complete synchronously.
-            return GetTabletAsync(table.TableId, partitionKey);
+            return GetTabletAsync(table.TableId, partitionKey, cancellationToken);
         }
 
         /// <summary>
