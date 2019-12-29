@@ -223,7 +223,7 @@ namespace Knet.Kudu.Client
             return new KuduTable(response);
         }
 
-        public async Task<WriteResponsePB[]> WriteRowAsync(
+        public async Task<WriteResponsePB[]> WriteAsync(
             IEnumerable<Operation> operations,
             ExternalConsistencyMode externalConsistencyMode = ExternalConsistencyMode.ClientPropagated,
             CancellationToken cancellationToken = default)
@@ -257,7 +257,7 @@ namespace Knet.Kudu.Client
 
             foreach (var tabletOperations in operationsByTablet)
             {
-                var task = WriteRowAsync(
+                var task = WriteAsync(
                     tabletOperations.Value,
                     tabletOperations.Key,
                     externalConsistencyMode,
@@ -271,7 +271,7 @@ namespace Knet.Kudu.Client
             return results;
         }
 
-        private async Task<WriteResponsePB> WriteRowAsync(
+        private async Task<WriteResponsePB> WriteAsync(
             List<Operation> operations,
             RemoteTablet tablet,
             ExternalConsistencyMode externalConsistencyMode,

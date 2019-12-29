@@ -34,7 +34,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             var rows = Enumerable.Range(0, 3)
                 .Select(i => ClientTestUtil.CreateBasicSchemaInsert(table, i));
 
-            await client.WriteRowAsync(rows);
+            await client.WriteAsync(rows);
 
             // Make sure the rows are in there before messing things up.
             var numRows = 0;
@@ -56,7 +56,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             var rows2 = Enumerable.Range(3, 3)
                 .Select(i => ClientTestUtil.CreateBasicSchemaInsert(table, i));
 
-            await client.WriteRowAsync(rows2);
+            await client.WriteAsync(rows2);
 
             var numRows2 = 0;
 
