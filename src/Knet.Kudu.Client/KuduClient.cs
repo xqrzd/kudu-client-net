@@ -507,6 +507,7 @@ namespace Knet.Kudu.Client
             var tasks = new HashSet<Task<ConnectToMasterResponse>>();
             var foundMasters = new List<ServerInfo>(masterAddresses.Count);
             int leaderIndex = -1;
+            List<HostPortPB> clusterMasterAddresses = null;
 
             using var cts = new CancellationTokenSource();
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
@@ -535,6 +536,7 @@ namespace Knet.Kudu.Client
                 }
 
                 foundMasters.Add(serverInfo);
+                clusterMasterAddresses = responsePb.MasterAddrs;
 
                 if (responsePb.Role == RaftPeerPB.Role.Leader)
                 {
@@ -566,6 +568,12 @@ namespace Knet.Kudu.Client
             else
             {
                 _logger.UnableToFindLeaderMaster();
+            }
+
+            if (clusterMasterAddresses?.Count > 0 &&
+                clusterMasterAddresses.Count != masterAddresses.Count)
+            {
+                _logger.MisconfiguredMasterAddresses(masterAddresses, clusterMasterAddresses);
             }
 
             return foundLeader;
