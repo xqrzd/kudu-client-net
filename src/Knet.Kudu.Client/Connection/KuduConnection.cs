@@ -57,7 +57,10 @@ namespace Knet.Kudu.Client.Connection
             }
         }
 
-        public async Task<T> SendReceiveAsync<T>(RequestHeader header, KuduRpc<T> rpc)
+        public async Task<T> SendReceiveAsync<T>(
+            RequestHeader header,
+            KuduRpc<T> rpc,
+            CancellationToken cancellationToken)
         {
             var message = new InflightRpc(rpc);
 
@@ -75,16 +78,29 @@ namespace Knet.Kudu.Client.Connection
                 _inflightRpcs.Add(header.CallId, message);
             }
 
-            using (rpc)
+            using var registration = cancellationToken.Register(
+                s => ((InflightRpc)s).TrySetCanceled(),
+                state: message,
+                useSynchronizationContext: false);
+
+            try
             {
-                await SendAsync(header, rpc).ConfigureAwait(false);
+                await SendAsync(header, rpc, cancellationToken).ConfigureAwait(false);
                 await message.Task.ConfigureAwait(false);
 
                 return rpc.Output;
             }
+            finally
+            {
+                RemoveInflightRpc(header.CallId);
+                rpc.Dispose();
+            }
         }
 
-        private async ValueTask SendAsync(RequestHeader header, KuduRpc rpc)
+        private async ValueTask SendAsync(
+            RequestHeader header,
+            KuduRpc rpc,
+            CancellationToken cancellationToken)
         {
             // TODO: Use PipeWriter once protobuf-net supports it.
             using (var stream = new RecyclableMemoryStream())
@@ -99,18 +115,19 @@ namespace Knet.Kudu.Client.Connection
                 // bytes we already allocated to store the length.
                 BinaryPrimitives.WriteUInt32BigEndian(stream.AsSpan(), (uint)stream.Length - 4);
 
-                await WriteAsync(stream.AsMemory()).ConfigureAwait(false);
+                await WriteAsync(stream.AsMemory(), cancellationToken).ConfigureAwait(false);
             }
         }
 
-        private async ValueTask WriteAsync(ReadOnlyMemory<byte> source)
+        private async ValueTask WriteAsync(
+            ReadOnlyMemory<byte> source,
+            CancellationToken cancellationToken)
         {
-            // TODO: CancellationToken support.
             PipeWriter output = _ioPipe.Output;
-            await _singleWriter.WaitAsync().ConfigureAwait(false);
+            await _singleWriter.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                await output.WriteAsync(source).ConfigureAwait(false);
+                await output.WriteAsync(source, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -165,16 +182,16 @@ namespace Knet.Kudu.Client.Connection
                 if (TryParseMessage(ref reader, parserContext))
                 {
                     var header = parserContext.Header;
-                    var callId = header.CallId;
+                    var rpc = parserContext.InflightRpc;
 
                     if (header.IsError)
                     {
                         var exception = GetException(parserContext.Error);
-                        CompleteRpc(callId, exception);
+                        CompleteRpc(rpc, exception);
                     }
                     else
                     {
-                        CompleteRpc(callId);
+                        CompleteRpc(rpc);
                     }
 
                     parserContext.Reset();
@@ -219,7 +236,13 @@ namespace Knet.Kudu.Client.Connection
                         if (TryParseResponseHeader(ref reader,
                             parserContext.HeaderLength, out parserContext.Header))
                         {
-                            parserContext.Rpc = GetRpc(parserContext.Header).Rpc;
+                            if (!TryGetRpc(parserContext.Header, out parserContext.InflightRpc))
+                            {
+                                // We don't have this RPC. It probably timed out
+                                // and was removed from _inflightRpcs.
+                                parserContext.Skip = true;
+                            }
+
                             goto case ParseStep.ReadMainMessageLength;
                         }
                         else
@@ -233,7 +256,15 @@ namespace Knet.Kudu.Client.Connection
                     {
                         if (reader.TryReadVarint(out parserContext.MainMessageLength))
                         {
-                            goto case ParseStep.ReadProtobufMessage;
+                            if (parserContext.Skip)
+                            {
+                                parserContext.RemainingSkipBytes = parserContext.MainMessageLength;
+                                goto case ParseStep.Skip;
+                            }
+                            else
+                            {
+                                goto case ParseStep.ReadProtobufMessage;
+                            }
                         }
                         else
                         {
@@ -305,6 +336,20 @@ namespace Knet.Kudu.Client.Connection
 
                         if (parserContext.RemainingSidecarLength == 0)
                             return true;
+
+                        break;
+                    }
+                case ParseStep.Skip:
+                    {
+                        var skipBytes = Math.Min(
+                            reader.Remaining,
+                            parserContext.RemainingSkipBytes);
+
+                        reader.Advance(skipBytes);
+                        parserContext.RemainingSkipBytes -= (int)skipBytes;
+
+                        if (parserContext.RemainingSkipBytes == 0)
+                            parserContext.Reset();
 
                         break;
                     }
@@ -380,49 +425,29 @@ namespace Knet.Kudu.Client.Connection
             }
         }
 
-        private InflightRpc GetRpc(ResponseHeader header)
-        {
-            bool success;
-            InflightRpc rpc;
-
-            lock (_inflightRpcs)
-            {
-                success = _inflightRpcs.TryGetValue(header.CallId, out rpc);
-            }
-
-            if (!success)
-            {
-                // If we get a bad RPC ID back, we are probably somehow misaligned from
-                // the server. So, we disconnect the connection.
-
-                throw new NonRecoverableException(KuduStatus.IllegalState(
-                    $"{LogPrefix} invalid callID: {header.CallId}"));
-            }
-
-            return rpc;
-        }
-
-        private void CompleteRpc(int callId)
-        {
-            if (TryRemoveRpc(callId, out var rpc))
-            {
-                rpc.TrySetResult(null);
-            }
-        }
-
-        private void CompleteRpc(int callId, Exception exception)
-        {
-            if (TryRemoveRpc(callId, out var rpc))
-            {
-                rpc.TrySetException(exception);
-            }
-        }
-
-        private bool TryRemoveRpc(int callId, out InflightRpc rpc)
+        private bool TryGetRpc(ResponseHeader header, out InflightRpc rpc)
         {
             lock (_inflightRpcs)
             {
-                return _inflightRpcs.Remove(callId, out rpc);
+                return _inflightRpcs.TryGetValue(header.CallId, out rpc);
+            }
+        }
+
+        private void CompleteRpc(InflightRpc rpc)
+        {
+            rpc.TrySetResult(null);
+        }
+
+        private void CompleteRpc(InflightRpc rpc, Exception exception)
+        {
+            rpc.TrySetException(exception);
+        }
+
+        private void RemoveInflightRpc(int callId)
+        {
+            lock (_inflightRpcs)
+            {
+                _inflightRpcs.Remove(callId);
             }
         }
 
@@ -509,6 +534,81 @@ namespace Knet.Kudu.Client.Connection
             }
 
             public void Invoke(Exception exception) => _callback?.Invoke(exception, _state);
+        }
+
+        private sealed class ParserContext
+        {
+            public ParseStep Step;
+
+            /// <summary>
+            /// Total message length (4 bytes).
+            /// </summary>
+            public int TotalMessageLength;
+
+            /// <summary>
+            /// RPC Header protobuf length (variable encoding).
+            /// </summary>
+            public int HeaderLength;
+
+            /// <summary>
+            /// Main message length (variable encoding).
+            /// Includes the size of any sidecars.
+            /// </summary>
+            public int MainMessageLength;
+
+            /// <summary>
+            /// RPC Header protobuf.
+            /// </summary>
+            public ResponseHeader Header;
+
+            public InflightRpc InflightRpc;
+
+            public ErrorStatusPB Error;
+
+            /// <summary>
+            /// Gets the size of the main message protobuf.
+            /// </summary>
+            public int ProtobufMessageLength => Header.SidecarOffsets == null ?
+                MainMessageLength : (int)Header.SidecarOffsets[0];
+
+            public bool HasSidecars => Header.SidecarOffsets != null;
+
+            public int SidecarLength => MainMessageLength - (int)Header.SidecarOffsets[0];
+
+            public KuduRpc Rpc => InflightRpc.Rpc;
+
+            public int RemainingSidecarLength;
+
+            public bool Skip;
+
+            public int RemainingSkipBytes;
+
+            public void Reset()
+            {
+                Step = ParseStep.NotStarted;
+                TotalMessageLength = default;
+                HeaderLength = default;
+                MainMessageLength = default;
+                Header = default;
+                InflightRpc = default;
+                Error = default;
+                RemainingSidecarLength = default;
+                Skip = default;
+                RemainingSkipBytes = default;
+            }
+        }
+
+        private enum ParseStep : byte
+        {
+            NotStarted,
+            ReadTotalMessageLength,
+            ReadHeaderLength,
+            ReadHeader,
+            ReadMainMessageLength,
+            ReadProtobufMessage,
+            BeginSidecars,
+            ReadSidecars,
+            Skip
         }
     }
 }

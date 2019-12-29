@@ -221,7 +221,7 @@ namespace Knet.Kudu.Client
             {
                 try
                 {
-                    await _client.WriteRowAsync(queue, _options.ExternalConsistencyMode)
+                    await _client.WriteAsync(queue, _options.ExternalConsistencyMode)
                         .ConfigureAwait(false);
 
                     return;

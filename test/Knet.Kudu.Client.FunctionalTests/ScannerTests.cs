@@ -50,7 +50,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             row.SetInt32(0, 7);
             row.SetString(1, "test value");
 
-            var results = await client.WriteRowAsync(new[] { insert });
+            var results = await client.WriteAsync(new[] { insert });
             Assert.Collection(results, r =>
             {
                 Assert.Empty(r.PerRowErrors);
