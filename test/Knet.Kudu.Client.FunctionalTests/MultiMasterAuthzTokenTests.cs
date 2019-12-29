@@ -39,7 +39,7 @@ namespace Knet.Kudu.Client.FunctionalTests
         [SkippableFact]
         public async Task TestAuthzTokensDuringElection()
         {
-            await using var session = _client.NewSession(new KuduSessionOptions());
+            await using var session = _client.NewSession();
 
             // Test sending various requests that require authorization.
             var builder = ClientTestUtil.GetBasicSchema()
@@ -110,7 +110,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             async Task WriteRowsAsync(bool flush)
             {
-                await using var session = _client.NewSession(new KuduSessionOptions());
+                await using var session = _client.NewSession();
 
                 while (Interlocked.Read(ref keepRunning) == 1)
                 {

@@ -5,18 +5,24 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Exceptions;
+using Knet.Kudu.Client.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client.Connection
 {
     public class ConnectionCache : IAsyncDisposable
     {
         private readonly IKuduConnectionFactory _connectionFactory;
+        private readonly ILogger _logger;
         private readonly Dictionary<IPEndPoint, Task<KuduConnection>> _connections;
         private volatile bool _disposed;
 
-        public ConnectionCache(IKuduConnectionFactory connectionFactory)
+        public ConnectionCache(
+            IKuduConnectionFactory connectionFactory,
+            ILoggerFactory loggerFactory)
         {
             _connectionFactory = connectionFactory;
+            _logger = loggerFactory.CreateLogger<ConnectionCache>();
             _connections = new Dictionary<IPEndPoint, Task<KuduConnection>>();
         }
 
@@ -47,7 +53,10 @@ namespace Knet.Kudu.Client.Connection
                 // Failed to negotiate a new connection.
                 RemoveFaultedConnection(serverInfo, skipTaskStatusCheck: false);
 
-                // The upper-level caller should handle the exception and retry using a new connection.
+                _logger.UnableToConnectToServer(serverInfo, ex);
+
+                // The upper-level caller should handle the exception and
+                // retry using a new connection.
                 throw new RecoverableException(
                     KuduStatus.IllegalState("Connection is disconnected."), ex);
             }

@@ -63,7 +63,7 @@ namespace Knet.Kudu.Client
             _loggerFactory = loggerFactory;
             _logger = loggerFactory.CreateLogger<KuduClient>();
             _connectionFactory = new KuduConnectionFactory(options, loggerFactory);
-            _connectionCache = new ConnectionCache(_connectionFactory);
+            _connectionCache = new ConnectionCache(_connectionFactory, loggerFactory);
             _tableLocations = new Dictionary<string, TableLocationsCache>();
             _requestTracker = new RequestTracker(Guid.NewGuid().ToString("N"));
             _authzTokenCache = new AuthzTokenCache();
@@ -328,6 +328,8 @@ namespace Knet.Kudu.Client
             return new ScanBuilder(this, table);
         }
 
+        public IKuduSession NewSession() => NewSession(new KuduSessionOptions());
+
         public IKuduSession NewSession(KuduSessionOptions options)
         {
             return new KuduSession(this, options, _loggerFactory);
@@ -561,6 +563,10 @@ namespace Knet.Kudu.Client
                 _masterCache = new ServerInfoCache(foundMasters, leaderIndex);
                 _hasConnectedToMaster = true;
             }
+            else
+            {
+                _logger.UnableToFindLeaderMaster();
+            }
 
             return foundLeader;
         }
@@ -587,18 +593,12 @@ namespace Knet.Kudu.Client
             responsePb = null;
 
             if (!task.IsCompletedSuccessfully())
-            {
-                _logger.ExceptionConnectingToMaster(task.Exception);
                 return false;
-            }
 
             ConnectToMasterResponse response = task.Result;
 
             if (response.ResponsePB.Error != null)
-            {
-                _logger.ConnectToMasterFailed(response.ResponsePB.Error);
                 return false;
-            }
 
             serverInfo = response.ServerInfo;
             responsePb = response.ResponsePB;

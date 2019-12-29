@@ -36,7 +36,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 .SetTableName("MultipleLeaderFailoverTest");
 
             var table = await client.CreateTableAsync(builder);
-            await using var session = client.NewSession(new KuduSessionOptions());
+            await using var session = client.NewSession();
 
             for (int i = 0; i < rowsPerIteration; i++)
             {
