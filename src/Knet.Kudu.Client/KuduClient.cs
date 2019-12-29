@@ -125,15 +125,16 @@ namespace Knet.Kudu.Client
             }
         }
 
-        public async Task<KuduTable> CreateTableAsync(TableBuilder table)
+        public async Task<KuduTable> CreateTableAsync(
+            TableBuilder table, CancellationToken cancellationToken = default)
         {
             var rpc = new CreateTableRequest(table.Build());
-            var response = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
+            var response = await SendRpcToMasterAsync(rpc, cancellationToken).ConfigureAwait(false);
 
-            await WaitForTableDoneAsync(response.TableId).ConfigureAwait(false);
+            await WaitForTableDoneAsync(response.TableId, cancellationToken).ConfigureAwait(false);
 
             var tableIdentifier = new TableIdentifierPB { TableId = response.TableId };
-            return await OpenTableAsync(tableIdentifier).ConfigureAwait(false);
+            return await OpenTableAsync(tableIdentifier, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -143,7 +144,11 @@ namespace Knet.Kudu.Client
         /// <param name="modifyExternalCatalogs">
         /// Whether to apply the deletion to external catalogs, such as the Hive Metastore.
         /// </param>
-        public async Task DeleteTableAsync(string tableName, bool modifyExternalCatalogs = true)
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public async Task DeleteTableAsync(
+            string tableName,
+            bool modifyExternalCatalogs = true,
+            CancellationToken cancellationToken = default)
         {
             var request = new DeleteTableRequestPB
             {
@@ -153,13 +158,14 @@ namespace Knet.Kudu.Client
 
             var rpc = new DeleteTableRequest(request);
 
-            await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
+            await SendRpcToMasterAsync(rpc, cancellationToken).ConfigureAwait(false);
         }
 
-        public async Task<List<ListTablesResponsePB.TableInfo>> GetTablesAsync(string nameFilter = null)
+        public async Task<List<ListTablesResponsePB.TableInfo>> GetTablesAsync(
+            string nameFilter = null, CancellationToken cancellationToken = default)
         {
             var rpc = new ListTablesRequest(nameFilter);
-            var response = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
+            var response = await SendRpcToMasterAsync(rpc, cancellationToken).ConfigureAwait(false);
 
             return response.Tables;
         }
@@ -207,10 +213,12 @@ namespace Knet.Kudu.Client
             return tabletLocations;
         }
 
-        public async Task<KuduTable> OpenTableAsync(string tableName)
+        public async Task<KuduTable> OpenTableAsync(
+            string tableName, CancellationToken cancellationToken = default)
         {
             var tableIdentifier = new TableIdentifierPB { TableName = tableName };
-            var response = await GetTableSchemaAsync(tableIdentifier).ConfigureAwait(false);
+            var response = await GetTableSchemaAsync(tableIdentifier, cancellationToken)
+                .ConfigureAwait(false);
 
             return new KuduTable(response);
         }
@@ -321,19 +329,22 @@ namespace Knet.Kudu.Client
             return new KuduSession(this, options, _loggerFactory);
         }
 
-        private async Task<KuduTable> OpenTableAsync(TableIdentifierPB tableIdentifier)
+        private async Task<KuduTable> OpenTableAsync(
+            TableIdentifierPB tableIdentifier, CancellationToken cancellationToken = default)
         {
-            var response = await GetTableSchemaAsync(tableIdentifier).ConfigureAwait(false);
+            var response = await GetTableSchemaAsync(tableIdentifier, cancellationToken)
+                .ConfigureAwait(false);
 
             return new KuduTable(response);
         }
 
-        private async Task<GetTableSchemaResponsePB> GetTableSchemaAsync(TableIdentifierPB tableIdentifier)
+        private async Task<GetTableSchemaResponsePB> GetTableSchemaAsync(
+            TableIdentifierPB tableIdentifier, CancellationToken cancellationToken = default)
         {
             var request = new GetTableSchemaRequestPB { Table = tableIdentifier };
             var rpc = new GetTableSchemaRequest(request);
 
-            var schema = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
+            var schema = await SendRpcToMasterAsync(rpc, cancellationToken).ConfigureAwait(false);
 
             var authzToken = schema.AuthzToken;
             if (authzToken != null)
@@ -345,7 +356,8 @@ namespace Knet.Kudu.Client
             return schema;
         }
 
-        private async Task WaitForTableDoneAsync(byte[] tableId)
+        private async Task WaitForTableDoneAsync(
+            byte[] tableId, CancellationToken cancellationToken = default)
         {
             var request = new IsCreateTableDoneRequestPB
             {
@@ -356,12 +368,13 @@ namespace Knet.Kudu.Client
 
             while (true)
             {
-                var result = await SendRpcToMasterAsync(rpc).ConfigureAwait(false);
+                var result = await SendRpcToMasterAsync(rpc, cancellationToken)
+                    .ConfigureAwait(false);
 
                 if (result.Done)
                     break;
 
-                await Task.Delay(50).ConfigureAwait(false);
+                await Task.Delay(50, cancellationToken).ConfigureAwait(false);
                 // TODO: Increment rpc attempts.
             }
         }
