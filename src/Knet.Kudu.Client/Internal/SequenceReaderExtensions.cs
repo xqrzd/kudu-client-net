@@ -20,7 +20,7 @@ namespace Knet.Kudu.Client.Util
             return true;
         }
 
-        private static unsafe bool TryReadMultisegmentUtf8String(
+        private static bool TryReadMultisegmentUtf8String(
             ref SequenceReader<byte> reader, int length, out string value)
         {
             Debug.Assert(reader.UnreadSpan.Length < length);
