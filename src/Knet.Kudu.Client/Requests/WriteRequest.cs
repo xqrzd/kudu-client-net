@@ -16,6 +16,7 @@ namespace Knet.Kudu.Client.Requests
             TableId = tableId;
             PartitionKey = partitionKey;
             NeedsAuthzToken = true;
+            IsRequestTracked = true;
         }
 
         public override void Serialize(Stream stream)

@@ -41,7 +41,7 @@ namespace Knet.Kudu.Client.Requests
         /// </summary>
         public bool IsRequestTracked { get; protected set; }
 
-        internal long SequenceId { get; set; }
+        internal long SequenceId { get; set; } = RequestTracker.NoSeqNo;
 
         public virtual ReplicaSelection ReplicaSelection => ReplicaSelection.LeaderOnly;
 

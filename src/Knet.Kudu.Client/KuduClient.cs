@@ -620,7 +620,15 @@ namespace Knet.Kudu.Client
             using var cts = new CancellationTokenSource(_defaultOperationTimeoutMs);
             using var linkedCts = CreateLinkedCts(cts, cancellationToken);
 
-            return await SendRpcToMasterInternalAsync(rpc, linkedCts.Token).ConfigureAwait(false);
+            try
+            {
+                return await SendRpcToMasterInternalAsync(rpc, linkedCts.Token)
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                CompleteTrackedRpc(rpc);
+            }
         }
 
         public async Task<T> SendRpcToTabletAsync<T>(
@@ -629,7 +637,15 @@ namespace Knet.Kudu.Client
             using var cts = new CancellationTokenSource(_defaultOperationTimeoutMs);
             using var linkedCts = CreateLinkedCts(cts, cancellationToken);
 
-            return await SendRpcToTabletInternalAsync(rpc, linkedCts.Token).ConfigureAwait(false);
+            try
+            {
+                return await SendRpcToTabletInternalAsync(rpc, linkedCts.Token)
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                CompleteTrackedRpc(rpc);
+            }
         }
 
         private CancellationTokenSource CreateLinkedCts(
@@ -643,6 +659,21 @@ namespace Knet.Kudu.Client
             }
 
             return timeout;
+        }
+
+        private void CompleteTrackedRpc(KuduRpc rpc)
+        {
+            // If this is a "tracked RPC" unregister it, unless it never
+            // got to the point of being registered.
+            if (rpc.IsRequestTracked)
+            {
+                long sequenceId = rpc.SequenceId;
+
+                if (sequenceId != RequestTracker.NoSeqNo)
+                {
+                    _requestTracker.CompleteRpc(sequenceId);
+                }
+            }
         }
 
         private async Task<T> SendRpcToMasterInternalAsync<T>(
