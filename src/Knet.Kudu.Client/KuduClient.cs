@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -38,7 +39,7 @@ namespace Knet.Kudu.Client
         private readonly ILogger _logger;
         private readonly IKuduConnectionFactory _connectionFactory;
         private readonly ConnectionCache _connectionCache;
-        private readonly Dictionary<string, TableLocationsCache> _tableLocations;
+        private readonly ConcurrentDictionary<string, TableLocationsCache> _tableLocations;
         private readonly RequestTracker _requestTracker;
         private readonly AuthzTokenCache _authzTokenCache;
         private readonly int _defaultOperationTimeoutMs;
@@ -64,7 +65,7 @@ namespace Knet.Kudu.Client
             _logger = loggerFactory.CreateLogger<KuduClient>();
             _connectionFactory = new KuduConnectionFactory(options, loggerFactory);
             _connectionCache = new ConnectionCache(_connectionFactory, loggerFactory);
-            _tableLocations = new Dictionary<string, TableLocationsCache>();
+            _tableLocations = new ConcurrentDictionary<string, TableLocationsCache>();
             _requestTracker = new RequestTracker(Guid.NewGuid().ToString("N"));
             _authzTokenCache = new AuthzTokenCache();
             _defaultOperationTimeoutMs = (int)options.DefaultOperationTimeout.TotalMilliseconds;
@@ -429,18 +430,8 @@ namespace Knet.Kudu.Client
         /// <returns>The requested tablet, or null if the tablet doesn't exist.</returns>
         private RemoteTablet GetTabletFromCache(string tableId, ReadOnlySpan<byte> partitionKey)
         {
-            TableLocationsCache tableCache;
-
-            lock (_tableLocations)
-            {
-                if (!_tableLocations.TryGetValue(tableId, out tableCache))
-                {
-                    // We don't have any tablets cached for this table.
-                    return null;
-                }
-            }
-
-            return tableCache.FindTablet(partitionKey);
+            TableLocationsCache cache = GetTableLocationsCache(tableId);
+            return cache.FindTablet(partitionKey);
         }
 
         /// <summary>
@@ -474,31 +465,19 @@ namespace Knet.Kudu.Client
         /// <param name="partitionKey">The partition key used to locate the given tablets.</param>
         private void CacheTablets(string tableId, List<RemoteTablet> tablets, ReadOnlySpan<byte> partitionKey)
         {
-            TableLocationsCache cache;
-
-            lock (_tableLocations)
-            {
-                if (!_tableLocations.TryGetValue(tableId, out cache))
-                {
-                    cache = new TableLocationsCache();
-                    _tableLocations.Add(tableId, cache);
-                }
-            }
-
+            TableLocationsCache cache = GetTableLocationsCache(tableId);
             cache.CacheTabletLocations(tablets, partitionKey);
         }
 
         private void RemoveTabletFromCache(RemoteTablet tablet)
         {
-            TableLocationsCache cache;
-
-            lock (_tableLocations)
-            {
-                if (!_tableLocations.TryGetValue(tablet.TableId, out cache))
-                    return;
-            }
-
+            TableLocationsCache cache = GetTableLocationsCache(tablet.TableId);
             cache.RemoveTablet(tablet.Partition.PartitionKeyStart);
+        }
+
+        private TableLocationsCache GetTableLocationsCache(string tableId)
+        {
+            return _tableLocations.GetOrAdd(tableId, key => new TableLocationsCache());
         }
 
         private async Task<bool> ConnectToClusterAsync(CancellationToken cancellationToken)
