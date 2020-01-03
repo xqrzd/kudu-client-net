@@ -12,6 +12,18 @@ namespace Knet.Kudu.Client.Util
             return hashAlgo.ComputeHash(certificate.RawData);
         }
 
+        public static Guid NewGuid()
+        {
+            using var rng = RandomNumberGenerator.Create();
+#if NETSTANDARD2_0
+            var buffer = new byte[16];
+#else
+            Span<byte> buffer = stackalloc byte[16];
+#endif
+            rng.GetBytes(buffer);
+            return new Guid(buffer);
+        }
+
         private static HashAlgorithm GetHashForChannelBinding(X509Certificate2 cert)
         {
             // https://github.com/dotnet/runtime/blob/master/src/libraries/System.Net.Security/src/System/Net/Security/Pal.Managed/EndpointChannelBindingToken.cs

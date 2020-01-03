@@ -66,7 +66,7 @@ namespace Knet.Kudu.Client
             _connectionFactory = new KuduConnectionFactory(options, loggerFactory);
             _connectionCache = new ConnectionCache(_connectionFactory, loggerFactory);
             _tableLocations = new ConcurrentDictionary<string, TableLocationsCache>();
-            _requestTracker = new RequestTracker(Guid.NewGuid().ToString("N"));
+            _requestTracker = new RequestTracker(SecurityUtil.NewGuid().ToString("N"));
             _authzTokenCache = new AuthzTokenCache();
             _defaultOperationTimeoutMs = (int)options.DefaultOperationTimeout.TotalMilliseconds;
         }
