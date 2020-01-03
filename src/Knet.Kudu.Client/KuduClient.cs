@@ -309,19 +309,17 @@ namespace Knet.Kudu.Client
                 ExternalConsistencyMode = (ExternalConsistencyModePB)externalConsistencyMode
             };
 
-            long lastPropagatedTimestamp = LastPropagatedTimestamp;
-            if (lastPropagatedTimestamp != NoTimestamp)
-            {
-                // TODO: This could be different from the one set by SendRpcToTabletAsync()
-                request.PropagatedTimestamp = (ulong)lastPropagatedTimestamp;
-            }
-
             var rpc = new WriteRequest(
                 request,
                 table.TableId,
                 tablet.Partition.PartitionKeyStart);
 
-            return await SendRpcToTabletAsync(rpc, cancellationToken).ConfigureAwait(false);
+            var response = await SendRpcToTabletAsync(rpc, cancellationToken)
+                .ConfigureAwait(false);
+
+            LastPropagatedTimestamp = (long)response.Timestamp;
+
+            return response;
         }
 
         public ScanBuilder NewScanBuilder(KuduTable table)
@@ -662,15 +660,6 @@ namespace Knet.Kudu.Client
 
             rpc.Attempt++;
 
-            // Set the propagated timestamp so that the next time we send a message to
-            // the server the message includes the last propagated timestamp.
-            long lastPropagatedTs = LastPropagatedTimestamp;
-            if (rpc.ExternalConsistencyMode == ExternalConsistencyMode.ClientPropagated &&
-                lastPropagatedTs != NoTimestamp)
-            {
-                rpc.PropagatedTimestamp = lastPropagatedTs;
-            }
-
             ServerInfo serverInfo = GetMasterServerInfo(rpc.ReplicaSelection);
             if (serverInfo != null)
             {
@@ -706,11 +695,11 @@ namespace Knet.Kudu.Client
 
             // Set the propagated timestamp so that the next time we send a message to
             // the server the message includes the last propagated timestamp.
-            long lastPropagatedTs = LastPropagatedTimestamp;
+            long lastPropagatedTimestamp = LastPropagatedTimestamp;
             if (rpc.ExternalConsistencyMode == ExternalConsistencyMode.ClientPropagated &&
-                lastPropagatedTs != NoTimestamp)
+                lastPropagatedTimestamp != NoTimestamp)
             {
-                rpc.PropagatedTimestamp = lastPropagatedTs;
+                rpc.PropagatedTimestamp = lastPropagatedTimestamp;
             }
 
             string tableId = rpc.TableId;

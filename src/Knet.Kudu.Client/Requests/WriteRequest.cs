@@ -24,6 +24,9 @@ namespace Knet.Kudu.Client.Requests
             if (AuthzToken != null)
                 _request.AuthzToken = AuthzToken;
 
+            if (PropagatedTimestamp != KuduClient.NoTimestamp)
+                _request.PropagatedTimestamp = (ulong)PropagatedTimestamp;
+
             Serialize(stream, _request);
         }
 
