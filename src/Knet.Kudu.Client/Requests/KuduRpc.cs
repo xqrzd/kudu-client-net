@@ -21,8 +21,6 @@ namespace Knet.Kudu.Client.Requests
 
         public abstract string MethodName { get; }
 
-        public long PropagatedTimestamp { get; set; } = -1;
-
         /// <summary>
         /// The external consistency mode for this RPC.
         /// TODO make this cover most if not all RPCs (right now only scans and writes use this).
@@ -96,6 +94,8 @@ namespace Knet.Kudu.Client.Requests
     public abstract class KuduTabletRpc<T> : KuduRpc<T>
     {
         public override string ServiceName => TabletServerServiceName;
+
+        public long PropagatedTimestamp { get; set; } = -1;
 
         /// <summary>
         /// Returns the partition key this RPC is for, or null if

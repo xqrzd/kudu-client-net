@@ -534,6 +534,10 @@ namespace Knet.Kudu.Client
                     {
                         newRequest.AuthzToken = AuthzToken;
                     }
+                    if (PropagatedTimestamp != KuduClient.NoTimestamp)
+                    {
+                        newRequest.PropagatedTimestamp = (ulong)PropagatedTimestamp;
+                    }
                     request.BatchSizeBytes = (uint)_scanner._batchSizeBytes;
                 }
                 else if (_state == State.Next)
