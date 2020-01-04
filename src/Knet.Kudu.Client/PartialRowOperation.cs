@@ -14,12 +14,24 @@ namespace Knet.Kudu.Client
 
         internal int RowSizeWithOperation => RowSize + 1;
 
-        public void WriteToWithOperation(Span<byte> buffer, Span<byte> indirectData)
+        public void WriteToWithOperation(
+            Span<byte> rowDestination,
+            Span<byte> indirectDestination,
+            int indirectDataStart,
+            out int rowBytesWritten,
+            out int indirectBytesWritten)
         {
-            buffer[0] = (byte)_operation;
-            buffer = buffer.Slice(1);
+            rowDestination[0] = (byte)_operation;
+            rowDestination = rowDestination.Slice(1);
 
-            WriteTo(buffer, indirectData);
+            WriteTo(
+                rowDestination,
+                indirectDestination,
+                indirectDataStart,
+                out rowBytesWritten,
+                out indirectBytesWritten);
+
+            rowBytesWritten += 1;
         }
     }
 }

@@ -1,5 +1,5 @@
-﻿using System.Collections.Generic;
-using Knet.Kudu.Client.Internal;
+﻿using System;
+using System.Collections.Generic;
 
 namespace Knet.Kudu.Client
 {
@@ -16,20 +16,45 @@ namespace Knet.Kudu.Client
 
     public static class OperationsEncoder
     {
-        public static void Encode(
-            List<KuduOperation> operations,
-            BufferWriter rowAllocWriter,
-            BufferWriter indirectDataWriter)
+        public static void ComputeSize<T>(
+            List<T> operations,
+            out int rowSize,
+            out int indirectSize) where T : PartialRowOperation
         {
+            int rSize = 0;
+            int iSize = 0;
+
             foreach (var row in operations)
             {
-                var rowSpan = rowAllocWriter.GetSpan(row.RowSizeWithOperation);
-                var indirectSpan = indirectDataWriter.GetSpan(row.IndirectDataSize);
+                // TODO: Combine these 2 calls into one method.
+                rSize += row.RowSizeWithOperation;
+                iSize += row.IndirectDataSize;
+            }
 
-                row.WriteToWithOperation(rowSpan, indirectSpan);
+            rowSize = rSize;
+            indirectSize = iSize;
+        }
 
-                rowAllocWriter.Advance(rowSpan.Length);
-                indirectDataWriter.Advance(indirectSpan.Length);
+        public static void Encode<T>(
+            List<T> operations,
+            Span<byte> rowDestination,
+            Span<byte> indirectDestination) where T : PartialRowOperation
+        {
+            int indirectDataOffset = 0;
+
+            foreach (var row in operations)
+            {
+                row.WriteToWithOperation(
+                    rowDestination,
+                    indirectDestination,
+                    indirectDataOffset,
+                    out int rowBytesWritten,
+                    out int indirectBytesWritten);
+
+                rowDestination = rowDestination.Slice(rowBytesWritten);
+                indirectDestination = indirectDestination.Slice(indirectBytesWritten);
+
+                indirectDataOffset += indirectBytesWritten;
             }
         }
     }

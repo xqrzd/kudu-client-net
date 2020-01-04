@@ -280,20 +280,15 @@ namespace Knet.Kudu.Client
         {
             var table = operations[0].Table;
 
-            byte[] rowData;
-            byte[] indirectData;
+            OperationsEncoder.ComputeSize(
+                operations,
+                out int rowSize,
+                out int indirectSize);
 
-            // TODO: Estimate better sizes for these.
-            using (var rowBuffer = new BufferWriter(1024))
-            using (var indirectBuffer = new BufferWriter(1024))
-            {
-                OperationsEncoder.Encode(operations, rowBuffer, indirectBuffer);
+            var rowData = new byte[rowSize];
+            var indirectData = new byte[indirectSize];
 
-                // protobuf-net doesn't support serializing Memory<byte>,
-                // so we need to copy these into an array.
-                rowData = rowBuffer.Memory.ToArray();
-                indirectData = indirectBuffer.Memory.ToArray();
-            }
+            OperationsEncoder.Encode(operations, rowData, indirectData);
 
             var rowOperations = new RowOperationsPB
             {

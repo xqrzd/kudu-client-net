@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Protocol.Master;
 
@@ -106,22 +105,20 @@ namespace Knet.Kudu.Client.Builder
 
         public CreateTableRequestPB Build()
         {
-            using (var rowAllocWriter = new BufferWriter(256))
-            using (var indirectDataWriter = new BufferWriter(256))
+            if (_ranges.Count > 0)
             {
-                foreach (var row in _ranges)
-                {
-                    var rowSpan = rowAllocWriter.GetSpan(row.RowSizeWithOperation);
-                    var indirectSpan = indirectDataWriter.GetSpan(row.IndirectDataSize);
+                OperationsEncoder.ComputeSize(
+                    _ranges,
+                    out int rowSize,
+                    out int indirectSize);
 
-                    row.WriteToWithOperation(rowSpan, indirectSpan);
+                var rowData = new byte[rowSize];
+                var indirectData = new byte[indirectSize];
 
-                    rowAllocWriter.Advance(rowSpan.Length);
-                    indirectDataWriter.Advance(indirectSpan.Length);
-                }
+                OperationsEncoder.Encode(_ranges, rowData, indirectData);
 
-                CreateTableRequest.SplitRowsRangeBounds.Rows = rowAllocWriter.Memory.ToArray();
-                CreateTableRequest.SplitRowsRangeBounds.IndirectData = indirectDataWriter.Memory.ToArray();
+                CreateTableRequest.SplitRowsRangeBounds.Rows = rowData;
+                CreateTableRequest.SplitRowsRangeBounds.IndirectData = indirectData;
             }
 
             return CreateTableRequest;

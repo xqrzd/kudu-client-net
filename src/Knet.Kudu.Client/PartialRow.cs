@@ -53,6 +53,7 @@ namespace Knet.Kudu.Client
 
         internal int IndirectDataSize
         {
+            // TODO: Fix this, we should be checking IsSet().
             get
             {
                 int length = 0;
@@ -73,7 +74,12 @@ namespace Knet.Kudu.Client
         // TODO:
         //public int PrimaryKeySize { get; private set; }
 
-        public void WriteTo(Span<byte> buffer, Span<byte> indirectData)
+        public void WriteTo(
+            Span<byte> rowDestination,
+            Span<byte> indirectDestination,
+            int indirectDataStart,
+            out int rowBytesWritten,
+            out int indirectBytesWritten)
         {
             var schema = Schema;
             ReadOnlySpan<byte> rowAlloc = _rowAlloc;
@@ -81,14 +87,17 @@ namespace Knet.Kudu.Client
             // Write the header. This includes,
             // - Column set bitmap
             // - Nullset bitmap
-            rowAlloc.Slice(0, _headerSize).CopyTo(buffer);
+            rowAlloc.Slice(0, _headerSize).CopyTo(rowDestination);
 
             // Advance buffers.
             rowAlloc = rowAlloc.Slice(_headerSize);
-            buffer = buffer.Slice(_headerSize);
+            rowDestination = rowDestination.Slice(_headerSize);
+            rowBytesWritten = _headerSize;
 
-            int varLengthOffset = 0;
+            int varLengthOffset = indirectDataStart;
             int numColumns = schema.Columns.Count;
+
+            indirectBytesWritten = 0;
 
             for (int i = 0; i < numColumns; i++)
             {
@@ -101,23 +110,25 @@ namespace Knet.Kudu.Client
                     if (type == KuduType.String || type == KuduType.Binary)
                     {
                         var data = GetVarLengthColumn(i);
-                        data.CopyTo(indirectData);
-                        BinaryPrimitives.WriteInt64LittleEndian(buffer, varLengthOffset);
-                        BinaryPrimitives.WriteInt64LittleEndian(buffer.Slice(8), data.Length);
+                        data.CopyTo(indirectDestination);
+                        BinaryPrimitives.WriteInt64LittleEndian(rowDestination, varLengthOffset);
+                        BinaryPrimitives.WriteInt64LittleEndian(rowDestination.Slice(8), data.Length);
 
-                        indirectData = indirectData.Slice(data.Length);
+                        indirectDestination = indirectDestination.Slice(data.Length);
                         varLengthOffset += data.Length;
+                        indirectBytesWritten += data.Length;
                     }
                     else
                     {
                         var data = rowAlloc.Slice(0, size);
-                        data.CopyTo(buffer);
+                        data.CopyTo(rowDestination);
 
                         rowAlloc = rowAlloc.Slice(size);
                     }
 
                     // Advance RowAlloc buffer only if we wrote that column.
-                    buffer = buffer.Slice(size);
+                    rowDestination = rowDestination.Slice(size);
+                    rowBytesWritten += size;
                 }
             }
         }
