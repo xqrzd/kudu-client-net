@@ -75,6 +75,7 @@ namespace Knet.Kudu.Client
 
         public void WriteTo(Span<byte> buffer, Span<byte> indirectData)
         {
+            var schema = Schema;
             ReadOnlySpan<byte> rowAlloc = _rowAlloc;
 
             // Write the header. This includes,
@@ -87,12 +88,13 @@ namespace Knet.Kudu.Client
             buffer = buffer.Slice(_headerSize);
 
             int varLengthOffset = 0;
+            int numColumns = schema.Columns.Count;
 
-            for (int i = 0; i < Schema.Columns.Count; i++)
+            for (int i = 0; i < numColumns; i++)
             {
                 if (IsSet(i) && !IsSetToNull(i))
                 {
-                    var column = Schema.GetColumn(i);
+                    var column = schema.GetColumn(i);
                     var size = column.Size;
                     var type = column.Type;
 
