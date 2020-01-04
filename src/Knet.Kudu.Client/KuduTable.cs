@@ -25,18 +25,17 @@ namespace Knet.Kudu.Client
 
         public string TableName => SchemaPb.TableName;
 
-        public Operation NewInsert() => NewOperation(RowOperation.Insert);
+        public KuduOperation NewInsert() => NewOperation(RowOperation.Insert);
 
-        public Operation NewUpdate() => NewOperation(RowOperation.Update);
+        public KuduOperation NewUpdate() => NewOperation(RowOperation.Update);
 
-        public Operation NewUpsert() => NewOperation(RowOperation.Upsert);
+        public KuduOperation NewUpsert() => NewOperation(RowOperation.Upsert);
 
-        public Operation NewDelete() => NewOperation(RowOperation.Delete);
+        public KuduOperation NewDelete() => NewOperation(RowOperation.Delete);
 
-        private Operation NewOperation(RowOperation rowOperation)
+        private KuduOperation NewOperation(RowOperation rowOperation)
         {
-            var row = new PartialRow(Schema, rowOperation);
-            return new Operation(this, row);
+            return new KuduOperation(this, rowOperation);
         }
     }
 }

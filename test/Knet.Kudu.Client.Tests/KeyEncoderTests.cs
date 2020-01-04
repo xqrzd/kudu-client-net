@@ -43,7 +43,7 @@ namespace Knet.Kudu.Client.Tests
                 },
                 schema);
 
-            var rowA = new PartialRow(schema, RowOperation.Insert);
+            var rowA = new PartialRow(schema);
             rowA.SetInt32(0, 0);
             rowA.SetString(1, "");
             rowA.SetString(2, "");

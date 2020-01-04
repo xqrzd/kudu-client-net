@@ -3,35 +3,30 @@ using Knet.Kudu.Client.Internal;
 
 namespace Knet.Kudu.Client
 {
-    public readonly struct Operation
+    public class KuduOperation : PartialRowOperation
     {
         public KuduTable Table { get; }
 
-        public PartialRow Row { get; }
-
-        // TODO: Should this store RowOperation instead of PartialRow?
-
-        public Operation(KuduTable table, PartialRow row)
+        public KuduOperation(KuduTable table, RowOperation operation)
+            : base(table.Schema, operation)
         {
             Table = table;
-            Row = row;
         }
     }
 
     public static class OperationsEncoder
     {
         public static void Encode(
-            List<Operation> operations,
+            List<KuduOperation> operations,
             BufferWriter rowAllocWriter,
             BufferWriter indirectDataWriter)
         {
-            foreach (var operation in operations)
+            foreach (var row in operations)
             {
-                var row = operation.Row;
-                var rowSpan = rowAllocWriter.GetSpan(row.RowSize);
+                var rowSpan = rowAllocWriter.GetSpan(row.RowSizeWithOperation);
                 var indirectSpan = indirectDataWriter.GetSpan(row.IndirectDataSize);
 
-                row.WriteTo(rowSpan, indirectSpan);
+                row.WriteToWithOperation(rowSpan, indirectSpan);
 
                 rowAllocWriter.Advance(rowSpan.Length);
                 indirectDataWriter.Advance(indirectSpan.Length);

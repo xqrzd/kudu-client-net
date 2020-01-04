@@ -6,7 +6,7 @@ namespace Knet.Kudu.Client
 {
     public interface IKuduSession : IAsyncDisposable
     {
-        ValueTask EnqueueAsync(Operation operation, CancellationToken cancellationToken = default);
+        ValueTask EnqueueAsync(KuduOperation operation, CancellationToken cancellationToken = default);
 
         Task FlushAsync(CancellationToken cancellationToken = default);
     }

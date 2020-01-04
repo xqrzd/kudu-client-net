@@ -225,11 +225,11 @@ namespace Knet.Kudu.Client
         }
 
         public async Task<WriteResponsePB[]> WriteAsync(
-            IEnumerable<Operation> operations,
+            IEnumerable<KuduOperation> operations,
             ExternalConsistencyMode externalConsistencyMode = ExternalConsistencyMode.ClientPropagated,
             CancellationToken cancellationToken = default)
         {
-            var operationsByTablet = new Dictionary<RemoteTablet, List<Operation>>();
+            var operationsByTablet = new Dictionary<RemoteTablet, List<KuduOperation>>();
 
             foreach (var operation in operations)
             {
@@ -240,7 +240,7 @@ namespace Knet.Kudu.Client
                 {
                     if (!operationsByTablet.TryGetValue(tablet, out var tabletOperations))
                     {
-                        tabletOperations = new List<Operation>();
+                        tabletOperations = new List<KuduOperation>();
                         operationsByTablet.Add(tablet, tabletOperations);
                     }
 
@@ -273,7 +273,7 @@ namespace Knet.Kudu.Client
         }
 
         private async Task<WriteResponsePB> WriteAsync(
-            List<Operation> operations,
+            List<KuduOperation> operations,
             RemoteTablet tablet,
             ExternalConsistencyMode externalConsistencyMode,
             CancellationToken cancellationToken = default)
@@ -385,13 +385,12 @@ namespace Knet.Kudu.Client
         }
 
         internal ValueTask<RemoteTablet> GetRowTabletAsync(
-            Operation operation, CancellationToken cancellationToken = default)
+            KuduOperation operation, CancellationToken cancellationToken = default)
         {
             var table = operation.Table;
-            var row = operation.Row;
 
             using var writer = new BufferWriter(256);
-            KeyEncoder.EncodePartitionKey(row, table.PartitionSchema, writer);
+            KeyEncoder.EncodePartitionKey(operation, table.PartitionSchema, writer);
             var partitionKey = writer.Memory.Span;
 
             // Note that we don't have to await this method before disposing the writer, as a

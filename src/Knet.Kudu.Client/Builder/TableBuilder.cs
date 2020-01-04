@@ -9,7 +9,7 @@ namespace Knet.Kudu.Client.Builder
 {
     public class TableBuilder
     {
-        private readonly List<PartialRow> _ranges;
+        private readonly List<PartialRowOperation> _ranges;
 
         internal CreateTableRequestPB CreateTableRequest;
 
@@ -25,7 +25,7 @@ namespace Knet.Kudu.Client.Builder
                 SplitRowsRangeBounds = new RowOperationsPB()
             };
 
-            _ranges = new List<PartialRow>();
+            _ranges = new List<PartialRowOperation>();
         }
 
         public TableBuilder SetTableName(string name)
@@ -85,7 +85,7 @@ namespace Knet.Kudu.Client.Builder
             return this;
         }
 
-        public TableBuilder AddRangePartition(Action<PartialRow, PartialRow> action)
+        public TableBuilder AddRangePartition(Action<PartialRowOperation, PartialRowOperation> action)
         {
             // TODO: Rework this
             var columns = CreateTableRequest.Schema.Columns
@@ -93,8 +93,8 @@ namespace Knet.Kudu.Client.Builder
                 .ToList();
 
             var schema = new Schema(columns);
-            var lowerBoundRow = new PartialRow(schema, RowOperation.RangeLowerBound);
-            var upperBoundRow = new PartialRow(schema, RowOperation.RangeUpperBound);
+            var lowerBoundRow = new PartialRowOperation(schema, RowOperation.RangeLowerBound);
+            var upperBoundRow = new PartialRowOperation(schema, RowOperation.RangeUpperBound);
 
             action(lowerBoundRow, upperBoundRow);
 
@@ -111,10 +111,10 @@ namespace Knet.Kudu.Client.Builder
             {
                 foreach (var row in _ranges)
                 {
-                    var rowSpan = rowAllocWriter.GetSpan(row.RowSize);
+                    var rowSpan = rowAllocWriter.GetSpan(row.RowSizeWithOperation);
                     var indirectSpan = indirectDataWriter.GetSpan(row.IndirectDataSize);
 
-                    row.WriteTo(rowSpan, indirectSpan);
+                    row.WriteToWithOperation(rowSpan, indirectSpan);
 
                     rowAllocWriter.Advance(rowSpan.Length);
                     indirectDataWriter.Advance(indirectSpan.Length);

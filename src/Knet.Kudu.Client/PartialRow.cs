@@ -14,10 +14,7 @@ namespace Knet.Kudu.Client
 
         private readonly byte[][] _varLengthData;
 
-        // TODO: Move this to Operation.
-        private readonly RowOperation? _rowOperation;
-
-        public PartialRow(Schema schema, RowOperation? rowOperation = null)
+        public PartialRow(Schema schema)
         {
             Schema = schema;
 
@@ -35,7 +32,6 @@ namespace Knet.Kudu.Client
 
             _headerSize = headerSize;
             _varLengthData = new byte[schema.VarLengthColumnCount][];
-            _rowOperation = rowOperation;
         }
 
         /// <summary>
@@ -51,10 +47,9 @@ namespace Knet.Kudu.Client
             _varLengthData = new byte[row._varLengthData.Length][];
             for (int i = 0; i < _varLengthData.Length; i++)
                 _varLengthData[i] = CloneArray(row._varLengthData[i]);
-            _rowOperation = row._rowOperation;
         }
 
-        internal int RowSize => GetRowSize() + 1; // TODO: Remove this as part of RowOperation.
+        internal int RowSize => GetRowSize();
 
         internal int IndirectDataSize
         {
@@ -83,15 +78,8 @@ namespace Knet.Kudu.Client
             ReadOnlySpan<byte> rowAlloc = _rowAlloc;
 
             // Write the header. This includes,
-            // 1) Row operation
-            // 2) Column set bitmap
-            // 3) Nullset bitmap
-            if (_rowOperation.HasValue)
-            {
-                buffer[0] = (byte)_rowOperation.Value;
-                buffer = buffer.Slice(1);
-            }
-
+            // - Column set bitmap
+            // - Nullset bitmap
             rowAlloc.Slice(0, _headerSize).CopyTo(buffer);
 
             // Advance buffers.
