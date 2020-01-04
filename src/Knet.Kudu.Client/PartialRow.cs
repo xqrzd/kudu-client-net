@@ -49,28 +49,6 @@ namespace Knet.Kudu.Client
                 _varLengthData[i] = CloneArray(row._varLengthData[i]);
         }
 
-        internal int RowSize => GetRowSize();
-
-        internal int IndirectDataSize
-        {
-            // TODO: Fix this, we should be checking IsSet().
-            get
-            {
-                int length = 0;
-                var varLengthData = _varLengthData;
-
-                for (int i = 0; i < varLengthData.Length; i++)
-                {
-                    var buffer = varLengthData[0];
-
-                    if (buffer != null)
-                        length += buffer.Length;
-                }
-
-                return length;
-            }
-        }
-
         // TODO:
         //public int PrimaryKeySize { get; private set; }
 
@@ -740,6 +718,33 @@ namespace Knet.Kudu.Client
             }
         }
 
+        internal void CalculateSize(out int rowSize, out int indirectSize)
+        {
+            var schema = Schema;
+            var numColumns = schema.Columns.Count;
+            var localRowSize = _headerSize;
+            var localIndirectSize = 0;
+
+            for (int i = 0; i < numColumns; i++)
+            {
+                if (IsSet(i) && !IsSetToNull(i))
+                {
+                    var column = schema.GetColumn(i);
+                    localRowSize += column.Size;
+
+                    if (!column.IsFixedSize)
+                    {
+                        int varLenColumnIndex = Schema.GetColumnOffset(i);
+                        var data = _varLengthData[varLenColumnIndex];
+                        localIndirectSize += data.Length;
+                    }
+                }
+            }
+
+            rowSize = localRowSize;
+            indirectSize = localIndirectSize;
+        }
+
         private void CheckColumn(int columnIndex, KuduType type)
         {
             ColumnSchema column = Schema.GetColumn(columnIndex);
@@ -796,22 +801,6 @@ namespace Knet.Kudu.Client
         {
             var varLenColumnIndex = Schema.GetColumnOffset(columnIndex);
             return _varLengthData[varLenColumnIndex];
-        }
-
-        private int GetRowSize()
-        {
-            var size = _headerSize;
-
-            for (int i = 0; i < Schema.Columns.Count; i++)
-            {
-                if (IsSet(i) && !IsSetToNull(i))
-                {
-                    var column = Schema.GetColumn(i);
-                    size += column.Size;
-                }
-            }
-
-            return size;
         }
 
         private void BitmapSet(int offset, int index)

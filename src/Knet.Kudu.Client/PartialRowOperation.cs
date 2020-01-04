@@ -12,8 +12,6 @@ namespace Knet.Kudu.Client
             _operation = operation;
         }
 
-        internal int RowSizeWithOperation => RowSize + 1;
-
         public void WriteToWithOperation(
             Span<byte> rowDestination,
             Span<byte> indirectDestination,

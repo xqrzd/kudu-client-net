@@ -21,18 +21,18 @@ namespace Knet.Kudu.Client
             out int rowSize,
             out int indirectSize) where T : PartialRowOperation
         {
-            int rSize = 0;
-            int iSize = 0;
+            int localRowSize = 0;
+            int localIndirectSize = 0;
 
             foreach (var row in operations)
             {
-                // TODO: Combine these 2 calls into one method.
-                rSize += row.RowSizeWithOperation;
-                iSize += row.IndirectDataSize;
+                row.CalculateSize(out int rSize, out int iSize);
+                localRowSize += rSize + 1; // Add 1 for RowOperation.
+                localIndirectSize += iSize;
             }
 
-            rowSize = rSize;
-            indirectSize = iSize;
+            rowSize = localRowSize;
+            indirectSize = localIndirectSize;
         }
 
         public static void Encode<T>(
