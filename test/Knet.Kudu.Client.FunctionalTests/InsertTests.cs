@@ -45,12 +45,11 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(tableName, table.TableName);
             Assert.Equal(1, table.NumReplicas);
 
-            var insert = table.NewInsert();
-            var row = insert.Row;
+            var row = table.NewInsert();
             row.SetInt32(0, 7);
             row.SetString(1, "test value");
 
-            var results = await client.WriteAsync(new[] { insert });
+            var results = await client.WriteAsync(new[] { row });
             Assert.Collection(results, r =>
             {
                 Assert.Empty(r.PerRowErrors);

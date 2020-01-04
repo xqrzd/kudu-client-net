@@ -14,10 +14,7 @@ namespace Knet.Kudu.Client
 
         private readonly byte[][] _varLengthData;
 
-        // TODO: Move this to Operation.
-        private readonly RowOperation? _rowOperation;
-
-        public PartialRow(Schema schema, RowOperation? rowOperation = null)
+        public PartialRow(Schema schema)
         {
             Schema = schema;
 
@@ -35,7 +32,6 @@ namespace Knet.Kudu.Client
 
             _headerSize = headerSize;
             _varLengthData = new byte[schema.VarLengthColumnCount][];
-            _rowOperation = rowOperation;
         }
 
         /// <summary>
@@ -51,83 +47,66 @@ namespace Knet.Kudu.Client
             _varLengthData = new byte[row._varLengthData.Length][];
             for (int i = 0; i < _varLengthData.Length; i++)
                 _varLengthData[i] = CloneArray(row._varLengthData[i]);
-            _rowOperation = row._rowOperation;
-        }
-
-        internal int RowSize => GetRowSize() + 1; // TODO: Remove this as part of RowOperation.
-
-        internal int IndirectDataSize
-        {
-            get
-            {
-                int length = 0;
-                var varLengthData = _varLengthData;
-
-                for (int i = 0; i < varLengthData.Length; i++)
-                {
-                    var buffer = varLengthData[0];
-
-                    if (buffer != null)
-                        length += buffer.Length;
-                }
-
-                return length;
-            }
         }
 
         // TODO:
         //public int PrimaryKeySize { get; private set; }
 
-        public void WriteTo(Span<byte> buffer, Span<byte> indirectData)
+        public void WriteTo(
+            Span<byte> rowDestination,
+            Span<byte> indirectDestination,
+            int indirectDataStart,
+            out int rowBytesWritten,
+            out int indirectBytesWritten)
         {
+            var schema = Schema;
             ReadOnlySpan<byte> rowAlloc = _rowAlloc;
 
             // Write the header. This includes,
-            // 1) Row operation
-            // 2) Column set bitmap
-            // 3) Nullset bitmap
-            if (_rowOperation.HasValue)
-            {
-                buffer[0] = (byte)_rowOperation.Value;
-                buffer = buffer.Slice(1);
-            }
-
-            rowAlloc.Slice(0, _headerSize).CopyTo(buffer);
+            // - Column set bitmap
+            // - Nullset bitmap
+            rowAlloc.Slice(0, _headerSize).CopyTo(rowDestination);
 
             // Advance buffers.
             rowAlloc = rowAlloc.Slice(_headerSize);
-            buffer = buffer.Slice(_headerSize);
+            rowDestination = rowDestination.Slice(_headerSize);
+            rowBytesWritten = _headerSize;
 
-            int varLengthOffset = 0;
+            int varLengthOffset = indirectDataStart;
+            int numColumns = schema.Columns.Count;
 
-            for (int i = 0; i < Schema.Columns.Count; i++)
+            indirectBytesWritten = 0;
+
+            for (int i = 0; i < numColumns; i++)
             {
                 if (IsSet(i) && !IsSetToNull(i))
                 {
-                    var column = Schema.GetColumn(i);
+                    var column = schema.GetColumn(i);
                     var size = column.Size;
                     var type = column.Type;
 
                     if (type == KuduType.String || type == KuduType.Binary)
                     {
                         var data = GetVarLengthColumn(i);
-                        data.CopyTo(indirectData);
-                        BinaryPrimitives.WriteInt64LittleEndian(buffer, varLengthOffset);
-                        BinaryPrimitives.WriteInt64LittleEndian(buffer.Slice(8), data.Length);
+                        data.CopyTo(indirectDestination);
+                        BinaryPrimitives.WriteInt64LittleEndian(rowDestination, varLengthOffset);
+                        BinaryPrimitives.WriteInt64LittleEndian(rowDestination.Slice(8), data.Length);
 
-                        indirectData = indirectData.Slice(data.Length);
+                        indirectDestination = indirectDestination.Slice(data.Length);
                         varLengthOffset += data.Length;
+                        indirectBytesWritten += data.Length;
                     }
                     else
                     {
                         var data = rowAlloc.Slice(0, size);
-                        data.CopyTo(buffer);
+                        data.CopyTo(rowDestination);
 
                         rowAlloc = rowAlloc.Slice(size);
                     }
 
                     // Advance RowAlloc buffer only if we wrote that column.
-                    buffer = buffer.Slice(size);
+                    rowDestination = rowDestination.Slice(size);
+                    rowBytesWritten += size;
                 }
             }
         }
@@ -739,6 +718,33 @@ namespace Knet.Kudu.Client
             }
         }
 
+        internal void CalculateSize(out int rowSize, out int indirectSize)
+        {
+            var schema = Schema;
+            var numColumns = schema.Columns.Count;
+            var localRowSize = _headerSize;
+            var localIndirectSize = 0;
+
+            for (int i = 0; i < numColumns; i++)
+            {
+                if (IsSet(i) && !IsSetToNull(i))
+                {
+                    var column = schema.GetColumn(i);
+                    localRowSize += column.Size;
+
+                    if (!column.IsFixedSize)
+                    {
+                        int varLenColumnIndex = Schema.GetColumnOffset(i);
+                        var data = _varLengthData[varLenColumnIndex];
+                        localIndirectSize += data.Length;
+                    }
+                }
+            }
+
+            rowSize = localRowSize;
+            indirectSize = localIndirectSize;
+        }
+
         private void CheckColumn(int columnIndex, KuduType type)
         {
             ColumnSchema column = Schema.GetColumn(columnIndex);
@@ -795,22 +801,6 @@ namespace Knet.Kudu.Client
         {
             var varLenColumnIndex = Schema.GetColumnOffset(columnIndex);
             return _varLengthData[varLenColumnIndex];
-        }
-
-        private int GetRowSize()
-        {
-            var size = _headerSize;
-
-            for (int i = 0; i < Schema.Columns.Count; i++)
-            {
-                if (IsSet(i) && !IsSetToNull(i))
-                {
-                    var column = Schema.GetColumn(i);
-                    size += column.Size;
-                }
-            }
-
-            return size;
         }
 
         private void BitmapSet(int offset, int index)

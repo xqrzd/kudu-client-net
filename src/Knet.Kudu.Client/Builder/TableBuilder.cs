@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Protocol.Master;
 
@@ -9,7 +8,7 @@ namespace Knet.Kudu.Client.Builder
 {
     public class TableBuilder
     {
-        private readonly List<PartialRow> _ranges;
+        private readonly List<PartialRowOperation> _ranges;
 
         internal CreateTableRequestPB CreateTableRequest;
 
@@ -25,7 +24,7 @@ namespace Knet.Kudu.Client.Builder
                 SplitRowsRangeBounds = new RowOperationsPB()
             };
 
-            _ranges = new List<PartialRow>();
+            _ranges = new List<PartialRowOperation>();
         }
 
         public TableBuilder SetTableName(string name)
@@ -85,7 +84,7 @@ namespace Knet.Kudu.Client.Builder
             return this;
         }
 
-        public TableBuilder AddRangePartition(Action<PartialRow, PartialRow> action)
+        public TableBuilder AddRangePartition(Action<PartialRowOperation, PartialRowOperation> action)
         {
             // TODO: Rework this
             var columns = CreateTableRequest.Schema.Columns
@@ -93,8 +92,8 @@ namespace Knet.Kudu.Client.Builder
                 .ToList();
 
             var schema = new Schema(columns);
-            var lowerBoundRow = new PartialRow(schema, RowOperation.RangeLowerBound);
-            var upperBoundRow = new PartialRow(schema, RowOperation.RangeUpperBound);
+            var lowerBoundRow = new PartialRowOperation(schema, RowOperation.RangeLowerBound);
+            var upperBoundRow = new PartialRowOperation(schema, RowOperation.RangeUpperBound);
 
             action(lowerBoundRow, upperBoundRow);
 
@@ -106,22 +105,20 @@ namespace Knet.Kudu.Client.Builder
 
         public CreateTableRequestPB Build()
         {
-            using (var rowAllocWriter = new BufferWriter(256))
-            using (var indirectDataWriter = new BufferWriter(256))
+            if (_ranges.Count > 0)
             {
-                foreach (var row in _ranges)
-                {
-                    var rowSpan = rowAllocWriter.GetSpan(row.RowSize);
-                    var indirectSpan = indirectDataWriter.GetSpan(row.IndirectDataSize);
+                OperationsEncoder.ComputeSize(
+                    _ranges,
+                    out int rowSize,
+                    out int indirectSize);
 
-                    row.WriteTo(rowSpan, indirectSpan);
+                var rowData = new byte[rowSize];
+                var indirectData = new byte[indirectSize];
 
-                    rowAllocWriter.Advance(rowSpan.Length);
-                    indirectDataWriter.Advance(indirectSpan.Length);
-                }
+                OperationsEncoder.Encode(_ranges, rowData, indirectData);
 
-                CreateTableRequest.SplitRowsRangeBounds.Rows = rowAllocWriter.Memory.ToArray();
-                CreateTableRequest.SplitRowsRangeBounds.IndirectData = indirectDataWriter.Memory.ToArray();
+                CreateTableRequest.SplitRowsRangeBounds.Rows = rowData;
+                CreateTableRequest.SplitRowsRangeBounds.IndirectData = indirectData;
             }
 
             return CreateTableRequest;

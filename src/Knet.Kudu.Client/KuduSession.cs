@@ -14,8 +14,8 @@ namespace Knet.Kudu.Client
         private readonly ILogger _logger;
         private readonly KuduClient _client;
         private readonly KuduSessionOptions _options;
-        private readonly ChannelWriter<Operation> _writer;
-        private readonly ChannelReader<Operation> _reader;
+        private readonly ChannelWriter<KuduOperation> _writer;
+        private readonly ChannelReader<KuduOperation> _reader;
         private readonly SemaphoreSlim _singleFlush;
         private readonly Task _consumeTask;
 
@@ -39,7 +39,7 @@ namespace Knet.Kudu.Client
                 AllowSynchronousContinuations = false
             };
 
-            var channel = Channel.CreateBounded<Operation>(channelOptions);
+            var channel = Channel.CreateBounded<KuduOperation>(channelOptions);
             _writer = channel.Writer;
             _reader = channel.Reader;
 
@@ -63,7 +63,7 @@ namespace Knet.Kudu.Client
         }
 
         public ValueTask EnqueueAsync(
-            Operation operation,
+            KuduOperation operation,
             CancellationToken cancellationToken = default)
         {
             return _writer.WriteAsync(operation, cancellationToken);
@@ -107,7 +107,7 @@ namespace Knet.Kudu.Client
         {
             var channelCompletionTask = _reader.Completion;
             int batchSize = _options.BatchSize;
-            var queue = new List<Operation>(batchSize);
+            var queue = new List<KuduOperation>(batchSize);
 
             while (!channelCompletionTask.IsCompleted)
             {
@@ -138,9 +138,9 @@ namespace Knet.Kudu.Client
             }
         }
 
-        private async Task<bool> DequeueAsync(List<Operation> queue)
+        private async Task<bool> DequeueAsync(List<KuduOperation> queue)
         {
-            ChannelReader<Operation> reader = _reader;
+            ChannelReader<KuduOperation> reader = _reader;
             CancellationToken flushToken = _flushCts.Token;
             bool flushRequested = flushToken.IsCancellationRequested;
             int capacity = _options.BatchSize;
@@ -166,7 +166,7 @@ namespace Knet.Kudu.Client
                 if (queue.Count == 0)
                 {
                     // Wait indefinitely for the first operation.
-                    Operation operation = await reader.ReadAsync(flushToken)
+                    KuduOperation operation = await reader.ReadAsync(flushToken)
                         .ConfigureAwait(false);
 
                     queue.Add(operation);
@@ -179,7 +179,7 @@ namespace Knet.Kudu.Client
 
                 while (queue.Count < capacity)
                 {
-                    Operation operation = await reader.ReadAsync(cancellationToken)
+                    KuduOperation operation = await reader.ReadAsync(cancellationToken)
                         .ConfigureAwait(false);
 
                     queue.Add(operation);
@@ -215,7 +215,7 @@ namespace Knet.Kudu.Client
             }
         }
 
-        private async Task SendAsync(List<Operation> queue)
+        private async Task SendAsync(List<KuduOperation> queue)
         {
             while (true)
             {

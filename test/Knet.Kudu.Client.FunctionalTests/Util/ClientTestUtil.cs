@@ -47,16 +47,15 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
             return tableBuilder.SetRangePartitionColumns("key");
         }
 
-        public static Operation CreateBasicSchemaInsert(KuduTable table, int key)
+        public static KuduOperation CreateBasicSchemaInsert(KuduTable table, int key)
         {
-            var insert = table.NewInsert();
-            var row = insert.Row;
+            var row = table.NewInsert();
             row.SetInt32(0, key);
             row.SetInt32(1, 2);
             row.SetInt32(2, 3);
             row.SetString(3, "a string");
             row.SetBool(4, true);
-            return insert;
+            return row;
         }
 
         public static async Task<int> CountRowsAsync(KuduClient client, KuduTable table)

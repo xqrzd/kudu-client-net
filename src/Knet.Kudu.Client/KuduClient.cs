@@ -225,11 +225,11 @@ namespace Knet.Kudu.Client
         }
 
         public async Task<WriteResponsePB[]> WriteAsync(
-            IEnumerable<Operation> operations,
+            IEnumerable<KuduOperation> operations,
             ExternalConsistencyMode externalConsistencyMode = ExternalConsistencyMode.ClientPropagated,
             CancellationToken cancellationToken = default)
         {
-            var operationsByTablet = new Dictionary<RemoteTablet, List<Operation>>();
+            var operationsByTablet = new Dictionary<RemoteTablet, List<KuduOperation>>();
 
             foreach (var operation in operations)
             {
@@ -240,7 +240,7 @@ namespace Knet.Kudu.Client
                 {
                     if (!operationsByTablet.TryGetValue(tablet, out var tabletOperations))
                     {
-                        tabletOperations = new List<Operation>();
+                        tabletOperations = new List<KuduOperation>();
                         operationsByTablet.Add(tablet, tabletOperations);
                     }
 
@@ -273,27 +273,22 @@ namespace Knet.Kudu.Client
         }
 
         private async Task<WriteResponsePB> WriteAsync(
-            List<Operation> operations,
+            List<KuduOperation> operations,
             RemoteTablet tablet,
             ExternalConsistencyMode externalConsistencyMode,
             CancellationToken cancellationToken = default)
         {
             var table = operations[0].Table;
 
-            byte[] rowData;
-            byte[] indirectData;
+            OperationsEncoder.ComputeSize(
+                operations,
+                out int rowSize,
+                out int indirectSize);
 
-            // TODO: Estimate better sizes for these.
-            using (var rowBuffer = new BufferWriter(1024))
-            using (var indirectBuffer = new BufferWriter(1024))
-            {
-                OperationsEncoder.Encode(operations, rowBuffer, indirectBuffer);
+            var rowData = new byte[rowSize];
+            var indirectData = new byte[indirectSize];
 
-                // protobuf-net doesn't support serializing Memory<byte>,
-                // so we need to copy these into an array.
-                rowData = rowBuffer.Memory.ToArray();
-                indirectData = indirectBuffer.Memory.ToArray();
-            }
+            OperationsEncoder.Encode(operations, rowData, indirectData);
 
             var rowOperations = new RowOperationsPB
             {
@@ -385,13 +380,12 @@ namespace Knet.Kudu.Client
         }
 
         internal ValueTask<RemoteTablet> GetRowTabletAsync(
-            Operation operation, CancellationToken cancellationToken = default)
+            KuduOperation operation, CancellationToken cancellationToken = default)
         {
             var table = operation.Table;
-            var row = operation.Row;
 
             using var writer = new BufferWriter(256);
-            KeyEncoder.EncodePartitionKey(row, table.PartitionSchema, writer);
+            KeyEncoder.EncodePartitionKey(operation, table.PartitionSchema, writer);
             var partitionKey = writer.Memory.Span;
 
             // Note that we don't have to await this method before disposing the writer, as a
