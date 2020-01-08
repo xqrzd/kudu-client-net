@@ -1,6 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Knet.Kudu.Client.Builder;
-using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protocol.Master;
 using Knet.Kudu.Client.Tablet;
 using Xunit;
@@ -48,82 +48,72 @@ namespace Knet.Kudu.Client.Tests
             rowA.SetString(1, "");
             rowA.SetString(2, "");
 
-            using (var writer = new BufferWriter(32))
+            CheckPartitionKey(rowA, partitionSchema, new byte[]
             {
-                KeyEncoder.EncodePartitionKey(rowA, partitionSchema, writer);
-
-                var expected = new byte[]
-                {
-                    0, 0, 0, 0,     // hash(0, "")
-                    0, 0, 0, 0x14,  // hash("")
-                    0x80, 0, 0, 0,  // a = 0
-                    0, 0            // b = ""; c is elided
-                };
-
-                Assert.Equal(expected, writer.Memory.ToArray());
-            }
+                0, 0, 0, 0,     // hash(0, "")
+                0, 0, 0, 0x14,  // hash("")
+                0x80, 0, 0, 0,  // a = 0
+                0, 0            // b = ""; c is elided
+            });
 
             var rowB = new PartialRow(schema);
             rowB.SetInt32(0, 1);
             rowB.SetString(1, "");
             rowB.SetString(2, "");
 
-            using (var writer = new BufferWriter(32))
+            CheckPartitionKey(rowB, partitionSchema, new byte[]
             {
-                KeyEncoder.EncodePartitionKey(rowB, partitionSchema, writer);
-
-                var expected = new byte[]
-                {
-                    0, 0, 0, 0x5,   // hash(1, "")
-                    0, 0, 0, 0x14,  // hash("")
-                    0x80, 0, 0, 1,  // a = 1
-                    0, 0            // b = ""; c is elided
-                };
-
-                Assert.Equal(expected, writer.Memory.ToArray());
-            }
+                0, 0, 0, 0x5,   // hash(1, "")
+                0, 0, 0, 0x14,  // hash("")
+                0x80, 0, 0, 1,  // a = 1
+                0, 0            // b = ""; c is elided
+            });
 
             var rowC = new PartialRow(schema);
             rowC.SetInt32(0, 0);
             rowC.SetString(1, "b");
             rowC.SetString(2, "c");
 
-            using (var writer = new BufferWriter(32))
+            CheckPartitionKey(rowC, partitionSchema, new byte[]
             {
-                KeyEncoder.EncodePartitionKey(rowC, partitionSchema, writer);
-
-                var expected = new byte[]
-                {
-                    0, 0, 0, 0x1A,      // hash(0, "b")
-                    0, 0, 0, 0x1D,      // hash("c")
-                    0x80, 0, 0, 0,      // a = 0
-                    (byte)'b', 0, 0,    // b = "b"
-                    (byte)'c'           // c = "c"
-                };
-
-                Assert.Equal(expected, writer.Memory.ToArray());
-            }
+                0, 0, 0, 0x1A,      // hash(0, "b")
+                0, 0, 0, 0x1D,      // hash("c")
+                0x80, 0, 0, 0,      // a = 0
+                (byte)'b', 0, 0,    // b = "b"
+                (byte)'c'           // c = "c"
+            });
 
             var rowD = new PartialRow(schema);
             rowD.SetInt32(0, 1);
             rowD.SetString(1, "b");
             rowD.SetString(2, "c");
 
-            using (var writer = new BufferWriter(32))
+            CheckPartitionKey(rowD, partitionSchema, new byte[]
             {
-                KeyEncoder.EncodePartitionKey(rowD, partitionSchema, writer);
+                0, 0, 0, 0,         // hash(1, "b")
+                0, 0, 0, 0x1D,      // hash("c")
+                0x80, 0, 0, 1,      // a = 1
+                (byte)'b', 0, 0,    // b = "b"
+                (byte)'c'           // c = "c"
+            });
+        }
 
-                var expected = new byte[]
-                {
-                    0, 0, 0, 0,         // hash(1, "b")
-                    0, 0, 0, 0x1D,      // hash("c")
-                    0x80, 0, 0, 1,      // a = 1
-                    (byte)'b', 0, 0,    // b = "b"
-                    (byte)'c'           // c = "c"
-                };
+        private static void CheckPartitionKey(
+            PartialRow row,
+            PartitionSchema partitionSchema,
+            byte[] expectedPartitionKey)
+        {
+            var maxSize = KeyEncoder.CalculateMaxPartitionKeySize(row, partitionSchema);
+            Span<byte> buffer = stackalloc byte[maxSize];
 
-                Assert.Equal(expected, writer.Memory.ToArray());
-            }
+            KeyEncoder.EncodePartitionKey(
+                row,
+                partitionSchema,
+                buffer,
+                out int bytesWritten);
+
+            var partitionKey = buffer.Slice(0, bytesWritten).ToArray();
+            Assert.Equal(expectedPartitionKey, partitionKey);
         }
 
         private static Schema GetSchema(TableBuilder builder)

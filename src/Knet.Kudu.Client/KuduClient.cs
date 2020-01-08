@@ -384,12 +384,18 @@ namespace Knet.Kudu.Client
         {
             var table = operation.Table;
 
-            using var writer = new BufferWriter(256);
-            KeyEncoder.EncodePartitionKey(operation, table.PartitionSchema, writer);
-            var partitionKey = writer.Memory.Span;
+            int maxSize = KeyEncoder.CalculateMaxPartitionKeySize(
+                operation, table.PartitionSchema);
+            Span<byte> buffer = stackalloc byte[maxSize];
 
-            // Note that we don't have to await this method before disposing the writer, as a
-            // copy of partitionKey will be made if the method cannot complete synchronously.
+            KeyEncoder.EncodePartitionKey(
+                operation,
+                table.PartitionSchema,
+                buffer,
+                out int bytesWritten);
+
+            var partitionKey = buffer.Slice(0, bytesWritten);
+
             return GetTabletAsync(table.TableId, partitionKey, cancellationToken);
         }
 
