@@ -40,7 +40,7 @@ namespace Knet.Kudu.Client.Tablet
                 var srcCurrent = src;
                 var destCurrent = dest;
 
-                for (; i < source.Length; i += 32)
+                for (; i < source.Length - 32; i += 32)
                 {
                     var data = Avx.LoadVector256(srcCurrent);
                     var zeros = new Vector256<byte>();
@@ -57,7 +57,7 @@ namespace Knet.Kudu.Client.Tablet
                     destCurrent += 32;
                 }
 
-                for (; i < source.Length; i += 16)
+                for (; i < source.Length - 16; i += 16)
                 {
                     var data = Sse2.LoadVector128(srcCurrent);
                     var zeros = new Vector128<byte>();
@@ -109,7 +109,7 @@ namespace Knet.Kudu.Client.Tablet
                 var srcCurrent = src;
                 var destCurrent = dest;
 
-                for (; i < source.Length; i += 16)
+                for (; i < source.Length - 16; i += 16)
                 {
                     var data = Sse2.LoadVector128(srcCurrent);
                     var zeros = new Vector128<byte>();
