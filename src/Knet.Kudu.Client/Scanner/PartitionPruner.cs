@@ -510,7 +510,8 @@ namespace Knet.Kudu.Client.Scanner
 
             foreach (PartialRow row in rows)
             {
-                int hash = KeyEncoder.GetHashBucket(row, hashSchema);
+                int maxSize = KeyEncoder.CalculateMaxPrimaryKeySize(row);
+                int hash = KeyEncoder.GetHashBucket(row, hashSchema, maxSize);
                 hashBuckets.Set(hash, true);
             }
 
