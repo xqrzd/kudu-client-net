@@ -156,14 +156,12 @@ namespace Knet.Kudu.Client.Tablet
             }
             else
             {
-                int bytesWrittenx = EncodeBinary(source, destination);
+                int localBytesWritten = EncodeBinary(source, destination);
 
-                // TODO: If we have a guarantee this memory is
-                // zeroed, this can be omitted.
-                destination[bytesWrittenx++] = 0x0;
-                destination[bytesWrittenx++] = 0x0;
+                destination[localBytesWritten++] = 0x0;
+                destination[localBytesWritten++] = 0x0;
 
-                bytesWritten = bytesWrittenx;
+                bytesWritten = localBytesWritten;
             }
         }
 
