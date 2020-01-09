@@ -27,18 +27,30 @@ namespace Knet.Kudu.Client.Builder
             _splitRowsRangeBounds = new List<PartialRowOperation>();
         }
 
+        /// <summary>
+        /// Sets the name of the table.
+        /// </summary>
+        /// <param name="name">The table's name.</param>
         public TableBuilder SetTableName(string name)
         {
             CreateTableRequest.Name = name;
             return this;
         }
 
+        /// <summary>
+        /// Sets the number of replicas that each tablet will have. If not specified,
+        /// it uses the server-side default which is usually 3 unless changed by an
+        /// administrator.
+        /// </summary>
+        /// <param name="numReplicas">The number of replicas to use.</param>
+        /// <returns></returns>
         public TableBuilder SetNumReplicas(int numReplicas)
         {
             CreateTableRequest.NumReplicas = numReplicas;
             return this;
         }
 
+        // TODO: Replace this
         public TableBuilder AddColumn(Action<ColumnBuilder> setup)
         {
             var column = new ColumnBuilder();
@@ -47,11 +59,45 @@ namespace Knet.Kudu.Client.Builder
             return this;
         }
 
+        /// <summary>
+        /// Add a set of hash partitions to the table.
+        /// 
+        /// Each column must be a part of the table's primary key, and an individual
+        /// column may only appear in a single hash component.
+        /// 
+        /// For each set of hash partitions added to the table, the total number of
+        /// table partitions is multiplied by the number of buckets. For example, if a
+        /// table is created with 3 split rows, and two hash partitions with 4 and 5
+        /// buckets respectively, the total number of table partitions will be 80
+        /// (4 range partitions * 4 hash buckets * 5 hash buckets).
+        /// </summary>
+        /// <param name="buckets">The number of buckets to hash into.</param>
+        /// <param name="columns">The columns to hash.</param>
         public TableBuilder AddHashPartitions(int buckets, params string[] columns)
         {
             return AddHashPartitions(buckets, 0, columns);
         }
 
+        /// <summary>
+        /// Add a set of hash partitions to the table.
+        /// 
+        /// Each column must be a part of the table's primary key, and an individual
+        /// column may only appear in a single hash component.
+        /// 
+        /// For each set of hash partitions added to the table, the total number of
+        /// table partitions is multiplied by the number of buckets. For example, if a
+        /// table is created with 3 split rows, and two hash partitions with 4 and 5
+        /// buckets respectively, the total number of table partitions will be 80
+        /// (4 range partitions * 4 hash buckets * 5 hash buckets).
+        /// 
+        /// This constructor takes a seed value, which can be used to randomize the
+        /// mapping of rows to hash buckets. Setting the seed may provide some
+        /// amount of protection against denial of service attacks when the hashed
+        /// columns contain user provided values.
+        /// </summary>
+        /// <param name="buckets">The number of buckets to hash into.</param>
+        /// <param name="seed">A hash seed.</param>
+        /// <param name="columns">The columns to hash.</param>
         public TableBuilder AddHashPartitions(int buckets, uint seed, params string[] columns)
         {
             var partition = new PartitionSchemaPB.HashBucketSchemaPB
@@ -71,6 +117,15 @@ namespace Knet.Kudu.Client.Builder
             return this;
         }
 
+        /// <summary>
+        /// Set the columns on which the table will be range-partitioned.
+        /// 
+        /// Every column must be a part of the table's primary key. If not set,
+        /// the table is range partitioned by the primary key columns with a single
+        /// unbounded partition. If called with an empty set, the table will be
+        /// created without range partitioning.
+        /// </summary>
+        /// <param name="columns">The range partitioned columns.</param>
         public TableBuilder SetRangePartitionColumns(params string[] columns)
         {
             var schemaColumns = CreateTableRequest.PartitionSchema.RangeSchema.Columns;
@@ -84,6 +139,24 @@ namespace Knet.Kudu.Client.Builder
             return this;
         }
 
+        /// <summary>
+        /// Add a range partition to the table with an inclusive lower bound and an
+        /// exclusive upper bound.
+        /// 
+        /// If either row is empty, then that end of the range will be unbounded. If a
+        /// range column is missing a value, the logical minimum value for that column
+        /// type will be used as the default.
+        /// 
+        /// Multiple range bounds may be added, but they must not overlap. All split
+        /// rows must fall in one of the range bounds. The lower bound must be less
+        /// than the upper bound.
+        /// 
+        /// If not provided, the table's range will be unbounded.
+        /// </summary>
+        /// <param name="configure">
+        /// Delegate to configure the inclusive lower bound and the exclusive upper
+        /// bound (in that order).
+        /// </param>
         public TableBuilder AddRangePartition(
             Action<PartialRowOperation, PartialRowOperation> configure)
         {
@@ -93,6 +166,25 @@ namespace Knet.Kudu.Client.Builder
                 RangePartitionBound.Exclusive);
         }
 
+        /// <summary>
+        /// Add a range partition partition to the table with a lower bound and upper
+        /// bound.
+        /// 
+        /// If either row is empty, then that end of the range will be unbounded. If a
+        /// range column is missing a value, the logical minimum value for that column
+        /// type will be used as the default.
+        /// 
+        /// Multiple range bounds may be added, but they must not overlap. All split
+        /// rows must fall in one of the range bounds. The lower bound must be less
+        /// than or equal to the upper bound.
+        /// 
+        /// If not provided, the table's range will be unbounded.
+        /// </summary>
+        /// <param name="configure">
+        /// Delegate to configure the lower bound and the upper bound (in that order).
+        /// </param>
+        /// <param name="lowerBoundType">The type of the lower bound.</param>
+        /// <param name="upperBoundType">The type of the upper bound.</param>
         public TableBuilder AddRangePartition(
             Action<PartialRowOperation, PartialRowOperation> configure,
             RangePartitionBound lowerBoundType,
@@ -123,6 +215,11 @@ namespace Knet.Kudu.Client.Builder
             return this;
         }
 
+        /// <summary>
+        /// Add a range partition split. The split row must fall in a range partition,
+        /// and causes the range partition to split into two contiguous range partitions.
+        /// </summary>
+        /// <param name="configure">A delegate to configure the split row.</param>
         public TableBuilder AddSplitRow(Action<PartialRowOperation> configure)
         {
             // TODO: Rework this
