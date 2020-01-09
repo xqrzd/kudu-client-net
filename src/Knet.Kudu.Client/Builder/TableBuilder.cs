@@ -8,7 +8,7 @@ namespace Knet.Kudu.Client.Builder
 {
     public class TableBuilder
     {
-        private readonly List<PartialRowOperation> _ranges;
+        private readonly List<PartialRowOperation> _splitRowsRangeBounds;
 
         internal CreateTableRequestPB CreateTableRequest;
 
@@ -24,7 +24,7 @@ namespace Knet.Kudu.Client.Builder
                 SplitRowsRangeBounds = new RowOperationsPB()
             };
 
-            _ranges = new List<PartialRowOperation>();
+            _splitRowsRangeBounds = new List<PartialRowOperation>();
         }
 
         public TableBuilder SetTableName(string name)
@@ -84,7 +84,46 @@ namespace Knet.Kudu.Client.Builder
             return this;
         }
 
-        public TableBuilder AddRangePartition(Action<PartialRowOperation, PartialRowOperation> action)
+        public TableBuilder AddRangePartition(
+            Action<PartialRowOperation, PartialRowOperation> configure)
+        {
+            return AddRangePartition(
+                configure,
+                RangePartitionBound.Inclusive,
+                RangePartitionBound.Exclusive);
+        }
+
+        public TableBuilder AddRangePartition(
+            Action<PartialRowOperation, PartialRowOperation> configure,
+            RangePartitionBound lowerBoundType,
+            RangePartitionBound upperBoundType)
+        {
+            // TODO: Rework this
+            var columns = CreateTableRequest.Schema.Columns
+                .Select(c => ColumnSchema.FromProtobuf(c))
+                .ToList();
+
+            var lowerRowOp = lowerBoundType == RangePartitionBound.Inclusive ?
+                RowOperation.RangeLowerBound :
+                RowOperation.ExclusiveRangeLowerBound;
+
+            var upperRowOp = upperBoundType == RangePartitionBound.Exclusive ?
+                RowOperation.RangeUpperBound :
+                RowOperation.InclusiveRangeUpperBound;
+
+            var schema = new Schema(columns);
+            var lowerBoundRow = new PartialRowOperation(schema, lowerRowOp);
+            var upperBoundRow = new PartialRowOperation(schema, upperRowOp);
+
+            configure(lowerBoundRow, upperBoundRow);
+
+            _splitRowsRangeBounds.Add(lowerBoundRow);
+            _splitRowsRangeBounds.Add(upperBoundRow);
+
+            return this;
+        }
+
+        public TableBuilder AddSplitRow(Action<PartialRowOperation> configure)
         {
             // TODO: Rework this
             var columns = CreateTableRequest.Schema.Columns
@@ -92,30 +131,28 @@ namespace Knet.Kudu.Client.Builder
                 .ToList();
 
             var schema = new Schema(columns);
-            var lowerBoundRow = new PartialRowOperation(schema, RowOperation.RangeLowerBound);
-            var upperBoundRow = new PartialRowOperation(schema, RowOperation.RangeUpperBound);
+            var splitRow = new PartialRowOperation(schema, RowOperation.SplitRow);
 
-            action(lowerBoundRow, upperBoundRow);
+            configure(splitRow);
 
-            _ranges.Add(lowerBoundRow);
-            _ranges.Add(upperBoundRow);
+            _splitRowsRangeBounds.Add(splitRow);
 
             return this;
         }
 
         public CreateTableRequestPB Build()
         {
-            if (_ranges.Count > 0)
+            if (_splitRowsRangeBounds.Count > 0)
             {
                 OperationsEncoder.ComputeSize(
-                    _ranges,
+                    _splitRowsRangeBounds,
                     out int rowSize,
                     out int indirectSize);
 
                 var rowData = new byte[rowSize];
                 var indirectData = new byte[indirectSize];
 
-                OperationsEncoder.Encode(_ranges, rowData, indirectData);
+                OperationsEncoder.Encode(_splitRowsRangeBounds, rowData, indirectData);
 
                 CreateTableRequest.SplitRowsRangeBounds.Rows = rowData;
                 CreateTableRequest.SplitRowsRangeBounds.IndirectData = indirectData;
