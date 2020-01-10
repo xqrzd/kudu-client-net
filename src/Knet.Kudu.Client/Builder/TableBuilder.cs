@@ -43,10 +43,38 @@ namespace Knet.Kudu.Client.Builder
         /// administrator.
         /// </summary>
         /// <param name="numReplicas">The number of replicas to use.</param>
-        /// <returns></returns>
         public TableBuilder SetNumReplicas(int numReplicas)
         {
             CreateTableRequest.NumReplicas = numReplicas;
+            return this;
+        }
+
+        /// <summary>
+        /// Set the table owner as the provided username in configured external
+        /// catalogs such as the Hive Metastore. Overrides the default of the
+        /// currently logged-in username or Kerberos principal.
+        /// </summary>
+        /// <param name="owner">
+        /// The username to set as the table owner in external catalogs.
+        /// </param>
+        public TableBuilder SetOwner(string owner)
+        {
+            CreateTableRequest.Owner = owner;
+            return this;
+        }
+
+        // TODO: Support dimension when protobuf contracts are regenerated.
+
+        /// <summary>
+        /// Sets the table's extra configuration properties.
+        /// </summary>
+        /// <param name="extraConfig">The table's extra configuration properties.</param>
+        public TableBuilder SetExtraConfigs(
+            IEnumerable<KeyValuePair<string, string>> extraConfig)
+        {
+            foreach (var kvp in extraConfig)
+                CreateTableRequest.ExtraConfigs.Add(kvp.Key, kvp.Value);
+
             return this;
         }
 
