@@ -2,7 +2,7 @@
 
 namespace Knet.Kudu.Client
 {
-    public class ColumnBuilder
+    public readonly struct ColumnBuilder
     {
         private readonly ColumnSchemaPB _column;
 
