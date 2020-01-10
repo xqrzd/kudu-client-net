@@ -78,12 +78,19 @@ namespace Knet.Kudu.Client
             return this;
         }
 
-        // TODO: Replace this
-        public TableBuilder AddColumn(Action<ColumnBuilder> setup)
+        /// <summary>
+        /// Add a new column to the table. The column defaults to a
+        /// nullable non-key column.
+        /// </summary>
+        /// <param name="name">The column name.</param>
+        /// <param name="type">The column type.</param>
+        /// <param name="configure">A delegate to further configure the column.</param>
+        public TableBuilder AddColumn(
+            string name, KuduType type, Action<ColumnBuilder> configure = null)
         {
-            var column = new ColumnBuilder();
-            setup(column);
-            CreateTableRequest.Schema.Columns.Add(column);
+            var builder = new ColumnBuilder(name, type);
+            configure?.Invoke(builder);
+            CreateTableRequest.Schema.Columns.Add(builder);
             return this;
         }
 

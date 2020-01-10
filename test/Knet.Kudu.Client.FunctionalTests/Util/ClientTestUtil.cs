@@ -7,36 +7,14 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
         public static TableBuilder GetBasicSchema()
         {
             var builder = new TableBuilder()
-                .AddColumn(c =>
-                {
-                    c.Name = "key";
-                    c.Type = KuduType.Int32;
-                    c.IsKey = true;
-                })
-                .AddColumn(c =>
-                {
-                    c.Name = "column1_i";
-                    c.Type = KuduType.Int32;
-                })
-                .AddColumn(c =>
-                {
-                    c.Name = "column2_i";
-                    c.Type = KuduType.Int32;
-                })
-                .AddColumn(c =>
-                {
-                    c.Name = "column3_s";
-                    c.Type = KuduType.String;
-                    c.IsNullable = true;
-                    c.CfileBlockSize = 4096;
-                    c.Encoding = EncodingType.DictEncoding;
-                    c.Compression = CompressionType.Lz4;
-                })
-                .AddColumn(c =>
-                {
-                    c.Name = "column4_b";
-                    c.Type = KuduType.Bool;
-                });
+                .AddColumn("key", KuduType.Int32, opt => opt.Key(true))
+                .AddColumn("column2_i", KuduType.Int32, opt => opt.Nullable(false))
+                .AddColumn("column2_i", KuduType.Int32, opt => opt.Nullable(false))
+                .AddColumn("column3_s", KuduType.String, opt => opt
+                    .DesiredBlockSize(4096)
+                    .Encoding(EncodingType.DictEncoding)
+                    .Compression(CompressionType.Lz4))
+                .AddColumn("column4_b", KuduType.Bool, opt => opt.Nullable(false));
 
             return builder;
         }
