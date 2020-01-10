@@ -1,4 +1,5 @@
 ﻿using Knet.Kudu.Client.Protocol;
+using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client
 {
@@ -115,6 +116,33 @@ namespace Knet.Kudu.Client
             return this;
         }
 
+        /// <summary>
+        /// Sets the default value that will be read from the column. Null by default.
+        /// </summary>
+        /// <param name="value">
+        /// A C# object representation of the default value that's read.
+        /// </param>
+        public ColumnBuilder DefaultValue(object value)
+        {
+            _column.ReadDefaultValue = KuduEncoder.EncodeValue(
+                (KuduType)_column.Type,
+                value,
+                ToColumnAttributes(_column.TypeAttributes));
+
+            return this;
+        }
+
         public static implicit operator ColumnSchemaPB(ColumnBuilder builder) => builder._column;
+
+        private static ColumnTypeAttributes ToColumnAttributes(
+            ColumnTypeAttributesPB attributesPb)
+        {
+            if (attributesPb == null)
+                return null;
+
+            return new ColumnTypeAttributes(
+                attributesPb.Precision,
+                attributesPb.Scale);
+        }
     }
 }
