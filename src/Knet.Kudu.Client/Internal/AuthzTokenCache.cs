@@ -1,7 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using Knet.Kudu.Client.Protocol.Security;
 
-namespace Knet.Kudu.Client
+namespace Knet.Kudu.Client.Internal
 {
     /// <summary>
     /// Cache for authz tokens received from the master of unbounded capacity. A
