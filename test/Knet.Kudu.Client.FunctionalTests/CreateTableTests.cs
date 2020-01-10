@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Knet.Kudu.Client.Builder;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
 using McMaster.Extensions.Xunit;
 using Xunit;
