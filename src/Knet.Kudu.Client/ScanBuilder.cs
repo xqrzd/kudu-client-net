@@ -3,7 +3,7 @@ using System.Linq;
 using Knet.Kudu.Client.Tablet;
 using Knet.Kudu.Client.Util;
 
-namespace Knet.Kudu.Client.Builder
+namespace Knet.Kudu.Client
 {
     public class ScanBuilder
     {

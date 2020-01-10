@@ -1,5 +1,4 @@
 ﻿using System.Threading.Tasks;
-using Knet.Kudu.Client.Builder;
 
 namespace Knet.Kudu.Client.FunctionalTests.Util
 {

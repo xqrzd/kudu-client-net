@@ -1,6 +1,6 @@
 ﻿using Knet.Kudu.Client.Protocol;
 
-namespace Knet.Kudu.Client.Builder
+namespace Knet.Kudu.Client
 {
     public class ColumnBuilder
     {
