@@ -8,7 +8,7 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
         {
             var builder = new TableBuilder()
                 .AddColumn("key", KuduType.Int32, opt => opt.Key(true))
-                .AddColumn("column2_i", KuduType.Int32, opt => opt.Nullable(false))
+                .AddColumn("column1_i", KuduType.Int32, opt => opt.Nullable(false))
                 .AddColumn("column2_i", KuduType.Int32, opt => opt.Nullable(false))
                 .AddColumn("column3_s", KuduType.String, opt => opt
                     .DesiredBlockSize(4096)
