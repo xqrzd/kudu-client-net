@@ -23,48 +23,36 @@ namespace Knet.Kudu.Client.Tests
         public void CanAddColumns()
         {
             var builder = new TableBuilder()
-                .AddColumn(column =>
-                {
-                    column.Name = "c1";
-                    column.Type = KuduType.Int32;
-                    column.IsKey = true;
-                    column.IsNullable = false;
-                })
-                .AddColumn(column =>
-                {
-                    column.Name = "c2";
-                    column.Encoding = EncodingType.DictEncoding;
-                    column.Compression = CompressionType.Snappy;
-                });
+                .AddColumn("c1", KuduType.Int32, opt => opt.Key(true))
+                .AddColumn("c2", KuduType.String, opt => opt
+                    .Nullable(false)
+                    .Encoding(EncodingType.DictEncoding)
+                    .Compression(CompressionType.Snappy));
 
             CreateTableRequestPB request = builder;
 
-            Assert.Collection(request.Schema.Columns,
-                c => {
-                    Assert.Equal("c1", c.Name);
-                    Assert.Equal(DataTypePB.Int32, c.Type);
-                    Assert.True(c.IsKey);
-                    Assert.False(c.IsNullable);
-                    Assert.Equal(EncodingTypePB.AutoEncoding, c.Encoding);
-                    Assert.Equal(CompressionTypePB.DefaultCompression, c.Compression);
-                    Assert.Null(c.TypeAttributes);
-                },
-                c => {
-                    Assert.Equal("c2", c.Name);
-                    Assert.Equal(EncodingTypePB.DictEncoding, c.Encoding);
-                    Assert.Equal(CompressionTypePB.Snappy, c.Compression);
-                });
+            Assert.Collection(request.Schema.Columns, c => {
+                Assert.Equal("c1", c.Name);
+                Assert.Equal(DataTypePB.Int32, c.Type);
+                Assert.True(c.IsKey);
+                Assert.False(c.IsNullable);
+                Assert.Equal(EncodingTypePB.AutoEncoding, c.Encoding);
+                Assert.Equal(CompressionTypePB.DefaultCompression, c.Compression);
+                Assert.Null(c.TypeAttributes);
+            }, c => {
+                Assert.Equal("c2", c.Name);
+                Assert.Equal(DataTypePB.String, c.Type);
+                Assert.Equal(EncodingTypePB.DictEncoding, c.Encoding);
+                Assert.Equal(CompressionTypePB.Snappy, c.Compression);
+            });
         }
 
         [Fact]
         public void CanSetColumnTypeAttributes()
         {
             var builder = new TableBuilder()
-                .AddColumn(column =>
-                {
-                    column.Precision = 4;
-                    column.Scale = 3;
-                });
+                .AddColumn("dec32", KuduType.Decimal32, opt => opt
+                    .DecimalAttributes(4, 3));
 
             CreateTableRequestPB request = builder;
 

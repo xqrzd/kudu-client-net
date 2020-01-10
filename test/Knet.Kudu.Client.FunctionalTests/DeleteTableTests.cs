@@ -24,13 +24,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             var builder = new TableBuilder()
                 .SetTableName(tableName)
                 .SetNumReplicas(1)
-                .AddColumn(column =>
-                {
-                    column.Name = "pk";
-                    column.Type = KuduType.Int32;
-                    column.IsKey = true;
-                    column.IsNullable = false;
-                });
+                .AddColumn("pk", KuduType.Int32, opt => opt.Key(true));
 
             var table = await client.CreateTableAsync(builder);
             Assert.Equal(tableName, table.TableName);

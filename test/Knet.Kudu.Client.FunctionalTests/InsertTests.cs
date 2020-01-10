@@ -23,22 +23,8 @@ namespace Knet.Kudu.Client.FunctionalTests
             var builder = new TableBuilder()
                 .SetTableName(tableName)
                 .SetNumReplicas(1)
-                .AddColumn(column =>
-                {
-                    column.Name = "column_x";
-                    column.Type = KuduType.Int32;
-                    column.IsKey = true;
-                    column.IsNullable = false;
-                    column.Compression = CompressionType.DefaultCompression;
-                    column.Encoding = EncodingType.AutoEncoding;
-                })
-                .AddColumn(column =>
-                {
-                    column.Name = "column_y";
-                    column.IsNullable = true;
-                    column.Type = KuduType.String;
-                    column.Encoding = EncodingType.DictEncoding;
-                });
+                .AddColumn("column_x", KuduType.Int32, opt => opt.Key(true))
+                .AddColumn("column_y", KuduType.String);
 
             var table = await client.CreateTableAsync(builder);
             Assert.Equal(tableName, table.TableName);

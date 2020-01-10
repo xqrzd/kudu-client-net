@@ -12,24 +12,9 @@ namespace Knet.Kudu.Client.Tests
         public void TestPartitionKeyEncoding()
         {
             var builder = new TableBuilder()
-                .AddColumn(c =>
-                {
-                    c.Name = "a";
-                    c.Type = KuduType.Int32;
-                    c.IsKey = true;
-                })
-                .AddColumn(c =>
-                {
-                    c.Name = "b";
-                    c.Type = KuduType.String;
-                    c.IsKey = true;
-                })
-                .AddColumn(c =>
-                {
-                    c.Name = "c";
-                    c.Type = KuduType.String;
-                    c.IsKey = true;
-                });
+                .AddColumn("a", KuduType.Int32, opt => opt.Key(true))
+                .AddColumn("b", KuduType.String, opt => opt.Key(true))
+                .AddColumn("c", KuduType.String, opt => opt.Key(true));
 
             var schema = GetSchema(builder);
 

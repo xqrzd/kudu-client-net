@@ -9,12 +9,7 @@ namespace Knet.Kudu.Client.Tests
         public void SingleInt8()
         {
             var builder = new TableBuilder()
-                .AddColumn(c =>
-                {
-                    c.Name = "int8";
-                    c.Type = KuduType.Int8;
-                    c.IsKey = true;
-                });
+                .AddColumn("int8", KuduType.Int8, opt => opt.Key(true));
 
             var schema = GetSchema(builder);
 
@@ -43,18 +38,8 @@ namespace Knet.Kudu.Client.Tests
         public void MultipleStrings()
         {
             var builder = new TableBuilder()
-                .AddColumn(c =>
-                {
-                    c.Name = "string1";
-                    c.Type = KuduType.String;
-                    c.IsKey = true;
-                })
-                .AddColumn(c =>
-                {
-                    c.Name = "string2";
-                    c.Type = KuduType.String;
-                    c.IsNullable = true;
-                });
+                .AddColumn("string1", KuduType.String, opt => opt.Key(true))
+                .AddColumn("string2", KuduType.String);
 
             var schema = GetSchema(builder);
 
@@ -98,45 +83,15 @@ namespace Knet.Kudu.Client.Tests
         public void MultipleTypes()
         {
             var builder = new TableBuilder()
-                .AddColumn(c =>
-                {
-                    c.Name = "string";
-                    c.Type = KuduType.String;
-                    c.IsKey = true;
-                })
-                .AddColumn(c =>
-                {
-                    c.Name = "int32";
-                    c.Type = KuduType.Int32;
-                    c.IsKey = true;
-                })
-                .AddColumn(c =>
-                {
-                    c.Name = "bool";
-                    c.Type = KuduType.Bool;
-                })
-                .AddColumn(c =>
-                {
-                    c.Name = "bin";
-                    c.Type = KuduType.Binary;
-                })
-                .AddColumn(c =>
-                {
-                    c.Name = "decimal64";
-                    c.Type = KuduType.Decimal64;
-                    c.Precision = 12;
-                    c.Scale = 4;
-                })
-                .AddColumn(c =>
-                {
-                    c.Name = "timestamp";
-                    c.Type = KuduType.UnixtimeMicros;
-                })
-                .AddColumn(c =>
-                {
-                    c.Name = "double";
-                    c.Type = KuduType.Double;
-                });
+                .AddColumn("string", KuduType.String, opt => opt.Key(true))
+                .AddColumn("int32", KuduType.Int32, opt => opt.Key(true))
+                .AddColumn("bool", KuduType.Bool, opt => opt.Nullable(false))
+                .AddColumn("bin", KuduType.Binary, opt => opt.Nullable(false))
+                .AddColumn("decimal64", KuduType.Decimal64, opt => opt
+                    .Nullable(false)
+                    .DecimalAttributes(12, 4))
+                .AddColumn("timestamp", KuduType.UnixtimeMicros, opt => opt.Nullable(false))
+                .AddColumn("double", KuduType.Double, opt => opt.Nullable(false));
 
             var schema = GetSchema(builder);
 
