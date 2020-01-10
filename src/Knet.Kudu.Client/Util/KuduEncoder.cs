@@ -100,6 +100,13 @@ namespace Knet.Kudu.Client.Util
             return buffer;
         }
 
+        public static byte[] EncodeDateTime(DateTime value)
+        {
+            var buffer = new byte[8];
+            EncodeDateTime(buffer, value);
+            return buffer;
+        }
+
         public static byte[] EncodeFloat(float value)
         {
             int bits = value.AsInt();
@@ -132,6 +139,28 @@ namespace Knet.Kudu.Client.Util
 
         public static byte[] EncodeString(string source) =>
             Encoding.UTF8.GetBytes(source);
+
+        public static byte[] EncodeValue(
+            KuduType type, object value, ColumnTypeAttributes attributes = null)
+        {
+            return type switch
+            {
+                KuduType.Int8 => EncodeInt8((sbyte)value),
+                KuduType.Int16 => EncodeInt16((short)value),
+                KuduType.Int32 => EncodeInt32((int)value),
+                KuduType.Int64 => EncodeInt64((long)value),
+                KuduType.String => EncodeString((string)value),
+                KuduType.Bool => EncodeBool((bool)value),
+                KuduType.Float => EncodeFloat((float)value),
+                KuduType.Double => EncodeDouble((double)value),
+                KuduType.Binary => (byte[])value,
+                KuduType.UnixtimeMicros => EncodeDateTime((DateTime)value),
+                KuduType.Decimal32 => EncodeDecimal32((decimal)value, attributes.Precision, attributes.Scale),
+                KuduType.Decimal64 => EncodeDecimal64((decimal)value, attributes.Precision, attributes.Scale),
+                KuduType.Decimal128 => EncodeDecimal128((decimal)value, attributes.Precision, attributes.Scale),
+                _ => throw new Exception($"Unknown data type {type}"),
+            };
+        }
 
         public static bool DecodeBool(ReadOnlySpan<byte> source) =>
             source[0] > 0;
