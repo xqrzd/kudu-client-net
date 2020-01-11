@@ -57,7 +57,8 @@ namespace Knet.Kudu.Client
         public ResultSet Current { get; private set; }
 
         public KuduScanEnumerator(
-            KuduClient client, KuduTable table,
+            KuduClient client,
+            KuduTable table,
             IKuduScanParser<ResultSet> parser,
             List<string> projectedNames,
             ReadMode readMode,
@@ -65,31 +66,34 @@ namespace Knet.Kudu.Client
             Dictionary<string, KuduPredicate> predicates,
             long limit,
             bool cacheBlocks,
-            byte[] startPrimaryKey, byte[] endPrimaryKey,
-            long startTimestamp, long htTimestamp,
+            byte[] startPrimaryKey,
+            byte[] endPrimaryKey,
+            long startTimestamp,
+            long htTimestamp,
             int? batchSizeBytes,
             PartitionPruner partitionPruner,
             ReplicaSelection replicaSelection,
             CancellationToken cancellationToken)
         {
-            //    checkArgument(batchSizeBytes >= 0, "Need non-negative number of bytes, " +
-            //"got %s", batchSizeBytes);
-            //    checkArgument(limit > 0, "Need a strictly positive number for the limit, " +
-            //        "got %s", limit);
-
             if (htTimestamp != KuduClient.NoTimestamp)
             {
-                //checkArgument(htTimestamp >= 0, "Need non-negative number for the scan, " +
-                //    " timestamp got %s", htTimestamp);
-                //checkArgument(readMode == ReadMode.READ_AT_SNAPSHOT, "When specifying a " +
-                //    "HybridClock timestamp, the read mode needs to be set to READ_AT_SNAPSHOT");
+                if (htTimestamp < 0)
+                    throw new ArgumentOutOfRangeException(
+                        $"Need non-negative number for the scan, timestamp got {htTimestamp}");
+
+                if (readMode != ReadMode.ReadAtSnapshot)
+                    throw new ArgumentOutOfRangeException(
+                        "When specifying a HybridClock timestamp, the read mode needs to be set to READ_AT_SNAPSHOT");
             }
             if (startTimestamp != KuduClient.NoTimestamp)
             {
-                //checkArgument(htTimestamp >= 0, "Must have both start and end timestamps " +
-                //              "for a diff scan");
-                //checkArgument(startTimestamp <= htTimestamp, "Start timestamp must be less " +
-                //              "than or equal to end timestamp");
+                if (htTimestamp < 0)
+                    throw new ArgumentOutOfRangeException(
+                        "Must have both start and end timestamps for a diff scan");
+
+                if (startTimestamp > htTimestamp)
+                    throw new ArgumentOutOfRangeException(
+                        "Start timestamp must be less than or equal to end timestamp");
             }
 
             _isFaultTolerant = isFaultTolerant;
