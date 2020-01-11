@@ -855,7 +855,7 @@ namespace Knet.Kudu.Client
         {
             try
             {
-                var result = await SendRpcGenericAsync(rpc, serverInfo, cancellationToken)
+                await SendRpcGenericAsync(rpc, serverInfo, cancellationToken)
                     .ConfigureAwait(false);
 
                 if (rpc.Error != null)
@@ -879,7 +879,7 @@ namespace Knet.Kudu.Client
                     }
                 }
 
-                return result;
+                return rpc.Output;
             }
             catch (RecoverableException ex)
             {
@@ -904,7 +904,7 @@ namespace Knet.Kudu.Client
         {
             try
             {
-                var result = await SendRpcGenericAsync(rpc, serverInfo, cancellationToken)
+                await SendRpcGenericAsync(rpc, serverInfo, cancellationToken)
                     .ConfigureAwait(false);
 
                 if (rpc.Error != null)
@@ -939,7 +939,7 @@ namespace Knet.Kudu.Client
                     }
                 }
 
-                return result;
+                return rpc.Output;
             }
             catch (RecoverableException ex)
             {
@@ -948,7 +948,7 @@ namespace Knet.Kudu.Client
             }
         }
 
-        private async Task<T> SendRpcGenericAsync<T>(
+        private async Task SendRpcGenericAsync<T>(
             KuduRpc<T> rpc, ServerInfo serverInfo,
             CancellationToken cancellationToken = default)
         {
@@ -959,7 +959,7 @@ namespace Knet.Kudu.Client
                 KuduConnection connection = await _connectionCache.GetConnectionAsync(
                     serverInfo, cancellationToken).ConfigureAwait(false);
 
-                return await connection.SendReceiveAsync(header, rpc, cancellationToken)
+                await connection.SendReceiveAsync(header, rpc, cancellationToken)
                     .ConfigureAwait(false);
             }
             catch (InvalidAuthnTokenException)

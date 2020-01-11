@@ -246,7 +246,7 @@ namespace Knet.Kudu.Client
                 // means we were in between tablets.
                 if (_tablet != null)
                 {
-                    var rpc = GetCloseRequest();
+                    using var rpc = GetCloseRequest();
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
                     try
@@ -285,7 +285,7 @@ namespace Knet.Kudu.Client
             else if (_tablet == null)
             {
                 // We need to open the scanner first.
-                var rpc = GetOpenRequest();
+                using var rpc = GetOpenRequest();
                 var resp = await _client.SendRpcToTabletAsync(rpc, _cancellationToken)
                     .ConfigureAwait(false);
 
@@ -345,7 +345,7 @@ namespace Knet.Kudu.Client
             }
             else
             {
-                var rpc = GetNextRowsRequest();
+                using var rpc = GetNextRowsRequest();
                 var resp = await _client.SendRpcToTabletAsync(rpc, _cancellationToken)
                     .ConfigureAwait(false);
 
@@ -360,6 +360,7 @@ namespace Knet.Kudu.Client
                     return resp.NumRows > 0;
                 }
                 _sequenceId++;
+
                 return resp.NumRows > 0;
             }
         }
@@ -439,7 +440,7 @@ namespace Knet.Kudu.Client
             _tablet = null;
         }
 
-        private class ScanRequest<T> : KuduTabletRpc<ScanResponse<T>>
+        private class ScanRequest<T> : KuduTabletRpc<ScanResponse<T>>, IDisposable
         {
             private readonly KuduScanEnumerator _scanner;
             private readonly IKuduScanParser<T> _parser;
@@ -465,6 +466,11 @@ namespace Knet.Kudu.Client
             public override ReplicaSelection ReplicaSelection => _scanner._replicaSelection;
 
             // TODO: Authz token
+
+            public void Dispose()
+            {
+                _parser.Dispose();
+            }
 
             public override void Serialize(Stream stream)
             {
@@ -558,14 +564,8 @@ namespace Knet.Kudu.Client
             {
                 var resp = Serializer.Deserialize<ScanResponsePB>(buffer);
 
-                // TODO: Error handling
-
                 _responsePB = resp;
-            }
-
-            protected override void Dispose(bool disposing)
-            {
-                _parser.Dispose();
+                Error = resp.Error;
             }
 
             public override ScanResponse<T> Output

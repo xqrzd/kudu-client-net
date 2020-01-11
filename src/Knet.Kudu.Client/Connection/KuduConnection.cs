@@ -57,9 +57,9 @@ namespace Knet.Kudu.Client.Connection
             }
         }
 
-        public async Task<T> SendReceiveAsync<T>(
+        public async Task SendReceiveAsync(
             RequestHeader header,
-            KuduRpc<T> rpc,
+            KuduRpc rpc,
             CancellationToken cancellationToken)
         {
             var message = new InflightRpc(rpc);
@@ -87,13 +87,10 @@ namespace Knet.Kudu.Client.Connection
             {
                 await SendAsync(header, rpc, cancellationToken).ConfigureAwait(false);
                 await message.Task.ConfigureAwait(false);
-
-                return rpc.Output;
             }
             finally
             {
                 RemoveInflightRpc(header.CallId);
-                rpc.Dispose();
             }
         }
 
