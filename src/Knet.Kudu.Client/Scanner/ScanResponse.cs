@@ -3,7 +3,7 @@
     /// <summary>
     /// Helper object that contains all the info sent by a TS after a Scan request.
     /// </summary>
-    internal class ScanResponse<T>
+    public class ScanResponse<T>
     {
         /// <summary>
         /// The ID associated with the scanner that issued the request.

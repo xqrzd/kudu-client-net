@@ -1,19 +1,14 @@
 ﻿using System;
-using System.Buffers;
 using System.Collections.Generic;
-using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Logging;
 using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Protocol.Tserver;
 using Knet.Kudu.Client.Requests;
 using Knet.Kudu.Client.Scanner;
 using Knet.Kudu.Client.Tablet;
-using Knet.Kudu.Client.Util;
 using Microsoft.Extensions.Logging;
-using ProtoBuf;
 
 namespace Knet.Kudu.Client
 {
@@ -318,18 +313,106 @@ namespace Knet.Kudu.Client
         private ScanRequest GetOpenRequest()
         {
             //checkScanningNotStarted();
-            return new ScanRequest(this, State.Opening);
+            var request = new ScanRequestPB();
+
+            var newRequest = request.NewScanRequest = new NewScanRequestPB
+            {
+                Limit = (ulong)(_limit - _numRowsReturned),
+                OrderMode = _orderMode,
+                CacheBlocks = _cacheBlocks,
+                ReadMode = (ReadModePB)_readMode
+            };
+
+            newRequest.ProjectedColumns.AddRange(_columns);
+
+            // If the last propagated timestamp is set, send it with the scan.
+            // For READ_YOUR_WRITES scan, use the propagated timestamp from
+            // the scanner.
+            bool setPropagatedTimestamp = false;
+
+            if (_readMode == ReadMode.ReadYourWrites)
+            {
+                long timestamp = _lowerBoundPropagationTimestamp;
+                if (timestamp != KuduClient.NoTimestamp)
+                    newRequest.PropagatedTimestamp = (ulong)timestamp;
+            }
+            else
+            {
+                setPropagatedTimestamp = true;
+            }
+
+            // If the mode is set to read on snapshot set the snapshot timestamps.
+            if (_readMode == ReadMode.ReadAtSnapshot)
+            {
+                if (_htTimestamp != KuduClient.NoTimestamp)
+                    newRequest.SnapTimestamp = (ulong)_htTimestamp;
+
+                if (_startTimestamp != KuduClient.NoTimestamp)
+                    newRequest.SnapStartTimestamp = (ulong)_startTimestamp;
+            }
+
+            if (_isFaultTolerant && _lastPrimaryKey.Length > 0)
+                newRequest.LastPrimaryKey = _lastPrimaryKey;
+
+            if (_startPrimaryKey.Length > 0)
+                newRequest.StartPrimaryKey = _startPrimaryKey;
+
+            if (_endPrimaryKey.Length > 0)
+                newRequest.StopPrimaryKey = _endPrimaryKey;
+
+            foreach (KuduPredicate predicate in _predicates.Values)
+                newRequest.ColumnPredicates.Add(predicate.ToProtobuf());
+
+            request.BatchSizeBytes = (uint)_batchSizeBytes;
+
+            return new ScanRequest(
+                ScanRequestState.Opening,
+                request,
+                _schema,
+                _parser,
+                _replicaSelection,
+                _table.TableId,
+                _partitionPruner.NextPartitionKey,
+                setPropagatedTimestamp);
         }
 
         private ScanRequest GetNextRowsRequest()
         {
             //checkScanningNotStarted();
-            return new ScanRequest(this, State.Next);
+            var request = new ScanRequestPB
+            {
+                ScannerId = _scannerId,
+                CallSeqId = _sequenceId,
+                BatchSizeBytes = (uint)_batchSizeBytes
+            };
+
+            return new ScanRequest(
+                ScanRequestState.Next,
+                request,
+                _schema,
+                _parser,
+                _replicaSelection,
+                _table.TableId,
+                _partitionPruner.NextPartitionKey);
         }
 
         private ScanRequest GetCloseRequest()
         {
-            return new ScanRequest(this, State.Closing);
+            var request = new ScanRequestPB
+            {
+                ScannerId = _scannerId,
+                BatchSizeBytes = 0,
+                CloseScanner = true
+            };
+
+            return new ScanRequest(
+                ScanRequestState.Closing,
+                request,
+                _schema,
+                _parser,
+                _replicaSelection,
+                _table.TableId,
+                _partitionPruner.NextPartitionKey);
         }
 
         private void ScanFinished()
@@ -415,167 +498,6 @@ namespace Knet.Kudu.Client
                 // Most of the time it probably does.
                 return 1024 * 1024;
             }
-        }
-
-        private class ScanRequest : KuduTabletRpc<ScanResponse<ResultSet>>, IDisposable
-        {
-            private readonly KuduScanEnumerator _scanner;
-            private readonly IKuduScanParser<ResultSet> _parser;
-            private readonly State _state;
-
-            private ScanResponsePB _responsePB;
-
-            public ScanRequest(KuduScanEnumerator scanner, State state)
-            {
-                _scanner = scanner;
-                _parser = scanner._parser;
-                _state = state;
-                Tablet = scanner._tablet;
-                TableId = _scanner._table.TableId;
-                PartitionKey = _scanner._partitionPruner.NextPartitionKey;
-                NeedsAuthzToken = true;
-            }
-
-            public override string MethodName => "Scan";
-
-            // TODO: Required features
-
-            public override ReplicaSelection ReplicaSelection => _scanner._replicaSelection;
-
-            // TODO: Authz token
-
-            public void Dispose()
-            {
-                _parser.Dispose();
-            }
-
-            public override void Serialize(Stream stream)
-            {
-                var request = new ScanRequestPB();
-
-                if (_state == State.Opening)
-                {
-                    var newRequest = request.NewScanRequest = new NewScanRequestPB();
-                    newRequest.Limit = (ulong)(_scanner._limit - _scanner._numRowsReturned);
-                    newRequest.ProjectedColumns.AddRange(_scanner._columns);
-                    newRequest.TabletId = Tablet.TabletId.ToUtf8ByteArray();
-                    newRequest.OrderMode = _scanner._orderMode;
-                    newRequest.CacheBlocks = _scanner._cacheBlocks;
-                    // If the last propagated timestamp is set, send it with the scan.
-                    // For READ_YOUR_WRITES scan, use the propagated timestamp from
-                    // the scanner.
-                    long timestamp;
-                    if (_scanner._readMode == ReadMode.ReadYourWrites)
-                    {
-                        timestamp = _scanner._lowerBoundPropagationTimestamp;
-                    }
-                    else
-                    {
-                        timestamp = _scanner._client.LastPropagatedTimestamp;
-                    }
-                    if (timestamp != KuduClient.NoTimestamp)
-                    {
-                        newRequest.PropagatedTimestamp = (ulong)timestamp;
-                    }
-                    newRequest.ReadMode = (ReadModePB)_scanner._readMode;
-
-                    // If the mode is set to read on snapshot set the snapshot timestamps.
-                    if (_scanner._readMode == ReadMode.ReadAtSnapshot)
-                    {
-                        if (_scanner._htTimestamp != KuduClient.NoTimestamp)
-                            newRequest.SnapTimestamp = (ulong)_scanner._htTimestamp;
-
-                        if (_scanner._startTimestamp != KuduClient.NoTimestamp)
-                            newRequest.SnapStartTimestamp = (ulong)_scanner._startTimestamp;
-                    }
-
-                    if (_scanner._isFaultTolerant)
-                    {
-                        if (_scanner._lastPrimaryKey.Length > 0)
-                        {
-                            newRequest.LastPrimaryKey = _scanner._lastPrimaryKey;
-                        }
-                    }
-
-                    if (_scanner._startPrimaryKey.Length > 0)
-                    {
-                        newRequest.StartPrimaryKey = _scanner._startPrimaryKey;
-                    }
-
-                    if (_scanner._endPrimaryKey.Length > 0)
-                    {
-                        newRequest.StopPrimaryKey = _scanner._endPrimaryKey;
-                    }
-
-                    foreach (KuduPredicate predicate in _scanner._predicates.Values)
-                    {
-                        newRequest.ColumnPredicates.Add(predicate.ToProtobuf());
-                    }
-                    if (AuthzToken != null)
-                    {
-                        newRequest.AuthzToken = AuthzToken;
-                    }
-                    if (PropagatedTimestamp != KuduClient.NoTimestamp)
-                    {
-                        newRequest.PropagatedTimestamp = (ulong)PropagatedTimestamp;
-                    }
-                    request.BatchSizeBytes = (uint)_scanner._batchSizeBytes;
-                }
-                else if (_state == State.Next)
-                {
-                    request.ScannerId = _scanner._scannerId;
-                    request.CallSeqId = _scanner._sequenceId;
-                    request.BatchSizeBytes = (uint)_scanner._batchSizeBytes;
-                }
-                else if (_state == State.Closing)
-                {
-                    request.ScannerId = _scanner._scannerId;
-                    request.BatchSizeBytes = 0;
-                    request.CloseScanner = true;
-                }
-
-                Serializer.SerializeWithLengthPrefix(stream, request, PrefixStyle.Base128);
-            }
-
-            public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
-            {
-                var resp = Serializer.Deserialize<ScanResponsePB>(buffer);
-
-                _responsePB = resp;
-                Error = resp.Error;
-            }
-
-            public override ScanResponse<ResultSet> Output
-            {
-                get
-                {
-                    return new ScanResponse<ResultSet>(
-                        _responsePB.ScannerId,
-                        _parser.Output,
-                        _responsePB.Data.NumRows,
-                        _responsePB.HasMoreResults,
-                        _responsePB.ShouldSerializeSnapTimestamp() ? (long)_responsePB.SnapTimestamp : KuduClient.NoTimestamp,
-                        _responsePB.ShouldSerializePropagatedTimestamp() ? (long)_responsePB.PropagatedTimestamp : KuduClient.NoTimestamp,
-                        _responsePB.LastPrimaryKey);
-                }
-            }
-
-            public override void BeginProcessingSidecars(KuduSidecarOffsets sidecars)
-            {
-                _parser.BeginProcessingSidecars(_scanner._schema, _responsePB, sidecars);
-            }
-
-            public override void ParseSidecarSegment(ref SequenceReader<byte> reader)
-            {
-                _parser.ParseSidecarSegment(ref reader);
-            }
-        }
-
-        private enum State
-        {
-            Opening,
-            Next,
-            Closing
         }
     }
 }
