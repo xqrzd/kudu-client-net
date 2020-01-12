@@ -57,7 +57,7 @@ namespace Knet.Kudu.Client
 
             _columnOffsets = columnOffsets;
             _rowSize = schema.RowSize;
-            NullBitSetOffset = columnOffsets.Length - 1;
+            NullBitSetOffset = columnOffsets[columnOffsets.Length - 1];
         }
 
         public void Dispose()
