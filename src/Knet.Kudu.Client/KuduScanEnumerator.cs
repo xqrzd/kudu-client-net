@@ -5,18 +5,21 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Connection;
+using Knet.Kudu.Client.Logging;
 using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Protocol.Tserver;
 using Knet.Kudu.Client.Requests;
 using Knet.Kudu.Client.Scanner;
 using Knet.Kudu.Client.Tablet;
 using Knet.Kudu.Client.Util;
+using Microsoft.Extensions.Logging;
 using ProtoBuf;
 
 namespace Knet.Kudu.Client
 {
     public class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
     {
+        private readonly ILogger _logger;
         private readonly KuduClient _client;
         private readonly KuduTable _table;
         private readonly IKuduScanParser<ResultSet> _parser;
@@ -57,6 +60,7 @@ namespace Knet.Kudu.Client
         public ResultSet Current { get; private set; }
 
         public KuduScanEnumerator(
+            ILogger logger,
             KuduClient client,
             KuduTable table,
             IKuduScanParser<ResultSet> parser,
@@ -107,6 +111,7 @@ namespace Knet.Kudu.Client
             else
                 _orderMode = OrderModePB.Unordered;
 
+            _logger = logger;
             _client = client;
             _table = table;
             _parser = parser;
@@ -178,31 +183,6 @@ namespace Knet.Kudu.Client
             }
         }
 
-        /// <summary>
-        /// Generates and returns a ColumnSchema for the virtual IS_DELETED column.
-        /// The column name is generated to ensure there is never a collision.
-        /// </summary>
-        /// <param name="schema">The table schema.</param>
-        private static ColumnSchemaPB GenerateIsDeletedColumn(Schema schema)
-        {
-            var columnName = "is_deleted";
-
-            // If the column already exists and we need to pick an alternate column name.
-            while (schema.HasColumn(columnName))
-            {
-                columnName += "_";
-            }
-
-            return new ColumnSchemaPB
-            {
-                Name = columnName,
-                Type = DataTypePB.IsDeleted,
-                ReadDefaultValue = new byte[] { 0 },
-                IsNullable = false,
-                IsKey = false
-            };
-        }
-
         public async ValueTask DisposeAsync()
         {
             if (Current != null)
@@ -227,8 +207,7 @@ namespace Knet.Kudu.Client
                     }
                     catch (Exception ex)
                     {
-                        // TODO: Log warning.
-                        Console.WriteLine($"Error closing scanner: {ex}");
+                        _logger.ExceptionClosingScanner(ex);
                     }
                 }
 
@@ -382,6 +361,31 @@ namespace Knet.Kudu.Client
         private void Invalidate()
         {
             _tablet = null;
+        }
+
+        /// <summary>
+        /// Generates and returns a ColumnSchema for the virtual IS_DELETED column.
+        /// The column name is generated to ensure there is never a collision.
+        /// </summary>
+        /// <param name="schema">The table schema.</param>
+        private static ColumnSchemaPB GenerateIsDeletedColumn(Schema schema)
+        {
+            var columnName = "is_deleted";
+
+            // If the column already exists and we need to pick an alternate column name.
+            while (schema.HasColumn(columnName))
+            {
+                columnName += "_";
+            }
+
+            return new ColumnSchemaPB
+            {
+                Name = columnName,
+                Type = DataTypePB.IsDeleted,
+                ReadDefaultValue = new byte[] { 0 },
+                IsNullable = false,
+                IsKey = false
+            };
         }
 
         private static ColumnSchemaPB ToColumnSchemaPb(ColumnSchema columnSchema)

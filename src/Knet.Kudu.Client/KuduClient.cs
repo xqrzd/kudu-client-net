@@ -36,6 +36,7 @@ namespace Knet.Kudu.Client
         private readonly KuduClientOptions _options;
         private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger _logger;
+        private readonly ILogger _scanLogger;
         private readonly IKuduConnectionFactory _connectionFactory;
         private readonly ConnectionCache _connectionCache;
         private readonly ConcurrentDictionary<string, TableLocationsCache> _tableLocations;
@@ -62,6 +63,7 @@ namespace Knet.Kudu.Client
             _options = options;
             _loggerFactory = loggerFactory;
             _logger = loggerFactory.CreateLogger<KuduClient>();
+            _scanLogger = loggerFactory.CreateLogger<KuduScanner>();
             _connectionFactory = new KuduConnectionFactory(options, loggerFactory);
             _connectionCache = new ConnectionCache(_connectionFactory, loggerFactory);
             _tableLocations = new ConcurrentDictionary<string, TableLocationsCache>();
@@ -318,7 +320,7 @@ namespace Knet.Kudu.Client
 
         public ScanBuilder NewScanBuilder(KuduTable table)
         {
-            return new ScanBuilder(this, table);
+            return new ScanBuilder(this, table, _scanLogger);
         }
 
         public IKuduSession NewSession() => NewSession(new KuduSessionOptions());

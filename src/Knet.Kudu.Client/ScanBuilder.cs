@@ -2,11 +2,13 @@
 using System.Linq;
 using Knet.Kudu.Client.Tablet;
 using Knet.Kudu.Client.Util;
+using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client
 {
     public class ScanBuilder
     {
+        internal readonly ILogger Logger;
         internal readonly KuduClient Client;
         internal readonly KuduTable Table;
 
@@ -30,10 +32,11 @@ namespace Knet.Kudu.Client
         internal long ScanRequestTimeout; // TODO: Expose this, and expose as TimeSpan?
         internal ReplicaSelection ReplicaSelection = ReplicaSelection.LeaderOnly;
 
-        public ScanBuilder(KuduClient client, KuduTable table)
+        public ScanBuilder(KuduClient client, KuduTable table, ILogger logger)
         {
             Client = client;
             Table = table;
+            Logger = logger;
             Predicates = new Dictionary<string, KuduPredicate>();
             ScanRequestTimeout = -1; // TODO: Pull this from the client.
         }

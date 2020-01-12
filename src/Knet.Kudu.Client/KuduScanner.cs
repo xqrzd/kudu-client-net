@@ -28,6 +28,7 @@ namespace Knet.Kudu.Client
                 _scanBuilder.UpperBoundPartitionKey);
 
             return new KuduScanEnumerator(
+                _scanBuilder.Logger,
                 _scanBuilder.Client,
                 _scanBuilder.Table,
                 parser,
