@@ -17,6 +17,7 @@ namespace Knet.Kudu.Client.Logging
         private static readonly Action<ILogger, string, Exception> _connectionDisconnected;
         private static readonly Action<ILogger, HostAndPort, IPAddress, string, Exception> _unableToConnectToServer;
         private static readonly Action<ILogger, Exception> _exceptionSendingSessionData;
+        private static readonly Action<ILogger, Exception> _exceptionClosingScanner;
 
         static LoggerExtensions()
         {
@@ -49,6 +50,11 @@ namespace Knet.Kudu.Client.Logging
                 eventId: new EventId(6, "ExceptionSendingSessionData"),
                 logLevel: LogLevel.Error,
                 formatString: "Exception occurred while flushing session data, will retry");
+
+            _exceptionClosingScanner = LoggerMessage.Define(
+                eventId: new EventId(7, "ExceptionClosingScanner"),
+                logLevel: LogLevel.Warning,
+                formatString: "Exception occurred while closing scanner");
         }
 
         public static void ConnectedToServer(this ILogger logger, HostAndPort hostPort, IPAddress ipAddress, string tlsInfo, string negotiateInfo, bool isLocal)
@@ -81,6 +87,11 @@ namespace Knet.Kudu.Client.Logging
         public static void ExceptionSendingSessionData(this ILogger logger, Exception ex)
         {
             _exceptionSendingSessionData(logger, ex);
+        }
+
+        public static void ExceptionClosingScanner(this ILogger logger, Exception ex)
+        {
+            _exceptionClosingScanner(logger, ex);
         }
     }
 }

@@ -1,5 +1,4 @@
-﻿using System;
-using System.Buffers;
+﻿using System.Buffers;
 using System.IO;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Protocol.Master;
@@ -11,7 +10,7 @@ using ProtoBuf;
 namespace Knet.Kudu.Client.Requests
 {
     // TODO: These types need a lot of refactoring.
-    public abstract class KuduRpc : IDisposable
+    public abstract class KuduRpc
     {
         // Service names.
         protected const string MasterServiceName = "kudu.master.MasterService";
@@ -57,15 +56,6 @@ namespace Knet.Kudu.Client.Requests
 
         public virtual void ParseSidecarSegment(ref SequenceReader<byte> reader)
         {
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
         }
     }
 

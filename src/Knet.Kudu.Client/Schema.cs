@@ -48,10 +48,15 @@ namespace Knet.Kudu.Client
 
         public bool HasNullableColumns { get; }
 
-        public Schema(List<ColumnSchema> columns)
-            : this(columns, null) { }
+        /// <summary>
+        /// Index of the IS_DELETED virtual column.
+        /// </summary>
+        public int IsDeletedIndex { get; }
 
-        public Schema(List<ColumnSchema> columns, List<int> columnIds)
+        public Schema(List<ColumnSchema> columns, int isDeletedIndex = -1)
+            : this(columns, null, isDeletedIndex) { }
+
+        public Schema(List<ColumnSchema> columns, List<int> columnIds, int isDeletedIndex = -1)
         {
             var hasColumnIds = columnIds != null;
             if (hasColumnIds)
@@ -61,6 +66,7 @@ namespace Knet.Kudu.Client
             _columnsByName = new Dictionary<string, int>(columns.Count);
             _columnsById = new Dictionary<int, int>(columns.Count);
             _columnOffsets = new int[columns.Count];
+            IsDeletedIndex = isDeletedIndex;
 
             for (int i = 0; i < columns.Count; i++)
             {
@@ -107,6 +113,7 @@ namespace Knet.Kudu.Client
             var columnsById = new Dictionary<int, int>(columns.Count);
             var columnOffsets = new int[columns.Count];
             var columnsByIndex = new ColumnSchema[columns.Count];
+            var isDeletedIndex = -1;
 
             for (int i = 0; i < columns.Count; i++)
             {
@@ -133,6 +140,9 @@ namespace Knet.Kudu.Client
                 if (column.IsKey)
                     primaryKeyColumns.Add(columnsByIndex[i]);
 
+                if (column.Type == DataTypePB.IsDeleted)
+                    isDeletedIndex = i;
+
                 // TODO: Remove this hack-fix. Kudu throws an exception if columnId is supplied.
                 column.ResetId();
             }
@@ -146,6 +156,7 @@ namespace Knet.Kudu.Client
             VarLengthColumnCount = varLenCnt;
             HasNullableColumns = hasNulls;
             RowSize = GetRowSize(columnsByIndex);
+            IsDeletedIndex = isDeletedIndex;
         }
 
         public IReadOnlyList<ColumnSchema> Columns => _columnsByIndex;
@@ -174,6 +185,11 @@ namespace Knet.Kudu.Client
         /// </summary>
         /// <param name="columnName">Column to search for.</param>
         public bool HasColumn(string columnName) => _columnsByName.ContainsKey(columnName);
+
+        /// <summary>
+        /// True if the schema has the IS_DELETED virtual column.
+        /// </summary>
+        public bool HasIsDeleted => IsDeletedIndex != -1;
 
         public static int GetTypeSize(KuduType type)
         {
