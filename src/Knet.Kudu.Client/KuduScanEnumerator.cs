@@ -78,21 +78,21 @@ namespace Knet.Kudu.Client
             if (htTimestamp != KuduClient.NoTimestamp)
             {
                 if (htTimestamp < 0)
-                    throw new ArgumentOutOfRangeException(
+                    throw new ArgumentException(
                         $"Need non-negative number for the scan, timestamp got {htTimestamp}");
 
                 if (readMode != ReadMode.ReadAtSnapshot)
-                    throw new ArgumentOutOfRangeException(
+                    throw new ArgumentException(
                         "When specifying a HybridClock timestamp, the read mode needs to be set to READ_AT_SNAPSHOT");
             }
             if (startTimestamp != KuduClient.NoTimestamp)
             {
                 if (htTimestamp < 0)
-                    throw new ArgumentOutOfRangeException(
+                    throw new ArgumentException(
                         "Must have both start and end timestamps for a diff scan");
 
                 if (startTimestamp > htTimestamp)
-                    throw new ArgumentOutOfRangeException(
+                    throw new ArgumentException(
                         "Start timestamp must be less than or equal to end timestamp");
             }
 
@@ -143,13 +143,22 @@ namespace Knet.Kudu.Client
                     columns.Add(columnSchema);
                 }
             }
-            _schema = new Schema(columns);
-            _batchSizeBytes = batchSizeBytes ?? GetScannerBatchSizeEstimate(_schema);
+
+            int isDeletedIndex = -1;
+
             // This is a diff scan so add the IS_DELETED column.
             if (startTimestamp != KuduClient.NoTimestamp)
             {
-                _columns.Add(GenerateIsDeletedColumn(table.Schema));
+                var deletedColumn = GenerateIsDeletedColumn(table.Schema);
+                _columns.Add(deletedColumn);
+
+                var delColumn = new ColumnSchema(deletedColumn.Name, KuduType.Bool);
+                columns.Add(delColumn);
+                isDeletedIndex = columns.Count - 1;
             }
+
+            _schema = new Schema(columns, isDeletedIndex);
+            _batchSizeBytes = batchSizeBytes ?? GetScannerBatchSizeEstimate(_schema);
 
             // If the partition pruner has pruned all partitions, then the scan can be
             // short circuited without contacting any tablet servers.
@@ -327,30 +336,6 @@ namespace Knet.Kudu.Client
             }
         }
 
-        private ColumnSchemaPB ToColumnSchemaPb(ColumnSchema columnSchema)
-        {
-            // TODO: Move this to shared location.
-            return new ColumnSchemaPB
-            {
-                Name = columnSchema.Name,
-                Type = (DataTypePB)columnSchema.Type,
-                IsNullable = columnSchema.IsNullable,
-                // Se isKey to false on the passed ColumnSchema.
-                // This allows out of order key columns in projections.
-                IsKey = false,
-                // TODO: Default values
-                // TODO: Block size
-                Encoding = (EncodingTypePB)columnSchema.Encoding,
-                Compression = (CompressionTypePB)columnSchema.Compression,
-                TypeAttributes = columnSchema.TypeAttributes == null ? null : new ColumnTypeAttributesPB
-                {
-                    Precision = columnSchema.TypeAttributes.Precision,
-                    Scale = columnSchema.TypeAttributes.Scale
-                }
-                // TODO: Comment
-            };
-        }
-
         private ScanRequest GetOpenRequest()
         {
             //checkScanningNotStarted();
@@ -397,6 +382,19 @@ namespace Knet.Kudu.Client
         private void Invalidate()
         {
             _tablet = null;
+        }
+
+        private static ColumnSchemaPB ToColumnSchemaPb(ColumnSchema columnSchema)
+        {
+            return new ColumnSchemaPB
+            {
+                Name = columnSchema.Name,
+                Type = (DataTypePB)columnSchema.Type,
+                IsNullable = columnSchema.IsNullable,
+                // Set isKey to false on the passed ColumnSchema.
+                // This allows out of order key columns in projections.
+                IsKey = false
+            };
         }
 
         private static int GetScannerBatchSizeEstimate(Schema schema)
