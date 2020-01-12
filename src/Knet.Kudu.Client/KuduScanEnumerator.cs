@@ -180,11 +180,7 @@ namespace Knet.Kudu.Client
 
         public async ValueTask DisposeAsync()
         {
-            if (Current != null)
-            {
-                Current.Dispose();
-                Current = null;
-            }
+            ClearCurrent();
 
             if (!_closed)
             {
@@ -216,11 +212,7 @@ namespace Knet.Kudu.Client
             // TODO: Catch OperationCancelledException, and call DisposeAsync()
             // Only wait a small amount of time to cancel the scan on the server.
 
-            if (Current != null)
-            {
-                Current.Dispose();
-                Current = null;
-            }
+            ClearCurrent();
 
             if (_closed)
             {
@@ -444,6 +436,16 @@ namespace Knet.Kudu.Client
         private void Invalidate()
         {
             _tablet = null;
+        }
+
+        private void ClearCurrent()
+        {
+            var current = Current;
+            if (current != null)
+            {
+                Current = null;
+                current.Dispose();
+            }
         }
 
         /// <summary>
