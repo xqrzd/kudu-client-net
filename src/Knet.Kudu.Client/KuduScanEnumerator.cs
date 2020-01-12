@@ -317,20 +317,13 @@ namespace Knet.Kudu.Client
 
             newRequest.ProjectedColumns.AddRange(_columns);
 
-            // If the last propagated timestamp is set, send it with the scan.
             // For READ_YOUR_WRITES scan, use the propagated timestamp from
             // the scanner.
-            bool setPropagatedTimestamp = false;
-
             if (_readMode == ReadMode.ReadYourWrites)
             {
                 long timestamp = _lowerBoundPropagationTimestamp;
                 if (timestamp != KuduClient.NoTimestamp)
                     newRequest.PropagatedTimestamp = (ulong)timestamp;
-            }
-            else
-            {
-                setPropagatedTimestamp = true;
             }
 
             // If the mode is set to read on snapshot set the snapshot timestamps.
@@ -364,8 +357,7 @@ namespace Knet.Kudu.Client
                 _parser,
                 _replicaSelection,
                 _table.TableId,
-                _partitionPruner.NextPartitionKey,
-                setPropagatedTimestamp);
+                _partitionPruner.NextPartitionKey);
         }
 
         private ScanRequest GetNextRowsRequest()

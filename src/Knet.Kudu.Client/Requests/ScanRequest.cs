@@ -2,6 +2,7 @@
 using System.Buffers;
 using System.IO;
 using Knet.Kudu.Client.Connection;
+using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Protocol.Tserver;
 using Knet.Kudu.Client.Scanner;
 using Knet.Kudu.Client.Util;
@@ -15,7 +16,6 @@ namespace Knet.Kudu.Client.Requests
         private readonly ScanRequestPB _scanRequestPb;
         private readonly Schema _schema;
         private readonly IKuduScanParser<ResultSet> _parser;
-        private readonly bool _setPropagatedTimestamp;
 
         private ScanResponsePB _responsePB;
 
@@ -26,14 +26,12 @@ namespace Knet.Kudu.Client.Requests
             IKuduScanParser<ResultSet> parser,
             ReplicaSelection replicaSelection,
             string tableId,
-            byte[] partitionKey,
-            bool setPropagatedTimestamp = false)
+            byte[] partitionKey)
         {
             _state = state;
             _scanRequestPb = scanRequestPb;
             _schema = schema;
             _parser = parser;
-            _setPropagatedTimestamp = setPropagatedTimestamp;
 
             ReplicaSelection = replicaSelection;
             TableId = tableId;
@@ -63,8 +61,12 @@ namespace Knet.Kudu.Client.Requests
                 if (AuthzToken != null)
                     newRequest.AuthzToken = AuthzToken;
 
-                if (_setPropagatedTimestamp && PropagatedTimestamp != KuduClient.NoTimestamp)
+                // If the last propagated timestamp is set, send it with the scan.
+                if (newRequest.ReadMode != ReadModePB.ReadYourWrites &&
+                    PropagatedTimestamp != KuduClient.NoTimestamp)
+                {
                     newRequest.PropagatedTimestamp = (ulong)PropagatedTimestamp;
+                }
             }
 
             Serializer.SerializeWithLengthPrefix(stream, _scanRequestPb, PrefixStyle.Base128);
