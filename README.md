@@ -15,7 +15,7 @@ To build the solution you need the [.NET Core 3.1 SDK](https://dotnet.microsoft.
 ## Supported Versions
 This library supports Apache Kudu 1.3 and newer. The newest version of this library
 should always be used, regardless of the Apache Kudu version.
-This client aims for feature partity between the official C++ and Java clients.
+This client aims for feature parity between the official C++ and Java clients.
 There should be no unsupported functionality, once this client is complete.
 
 ## Quickstart
@@ -83,7 +83,7 @@ await foreach (ResultSet resultSet in scanner)
 
 static void PrintRows(ResultSet resultSet)
 {
-    foreach (var row in resultSet)
+    foreach (RowResult row in resultSet)
     {
         var tweetId = row.GetInt64("tweet_id");
         var userName = row.GetString("user_name");
