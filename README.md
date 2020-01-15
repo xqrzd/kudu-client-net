@@ -44,6 +44,8 @@ var tableBuilder = new TableBuilder("twitter_firehose")
 await client.CreateTableAsync(tableBuilder);
 ```
 
+See more table options in the [wiki](Create-Table).
+
 ### Open a Table
 
 ```csharp
