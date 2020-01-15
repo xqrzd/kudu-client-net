@@ -44,7 +44,7 @@ var tableBuilder = new TableBuilder("twitter_firehose")
 await client.CreateTableAsync(tableBuilder);
 ```
 
-See more table options in the [wiki](Create-Table).
+See more table options in the [wiki](https://github.com/xqrzd/kudu-client-net/wiki/Create-Table).
 
 ### Open a Table
 
