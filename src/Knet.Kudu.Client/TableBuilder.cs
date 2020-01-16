@@ -12,10 +12,15 @@ namespace Knet.Kudu.Client
 
         internal CreateTableRequestPB CreateTableRequest;
 
-        public TableBuilder()
+        /// <summary>
+        /// Creates a new table builder with the given table name.
+        /// </summary>
+        /// <param name="tableName">The table's name.</param>
+        public TableBuilder(string tableName = null)
         {
             CreateTableRequest = new CreateTableRequestPB
             {
+                Name = tableName,
                 Schema = new SchemaPB(),
                 PartitionSchema = new PartitionSchemaPB
                 {
