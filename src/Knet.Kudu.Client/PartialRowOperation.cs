@@ -12,6 +12,12 @@ namespace Knet.Kudu.Client
             _operation = operation;
         }
 
+        internal PartialRowOperation(PartialRowOperation row, RowOperation operation)
+            : base(row)
+        {
+            _operation = operation;
+        }
+
         public void WriteToWithOperation(
             Span<byte> rowDestination,
             Span<byte> indirectDestination,

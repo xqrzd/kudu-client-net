@@ -251,6 +251,43 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// Add a range partition partition to the table with an identical lower
+        /// bound and upper bound.
+        /// 
+        /// If arange column is missing a value, the logical minimum value for that
+        /// column type will be used as the default.
+        /// 
+        /// Multiple range bounds may be added, but they must not overlap. All split
+        /// rows must fall in one of the range bounds.
+        /// 
+        /// If not provided, the table's range will be unbounded.
+        /// </summary>
+        /// <param name="configure">
+        /// Delegate to configure the partition row.
+        /// </param>
+        public TableBuilder AddRangePartition(
+            Action<PartialRowOperation> configure)
+        {
+            // TODO: Rework this
+            var columns = CreateTableRequest.Schema.Columns
+                .Select(c => ColumnSchema.FromProtobuf(c))
+                .ToList();
+
+            var schema = new Schema(columns);
+            var lowerBoundRow = new PartialRowOperation(
+                schema, RowOperation.RangeLowerBound);
+            configure(lowerBoundRow);
+
+            var upperBoundRow = new PartialRowOperation(
+                lowerBoundRow, RowOperation.InclusiveRangeUpperBound);
+
+            _splitRowsRangeBounds.Add(lowerBoundRow);
+            _splitRowsRangeBounds.Add(upperBoundRow);
+
+            return this;
+        }
+
+        /// <summary>
         /// Add a range partition split. The split row must fall in a range partition,
         /// and causes the range partition to split into two contiguous range partitions.
         /// </summary>
