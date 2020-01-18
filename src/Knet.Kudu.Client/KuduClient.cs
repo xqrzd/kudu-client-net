@@ -139,6 +139,17 @@ namespace Knet.Kudu.Client
             return await OpenTableAsync(tableIdentifier, cancellationToken).ConfigureAwait(false);
         }
 
+        public async Task<AlterTableResponse> AlterTableAsync(
+            string tableName,
+            AlterTableBuilder alterTable,
+            CancellationToken cancellationToken = default)
+        {
+            var rpc = new AlterTableRequest(tableName, alterTable);
+            var response = await SendRpcToMasterAsync(rpc, cancellationToken).ConfigureAwait(false);
+
+            return response;
+        }
+
         /// <summary>
         /// Delete a table on the cluster with the specified name.
         /// </summary>
