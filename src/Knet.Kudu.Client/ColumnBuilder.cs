@@ -124,25 +124,13 @@ namespace Knet.Kudu.Client
         /// </param>
         public ColumnBuilder DefaultValue(object value)
         {
-            _column.ReadDefaultValue = KuduEncoder.EncodeValue(
+            _column.ReadDefaultValue = KuduEncoder.EncodeDefaultValue(
                 (KuduType)_column.Type,
-                value,
-                ToColumnAttributes(_column.TypeAttributes));
+                value);
 
             return this;
         }
 
         public static implicit operator ColumnSchemaPB(ColumnBuilder builder) => builder._column;
-
-        private static ColumnTypeAttributes ToColumnAttributes(
-            ColumnTypeAttributesPB attributesPb)
-        {
-            if (attributesPb == null)
-                return null;
-
-            return new ColumnTypeAttributes(
-                attributesPb.Precision,
-                attributesPb.Scale);
-        }
     }
 }

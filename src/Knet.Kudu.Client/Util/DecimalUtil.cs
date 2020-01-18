@@ -220,6 +220,12 @@ namespace Knet.Kudu.Client.Util
             return KuduInt128.PowerOf10(precision) - 1;
         }
 
+        public static int GetScale(decimal value)
+        {
+            var dec = new DecimalAccessor(value);
+            return (int)dec.Scale;
+        }
+
         private static ulong ToLong(uint low, uint high)
         {
             return ((ulong)high << 32) | low;
