@@ -140,8 +140,7 @@ namespace Knet.Kudu.Client.Util
         public static byte[] EncodeString(string source) =>
             Encoding.UTF8.GetBytes(source);
 
-        public static byte[] EncodeValue(
-            KuduType type, object value, ColumnTypeAttributes attributes = null)
+        public static byte[] EncodeDefaultValue(KuduType type, object value)
         {
             return type switch
             {
@@ -155,11 +154,19 @@ namespace Knet.Kudu.Client.Util
                 KuduType.Double => EncodeDouble((double)value),
                 KuduType.Binary => (byte[])value,
                 KuduType.UnixtimeMicros => EncodeDateTime((DateTime)value),
-                KuduType.Decimal32 => EncodeDecimal32((decimal)value, attributes.Precision, attributes.Scale),
-                KuduType.Decimal64 => EncodeDecimal64((decimal)value, attributes.Precision, attributes.Scale),
-                KuduType.Decimal128 => EncodeDecimal128((decimal)value, attributes.Precision, attributes.Scale),
+                KuduType.Decimal32 => EncodeDecimal((decimal)value),
+                KuduType.Decimal64 => EncodeDecimal((decimal)value),
+                KuduType.Decimal128 => EncodeDecimal((decimal)value),
                 _ => throw new Exception($"Unknown data type {type}"),
             };
+
+            static byte[] EncodeDecimal(decimal value)
+            {
+                var scale = DecimalUtil.GetScale(value);
+
+                return EncodeDecimal128(
+                    value, DecimalUtil.MaxDecimal128Precision, scale);
+            }
         }
 
         public static bool DecodeBool(ReadOnlySpan<byte> source) =>

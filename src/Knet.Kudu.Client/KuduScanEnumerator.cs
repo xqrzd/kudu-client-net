@@ -474,7 +474,12 @@ namespace Knet.Kudu.Client
                 IsNullable = columnSchema.IsNullable,
                 // Set isKey to false on the passed ColumnSchema.
                 // This allows out of order key columns in projections.
-                IsKey = false
+                IsKey = false,
+                TypeAttributes = columnSchema.TypeAttributes == null ? null : new ColumnTypeAttributesPB
+                {
+                    Precision = columnSchema.TypeAttributes.Precision,
+                    Scale = columnSchema.TypeAttributes.Scale
+                }
             };
         }
 
