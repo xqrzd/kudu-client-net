@@ -139,6 +139,59 @@ namespace Knet.Kudu.Client
             return await OpenTableAsync(tableIdentifier, cancellationToken).ConfigureAwait(false);
         }
 
+        public async Task<AlterTableResponse> AlterTableAsync(
+            AlterTableBuilder alterTable,
+            CancellationToken cancellationToken = default)
+        {
+            var rpc = new AlterTableRequest(alterTable);
+            AlterTableResponse response;
+
+            try
+            {
+                response = await SendRpcToMasterAsync(rpc, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                if (alterTable.HasAddDropRangePartitions)
+                {
+                    // Clear the table locations cache so the new partition is
+                    // immediately visible. We clear the cache even on failure,
+                    // just in case the alter table operation actually succeeded.
+                    _tableLocations.TryRemove(alterTable.TableId, out _);
+                }
+            }
+
+            if (alterTable.Wait)
+            {
+                var isDoneResponse = await WaitForIsAlterTableDoneAsync(
+                    alterTable.TableIdPb, cancellationToken).ConfigureAwait(false);
+
+                response = new AlterTableResponse(
+                    response.TableId,
+                    isDoneResponse.SchemaVersion);
+            }
+
+            return response;
+        }
+
+        private async Task<IsAlterTableDoneResponsePB> WaitForIsAlterTableDoneAsync(
+            TableIdentifierPB tableId, CancellationToken cancellationToken)
+        {
+            var rpc = new IsAlterTableDoneRequest(tableId);
+
+            while (true)
+            {
+                var response = await SendRpcToMasterAsync(rpc, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (response.Done)
+                    return response;
+                else
+                    await Task.Delay(100).ConfigureAwait(false);
+            }
+        }
+
         /// <summary>
         /// Delete a table on the cluster with the specified name.
         /// </summary>

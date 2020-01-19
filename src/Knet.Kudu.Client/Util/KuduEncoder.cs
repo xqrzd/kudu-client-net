@@ -154,19 +154,39 @@ namespace Knet.Kudu.Client.Util
                 KuduType.Double => EncodeDouble((double)value),
                 KuduType.Binary => (byte[])value,
                 KuduType.UnixtimeMicros => EncodeDateTime((DateTime)value),
-                KuduType.Decimal32 => EncodeDecimal((decimal)value),
-                KuduType.Decimal64 => EncodeDecimal((decimal)value),
-                KuduType.Decimal128 => EncodeDecimal((decimal)value),
+                KuduType.Decimal32 => EncodeDefaultDecimal((decimal)value),
+                KuduType.Decimal64 => EncodeDefaultDecimal((decimal)value),
+                KuduType.Decimal128 => EncodeDefaultDecimal((decimal)value),
                 _ => throw new Exception($"Unknown data type {type}"),
             };
+        }
 
-            static byte[] EncodeDecimal(decimal value)
+        /// <summary>
+        /// Serializes an object based on its C# type. Used for Alter Column
+        /// operations where the column's type is not available.
+        /// </summary>
+        /// <param name="value">The value to serialize.</param>
+        public static byte[] EncodeDefaultValue(object value)
+        {
+            return value switch
             {
-                var scale = DecimalUtil.GetScale(value);
-
-                return EncodeDecimal128(
-                    value, DecimalUtil.MaxDecimal128Precision, scale);
-            }
+                sbyte v => EncodeInt8(v),
+                byte v => EncodeInt8((sbyte)v),
+                short v => EncodeInt16(v),
+                ushort v => EncodeInt16((short)v),
+                int v => EncodeInt32(v),
+                uint v => EncodeInt32((int)v),
+                long v => EncodeInt64(v),
+                ulong v => EncodeInt64((long)v),
+                string v => EncodeString(v),
+                bool v => EncodeBool(v),
+                float v => EncodeFloat(v),
+                double v => EncodeDouble(v),
+                byte[] v => v,
+                DateTime v => EncodeDateTime(v),
+                decimal v => EncodeDefaultDecimal(v),
+                _ => throw new Exception($"Unsupported data type {value.GetType().Name}"),
+            };
         }
 
         public static bool DecodeBool(ReadOnlySpan<byte> source) =>
@@ -233,5 +253,13 @@ namespace Knet.Kudu.Client.Util
 
         public static string DecodeString(ReadOnlySpan<byte> source) =>
             Encoding.UTF8.GetString(source);
+
+        private static byte[] EncodeDefaultDecimal(decimal value)
+        {
+            var scale = DecimalUtil.GetScale(value);
+
+            return EncodeDecimal128(
+                value, DecimalUtil.MaxDecimal128Precision, scale);
+        }
     }
 }
