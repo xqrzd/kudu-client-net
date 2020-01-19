@@ -276,6 +276,30 @@ namespace Knet.Kudu.Client
             return this;
         }
 
+        /// <summary>
+        /// Add a range partition to the table with an inclusive lower bound and an
+        /// exclusive upper bound.
+        /// 
+        /// If either row is empty, then that end of the range will be unbounded.
+        /// If a range column is missing a value, the logical minimum value for that
+        /// column type will be used as the default.
+        /// 
+        /// Multiple range partitions may be added as part of a single alter table
+        /// transaction by calling this method multiple times. Added range partitions
+        /// must not overlap with each other or any existing range partitions (unless
+        /// the existing range partitions are dropped as part of the alter transaction
+        /// first). The lower bound must be less than the upper bound.
+        /// 
+        /// This client will immediately be able to write and scan the new tablets when
+        /// the alter table operation returns success, however other existing clients may
+        /// have to wait for a timeout period to elapse before the tablets become visible.
+        /// This period is configured by the master's 'table_locations_ttl_ms' flag, and
+        /// defaults to 5 minutes.
+        /// </summary>
+        /// <param name="configure">
+        /// Delegate to configure the inclusive lower bound and the exclusive upper
+        /// bound (in that order).
+        /// </param>
         public AlterTableBuilder AddRangePartition(
             Action<PartialRowOperation, PartialRowOperation> configure)
         {
@@ -286,6 +310,30 @@ namespace Knet.Kudu.Client
                 RangePartitionBound.Exclusive);
         }
 
+        /// <summary>
+        /// Add a range partition to the table with a lower bound and upper bound.
+        /// 
+        /// If either row is empty, then that end of the range will be unbounded.
+        /// If a range column is missing a value, the logical minimum value for that
+        /// column type will be used as the default.
+        /// 
+        /// Multiple range partitions may be added as part of a single alter table
+        /// transaction by calling this method multiple times. Added range partitions
+        /// must not overlap with each other or any existing range partitions (unless
+        /// the existing range partitions are dropped as part of the alter transaction
+        /// first). The lower bound must be less than the upper bound.
+        /// 
+        /// This client will immediately be able to write and scan the new tablets when
+        /// the alter table operation returns success, however other existing clients may
+        /// have to wait for a timeout period to elapse before the tablets become visible.
+        /// This period is configured by the master's 'table_locations_ttl_ms' flag, and
+        /// defaults to 5 minutes.
+        /// </summary>
+        /// <param name="configure">
+        /// Delegate to configure the lower bound and the upper bound (in that order).
+        /// </param>
+        /// <param name="lowerBoundType">The type of the lower bound.</param>
+        /// <param name="upperBoundType">The type of the upper bound.</param>
         public AlterTableBuilder AddRangePartition(
             Action<PartialRowOperation, PartialRowOperation> configure,
             RangePartitionBound lowerBoundType,
@@ -298,6 +346,38 @@ namespace Knet.Kudu.Client
                 upperBoundType);
         }
 
+        /// <summary>
+        /// Add a range partition to the table with dimension label.
+        /// 
+        /// If either row is empty, then that end of the range will be unbounded.
+        /// If a range column is missing a value, the logical minimum value for that
+        /// column type will be used as the default.
+        /// 
+        /// Multiple range partitions may be added as part of a single alter table
+        /// transaction by calling this method multiple times. Added range partitions
+        /// must not overlap with each other or any existing range partitions (unless
+        /// the existing range partitions are dropped as part of the alter transaction
+        /// first). The lower bound must be less than the upper bound.
+        /// 
+        /// This client will immediately be able to write and scan the new tablets when
+        /// the alter table operation returns success, however other existing clients may
+        /// have to wait for a timeout period to elapse before the tablets become visible.
+        /// This period is configured by the master's 'table_locations_ttl_ms' flag, and
+        /// defaults to 5 minutes.
+        /// 
+        /// By default, the master will try to place newly created tablet replicas on
+        /// tablet servers with a small number of tablet replicas. If the dimension label
+        /// is provided, newly created replicas will be evenly distributed in the cluster
+        /// based on the dimension label.In other words, the master will try to place newly
+        /// created tablet replicas on tablet servers with a small number of tablet replicas
+        /// belonging to this dimension label.
+        /// </summary>
+        /// <param name="configure">
+        /// Delegate to configure the lower bound and the upper bound (in that order).
+        /// </param>
+        /// <param name="dimensionLabel">The dimension label for the tablet to be created.</param>
+        /// <param name="lowerBoundType">The type of the lower bound.</param>
+        /// <param name="upperBoundType">The type of the upper bound.</param>
         public AlterTableBuilder AddRangePartition(
             Action<PartialRowOperation, PartialRowOperation> configure,
             string dimensionLabel,
@@ -336,6 +416,23 @@ namespace Knet.Kudu.Client
             return this;
         }
 
+        /// <summary>
+        /// Add a range partition to the table with with an identical lower bound
+        /// and upper bound.
+        /// 
+        /// Multiple range partitions may be added as part of a single alter table
+        /// transaction by calling this method multiple times. Added range partitions
+        /// must not overlap with each other or any existing range partitions (unless
+        /// the existing range partitions are dropped as part of the alter transaction
+        /// first).
+        /// 
+        /// This client will immediately be able to write and scan the new tablets when
+        /// the alter table operation returns success, however other existing clients may
+        /// have to wait for a timeout period to elapse before the tablets become visible.
+        /// This period is configured by the master's 'table_locations_ttl_ms' flag, and
+        /// defaults to 5 minutes.
+        /// </summary>
+        /// <param name="configure">Delegate to configure the partition row.</param>
         public AlterTableBuilder AddRangePartition(
             Action<PartialRowOperation> configure)
         {
@@ -363,6 +460,21 @@ namespace Knet.Kudu.Client
             return this;
         }
 
+        /// <summary>
+        /// Drop the range partition from the table with the specified inclusive lower
+        /// bound and exclusive upper bound. The bounds must match exactly, and may not
+        /// span multiple range partitions.
+        /// 
+        /// If either row is empty, then that end of the range will be unbounded. If a
+        /// range column is missing a value, the logical minimum value for that column
+        /// type will be used as the default.
+        /// 
+        /// Multiple range partitions may be dropped as part of a single alter table
+        /// transaction by calling this method multiple times.
+        /// </summary>
+        /// <param name="configure">
+        /// Delegate to configure the lower bound and the upper bound (in that order).
+        /// </param>
         public AlterTableBuilder DropRangePartition(
             Action<PartialRowOperation, PartialRowOperation> configure)
         {
@@ -372,6 +484,23 @@ namespace Knet.Kudu.Client
                 RangePartitionBound.Exclusive);
         }
 
+        /// <summary>
+        /// Drop the range partition from the table with the specified lower bound and
+        /// upper bound. The bounds must match exactly, and may not span multiple range
+        /// partitions.
+        /// 
+        /// If either row is empty, then that end of the range will be unbounded. If a
+        /// range column is missing a value, the logical minimum value for that column
+        /// type will be used as the default.
+        /// 
+        /// Multiple range partitions may be dropped as part of a single alter table
+        /// transaction by calling this method multiple times.
+        /// </summary>
+        /// <param name="configure">
+        /// Delegate to configure the lower bound and the upper bound (in that order).
+        /// </param>
+        /// <param name="lowerBoundType">The type of the lower bound.</param>
+        /// <param name="upperBoundType">The type of the upper bound.</param>
         public AlterTableBuilder DropRangePartition(
             Action<PartialRowOperation, PartialRowOperation> configure,
             RangePartitionBound lowerBoundType,
@@ -407,6 +536,17 @@ namespace Knet.Kudu.Client
             return this;
         }
 
+        /// <summary>
+        /// Drop the range partition from the table with with an identical lower
+        /// bound and upper bound.
+        /// 
+        /// If a range column is missing a value, the logical minimum value for that
+        /// column type will be used as the default.
+        /// 
+        /// Multiple range partitions may be dropped as part of a single alter table
+        /// transaction by calling this method multiple times.
+        /// </summary>
+        /// <param name="configure">Delegate to configure the partition row.</param>
         public AlterTableBuilder DropRangePartition(
             Action<PartialRowOperation> configure)
         {
