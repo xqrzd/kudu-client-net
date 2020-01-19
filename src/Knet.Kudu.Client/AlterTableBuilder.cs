@@ -47,11 +47,18 @@ namespace Knet.Kudu.Client
         internal TableIdentifierPB TableIdPb => _request.Table;
 
         /// <summary>
-        /// Add a new column.
+        /// Add a new column to the table. The column defaults to a
+        /// nullable non-key column.
         /// </summary>
-        /// <param name="columnBuilder">The column to add.</param>
-        public AlterTableBuilder AddColumn(ColumnBuilder columnBuilder)
+        /// <param name="name">The column name.</param>
+        /// <param name="type">The column type.</param>
+        /// <param name="configure">A delegate to further configure the column.</param>
+        public AlterTableBuilder AddColumn(
+            string name, KuduType type, Action<ColumnBuilder> configure = null)
         {
+            var columnBuilder = new ColumnBuilder(name, type);
+            configure?.Invoke(columnBuilder);
+
             ColumnSchemaPB schema = columnBuilder;
 
             if (!schema.IsNullable && schema.ReadDefaultValue == null)
