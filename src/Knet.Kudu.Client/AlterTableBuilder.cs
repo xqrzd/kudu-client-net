@@ -288,6 +288,18 @@ namespace Knet.Kudu.Client
 
         public AlterTableBuilder AddRangePartition(
             Action<PartialRowOperation, PartialRowOperation> configure,
+            RangePartitionBound lowerBoundType,
+            RangePartitionBound upperBoundType)
+        {
+            return AddRangePartition(
+                configure,
+                null,
+                lowerBoundType,
+                upperBoundType);
+        }
+
+        public AlterTableBuilder AddRangePartition(
+            Action<PartialRowOperation, PartialRowOperation> configure,
             string dimensionLabel,
             RangePartitionBound lowerBoundType,
             RangePartitionBound upperBoundType)
@@ -312,6 +324,104 @@ namespace Knet.Kudu.Client
             {
                 Type = AlterTableRequestPB.StepType.AddRangePartition,
                 AddRangePartition = new AlterTableRequestPB.AddRangePartition
+                {
+                    RangeBounds = ProtobufHelper.EncodeRowOperations(
+                        lowerBoundRow, upperBoundRow)
+                }
+            });
+
+            if (_request.Schema == null)
+                _request.Schema = _table.SchemaPb.Schema;
+
+            return this;
+        }
+
+        public AlterTableBuilder AddRangePartition(
+            Action<PartialRowOperation> configure)
+        {
+            var schema = _table.Schema;
+            var lowerBoundRow = new PartialRowOperation(
+                schema, RowOperation.RangeLowerBound);
+            configure(lowerBoundRow);
+
+            var upperBoundRow = new PartialRowOperation(
+                lowerBoundRow, RowOperation.InclusiveRangeUpperBound);
+
+            _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
+            {
+                Type = AlterTableRequestPB.StepType.AddRangePartition,
+                AddRangePartition = new AlterTableRequestPB.AddRangePartition
+                {
+                    RangeBounds = ProtobufHelper.EncodeRowOperations(
+                        lowerBoundRow, upperBoundRow)
+                }
+            });
+
+            if (_request.Schema == null)
+                _request.Schema = _table.SchemaPb.Schema;
+
+            return this;
+        }
+
+        public AlterTableBuilder DropRangePartition(
+            Action<PartialRowOperation, PartialRowOperation> configure)
+        {
+            return DropRangePartition(
+                configure,
+                RangePartitionBound.Inclusive,
+                RangePartitionBound.Exclusive);
+        }
+
+        public AlterTableBuilder DropRangePartition(
+            Action<PartialRowOperation, PartialRowOperation> configure,
+            RangePartitionBound lowerBoundType,
+            RangePartitionBound upperBoundType)
+        {
+            var lowerRowOp = lowerBoundType == RangePartitionBound.Inclusive ?
+                RowOperation.RangeLowerBound :
+                RowOperation.ExclusiveRangeLowerBound;
+
+            var upperRowOp = upperBoundType == RangePartitionBound.Exclusive ?
+                RowOperation.RangeUpperBound :
+                RowOperation.InclusiveRangeUpperBound;
+
+            var schema = _table.Schema;
+            var lowerBoundRow = new PartialRowOperation(schema, lowerRowOp);
+            var upperBoundRow = new PartialRowOperation(schema, upperRowOp);
+
+            configure(lowerBoundRow, upperBoundRow);
+
+            _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
+            {
+                Type = AlterTableRequestPB.StepType.DropRangePartition,
+                DropRangePartition = new AlterTableRequestPB.DropRangePartition
+                {
+                    RangeBounds = ProtobufHelper.EncodeRowOperations(
+                        lowerBoundRow, upperBoundRow)
+                }
+            });
+
+            if (_request.Schema == null)
+                _request.Schema = _table.SchemaPb.Schema;
+
+            return this;
+        }
+
+        public AlterTableBuilder DropRangePartition(
+            Action<PartialRowOperation> configure)
+        {
+            var schema = _table.Schema;
+            var lowerBoundRow = new PartialRowOperation(
+                schema, RowOperation.RangeLowerBound);
+            configure(lowerBoundRow);
+
+            var upperBoundRow = new PartialRowOperation(
+                lowerBoundRow, RowOperation.InclusiveRangeUpperBound);
+
+            _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
+            {
+                Type = AlterTableRequestPB.StepType.DropRangePartition,
+                DropRangePartition = new AlterTableRequestPB.DropRangePartition
                 {
                     RangeBounds = ProtobufHelper.EncodeRowOperations(
                         lowerBoundRow, upperBoundRow)
