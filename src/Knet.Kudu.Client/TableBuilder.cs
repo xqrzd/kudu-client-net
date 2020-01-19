@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Protocol.Master;
+using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client
 {
@@ -318,18 +319,8 @@ namespace Knet.Kudu.Client
         {
             if (_splitRowsRangeBounds.Count > 0)
             {
-                OperationsEncoder.ComputeSize(
-                    _splitRowsRangeBounds,
-                    out int rowSize,
-                    out int indirectSize);
-
-                var rowData = new byte[rowSize];
-                var indirectData = new byte[indirectSize];
-
-                OperationsEncoder.Encode(_splitRowsRangeBounds, rowData, indirectData);
-
-                CreateTableRequest.SplitRowsRangeBounds.Rows = rowData;
-                CreateTableRequest.SplitRowsRangeBounds.IndirectData = indirectData;
+                CreateTableRequest.SplitRowsRangeBounds =
+                    ProtobufHelper.EncodeRowOperations(_splitRowsRangeBounds);
             }
 
             return CreateTableRequest;

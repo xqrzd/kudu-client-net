@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Protocol.Master;
 using Knet.Kudu.Client.Util;
@@ -7,11 +8,19 @@ namespace Knet.Kudu.Client
 {
     public class AlterTableBuilder
     {
+        private readonly KuduTable _table;
         private readonly AlterTableRequestPB _request;
 
-        public AlterTableBuilder()
+        public AlterTableBuilder(KuduTable table)
         {
-            _request = new AlterTableRequestPB();
+            _table = table;
+            _request = new AlterTableRequestPB
+            {
+                Table = new TableIdentifierPB
+                {
+                    TableId = _table.SchemaPb.TableId
+                }
+            };
         }
 
         /// <summary>
@@ -23,6 +32,14 @@ namespace Knet.Kudu.Client
             _request.NewTableName = newName;
             return this;
         }
+
+        /// <summary>
+        /// True if the alter table operation includes an add or drop
+        /// partition operation.
+        /// </summary>
+        internal bool HasAddDropRangePartitions => _request.Schema != null;
+
+        internal string TableId => _table.TableId;
 
         /// <summary>
         /// Add a new column.
@@ -209,6 +226,95 @@ namespace Knet.Kudu.Client
                     }
                 }
             });
+
+            return this;
+        }
+
+        /// <summary>
+        /// Change the comment for the column.
+        /// </summary>
+        /// <param name="name">Name of the column.</param>
+        /// <param name="comment">
+        /// The new comment for the column, an empty comment means
+        /// deleting an existing comment.
+        /// </param>
+        public AlterTableBuilder ChangeComment(string name, string comment)
+        {
+            _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
+            {
+                Type = AlterTableRequestPB.StepType.AlterColumn,
+                AlterColumn = new AlterTableRequestPB.AlterColumn
+                {
+                    Delta = new ColumnSchemaDeltaPB
+                    {
+                        Name = name,
+                        NewComment = comment
+                    }
+                }
+            });
+
+            return this;
+        }
+
+        /// <summary>
+        /// Change the table's extra configuration properties.
+        /// These configuration properties will be merged into existing configuration
+        /// properties.
+        /// </summary>
+        /// <param name="extraConfig">The table's extra configuration properties.</param>
+        public AlterTableBuilder AlterExtraConfigs(
+            IEnumerable<KeyValuePair<string, string>> extraConfig)
+        {
+            foreach (var kvp in extraConfig)
+                _request.NewExtraConfigs.Add(kvp.Key, kvp.Value);
+
+            return this;
+        }
+
+        public AlterTableBuilder AddRangePartition(
+            Action<PartialRowOperation, PartialRowOperation> configure)
+        {
+            return AddRangePartition(
+                configure,
+                null,
+                RangePartitionBound.Inclusive,
+                RangePartitionBound.Exclusive);
+        }
+
+        public AlterTableBuilder AddRangePartition(
+            Action<PartialRowOperation, PartialRowOperation> configure,
+            string dimensionLabel,
+            RangePartitionBound lowerBoundType,
+            RangePartitionBound upperBoundType)
+        {
+            var lowerRowOp = lowerBoundType == RangePartitionBound.Inclusive ?
+                RowOperation.RangeLowerBound :
+                RowOperation.ExclusiveRangeLowerBound;
+
+            var upperRowOp = upperBoundType == RangePartitionBound.Exclusive ?
+                RowOperation.RangeUpperBound :
+                RowOperation.InclusiveRangeUpperBound;
+
+            var schema = _table.Schema;
+            var lowerBoundRow = new PartialRowOperation(schema, lowerRowOp);
+            var upperBoundRow = new PartialRowOperation(schema, upperRowOp);
+
+            configure(lowerBoundRow, upperBoundRow);
+
+            // TODO: Set dimensionLabel when protobuf contracts are regenerated.
+
+            _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
+            {
+                Type = AlterTableRequestPB.StepType.AddRangePartition,
+                AddRangePartition = new AlterTableRequestPB.AddRangePartition
+                {
+                    RangeBounds = ProtobufHelper.EncodeRowOperations(
+                        lowerBoundRow, upperBoundRow)
+                }
+            });
+
+            if (_request.Schema == null)
+                _request.Schema = _table.SchemaPb.Schema;
 
             return this;
         }

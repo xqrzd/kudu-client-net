@@ -140,12 +140,27 @@ namespace Knet.Kudu.Client
         }
 
         public async Task<AlterTableResponse> AlterTableAsync(
-            string tableName,
             AlterTableBuilder alterTable,
             CancellationToken cancellationToken = default)
         {
-            var rpc = new AlterTableRequest(tableName, alterTable);
-            var response = await SendRpcToMasterAsync(rpc, cancellationToken).ConfigureAwait(false);
+            var rpc = new AlterTableRequest(alterTable);
+            AlterTableResponse response;
+
+            try
+            {
+                response = await SendRpcToMasterAsync(rpc, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                if (alterTable.HasAddDropRangePartitions)
+                {
+                    // Clear the table locations cache so the new partition is
+                    // immediately visible. We clear the cache even on failure,
+                    // just in case the alter table operation actually succeeded.
+                    _tableLocations.TryRemove(alterTable.TableId, out _);
+                }
+            }
 
             return response;
         }

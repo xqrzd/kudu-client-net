@@ -8,20 +8,17 @@ namespace Knet.Kudu.Client.Requests
 {
     public class AlterTableRequest : KuduMasterRpc<AlterTableResponse>
     {
-        private readonly string _tableName;
         private readonly AlterTableRequestPB _request;
 
         public override string MethodName => "AlterTable";
 
-        public AlterTableRequest(string tableName, AlterTableRequestPB request)
+        public AlterTableRequest(AlterTableRequestPB request)
         {
-            _tableName = tableName;
             _request = request;
         }
 
         public override void Serialize(Stream stream)
         {
-            _request.Table = new TableIdentifierPB { TableName = _tableName };
             Serialize(stream, _request);
         }
 
