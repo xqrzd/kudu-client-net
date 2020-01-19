@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO.Pipelines;
 using Knet.Kudu.Client.Connection;
-using Pipelines.Sockets.Unofficial;
 
 namespace Knet.Kudu.Client
 {
@@ -46,16 +45,16 @@ namespace Knet.Kudu.Client
             // Place these here so we don't instantiate them too early.
 
             internal static readonly PipeOptions DefaultSendOptions = new PipeOptions(
-                readerScheduler: DedicatedThreadPoolPipeScheduler.Default,
-                writerScheduler: DedicatedThreadPoolPipeScheduler.Default,
+                readerScheduler: PipeScheduler.ThreadPool,
+                writerScheduler: PipeScheduler.ThreadPool,
                 pauseWriterThreshold: 1024 * 1024 * 4,  // 4MB
                 resumeWriterThreshold: 1024 * 1024 * 2, // 2MB
                 minimumSegmentSize: 4096,
                 useSynchronizationContext: false);
 
             internal static readonly PipeOptions DefaultReceiveOptions = new PipeOptions(
-                readerScheduler: DedicatedThreadPoolPipeScheduler.Default,
-                writerScheduler: DedicatedThreadPoolPipeScheduler.Default,
+                readerScheduler: PipeScheduler.ThreadPool,
+                writerScheduler: PipeScheduler.ThreadPool,
                 pauseWriterThreshold: 1024 * 1024 * 256,  // 256MB
                 resumeWriterThreshold: 1024 * 1024 * 128, // 128MB
                 minimumSegmentSize: 1024 * 256,
