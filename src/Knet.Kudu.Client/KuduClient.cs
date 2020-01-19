@@ -162,7 +162,34 @@ namespace Knet.Kudu.Client
                 }
             }
 
+            if (alterTable.Wait)
+            {
+                var isDoneResponse = await WaitForIsAlterTableDoneAsync(
+                    alterTable.TableIdPb, cancellationToken).ConfigureAwait(false);
+
+                response = new AlterTableResponse(
+                    response.TableId,
+                    isDoneResponse.SchemaVersion);
+            }
+
             return response;
+        }
+
+        private async Task<IsAlterTableDoneResponsePB> WaitForIsAlterTableDoneAsync(
+            TableIdentifierPB tableId, CancellationToken cancellationToken)
+        {
+            var rpc = new IsAlterTableDoneRequest(tableId);
+
+            while (true)
+            {
+                var response = await SendRpcToMasterAsync(rpc, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (response.Done)
+                    return response;
+                else
+                    await Task.Delay(100).ConfigureAwait(false);
+            }
         }
 
         /// <summary>

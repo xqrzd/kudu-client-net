@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Protocol.Master;
 using Knet.Kudu.Client.Util;
@@ -10,6 +11,8 @@ namespace Knet.Kudu.Client
     {
         private readonly KuduTable _table;
         private readonly AlterTableRequestPB _request;
+
+        internal bool Wait { get; private set; } = true;
 
         public AlterTableBuilder(KuduTable table)
         {
@@ -40,6 +43,8 @@ namespace Knet.Kudu.Client
         internal bool HasAddDropRangePartitions => _request.Schema != null;
 
         internal string TableId => _table.TableId;
+
+        internal TableIdentifierPB TableIdPb => _request.Table;
 
         /// <summary>
         /// Add a new column.
@@ -316,6 +321,26 @@ namespace Knet.Kudu.Client
             if (_request.Schema == null)
                 _request.Schema = _table.SchemaPb.Schema;
 
+            return this;
+        }
+
+        /// <summary>
+        /// Whether to wait for the table to be fully altered before this alter
+        /// operation is considered to be finished.
+        /// 
+        /// If false, the alter will finish quickly, but a subsequent
+        /// <see cref="KuduClient.OpenTableAsync(string, CancellationToken)"/>
+        /// may return a <see cref="KuduTable"/> with an out-of-date schema.
+        /// 
+        /// If true, the alter will take longer, but the very next schema is
+        /// guaranteed to be up-to-date.
+        /// 
+        /// If not provided, defaults to true.
+        /// </summary>
+        /// <param name="wait">Whether to wait for the table to be fully altered.</param>
+        public AlterTableBuilder SetWait(bool wait)
+        {
+            Wait = wait;
             return this;
         }
 
