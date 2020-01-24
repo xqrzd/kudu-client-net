@@ -290,21 +290,13 @@ namespace Knet.Kudu.Client
                 var tablet = await GetRowTabletAsync(operation, cancellationToken)
                     .ConfigureAwait(false);
 
-                if (tablet != null)
+                if (!operationsByTablet.TryGetValue(tablet, out var tabletOperations))
                 {
-                    if (!operationsByTablet.TryGetValue(tablet, out var tabletOperations))
-                    {
-                        tabletOperations = new List<KuduOperation>();
-                        operationsByTablet.Add(tablet, tabletOperations);
-                    }
+                    tabletOperations = new List<KuduOperation>();
+                    operationsByTablet.Add(tablet, tabletOperations);
+                }
 
-                    tabletOperations.Add(operation);
-                }
-                else
-                {
-                    // TODO: Handle failure
-                    Console.WriteLine("Unable to find tablet");
-                }
+                tabletOperations.Add(operation);
             }
 
             var tasks = new Task<WriteResponsePB>[operationsByTablet.Count];
@@ -504,7 +496,13 @@ namespace Knet.Kudu.Client
 
             CacheTablets(tableId, tablets, partitionKey);
 
-            var tablet = GetTabletFromCache(tableId, partitionKey);
+            var tablet = tablets.FindTablet(partitionKey);
+
+            if (tablet == null)
+            {
+                throw new NonCoveredRangeException(
+                    partitionKey, tablets.GetNonCoveredRangeEnd(partitionKey));
+            }
 
             return tablet;
         }

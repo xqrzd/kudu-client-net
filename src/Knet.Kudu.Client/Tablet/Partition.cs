@@ -82,6 +82,17 @@ namespace Knet.Kudu.Client.Tablet
         }
 
         /// <summary>
+        /// Returns true if the given partition key belongs to this partition.
+        /// </summary>
+        /// <param name="partitionKey">The partition key to check.</param>
+        public bool ContainsPartitionKey(ReadOnlySpan<byte> partitionKey)
+        {
+            return
+                (IsStartPartition || partitionKey.SequenceCompareTo(PartitionKeyStart) >= 0) &&
+                (IsEndPartition || partitionKey.SequenceCompareTo(PartitionKeyEnd) < 0);
+        }
+
+        /// <summary>
         /// Equality only holds for partitions from the same table. Partition equality only takes into
         /// account the partition keys, since there is a 1 to 1 correspondence between partition keys and
         /// the hash buckets and range keys.
