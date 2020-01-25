@@ -170,6 +170,380 @@ namespace Knet.Kudu.Client.FunctionalTests
             }
         }
 
+        [SkippableFact]
+        public async Task TestAlterRangePartitioning()
+        {
+            KuduTable table = await CreateTableAsync();
+            Schema schema = table.Schema;
+
+            // Insert some rows, and then drop the partition and ensure that the table is empty.
+            await InsertRowsAsync(table, 0, 100);
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .DropRangePartition((lower, upper) => { }));
+            Assert.Equal(0, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // Add new range partition and insert rows.
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 0);
+                    upper.SetInt32("c0", 100);
+                }));
+            await InsertRowsAsync(table, 0, 100);
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // Replace the range partition with a different one.
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .DropRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 0);
+                    upper.SetInt32("c0", 100);
+                })
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 50);
+                    upper.SetInt32("c0", 150);
+                }));
+
+            Assert.Equal(0, await ClientTestUtil.CountRowsAsync(_client, table));
+            await InsertRowsAsync(table, 50, 125);
+            Assert.Equal(75, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // Replace the range partition with the same one.
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .DropRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 50);
+                    upper.SetInt32("c0", 150);
+                })
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 50);
+                    upper.SetInt32("c0", 150);
+                }));
+
+            Assert.Equal(0, await ClientTestUtil.CountRowsAsync(_client, table));
+            await InsertRowsAsync(table, 50, 125);
+            Assert.Equal(75, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // Alter table partitioning + alter table schema
+            var newTableName = $"{_tableName}-renamed";
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 200);
+                    upper.SetInt32("c0", 300);
+                })
+                .RenameTable(newTableName)
+                .AddColumn("c2", KuduType.Int32));
+
+            await InsertRowsAsync(table, 200, 300);
+            Assert.Equal(175, await ClientTestUtil.CountRowsAsync(_client, table));
+            Assert.Equal(3, (await _client.OpenTableAsync(newTableName)).Schema.Columns.Count);
+
+            // Drop all range partitions + alter table schema. This also serves to test
+            // specifying range bounds with a subset schema (since a column was
+            // previously added).
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .DropRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 200);
+                    upper.SetInt32("c0", 300);
+                })
+                .DropRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 50);
+                    upper.SetInt32("c0", 150);
+                })
+                .DropColumn("c2"));
+
+            Assert.Equal(0, await ClientTestUtil.CountRowsAsync(_client, table));
+            Assert.Equal(2, (await _client.OpenTableAsync(newTableName)).Schema.Columns.Count);
+        }
+
+        [SkippableFact]
+        public async Task TestAlterRangePartitioningExclusiveInclusive()
+        {
+            // Create initial table with single range partition covering (-1, 99].
+            var builder = new TableBuilder(_tableName)
+                .SetNumReplicas(1)
+                .AddColumn("c0", KuduType.Int32, opt => opt.Key(true))
+                .AddColumn("c1", KuduType.Int32, opt => opt.Nullable(false))
+                .SetRangePartitionColumns("c0")
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", -1);
+                    upper.SetInt32("c0", 99);
+                }, RangePartitionBound.Exclusive, RangePartitionBound.Inclusive);
+
+            KuduTable table = await _client.CreateTableAsync(builder);
+
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 199);
+                    upper.SetInt32("c0", 299);
+                }, RangePartitionBound.Exclusive, RangePartitionBound.Inclusive));
+
+            // Insert some rows, and then drop the partition and ensure that the table is empty.
+            await InsertRowsAsync(table, 0, 100);
+            await InsertRowsAsync(table, 200, 300);
+            Assert.Equal(200, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .DropRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 0);
+                    upper.SetInt32("c0", 100);
+                }, RangePartitionBound.Inclusive, RangePartitionBound.Exclusive)
+                .DropRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 199);
+                    upper.SetInt32("c0", 299);
+                }, RangePartitionBound.Exclusive, RangePartitionBound.Inclusive));
+
+            Assert.Equal(0, await ClientTestUtil.CountRowsAsync(_client, table));
+        }
+
+        [SkippableFact]
+        public async Task TestAlterRangeParitioningInvalid()
+        {
+            // Create initial table with single range partition covering [0, 100).
+            KuduTable table = await CreateTableAsync((0, 100));
+            await InsertRowsAsync(table, 0, 100);
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // ADD [0, 100) <- illegal (duplicate)
+            try
+            {
+                await _client.AlterTableAsync(new AlterTableBuilder(table)
+                    .AddRangePartition((lower, upper) =>
+                    {
+                        lower.SetInt32("c0", 0);
+                        upper.SetInt32("c0", 100);
+                    }));
+
+                Assert.True(false);
+            }
+            catch (KuduException e)
+            {
+                Assert.True(e.Status.IsInvalidArgument);
+                Assert.Contains(
+                    "New range partition conflicts with existing range partition",
+                    e.Status.Message);
+            }
+
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // ADD [50, 150) <- illegal (overlap)
+            try
+            {
+                await _client.AlterTableAsync(new AlterTableBuilder(table)
+                    .AddRangePartition((lower, upper) =>
+                    {
+                        lower.SetInt32("c0", 50);
+                        upper.SetInt32("c0", 150);
+                    }));
+
+                Assert.True(false);
+            }
+            catch (KuduException e)
+            {
+                Assert.True(e.Status.IsInvalidArgument);
+                Assert.Contains(
+                    "New range partition conflicts with existing range partition",
+                    e.Status.Message);
+            }
+
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // ADD [-50, 50) <- illegal (overlap)
+            try
+            {
+                await _client.AlterTableAsync(new AlterTableBuilder(table)
+                    .AddRangePartition((lower, upper) =>
+                    {
+                        lower.SetInt32("c0", -50);
+                        upper.SetInt32("c0", 50);
+                    }));
+
+                Assert.True(false);
+            }
+            catch (KuduException e)
+            {
+                Assert.True(e.Status.IsInvalidArgument);
+                Assert.Contains(
+                    "New range partition conflicts with existing range partition",
+                    e.Status.Message);
+            }
+
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // ADD [200, 300)
+            // ADD [-50, 150) <- illegal (overlap)
+            try
+            {
+                await _client.AlterTableAsync(new AlterTableBuilder(table)
+                    .AddRangePartition((lower, upper) =>
+                    {
+                        lower.SetInt32("c0", 200);
+                        upper.SetInt32("c0", 300);
+                    })
+                    .AddRangePartition((lower, upper) =>
+                    {
+                        lower.SetInt32("c0", -50);
+                        upper.SetInt32("c0", 150);
+                    }));
+
+                Assert.True(false);
+            }
+            catch (KuduException e)
+            {
+                Assert.True(e.Status.IsInvalidArgument);
+                Assert.Contains(
+                    "New range partition conflicts with existing range partition",
+                    e.Status.Message);
+            }
+
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // DROP [<start>, <end>)
+            try
+            {
+                await _client.AlterTableAsync(new AlterTableBuilder(table)
+                    .DropRangePartition((lower, upper) => { }));
+
+                Assert.True(false);
+            }
+            catch (KuduException e)
+            {
+                Assert.True(e.Status.IsInvalidArgument);
+                Assert.Contains(
+                    "No range partition found for drop range partition step",
+                    e.Status.Message);
+            }
+
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // DROP [50, 150)
+            // RENAME foo
+            try
+            {
+                await _client.AlterTableAsync(new AlterTableBuilder(table)
+                     .DropRangePartition((lower, upper) =>
+                     {
+                         lower.SetInt32("c0", 50);
+                         upper.SetInt32("c0", 150);
+                     })
+                     .RenameTable("foo"));
+
+                Assert.True(false);
+            }
+            catch (KuduException e)
+            {
+                Assert.True(e.Status.IsInvalidArgument);
+                Assert.Contains(
+                    "No range partition found for drop range partition step",
+                    e.Status.Message);
+            }
+
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+            Assert.Empty(await _client.GetTablesAsync("foo"));
+
+            // DROP [0, 100)
+            // ADD  [100, 200)
+            // DROP [100, 200)
+            // ADD  [150, 250)
+            // DROP [0, 10)    <- illegal
+            try
+            {
+                await _client.AlterTableAsync(new AlterTableBuilder(table)
+                     .DropRangePartition((lower, upper) =>
+                     {
+                         lower.SetInt32("c0", 0);
+                         upper.SetInt32("c0", 100);
+                     })
+                     .AddRangePartition((lower, upper) =>
+                     {
+                         lower.SetInt32("c0", 100);
+                         upper.SetInt32("c0", 200);
+                     })
+                     .DropRangePartition((lower, upper) =>
+                     {
+                         lower.SetInt32("c0", 100);
+                         upper.SetInt32("c0", 200);
+                     })
+                     .AddRangePartition((lower, upper) =>
+                     {
+                         lower.SetInt32("c0", 150);
+                         upper.SetInt32("c0", 250);
+                     })
+                     .DropRangePartition((lower, upper) =>
+                     {
+                         lower.SetInt32("c0", 0);
+                         upper.SetInt32("c0", 10);
+                     }));
+
+                Assert.True(false);
+            }
+            catch (KuduException e)
+            {
+                Assert.True(e.Status.IsInvalidArgument);
+                Assert.Contains(
+                    "No range partition found for drop range partition step",
+                    e.Status.Message);
+            }
+
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+        }
+
+        [SkippableFact]
+        public async Task TestAlterExtraConfigs()
+        {
+            KuduTable table = await CreateTableAsync();
+            await InsertRowsAsync(table, 0, 100);
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // 1. Check for expected defaults.
+            table = await _client.OpenTableAsync(_tableName);
+            Assert.DoesNotContain("kudu.table.history_max_age_sec", table.ExtraConfig);
+
+            // 2. Alter history max age second to 3600
+            var alterExtraConfigs = new Dictionary<string, string>
+            {
+                { "kudu.table.history_max_age_sec", "3600" }
+            };
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .AlterExtraConfigs(alterExtraConfigs));
+
+            table = await _client.OpenTableAsync(_tableName);
+            Assert.Equal("3600", table.ExtraConfig["kudu.table.history_max_age_sec"]);
+
+            // 3. Alter history max age second to 7200
+            alterExtraConfigs = new Dictionary<string, string>
+            {
+                { "kudu.table.history_max_age_sec", "7200" }
+            };
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .AlterExtraConfigs(alterExtraConfigs));
+
+            table = await _client.OpenTableAsync(_tableName);
+            Assert.Equal("7200", table.ExtraConfig["kudu.table.history_max_age_sec"]);
+
+            // 4. Reset history max age second to default
+            alterExtraConfigs = new Dictionary<string, string>
+            {
+                { "kudu.table.history_max_age_sec", "" }
+            };
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .AlterExtraConfigs(alterExtraConfigs));
+
+            table = await _client.OpenTableAsync(_tableName);
+            Assert.Empty(table.ExtraConfig);
+        }
+
         /// <summary>
         /// Creates a new table with two int columns, c0 and c1. c0 is the primary key.
         /// The table is hash partitioned on c0 into two buckets, and range partitioned
