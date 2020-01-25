@@ -1,4 +1,5 @@
-﻿using Knet.Kudu.Client.Protocol.Master;
+﻿using System.Collections.Generic;
+using Knet.Kudu.Client.Protocol.Master;
 using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client
@@ -13,12 +14,15 @@ namespace Knet.Kudu.Client
 
         public string TableId { get; }
 
+        public IReadOnlyDictionary<string, string> ExtraConfig { get; }
+
         public KuduTable(GetTableSchemaResponsePB schemaPb)
         {
             Schema = new Schema(schemaPb.Schema);
             SchemaPb = schemaPb;
             PartitionSchema = new PartitionSchema(schemaPb.PartitionSchema);
             TableId = schemaPb.TableId.ToStringUtf8();
+            ExtraConfig = schemaPb.ExtraConfigs;
         }
 
         public int NumReplicas => SchemaPb.NumReplicas;

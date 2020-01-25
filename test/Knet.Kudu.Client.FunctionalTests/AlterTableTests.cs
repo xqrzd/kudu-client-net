@@ -499,6 +499,51 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
         }
 
+        [SkippableFact]
+        public async Task TestAlterExtraConfigs()
+        {
+            KuduTable table = await CreateTableAsync();
+            await InsertRowsAsync(table, 0, 100);
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // 1. Check for expected defaults.
+            table = await _client.OpenTableAsync(_tableName);
+            Assert.DoesNotContain("kudu.table.history_max_age_sec", table.ExtraConfig);
+
+            // 2. Alter history max age second to 3600
+            var alterExtraConfigs = new Dictionary<string, string>
+            {
+                { "kudu.table.history_max_age_sec", "3600" }
+            };
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .AlterExtraConfigs(alterExtraConfigs));
+
+            table = await _client.OpenTableAsync(_tableName);
+            Assert.Equal("3600", table.ExtraConfig["kudu.table.history_max_age_sec"]);
+
+            // 3. Alter history max age second to 7200
+            alterExtraConfigs = new Dictionary<string, string>
+            {
+                { "kudu.table.history_max_age_sec", "7200" }
+            };
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .AlterExtraConfigs(alterExtraConfigs));
+
+            table = await _client.OpenTableAsync(_tableName);
+            Assert.Equal("7200", table.ExtraConfig["kudu.table.history_max_age_sec"]);
+
+            // 4. Reset history max age second to default
+            alterExtraConfigs = new Dictionary<string, string>
+            {
+                { "kudu.table.history_max_age_sec", "" }
+            };
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .AlterExtraConfigs(alterExtraConfigs));
+
+            table = await _client.OpenTableAsync(_tableName);
+            Assert.Empty(table.ExtraConfig);
+        }
+
         /// <summary>
         /// Creates a new table with two int columns, c0 and c1. c0 is the primary key.
         /// The table is hash partitioned on c0 into two buckets, and range partitioned
