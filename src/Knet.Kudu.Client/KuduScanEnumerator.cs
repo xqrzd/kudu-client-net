@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Logging;
 using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Protocol.Tserver;
@@ -223,62 +224,87 @@ namespace Knet.Kudu.Client
             {
                 // We need to open the scanner first.
                 using var rpc = GetOpenRequest();
-                var resp = await _client.SendRpcToTabletAsync(rpc, _cancellationToken)
-                    .ConfigureAwait(false);
-
-                _tablet = rpc.Tablet;
-
-                if (_htTimestamp == KuduClient.NoTimestamp &&
-                    resp.ScanTimestamp != KuduClient.NoTimestamp)
+                try
                 {
-                    // If the server-assigned timestamp is present in the tablet
-                    // server's response, store it in the scanner. The stored value
-                    // is used for read operations in READ_AT_SNAPSHOT mode at
-                    // other tablet servers in the context of the same scan.
-                    _htTimestamp = resp.ScanTimestamp;
-                }
+                    var resp = await _client.SendRpcToTabletAsync(rpc, _cancellationToken)
+                        .ConfigureAwait(false);
 
-                long lastPropagatedTimestamp = KuduClient.NoTimestamp;
-                if (_readMode == ReadMode.ReadYourWrites &&
-                    resp.ScanTimestamp != KuduClient.NoTimestamp)
-                {
-                    // For READ_YOUR_WRITES mode, update the latest propagated timestamp
-                    // with the chosen snapshot timestamp sent back from the server, to
-                    // avoid unnecessarily wait for subsequent reads. Since as long as
-                    // the chosen snapshot timestamp of the next read is greater than
-                    // the previous one, the scan does not violate READ_YOUR_WRITES
-                    // session guarantees.
-                    lastPropagatedTimestamp = resp.ScanTimestamp;
-                }
-                else if (resp.PropagatedTimestamp != KuduClient.NoTimestamp)
-                {
-                    // Otherwise we just use the propagated timestamp returned from
-                    // the server as the latest propagated timestamp.
-                    lastPropagatedTimestamp = resp.PropagatedTimestamp;
-                }
-                if (lastPropagatedTimestamp != KuduClient.NoTimestamp)
-                {
-                    _client.LastPropagatedTimestamp = lastPropagatedTimestamp;
-                }
+                    _tablet = rpc.Tablet;
 
-                if (_isFaultTolerant && resp.LastPrimaryKey != null)
-                {
-                    _lastPrimaryKey = resp.LastPrimaryKey;
-                }
+                    if (_htTimestamp == KuduClient.NoTimestamp &&
+                        resp.ScanTimestamp != KuduClient.NoTimestamp)
+                    {
+                        // If the server-assigned timestamp is present in the tablet
+                        // server's response, store it in the scanner. The stored value
+                        // is used for read operations in READ_AT_SNAPSHOT mode at
+                        // other tablet servers in the context of the same scan.
+                        _htTimestamp = resp.ScanTimestamp;
+                    }
 
-                _numRowsReturned += resp.NumRows;
-                Current = resp.Data;
+                    long lastPropagatedTimestamp = KuduClient.NoTimestamp;
+                    if (_readMode == ReadMode.ReadYourWrites &&
+                        resp.ScanTimestamp != KuduClient.NoTimestamp)
+                    {
+                        // For READ_YOUR_WRITES mode, update the latest propagated timestamp
+                        // with the chosen snapshot timestamp sent back from the server, to
+                        // avoid unnecessarily wait for subsequent reads. Since as long as
+                        // the chosen snapshot timestamp of the next read is greater than
+                        // the previous one, the scan does not violate READ_YOUR_WRITES
+                        // session guarantees.
+                        lastPropagatedTimestamp = resp.ScanTimestamp;
+                    }
+                    else if (resp.PropagatedTimestamp != KuduClient.NoTimestamp)
+                    {
+                        // Otherwise we just use the propagated timestamp returned from
+                        // the server as the latest propagated timestamp.
+                        lastPropagatedTimestamp = resp.PropagatedTimestamp;
+                    }
+                    if (lastPropagatedTimestamp != KuduClient.NoTimestamp)
+                    {
+                        _client.LastPropagatedTimestamp = lastPropagatedTimestamp;
+                    }
 
-                if (!resp.HasMoreResults || resp.ScannerId == null)
-                {
-                    ScanFinished();
+                    if (_isFaultTolerant && resp.LastPrimaryKey != null)
+                    {
+                        _lastPrimaryKey = resp.LastPrimaryKey;
+                    }
+
+                    _numRowsReturned += resp.NumRows;
+                    Current = resp.Data;
+
+                    if (!resp.HasMoreResults || resp.ScannerId == null)
+                    {
+                        ScanFinished();
+                        return resp.NumRows > 0;
+                    }
+
+                    _scannerId = resp.ScannerId;
+                    _sequenceId++;
+
                     return resp.NumRows > 0;
                 }
+                catch (NonCoveredRangeException ex)
+                {
+                    Invalidate();
+                    _partitionPruner.RemovePartitionKeyRange(ex.NonCoveredRangeEnd);
 
-                _scannerId = resp.ScannerId;
-                _sequenceId++;
+                    // Stop scanning if the non-covered range is past the end partition key.
+                    if (!_partitionPruner.HasMorePartitionKeyRanges)
+                    {
+                        // The scanner is closed on the other side at this point.
+                        _closed = true;
+                        return false;
+                    }
 
-                return resp.NumRows > 0;
+                    _scannerId = null;
+                    _sequenceId = 0;
+                    return await MoveNextAsync().ConfigureAwait(false);
+                }
+                catch
+                {
+                    Invalidate();
+                    throw;
+                }
             }
             else
             {

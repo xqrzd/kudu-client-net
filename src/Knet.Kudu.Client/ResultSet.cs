@@ -62,7 +62,7 @@ namespace Knet.Kudu.Client
 
         public void Dispose()
         {
-            _rowAlloc.Dispose();
+            _rowAlloc?.Dispose();
             _indirectData?.Dispose();
         }
 
