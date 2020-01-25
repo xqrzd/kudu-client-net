@@ -170,6 +170,99 @@ namespace Knet.Kudu.Client.FunctionalTests
             }
         }
 
+        [SkippableFact]
+        public async Task TestAlterRangePartitioning()
+        {
+            KuduTable table = await CreateTableAsync();
+            Schema schema = table.Schema;
+
+            // Insert some rows, and then drop the partition and ensure that the table is empty.
+            await InsertRowsAsync(table, 0, 100);
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .DropRangePartition((lower, upper) => { }));
+            Assert.Equal(0, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // Add new range partition and insert rows.
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 0);
+                    upper.SetInt32("c0", 100);
+                }));
+            await InsertRowsAsync(table, 0, 100);
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // Replace the range partition with a different one.
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .DropRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 0);
+                    upper.SetInt32("c0", 100);
+                })
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 50);
+                    upper.SetInt32("c0", 150);
+                }));
+
+            Assert.Equal(0, await ClientTestUtil.CountRowsAsync(_client, table));
+            await InsertRowsAsync(table, 50, 125);
+            Assert.Equal(75, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // Replace the range partition with the same one.
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .DropRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 50);
+                    upper.SetInt32("c0", 150);
+                })
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 50);
+                    upper.SetInt32("c0", 150);
+                }));
+
+            Assert.Equal(0, await ClientTestUtil.CountRowsAsync(_client, table));
+            await InsertRowsAsync(table, 50, 125);
+            Assert.Equal(75, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // Alter table partitioning + alter table schema
+            var newTableName = $"{_tableName}-renamed";
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 200);
+                    upper.SetInt32("c0", 300);
+                })
+                .RenameTable(newTableName)
+                .AddColumn("c2", KuduType.Int32));
+
+            await InsertRowsAsync(table, 200, 300);
+            Assert.Equal(175, await ClientTestUtil.CountRowsAsync(_client, table));
+            Assert.Equal(3, (await _client.OpenTableAsync(newTableName)).Schema.Columns.Count);
+
+            // Drop all range partitions + alter table schema. This also serves to test
+            // specifying range bounds with a subset schema (since a column was
+            // previously added).
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .DropRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 200);
+                    upper.SetInt32("c0", 300);
+                })
+                .DropRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 50);
+                    upper.SetInt32("c0", 150);
+                })
+                .DropColumn("c2"));
+
+            Assert.Equal(0, await ClientTestUtil.CountRowsAsync(_client, table));
+            Assert.Equal(2, (await _client.OpenTableAsync(newTableName)).Schema.Columns.Count);
+        }
+
         /// <summary>
         /// Creates a new table with two int columns, c0 and c1. c0 is the primary key.
         /// The table is hash partitioned on c0 into two buckets, and range partitioned
