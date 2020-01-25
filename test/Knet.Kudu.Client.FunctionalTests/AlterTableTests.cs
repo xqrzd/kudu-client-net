@@ -307,6 +307,198 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(0, await ClientTestUtil.CountRowsAsync(_client, table));
         }
 
+        [SkippableFact]
+        public async Task TestAlterRangeParitioningInvalid()
+        {
+            // Create initial table with single range partition covering [0, 100).
+            KuduTable table = await CreateTableAsync((0, 100));
+            await InsertRowsAsync(table, 0, 100);
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // ADD [0, 100) <- illegal (duplicate)
+            try
+            {
+                await _client.AlterTableAsync(new AlterTableBuilder(table)
+                    .AddRangePartition((lower, upper) =>
+                    {
+                        lower.SetInt32("c0", 0);
+                        upper.SetInt32("c0", 100);
+                    }));
+
+                Assert.True(false);
+            }
+            catch (KuduException e)
+            {
+                Assert.True(e.Status.IsInvalidArgument);
+                Assert.Contains(
+                    "New range partition conflicts with existing range partition",
+                    e.Status.Message);
+            }
+
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // ADD [50, 150) <- illegal (overlap)
+            try
+            {
+                await _client.AlterTableAsync(new AlterTableBuilder(table)
+                    .AddRangePartition((lower, upper) =>
+                    {
+                        lower.SetInt32("c0", 50);
+                        upper.SetInt32("c0", 150);
+                    }));
+
+                Assert.True(false);
+            }
+            catch (KuduException e)
+            {
+                Assert.True(e.Status.IsInvalidArgument);
+                Assert.Contains(
+                    "New range partition conflicts with existing range partition",
+                    e.Status.Message);
+            }
+
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // ADD [-50, 50) <- illegal (overlap)
+            try
+            {
+                await _client.AlterTableAsync(new AlterTableBuilder(table)
+                    .AddRangePartition((lower, upper) =>
+                    {
+                        lower.SetInt32("c0", -50);
+                        upper.SetInt32("c0", 50);
+                    }));
+
+                Assert.True(false);
+            }
+            catch (KuduException e)
+            {
+                Assert.True(e.Status.IsInvalidArgument);
+                Assert.Contains(
+                    "New range partition conflicts with existing range partition",
+                    e.Status.Message);
+            }
+
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // ADD [200, 300)
+            // ADD [-50, 150) <- illegal (overlap)
+            try
+            {
+                await _client.AlterTableAsync(new AlterTableBuilder(table)
+                    .AddRangePartition((lower, upper) =>
+                    {
+                        lower.SetInt32("c0", 200);
+                        upper.SetInt32("c0", 300);
+                    })
+                    .AddRangePartition((lower, upper) =>
+                    {
+                        lower.SetInt32("c0", -50);
+                        upper.SetInt32("c0", 150);
+                    }));
+
+                Assert.True(false);
+            }
+            catch (KuduException e)
+            {
+                Assert.True(e.Status.IsInvalidArgument);
+                Assert.Contains(
+                    "New range partition conflicts with existing range partition",
+                    e.Status.Message);
+            }
+
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // DROP [<start>, <end>)
+            try
+            {
+                await _client.AlterTableAsync(new AlterTableBuilder(table)
+                    .DropRangePartition((lower, upper) => { }));
+
+                Assert.True(false);
+            }
+            catch (KuduException e)
+            {
+                Assert.True(e.Status.IsInvalidArgument);
+                Assert.Contains(
+                    "No range partition found for drop range partition step",
+                    e.Status.Message);
+            }
+
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            // DROP [50, 150)
+            // RENAME foo
+            try
+            {
+                await _client.AlterTableAsync(new AlterTableBuilder(table)
+                     .DropRangePartition((lower, upper) =>
+                     {
+                         lower.SetInt32("c0", 50);
+                         upper.SetInt32("c0", 150);
+                     })
+                     .RenameTable("foo"));
+
+                Assert.True(false);
+            }
+            catch (KuduException e)
+            {
+                Assert.True(e.Status.IsInvalidArgument);
+                Assert.Contains(
+                    "No range partition found for drop range partition step",
+                    e.Status.Message);
+            }
+
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+            Assert.Empty(await _client.GetTablesAsync("foo"));
+
+            // DROP [0, 100)
+            // ADD  [100, 200)
+            // DROP [100, 200)
+            // ADD  [150, 250)
+            // DROP [0, 10)    <- illegal
+            try
+            {
+                await _client.AlterTableAsync(new AlterTableBuilder(table)
+                     .DropRangePartition((lower, upper) =>
+                     {
+                         lower.SetInt32("c0", 0);
+                         upper.SetInt32("c0", 100);
+                     })
+                     .AddRangePartition((lower, upper) =>
+                     {
+                         lower.SetInt32("c0", 100);
+                         upper.SetInt32("c0", 200);
+                     })
+                     .DropRangePartition((lower, upper) =>
+                     {
+                         lower.SetInt32("c0", 100);
+                         upper.SetInt32("c0", 200);
+                     })
+                     .AddRangePartition((lower, upper) =>
+                     {
+                         lower.SetInt32("c0", 150);
+                         upper.SetInt32("c0", 250);
+                     })
+                     .DropRangePartition((lower, upper) =>
+                     {
+                         lower.SetInt32("c0", 0);
+                         upper.SetInt32("c0", 10);
+                     }));
+
+                Assert.True(false);
+            }
+            catch (KuduException e)
+            {
+                Assert.True(e.Status.IsInvalidArgument);
+                Assert.Contains(
+                    "No range partition found for drop range partition step",
+                    e.Status.Message);
+            }
+
+            Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
+        }
+
         /// <summary>
         /// Creates a new table with two int columns, c0 and c1. c0 is the primary key.
         /// The table is hash partitioned on c0 into two buckets, and range partitioned
