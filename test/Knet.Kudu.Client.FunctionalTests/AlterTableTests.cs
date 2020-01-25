@@ -263,6 +263,50 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(2, (await _client.OpenTableAsync(newTableName)).Schema.Columns.Count);
         }
 
+        [SkippableFact]
+        public async Task TestAlterRangePartitioningExclusiveInclusive()
+        {
+            // Create initial table with single range partition covering (-1, 99].
+            var builder = new TableBuilder(_tableName)
+                .SetNumReplicas(1)
+                .AddColumn("c0", KuduType.Int32, opt => opt.Key(true))
+                .AddColumn("c1", KuduType.Int32, opt => opt.Nullable(false))
+                .SetRangePartitionColumns("c0")
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", -1);
+                    upper.SetInt32("c0", 99);
+                }, RangePartitionBound.Exclusive, RangePartitionBound.Inclusive);
+
+            KuduTable table = await _client.CreateTableAsync(builder);
+
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 199);
+                    upper.SetInt32("c0", 299);
+                }, RangePartitionBound.Exclusive, RangePartitionBound.Inclusive));
+
+            // Insert some rows, and then drop the partition and ensure that the table is empty.
+            await InsertRowsAsync(table, 0, 100);
+            await InsertRowsAsync(table, 200, 300);
+            Assert.Equal(200, await ClientTestUtil.CountRowsAsync(_client, table));
+
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .DropRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 0);
+                    upper.SetInt32("c0", 100);
+                }, RangePartitionBound.Inclusive, RangePartitionBound.Exclusive)
+                .DropRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 199);
+                    upper.SetInt32("c0", 299);
+                }, RangePartitionBound.Exclusive, RangePartitionBound.Inclusive));
+
+            Assert.Equal(0, await ClientTestUtil.CountRowsAsync(_client, table));
+        }
+
         /// <summary>
         /// Creates a new table with two int columns, c0 and c1. c0 is the primary key.
         /// The table is hash partitioned on c0 into two buckets, and range partitioned
