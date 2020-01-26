@@ -327,10 +327,21 @@ namespace Knet.Kudu.Client
                 response = await _client.SendRpcToTabletAsync(rpc, _cancellationToken)
                     .ConfigureAwait(false);
             }
+            catch (FaultTolerantScannerExpiredException)
+            {
+                // If encountered FaultTolerantScannerExpiredException, it means the
+                // fault tolerant scanner on the server side expired. Therefore, open
+                // a new scanner.
+                Invalidate();
+
+                _scannerId = null;
+                _sequenceId = 0;
+                Console.WriteLine("Scanner expired, creating a new one");
+
+                return await MoveNextAsync().ConfigureAwait(false);
+            }
             catch
             {
-                // TODO: Handle FaultTolerantScannerExpiredException.
-
                 // If there was an error, don't assume we're still OK.
                 Invalidate();
                 throw;
@@ -407,7 +418,8 @@ namespace Knet.Kudu.Client
                 _parser,
                 _replicaSelection,
                 _table.TableId,
-                _partitionPruner.NextPartitionKey);
+                _partitionPruner.NextPartitionKey,
+                _isFaultTolerant);
         }
 
         private ScanRequest GetNextRowsRequest()
@@ -427,7 +439,8 @@ namespace Knet.Kudu.Client
                 _parser,
                 _replicaSelection,
                 _table.TableId,
-                _partitionPruner.NextPartitionKey);
+                _partitionPruner.NextPartitionKey,
+                _isFaultTolerant);
         }
 
         private ScanRequest GetCloseRequest()
@@ -446,7 +459,8 @@ namespace Knet.Kudu.Client
                 _parser,
                 _replicaSelection,
                 _table.TableId,
-                _partitionPruner.NextPartitionKey);
+                _partitionPruner.NextPartitionKey,
+                _isFaultTolerant);
         }
 
         private void ScanFinished()

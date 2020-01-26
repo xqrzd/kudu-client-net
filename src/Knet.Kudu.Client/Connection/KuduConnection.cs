@@ -149,6 +149,7 @@ namespace Knet.Kudu.Client.Connection
                     var result = await input.ReadAsync().ConfigureAwait(false);
                     var buffer = result.Buffer;
 
+                    // TODO: Review this. IsCompleted should happen after ParseMessages().
                     if (result.IsCanceled || result.IsCompleted)
                         break;
 
@@ -185,6 +186,10 @@ namespace Knet.Kudu.Client.Connection
                     {
                         var exception = GetException(parserContext.Error);
                         CompleteRpc(rpc, exception);
+                    }
+                    else if (parserContext.ParseException != null)
+                    {
+                        CompleteRpc(rpc, parserContext.ParseException);
                     }
                     else
                     {
@@ -289,7 +294,14 @@ namespace Knet.Kudu.Client.Connection
                         }
                         else
                         {
-                            parserContext.Rpc.ParseProtobuf(mainProtobufMessage);
+                            try
+                            {
+                                parserContext.Rpc.ParseProtobuf(mainProtobufMessage);
+                            }
+                            catch (Exception ex)
+                            {
+                                parserContext.ParseException = ex;
+                            }
                         }
 
                         reader.Advance(messageLength);
@@ -562,6 +574,9 @@ namespace Knet.Kudu.Client.Connection
 
             public ErrorStatusPB Error;
 
+            // TODO: Consolidate Error and ParseException
+            public Exception ParseException;
+
             /// <summary>
             /// Gets the size of the main message protobuf.
             /// </summary>
@@ -589,6 +604,7 @@ namespace Knet.Kudu.Client.Connection
                 Header = default;
                 InflightRpc = default;
                 Error = default;
+                ParseException = default;
                 RemainingSidecarLength = default;
                 Skip = default;
                 RemainingSkipBytes = default;
