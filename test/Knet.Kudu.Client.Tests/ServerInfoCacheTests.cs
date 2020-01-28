@@ -89,6 +89,33 @@ namespace Knet.Kudu.Client.Tests
                 cache.GetServerInfo(ReplicaSelection.ClosestReplica, ClientLocation).Uuid);
         }
 
+        [Fact]
+        public void TestGetReplicaSelectedServerInfoDeterminism()
+        {
+            // There's a local leader replica.
+            var tabletWithLocal = GetCache(0, 0, 0);
+            VerifyGetReplicaSelectedServerInfoDeterminism(tabletWithLocal);
+
+            // There's a leader in the same location as the client.
+            var tabletWithSameLocation = GetCache(0, -1, 0);
+            VerifyGetReplicaSelectedServerInfoDeterminism(tabletWithSameLocation);
+
+            // There's no local replica or replica in the same location.
+            var tabletWithRemote = GetCache(0, -1, -1);
+            VerifyGetReplicaSelectedServerInfoDeterminism(tabletWithRemote);
+        }
+
+        private void VerifyGetReplicaSelectedServerInfoDeterminism(ServerInfoCache cache)
+        {
+            string init = cache.GetClosestServerInfo(ClientLocation).Uuid;
+            for (int i = 0; i < 10; i++)
+            {
+                string next = cache.GetClosestServerInfo(ClientLocation).Uuid;
+
+                Assert.Equal(init, next);
+            }
+        }
+
         private ServerInfoCache GetCache(
             int leaderIndex,
             int localReplicaIndex,
