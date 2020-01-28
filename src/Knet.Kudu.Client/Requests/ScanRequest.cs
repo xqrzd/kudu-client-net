@@ -2,6 +2,7 @@
 using System.Buffers;
 using System.IO;
 using Knet.Kudu.Client.Connection;
+using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Protocol.Tserver;
 using Knet.Kudu.Client.Scanner;
@@ -16,6 +17,7 @@ namespace Knet.Kudu.Client.Requests
         private readonly ScanRequestPB _scanRequestPb;
         private readonly Schema _schema;
         private readonly IKuduScanParser<ResultSet> _parser;
+        private readonly bool _isFaultTolerant;
 
         private ScanResponsePB _responsePB;
 
@@ -26,12 +28,14 @@ namespace Knet.Kudu.Client.Requests
             IKuduScanParser<ResultSet> parser,
             ReplicaSelection replicaSelection,
             string tableId,
-            byte[] partitionKey)
+            byte[] partitionKey,
+            bool isFaultTolerant)
         {
             _state = state;
             _scanRequestPb = scanRequestPb;
             _schema = schema;
             _parser = parser;
+            _isFaultTolerant = isFaultTolerant;
 
             ReplicaSelection = replicaSelection;
             TableId = tableId;
@@ -74,10 +78,40 @@ namespace Knet.Kudu.Client.Requests
 
         public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
         {
-            var resp = Serializer.Deserialize<ScanResponsePB>(buffer);
+            var response = Serializer.Deserialize<ScanResponsePB>(buffer);
+            var error = response.Error;
 
-            _responsePB = resp;
-            Error = resp.Error;
+            Error = error;
+            _responsePB = response;
+
+            if (error == null)
+                return;
+
+            switch (error.code)
+            {
+                case TabletServerErrorPB.Code.TabletNotFound:
+                case TabletServerErrorPB.Code.TabletNotRunning:
+                    if (_state == ScanRequestState.Opening ||
+                        (_state == ScanRequestState.Next && _isFaultTolerant))
+                    {
+                        // Doing this will trigger finding the new location.
+                        return;
+                    }
+                    else
+                    {
+                        var statusIncomplete = KuduStatus.Incomplete("Cannot continue scanning, " +
+                            "the tablet has moved and this isn't a fault tolerant scan");
+                        throw new NonRecoverableException(statusIncomplete);
+                    }
+                case TabletServerErrorPB.Code.ScannerExpired:
+                    if (_isFaultTolerant)
+                    {
+                        var status = KuduStatus.FromTabletServerErrorPB(error);
+                        throw new FaultTolerantScannerExpiredException(status);
+                    }
+
+                    break;
+            }
         }
 
         public override ScanResponse<ResultSet> Output
