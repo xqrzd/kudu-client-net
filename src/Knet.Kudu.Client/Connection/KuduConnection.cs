@@ -174,17 +174,11 @@ namespace Knet.Kudu.Client.Connection
             {
                 if (TryParseMessage(ref reader, parserContext))
                 {
-                    var header = parserContext.Header;
                     var rpc = parserContext.InflightRpc;
 
-                    if (header.IsError)
+                    if (parserContext.Exception != null)
                     {
-                        var exception = GetException(parserContext.Error);
-                        CompleteRpc(rpc, exception);
-                    }
-                    else if (parserContext.ParseException != null)
-                    {
-                        CompleteRpc(rpc, parserContext.ParseException);
+                        CompleteRpc(rpc, parserContext.Exception);
                     }
                     else
                     {
@@ -285,7 +279,9 @@ namespace Knet.Kudu.Client.Connection
 
                         if (parserContext.Header.IsError)
                         {
-                            parserContext.Error = GetRpcError(mainProtobufMessage);
+                            var error = GetRpcError(mainProtobufMessage);
+                            var exception = GetException(error);
+                            parserContext.Exception = exception;
                         }
                         else
                         {
@@ -295,7 +291,7 @@ namespace Knet.Kudu.Client.Connection
                             }
                             catch (Exception ex)
                             {
-                                parserContext.ParseException = ex;
+                                parserContext.Exception = ex;
                             }
                         }
 
@@ -567,10 +563,7 @@ namespace Knet.Kudu.Client.Connection
 
             public InflightRpc InflightRpc;
 
-            public ErrorStatusPB Error;
-
-            // TODO: Consolidate Error and ParseException
-            public Exception ParseException;
+            public Exception Exception;
 
             /// <summary>
             /// Gets the size of the main message protobuf.
@@ -598,8 +591,7 @@ namespace Knet.Kudu.Client.Connection
                 MainMessageLength = default;
                 Header = default;
                 InflightRpc = default;
-                Error = default;
-                ParseException = default;
+                Exception = default;
                 RemainingSidecarLength = default;
                 Skip = default;
                 RemainingSkipBytes = default;
