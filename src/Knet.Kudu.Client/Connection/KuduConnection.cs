@@ -224,7 +224,7 @@ namespace Knet.Kudu.Client.Connection
                     }
                 case ParseStep.ReadHeader:
                     {
-                        if (TryParseResponseHeader(ref reader,
+                        if (ProtobufHelper.TryParseResponseHeader(ref reader,
                             parserContext.HeaderLength, out parserContext.Header))
                         {
                             if (!TryGetRpc(parserContext.Header, out parserContext.InflightRpc))
@@ -279,7 +279,7 @@ namespace Knet.Kudu.Client.Connection
 
                         if (parserContext.Header.IsError)
                         {
-                            var error = GetRpcError(mainProtobufMessage);
+                            var error = ProtobufHelper.GetErrorStatus(mainProtobufMessage);
                             var exception = GetException(error);
                             parserContext.Exception = exception;
                         }
@@ -356,28 +356,6 @@ namespace Knet.Kudu.Client.Connection
             }
 
             return false;
-        }
-
-        private static bool TryParseResponseHeader(
-            ref SequenceReader<byte> reader, long length, out ResponseHeader header)
-        {
-            if (reader.Remaining < length)
-            {
-                header = null;
-                return false;
-            }
-
-            var slice = reader.Sequence.Slice(reader.Position, length);
-            header = Serializer.Deserialize<ResponseHeader>(slice);
-
-            reader.Advance(length);
-
-            return true;
-        }
-
-        private static ErrorStatusPB GetRpcError(ReadOnlySequence<byte> buffer)
-        {
-            return Serializer.Deserialize<ErrorStatusPB>(buffer);
         }
 
         private Exception GetException(ErrorStatusPB error)
