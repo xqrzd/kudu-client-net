@@ -63,20 +63,15 @@ namespace Knet.Kudu.Client.Connection
             CancellationToken cancellationToken)
         {
             var message = new InflightRpc(rpc);
+            int callId;
 
             lock (_inflightRpcs)
             {
-                if (_closed)
-                {
-                    // The upper-level caller should handle the exception
-                    // and retry using a new connection.
-                    throw _closedException;
-                }
-
-                header.CallId = _nextCallId++;
-
-                _inflightRpcs.Add(header.CallId, message);
+                callId = _nextCallId++;
+                _inflightRpcs.Add(callId, message);
             }
+
+            header.CallId = callId;
 
             using var registration = cancellationToken.Register(
                 s => ((InflightRpc)s).TrySetCanceled(),
