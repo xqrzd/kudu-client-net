@@ -107,10 +107,15 @@ namespace Knet.Kudu.Client.Negotiate
             IDuplexPipe pipe;
             if (useTls)
             {
-                pipe = StreamConnection.GetDuplex(_stream,
-                    _options.SendPipeOptions,
+                // Hack-fix for https://github.com/xqrzd/kudu-client-net/issues/44
+                var output = PipeWriter.Create(_stream,
+                    new StreamPipeWriterOptions(leaveOpen: true));
+
+                var input = StreamConnection.GetReader(_stream,
                     _options.ReceivePipeOptions,
                     name: _serverInfo.ToString());
+
+                pipe = new DuplexPipe(output, input);
             }
             else
             {
@@ -441,6 +446,21 @@ namespace Knet.Kudu.Client.Negotiate
             public string TlsInfo { get; set; } = "Plaintext";
 
             public string NegotiateInfo { get; set; } = "SaslPlain";
+        }
+
+        private class DuplexPipe : IDuplexPipe
+        {
+            public PipeWriter Output { get; }
+
+            public PipeReader Input { get; }
+
+            public DuplexPipe(PipeWriter output, PipeReader input)
+            {
+                Output = output;
+                Input = input;
+            }
+
+            public override string ToString() => Input.ToString();
         }
     }
 }
