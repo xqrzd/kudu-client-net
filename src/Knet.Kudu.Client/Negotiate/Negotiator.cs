@@ -104,21 +104,10 @@ namespace Knet.Kudu.Client.Negotiate
 
             await SendConnectionContextAsync(result.Nonce, cancellationToken).ConfigureAwait(false);
 
-            IDuplexPipe pipe;
-            if (useTls)
-            {
-                pipe = new TestPipe(_stream,
-                    _options.SendPipeOptions,
-                    _options.ReceivePipeOptions,
-                    name: _serverInfo.ToString());
-            }
-            else
-            {
-                pipe = SocketConnection.Create(_socket,
-                    _options.SendPipeOptions,
-                    _options.ReceivePipeOptions,
-                    name: _serverInfo.ToString());
-            }
+            var pipe = new TestPipe(_stream,
+                _options.SendPipeOptions,
+                _options.ReceivePipeOptions,
+                name: _serverInfo.ToString());
 
             _logger.ConnectedToServer(
                 _serverInfo.HostPort,

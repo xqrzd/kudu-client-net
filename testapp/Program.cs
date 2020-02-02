@@ -11,7 +11,7 @@ namespace testapp
     {
         static async Task Main(string[] args)
         {
-            if (args.Length < 2)
+            if (args == null || args.Length < 2)
             {
                 Console.WriteLine("Usage: testapp masters should_block");
                 Console.WriteLine("Example: testapp localhost:7051 true");
