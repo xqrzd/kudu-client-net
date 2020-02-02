@@ -107,7 +107,7 @@ namespace Knet.Kudu.Client.Negotiate
             IDuplexPipe pipe;
             if (useTls)
             {
-                pipe = StreamConnection.GetDuplex(_stream,
+                pipe = new TestPipe(_stream,
                     _options.SendPipeOptions,
                     _options.ReceivePipeOptions,
                     name: _serverInfo.ToString());

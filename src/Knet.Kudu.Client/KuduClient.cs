@@ -530,7 +530,7 @@ namespace Knet.Kudu.Client
             return _tableLocations.GetOrAdd(tableId, key => new TableLocationsCache());
         }
 
-        private async Task<bool> ConnectToClusterAsync(CancellationToken cancellationToken)
+        public async Task<bool> ConnectToClusterAsync(CancellationToken cancellationToken = default)
         {
             var masterAddresses = _options.MasterAddresses;
             var tasks = new HashSet<Task<ConnectToMasterResponse>>();
