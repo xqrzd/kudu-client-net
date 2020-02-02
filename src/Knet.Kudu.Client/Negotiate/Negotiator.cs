@@ -77,7 +77,6 @@ namespace Knet.Kudu.Client.Negotiate
             await networkStream.WriteAsync(ConnectionHeader, cancellationToken).ConfigureAwait(false);
 
             var features = await NegotiateFeaturesAsync(cancellationToken).ConfigureAwait(false);
-            var useTls = false;
 
             // Always use TLS if the server supports it.
             if (features.HasRpcFeature(RpcFeatureFlag.Tls))
@@ -91,7 +90,6 @@ namespace Knet.Kudu.Client.Negotiate
                 // Don't wrap the TLS socket if we are using TLS for authentication only.
                 if (!features.HasRpcFeature(RpcFeatureFlag.TlsAuthenticationOnly))
                 {
-                    useTls = true;
                     _stream = tlsStream;
                 }
             }
