@@ -6,6 +6,7 @@ using System.IO.Pipelines;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Security.Principal;
 using System.Threading;
@@ -256,10 +257,16 @@ namespace Knet.Kudu.Client.Negotiate
             var targetName = _options.KerberosSpn ?? $"kudu/{_serverInfo.HostPort.Host}";
             _logMessage.NegotiateInfo = $"SaslGssApi [{targetName}]";
 
+            // Hopefully a temporary hack-fix, until we can figure
+            // out why EncryptAndSign doesn't work on Windows.
+            var protectionLevel = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ?
+                ProtectionLevel.Sign :
+                ProtectionLevel.EncryptAndSign;
+
             await negotiateStream.AuthenticateAsClientAsync(
                 CredentialCache.DefaultNetworkCredentials,
                 targetName,
-                ProtectionLevel.EncryptAndSign,
+                protectionLevel,
                 TokenImpersonationLevel.Identification).ConfigureAwait(false);
 
             gssApiStream.CompleteNegotiate(negotiateStream);
