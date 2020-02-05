@@ -1060,10 +1060,11 @@ namespace Knet.Kudu.Client
             CancellationToken cancellationToken = default)
         {
             RequestHeader header = CreateRequestHeader(rpc);
+            KuduConnection connection = null;
 
             try
             {
-                KuduConnection connection = await _connectionCache.GetConnectionAsync(
+                connection = await _connectionCache.GetConnectionAsync(
                     serverInfo, cancellationToken).ConfigureAwait(false);
 
                 await connection.SendReceiveAsync(header, rpc, cancellationToken)
@@ -1071,7 +1072,17 @@ namespace Knet.Kudu.Client
             }
             catch (InvalidAuthnTokenException)
             {
-                // TODO
+                // This connection can't be used anymore.
+                // Close the connection and rethrow the exception so we
+                // can retry in the hopes the user imported a new token.
+
+                // TODO: Here we just want to invoke the disconnected callback,
+                // and close just the writing side of the pipe (leave the read
+                // side open to allow pending RPCs to finish, instead of forcing
+                // them to retry on a new connection).
+                if (connection != null)
+                    await connection.StopAsync().ConfigureAwait(false);
+
                 throw;
             }
             catch (InvalidAuthzTokenException)
