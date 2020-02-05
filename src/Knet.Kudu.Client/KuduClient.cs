@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
@@ -38,6 +39,7 @@ namespace Knet.Kudu.Client
         private readonly ILogger _logger;
         private readonly ILogger _scanLogger;
         private readonly IKuduConnectionFactory _connectionFactory;
+        private readonly SecurityContext _securityContext;
         private readonly ConnectionCache _connectionCache;
         private readonly ConcurrentDictionary<string, TableLocationsCache> _tableLocations;
         private readonly RequestTracker _requestTracker;
@@ -64,7 +66,8 @@ namespace Knet.Kudu.Client
             _loggerFactory = loggerFactory;
             _logger = loggerFactory.CreateLogger<KuduClient>();
             _scanLogger = loggerFactory.CreateLogger<KuduScanner>();
-            _connectionFactory = new KuduConnectionFactory(options, loggerFactory);
+            _securityContext = new SecurityContext();
+            _connectionFactory = new KuduConnectionFactory(options, _securityContext, loggerFactory);
             _connectionCache = new ConnectionCache(_connectionFactory, loggerFactory);
             _tableLocations = new ConcurrentDictionary<string, TableLocationsCache>();
             _requestTracker = new RequestTracker(SecurityUtil.NewGuid().ToString("N"));
@@ -125,6 +128,43 @@ namespace Knet.Kudu.Client
                 await SendRpcToMasterAsync(rpc, cancellationToken).ConfigureAwait(false);
                 return _hiveMetastoreConfig;
             }
+        }
+
+        /// <summary>
+        /// Export serialized authentication data that may be passed to a different
+        /// client instance and imported to provide that client the ability to connect
+        /// to the cluster.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public ValueTask<ReadOnlyMemory<byte>> ExportAuthenticationCredentialsAsync(
+            CancellationToken cancellationToken = default)
+        {
+            if (_hasConnectedToMaster)
+            {
+                return new ValueTask<ReadOnlyMemory<byte>>(
+                    _securityContext.ExportAuthenticationCredentials());
+            }
+
+            return ConnectAsync(cancellationToken);
+
+            async ValueTask<ReadOnlyMemory<byte>> ConnectAsync(CancellationToken cancellationToken)
+            {
+                var rpc = new ConnectToMasterRequest2();
+                await SendRpcToMasterAsync(rpc, cancellationToken).ConfigureAwait(false);
+                return _securityContext.ExportAuthenticationCredentials();
+            }
+        }
+
+        /// <summary>
+        /// Import data allowing this client to authenticate to the cluster.
+        /// </summary>
+        /// <param name="token">
+        /// The authentication token provided by a prior call to
+        /// <see cref="ExportAuthenticationCredentialsAsync(CancellationToken)"/>.
+        /// </param>
+        public void ImportAuthenticationCredentials(ReadOnlyMemory<byte> token)
+        {
+            _securityContext.ImportAuthenticationCredentials(token);
         }
 
         public async Task<KuduTable> CreateTableAsync(
@@ -582,6 +622,20 @@ namespace Knet.Kudu.Client
                             hmsConfig.HmsUuid);
                     }
 
+                    var authnToken = responsePb.AuthnToken;
+                    if (authnToken != null)
+                    {
+                        // If the response has security info, adopt it.
+                        _securityContext.SetAuthenticationToken(authnToken);
+                    }
+
+                    var certificates = responsePb.CaCertDers;
+                    if (certificates.Count > 0)
+                    {
+                        // TODO: Log any exceptions from this.
+                        _securityContext.TrustCertificates(certificates);
+                    }
+
                     // Found the leader, that's all we really care about.
                     // Wait a few more seconds to get any followers.
                     cts.CancelAfter(TimeSpan.FromSeconds(3));
@@ -1006,10 +1060,11 @@ namespace Knet.Kudu.Client
             CancellationToken cancellationToken = default)
         {
             RequestHeader header = CreateRequestHeader(rpc);
+            KuduConnection connection = null;
 
             try
             {
-                KuduConnection connection = await _connectionCache.GetConnectionAsync(
+                connection = await _connectionCache.GetConnectionAsync(
                     serverInfo, cancellationToken).ConfigureAwait(false);
 
                 await connection.SendReceiveAsync(header, rpc, cancellationToken)
@@ -1017,7 +1072,17 @@ namespace Knet.Kudu.Client
             }
             catch (InvalidAuthnTokenException)
             {
-                // TODO
+                // This connection can't be used anymore.
+                // Close the connection and rethrow the exception so we
+                // can retry in the hopes the user imported a new token.
+
+                // TODO: Here we just want to invoke the disconnected callback,
+                // and close just the writing side of the pipe (leave the read
+                // side open to allow pending RPCs to finish, instead of forcing
+                // them to retry on a new connection).
+                if (connection != null)
+                    await connection.StopAsync().ConfigureAwait(false);
+
                 throw;
             }
             catch (InvalidAuthzTokenException)

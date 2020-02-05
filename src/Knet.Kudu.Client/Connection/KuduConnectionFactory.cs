@@ -15,12 +15,17 @@ namespace Knet.Kudu.Client.Connection
     {
         private readonly ILoggerFactory _loggerFactory;
         private readonly KuduClientOptions _options;
+        private readonly SecurityContext _securityContext;
         private readonly HashSet<IPAddress> _localIPs;
 
-        public KuduConnectionFactory(KuduClientOptions options, ILoggerFactory loggerFactory)
+        public KuduConnectionFactory(
+            KuduClientOptions options,
+            SecurityContext securityContext,
+            ILoggerFactory loggerFactory)
         {
             _loggerFactory = loggerFactory;
             _options = options;
+            _securityContext = securityContext;
             _localIPs = GetLocalAddresses();
         }
 
@@ -29,7 +34,7 @@ namespace Knet.Kudu.Client.Connection
         {
             var socket = await ConnectAsync(serverInfo.Endpoint).ConfigureAwait(false);
 
-            var negotiator = new Negotiator(_options, _loggerFactory, serverInfo, socket);
+            var negotiator = new Negotiator(_options, _securityContext, _loggerFactory, serverInfo, socket);
             return await negotiator.NegotiateAsync(cancellationToken).ConfigureAwait(false);
         }
 
