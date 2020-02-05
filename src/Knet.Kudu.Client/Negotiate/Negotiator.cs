@@ -16,6 +16,7 @@ using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Logging;
 using Knet.Kudu.Client.Protocol.Rpc;
+using Knet.Kudu.Client.Protocol.Security;
 using Knet.Kudu.Client.Util;
 using Microsoft.Extensions.Logging;
 using Pipelines.Sockets.Unofficial;
@@ -46,15 +47,24 @@ namespace Knet.Kudu.Client.Negotiate
         private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger _logger;
         private readonly KuduClientOptions _options;
+        private readonly SecurityContext _securityContext;
         private readonly ServerInfo _serverInfo;
         private readonly Socket _socket;
         private readonly NegotiateLoggerMessage _logMessage;
+
+        /// <summary>
+        /// The authentication token we'll try to connect with, maybe null.
+        /// This is fetched from <see cref="SecurityContext"/> in the constructor to
+        /// ensure that it doesn't change over the course of a negotiation attempt.
+        /// </summary>
+        private readonly SignedTokenPB _authnToken;
 
         private Stream _stream;
         private X509Certificate2 _remoteCertificate;
 
         public Negotiator(
             KuduClientOptions options,
+            SecurityContext securityContext,
             ILoggerFactory loggerFactory,
             ServerInfo serverInfo,
             Socket socket)
@@ -62,9 +72,16 @@ namespace Knet.Kudu.Client.Negotiate
             _loggerFactory = loggerFactory;
             _logger = loggerFactory.CreateLogger<Negotiator>();
             _options = options;
+            _securityContext = securityContext;
             _serverInfo = serverInfo;
             _socket = socket;
             _logMessage = new NegotiateLoggerMessage();
+
+            if (securityContext.IsAuthenticationTokenImported)
+            {
+                // If an authentication token was imported we'll try to use it.
+                _authnToken = securityContext.GetAuthenticationToken();
+            }
         }
 
         public async Task<KuduConnection> NegotiateAsync(CancellationToken cancellationToken = default)
@@ -80,6 +97,9 @@ namespace Knet.Kudu.Client.Negotiate
             var features = await NegotiateFeaturesAsync(cancellationToken).ConfigureAwait(false);
             var useTls = false;
 
+            // Check the negotiated authentication type sent by the server.
+            var chosenAuthnType = ChooseAuthenticationType(features);
+
             // Always use TLS if the server supports it.
             if (features.HasRpcFeature(RpcFeatureFlag.Tls))
             {
@@ -87,7 +107,8 @@ namespace Knet.Kudu.Client.Negotiate
 
                 // If we negotiated TLS, then we want to start the TLS handshake;
                 // otherwise, we can move directly to the authentication phase.
-                var tlsStream = await NegotiateTlsAsync(networkStream, tlsHost).ConfigureAwait(false);
+                var tlsStream = await NegotiateTlsAsync(networkStream, tlsHost, chosenAuthnType)
+                    .ConfigureAwait(false);
 
                 // Don't wrap the TLS socket if we are using TLS for authentication only.
                 if (!features.HasRpcFeature(RpcFeatureFlag.TlsAuthenticationOnly))
@@ -96,9 +117,6 @@ namespace Knet.Kudu.Client.Negotiate
                     _stream = tlsStream;
                 }
             }
-
-            // Check the negotiated authentication type sent by the server.
-            var chosenAuthnType = ChooseAuthenticationType(features);
 
             var result = await AuthenticateAsync(chosenAuthnType, cancellationToken)
                 .ConfigureAwait(false);
@@ -157,17 +175,30 @@ namespace Knet.Kudu.Client.Negotiate
             // We always advertise SASL.
             request.AuthnTypes.Add(new AuthenticationTypePB { sasl = new AuthenticationTypePB.Sasl() });
 
-            // TODO: Advertise token authentication if we have a token.
+            // We may also have a token. But, we can only use the token
+            // if we are able to use authenticated TLS to authenticate the server.
+            if (_authnToken != null)
+            {
+                request.AuthnTypes.Add(new AuthenticationTypePB { token = new AuthenticationTypePB.Token() });
+            }
+
             // TODO: Advertise certificate authentication if we have a certificate.
 
             return SendReceiveAsync(request, cancellationToken);
         }
 
-        private async Task<SslStream> NegotiateTlsAsync(NetworkStream stream, string tlsHost)
+        private async Task<SslStream> NegotiateTlsAsync(
+            NetworkStream stream,
+            string tlsHost,
+            AuthenticationType authenticationType)
         {
             var authenticationStream = new KuduTlsAuthenticationStream(this);
             var sslInnerStream = new StreamWrapper(authenticationStream);
-            var tlsStream = SslStreamFactory.CreateSslStreamTrustAll(sslInnerStream);
+
+            SslStream tlsStream = authenticationType == AuthenticationType.Token ?
+                _securityContext.CreateTlsStream(sslInnerStream) :
+                _securityContext.CreateTlsStreamTrustAll(sslInnerStream);
+
             await tlsStream.AuthenticateAsClientAsync(tlsHost).ConfigureAwait(false);
 
             _remoteCertificate = new X509Certificate2(tlsStream.RemoteCertificate);
@@ -234,6 +265,7 @@ namespace Knet.Kudu.Client.Negotiate
             {
                 AuthenticationType.SaslGssApi => AuthenticateSaslGssApiAsync(cancellationToken),
                 AuthenticationType.SaslPlain => AuthenticateSaslPlainAsync(cancellationToken),
+                AuthenticationType.Token => AuthenticateTokenAsync(cancellationToken),
 
                 _ => throw new Exception($"Unsupported authentication type {authenticationType}"),
             };
@@ -326,6 +358,21 @@ namespace Knet.Kudu.Client.Negotiate
             }
 
             return new AuthenticationResult(nonce);
+        }
+
+        private async Task<AuthenticationResult> AuthenticateTokenAsync(CancellationToken cancellationToken)
+        {
+            var request = new NegotiatePB { Step = NegotiateStep.TokenExchange };
+            request.AuthnToken = _authnToken;
+
+            _logMessage.NegotiateInfo = "TokenAuth";
+
+            var response = await SendReceiveAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (response.Step != NegotiateStep.TokenExchange)
+                throw new Exception($"Expected TokenExchange, got step {response.Step}");
+
+            return new AuthenticationResult();
         }
 
         private Task SendConnectionContextAsync(byte[] nonce, CancellationToken cancellationToken)
