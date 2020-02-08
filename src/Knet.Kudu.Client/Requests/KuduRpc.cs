@@ -40,8 +40,6 @@ namespace Knet.Kudu.Client.Requests
 
         internal long SequenceId { get; set; } = RequestTracker.NoSeqNo;
 
-        public virtual ReplicaSelection ReplicaSelection => ReplicaSelection.LeaderOnly;
-
         //void WriteRequest(IBufferWriter<byte> writer);
         public abstract void Serialize(Stream stream);
 
@@ -94,6 +92,8 @@ namespace Knet.Kudu.Client.Requests
         public byte[] PartitionKey { get; protected set; }
 
         public RemoteTablet Tablet { get; internal set; }
+
+        public virtual ReplicaSelection ReplicaSelection => ReplicaSelection.LeaderOnly;
 
         public bool NeedsAuthzToken { get; protected set; }
 

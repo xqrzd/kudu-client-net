@@ -5,6 +5,10 @@ namespace Knet.Kudu.Client.Connection
 {
     public class ServerInfoCache
     {
+        // Use a random number so all clients don't hit the same replicas.
+        // The randomInt variable is static so the choice is same across multiple
+        // RemoteTablet instances. This ensures follow up calls are routed to the
+        // same server with the scanner open.
         private static readonly int _randomInt = new Random().Next(int.MaxValue);
 
         private readonly List<ServerInfo> _servers;
@@ -100,12 +104,10 @@ namespace Knet.Kudu.Client.Connection
         /// <param name="location">The location of the client.</param>
         public ServerInfo GetServerInfo(ReplicaSelection replicaSelection, string location = null)
         {
-            return replicaSelection switch
-            {
-                ReplicaSelection.LeaderOnly => GetLeaderServerInfo(),
-                ReplicaSelection.ClosestReplica => GetClosestServerInfo(location),
-                _ => throw new NotSupportedException($"Unknown replica selection {replicaSelection}"),
-            };
+            if (replicaSelection == ReplicaSelection.LeaderOnly)
+                return GetLeaderServerInfo();
+
+            return GetClosestServerInfo(location);
         }
     }
 }

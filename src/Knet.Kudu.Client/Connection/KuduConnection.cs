@@ -85,7 +85,7 @@ namespace Knet.Kudu.Client.Connection
             }
             finally
             {
-                RemoveInflightRpc(header.CallId);
+                RemoveInflightRpc(callId);
             }
         }
 
