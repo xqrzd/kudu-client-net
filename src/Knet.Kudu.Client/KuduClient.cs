@@ -48,7 +48,7 @@ namespace Knet.Kudu.Client
 
         private volatile bool _hasConnectedToMaster;
         private volatile string _location;
-        private volatile ServerInfoCache _masterCache;
+        private volatile ServerInfo _masterLeaderInfo;
         private volatile HiveMetastoreConfig _hiveMetastoreConfig;
 
         /// <summary>
@@ -574,8 +574,7 @@ namespace Knet.Kudu.Client
         {
             var masterAddresses = _options.MasterAddresses;
             var tasks = new HashSet<Task<ConnectToMasterResponse>>();
-            var foundMasters = new List<ServerInfo>(masterAddresses.Count);
-            int leaderIndex = -1;
+            ServerInfo leaderServerInfo = null;
             List<HostPortPB> clusterMasterAddresses = null;
 
             using var cts = new CancellationTokenSource();
@@ -589,7 +588,7 @@ namespace Knet.Kudu.Client
                 tasks.Add(task);
             }
 
-            while (tasks.Count > 0 && leaderIndex == -1)
+            while (tasks.Count > 0 && leaderServerInfo == null)
             {
                 var task = await Task.WhenAny(tasks).ConfigureAwait(false);
                 tasks.Remove(task);
@@ -604,12 +603,11 @@ namespace Knet.Kudu.Client
                     continue;
                 }
 
-                foundMasters.Add(serverInfo);
                 clusterMasterAddresses = responsePb.MasterAddrs;
 
                 if (responsePb.Role == RaftPeerPB.Role.Leader)
                 {
-                    leaderIndex = foundMasters.Count - 1;
+                    leaderServerInfo = serverInfo;
 
                     _location = responsePb.ClientLocation;
 
@@ -641,10 +639,10 @@ namespace Knet.Kudu.Client
                 }
             }
 
-            var foundLeader = leaderIndex != -1;
+            var foundLeader = leaderServerInfo != null;
             if (foundLeader)
             {
-                _masterCache = new ServerInfoCache(foundMasters, leaderIndex);
+                _masterLeaderInfo = leaderServerInfo;
                 _hasConnectedToMaster = true;
             }
             else
@@ -765,7 +763,7 @@ namespace Knet.Kudu.Client
 
             rpc.Attempt++;
 
-            ServerInfo serverInfo = GetMasterServerInfo(rpc.ReplicaSelection);
+            ServerInfo serverInfo = _masterLeaderInfo;
             if (serverInfo != null)
             {
                 return await SendRpcToServerAsync(rpc, serverInfo, cancellationToken).ConfigureAwait(false);
@@ -852,11 +850,6 @@ namespace Knet.Kudu.Client
             return tablet.GetServerInfo(replicaSelection, _location);
         }
 
-        private ServerInfo GetMasterServerInfo(ReplicaSelection replicaSelection)
-        {
-            return _masterCache?.GetServerInfo(replicaSelection, _location);
-        }
-
         private async ValueTask<SignedTokenPB> GetAuthzTokenAsync(string tableId)
         {
             var authzToken = _authzTokenCache.GetAuthzToken(tableId);
@@ -890,13 +883,13 @@ namespace Knet.Kudu.Client
             // is discovered. We don't need the RPC's results; it's just a simple way to
             // wait until a leader master is elected.
 
-            var serverInfo = GetMasterServerInfo(ReplicaSelection.LeaderOnly);
+            var serverInfo = _masterLeaderInfo;
             if (serverInfo == null)
             {
                 // If there's no leader master, this will time out and throw an exception.
                 await GetTabletServersAsync(cancellationToken).ConfigureAwait(false);
 
-                serverInfo = GetMasterServerInfo(ReplicaSelection.LeaderOnly);
+                serverInfo = _masterLeaderInfo;
                 if (serverInfo == null)
                 {
                     throw new NonRecoverableException(KuduStatus.IllegalState(
@@ -1113,7 +1106,7 @@ namespace Knet.Kudu.Client
 
         private void InvalidateMasterServerCache()
         {
-            _masterCache = null;
+            _masterLeaderInfo = null;
         }
 
         private void RemoveCachedAuthzToken<T>(KuduRpc<T> rpc)
