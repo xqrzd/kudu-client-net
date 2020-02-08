@@ -57,7 +57,7 @@ namespace Knet.Kudu.Client.Tablet
 
         public override string ToString()
         {
-            var leader = _cache.GetServerInfo(ReplicaSelection.LeaderOnly);
+            var leader = _cache.GetLeaderServerInfo();
 
             var tabletServers = _cache.Servers
                 .Select(e => $"{e}{(e == leader ? "[L]" : "")}")
