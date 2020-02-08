@@ -589,7 +589,7 @@ namespace Knet.Kudu.Client
                 tasks.Add(task);
             }
 
-            while (tasks.Count > 0)
+            while (tasks.Count > 0 && leaderIndex == -1)
             {
                 var task = await Task.WhenAny(tasks).ConfigureAwait(false);
                 tasks.Remove(task);
@@ -636,9 +636,8 @@ namespace Knet.Kudu.Client
                         _securityContext.TrustCertificates(certificates);
                     }
 
-                    // Found the leader, that's all we really care about.
-                    // Wait a few more seconds to get any followers.
-                    cts.CancelAfter(TimeSpan.FromSeconds(3));
+                    // Found the leader, that's all we care about.
+                    cts.Cancel();
                 }
             }
 
