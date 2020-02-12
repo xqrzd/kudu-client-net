@@ -74,6 +74,12 @@ namespace Knet.Kudu.Client.Scanner
 
             remaining = length;
             remainingSidecarLength = currentSidecar.Length;
+
+            if (length == 0)
+            {
+                // Empty projection.
+                Output = new ResultSet(scanSchema, scanResponse.Data.NumRows, null, null);
+            }
         }
 
         public void ParseSidecarSegment(ref SequenceReader<byte> reader)

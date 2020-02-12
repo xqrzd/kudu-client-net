@@ -96,7 +96,8 @@ namespace Knet.Kudu.Client
             internal Enumerator(ResultSet resultSet)
             {
                 _resultSet = resultSet;
-                _rowData = resultSet._rowAlloc.Memory.Span;
+                _rowData = resultSet._rowAlloc != null ?
+                    resultSet._rowAlloc.Memory.Span : default;
                 _indirectData = resultSet._indirectData != null ?
                     resultSet._indirectData.Memory.Span : default;
                 _rowSize = resultSet._rowSize;
