@@ -87,6 +87,13 @@ namespace Knet.Kudu.Client
 
         public static ScanBuilder AddInListPredicate<T>(
             this ScanBuilder scanBuilder,
+            string columnName, params T[] values)
+        {
+            return AddInListPredicate(scanBuilder, columnName, (IEnumerable<T>)values);
+        }
+
+        public static ScanBuilder AddInListPredicate<T>(
+            this ScanBuilder scanBuilder,
             string columnName, IEnumerable<T> values)
         {
             var column = scanBuilder.Table.Schema.GetColumn(columnName);
