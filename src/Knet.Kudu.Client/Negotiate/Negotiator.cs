@@ -182,7 +182,7 @@ namespace Knet.Kudu.Client.Negotiate
                 request.AuthnTypes.Add(new AuthenticationTypePB { token = new AuthenticationTypePB.Token() });
             }
 
-            // TODO: Advertise certificate authentication if we have a certificate.
+            // Certificate authentication is not supported for external clients.
 
             return SendReceiveAsync(request, cancellationToken);
         }
@@ -233,10 +233,6 @@ namespace Knet.Kudu.Client.Negotiate
 
                 throw new NonRecoverableException(KuduStatus.IllegalState(
                     $"Server supplied unexpected sasl mechanisms {string.Join(",", serverMechs)}"));
-            }
-            else if (authType.certificate != null)
-            {
-                return AuthenticationType.Certificate;
             }
             else if (authType.token != null)
             {
@@ -481,8 +477,7 @@ namespace Knet.Kudu.Client.Negotiate
         {
             SaslGssApi,
             SaslPlain,
-            Token,
-            Certificate
+            Token
         }
 
         private readonly struct AuthenticationResult
