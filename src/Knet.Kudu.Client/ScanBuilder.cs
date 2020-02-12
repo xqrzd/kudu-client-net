@@ -59,7 +59,16 @@ namespace Knet.Kudu.Client
         /// <param name="columns">The names of columns to read, or 'null' to read all columns.</param>
         public ScanBuilder SetProjectedColumns(params string[] columns)
         {
-            ProjectedColumns = columns.ToList();
+            ProjectedColumns = columns?.ToList();
+            return this;
+        }
+
+        /// <summary>
+        /// Don't read any columns. Useful for counting.
+        /// </summary>
+        public ScanBuilder SetEmptyProjection()
+        {
+            ProjectedColumns = new List<string>();
             return this;
         }
 
