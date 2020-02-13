@@ -6,9 +6,12 @@ namespace Knet.Kudu.Client
     public class KuduScannerBuilder :
         AbstractKuduScannerBuilder<KuduScannerBuilder, KuduScanner<ResultSet>>
     {
+        internal readonly ILogger Logger;
+
         public KuduScannerBuilder(KuduClient client, KuduTable table, ILogger logger)
-            : base(client, table, logger)
+            : base(client, table)
         {
+            Logger = logger;
         }
 
         public override KuduScanner<ResultSet> Build()

@@ -13,7 +13,6 @@ namespace Knet.Kudu.Client
     public abstract class AbstractKuduScannerBuilder<TBuilder, TOutput>
         where TBuilder : AbstractKuduScannerBuilder<TBuilder, TOutput>
     {
-        internal readonly ILogger Logger;
         internal readonly KuduClient Client;
         internal readonly KuduTable Table;
 
@@ -37,11 +36,10 @@ namespace Knet.Kudu.Client
         internal long ScanRequestTimeout; // TODO: Expose this, and expose as TimeSpan?
         internal ReplicaSelection ReplicaSelection = ReplicaSelection.LeaderOnly;
 
-        public AbstractKuduScannerBuilder(KuduClient client, KuduTable table, ILogger logger)
+        public AbstractKuduScannerBuilder(KuduClient client, KuduTable table)
         {
             Client = client;
             Table = table;
-            Logger = logger;
             Predicates = new Dictionary<string, KuduPredicate>();
             ScanRequestTimeout = -1; // TODO: Pull this from the client.
         }
