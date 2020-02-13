@@ -153,6 +153,17 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// Sets a previously encoded HT timestamp as a snapshot timestamp, for tests.
+        /// None is used by default. Requires that the ReadMode is READ_AT_SNAPSHOT.
+        /// </summary>
+        /// <param name="htTimestamp">A long representing a HybridTime-encoded timestamp.</param>
+        public TBuilder SnapshotTimestampRaw(long htTimestamp)
+        {
+            HtTimestamp = htTimestamp;
+            return (TBuilder)this;
+        }
+
+        /// <summary>
         /// Sets the timestamp the scan must be executed at, in microseconds since the Unix epoch.
         /// None is used by default. Requires that the ReadMode is READ_AT_SNAPSHOT.
         /// </summary>
@@ -160,6 +171,22 @@ namespace Knet.Kudu.Client
         public TBuilder SnapshotTimestampMicros(long timestamp)
         {
             HtTimestamp = HybridTimeUtil.PhysicalAndLogicalToHTTimestamp(timestamp, 0);
+            return (TBuilder)this;
+        }
+
+        /// <summary>
+        /// Sets the start timestamp and end timestamp for a diff scan.
+        /// The timestamps should be encoded HT timestamps.
+        /// Additionally sets any other scan properties required by diff scans.
+        /// </summary>
+        /// <param name="startTimestamp">A long representing a HybridTime-encoded start timestamp.</param>
+        /// <param name="endTimestamp">A long representing a HybridTime-encoded end timestamp.</param>
+        public TBuilder DiffScan(long startTimestamp, long endTimestamp)
+        {
+            StartTimestamp = startTimestamp;
+            HtTimestamp = endTimestamp;
+            IsFaultTolerant = true;
+            ReadMode = ReadMode.ReadAtSnapshot;
             return (TBuilder)this;
         }
 
