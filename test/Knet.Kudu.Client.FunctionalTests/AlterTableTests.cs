@@ -125,7 +125,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             try
             {
                 // Scanning with the old schema.
-                KuduScanner scanner = _client.NewScanBuilder(table)
+                var scanner = _client.NewScanBuilder(table)
                     .SetProjectedColumns("c0", "c1")
                     .Build();
 
@@ -152,7 +152,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _session.EnqueueAsync(insert);
             await _session.FlushAsync();
 
-            KuduScanner scanner2 = _client.NewScanBuilder(table)
+            var scanner2 = _client.NewScanBuilder(table)
                 .SetProjectedColumns("c0Key", "c1")
                 .Build();
 
@@ -595,7 +595,7 @@ namespace Knet.Kudu.Client.FunctionalTests
         }
 
         private async Task<List<string>> ScanTableToStrings(
-            KuduTable table, KuduScanner scanner)
+            KuduTable table, KuduScanner<ResultSet> scanner)
         {
             var results = new List<string>();
 

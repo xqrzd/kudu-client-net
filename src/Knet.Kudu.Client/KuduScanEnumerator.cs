@@ -13,12 +13,12 @@ using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client
 {
-    public class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
+    public class KuduScanEnumerator<T> : IAsyncEnumerator<T>
     {
         private readonly ILogger _logger;
         private readonly KuduClient _client;
         private readonly KuduTable _table;
-        private readonly IKuduScanParser<ResultSet> _parser;
+        private readonly IKuduScanParser<T> _parser;
         private readonly List<ColumnSchemaPB> _columns;
         private readonly Schema _schema;
         private readonly PartitionPruner _partitionPruner;
@@ -53,13 +53,13 @@ namespace Knet.Kudu.Client
         /// </summary>
         private RemoteTablet _tablet;
 
-        public ResultSet Current { get; private set; }
+        public T Current { get; private set; }
 
         public KuduScanEnumerator(
             ILogger logger,
             KuduClient client,
             KuduTable table,
-            IKuduScanParser<ResultSet> parser,
+            IKuduScanParser<T> parser,
             List<string> projectedNames,
             ReadMode readMode,
             bool isFaultTolerant,
@@ -232,7 +232,7 @@ namespace Knet.Kudu.Client
         private async ValueTask<bool> OpenScannerAsync()
         {
             using var rpc = GetOpenRequest();
-            ScanResponse<ResultSet> response;
+            ScanResponse<T> response;
 
             try
             {
@@ -320,7 +320,7 @@ namespace Knet.Kudu.Client
         private async ValueTask<bool> ScanNextRowsAsync()
         {
             using var rpc = GetNextRowsRequest();
-            ScanResponse<ResultSet> response;
+            ScanResponse<T> response;
 
             try
             {
@@ -363,7 +363,7 @@ namespace Knet.Kudu.Client
             return response.NumRows > 0;
         }
 
-        private ScanRequest GetOpenRequest()
+        private ScanRequest<T> GetOpenRequest()
         {
             //checkScanningNotStarted();
             var request = new ScanRequestPB();
@@ -411,7 +411,7 @@ namespace Knet.Kudu.Client
 
             request.BatchSizeBytes = (uint)_batchSizeBytes;
 
-            return new ScanRequest(
+            return new ScanRequest<T>(
                 ScanRequestState.Opening,
                 request,
                 _schema,
@@ -422,7 +422,7 @@ namespace Knet.Kudu.Client
                 _isFaultTolerant);
         }
 
-        private ScanRequest GetNextRowsRequest()
+        private ScanRequest<T> GetNextRowsRequest()
         {
             //checkScanningNotStarted();
             var request = new ScanRequestPB
@@ -432,7 +432,7 @@ namespace Knet.Kudu.Client
                 BatchSizeBytes = (uint)_batchSizeBytes
             };
 
-            return new ScanRequest(
+            return new ScanRequest<T>(
                 ScanRequestState.Next,
                 request,
                 _schema,
@@ -443,7 +443,7 @@ namespace Knet.Kudu.Client
                 _isFaultTolerant);
         }
 
-        private ScanRequest GetCloseRequest()
+        private ScanRequest<T> GetCloseRequest()
         {
             var request = new ScanRequestPB
             {
@@ -452,7 +452,7 @@ namespace Knet.Kudu.Client
                 CloseScanner = true
             };
 
-            return new ScanRequest(
+            return new ScanRequest<T>(
                 ScanRequestState.Closing,
                 request,
                 _schema,
@@ -499,8 +499,8 @@ namespace Knet.Kudu.Client
             var current = Current;
             if (current != null)
             {
-                Current = null;
-                current.Dispose();
+                Current = default;
+                (current as IDisposable)?.Dispose();
             }
         }
 

@@ -11,12 +11,12 @@ using ProtoBuf;
 
 namespace Knet.Kudu.Client.Requests
 {
-    public class ScanRequest : KuduTabletRpc<ScanResponse<ResultSet>>, IDisposable
+    public class ScanRequest<T> : KuduTabletRpc<ScanResponse<T>>, IDisposable
     {
         private readonly ScanRequestState _state;
         private readonly ScanRequestPB _scanRequestPb;
         private readonly Schema _schema;
-        private readonly IKuduScanParser<ResultSet> _parser;
+        private readonly IKuduScanParser<T> _parser;
         private readonly bool _isFaultTolerant;
 
         private ScanResponsePB _responsePB;
@@ -25,7 +25,7 @@ namespace Knet.Kudu.Client.Requests
             ScanRequestState state,
             ScanRequestPB scanRequestPb,
             Schema schema,
-            IKuduScanParser<ResultSet> parser,
+            IKuduScanParser<T> parser,
             ReplicaSelection replicaSelection,
             string tableId,
             byte[] partitionKey,
@@ -114,11 +114,11 @@ namespace Knet.Kudu.Client.Requests
             }
         }
 
-        public override ScanResponse<ResultSet> Output
+        public override ScanResponse<T> Output
         {
             get
             {
-                return new ScanResponse<ResultSet>(
+                return new ScanResponse<T>(
                     _responsePB.ScannerId,
                     _parser.Output,
                     _responsePB.Data.NumRows,
