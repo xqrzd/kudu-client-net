@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Knet.Kudu.Client.Tablet;
 using Knet.Kudu.Client.Util;
-using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client
 {
@@ -26,12 +25,12 @@ namespace Knet.Kudu.Client
         internal int? BatchSizeBytes;
         internal long Limit = long.MaxValue;
         internal bool CacheBlocks = true;
-        internal long StartTimestamp = -1; // Not currently exposed.
-        internal long HtTimestamp = -1;
-        internal byte[] LowerBoundPrimaryKey;
-        internal byte[] UpperBoundPrimaryKey;
-        internal byte[] LowerBoundPartitionKey; // Not currently exposed.
-        internal byte[] UpperBoundPartitionKey; // Not currently exposed.
+        internal long StartTimestamp = KuduClient.NoTimestamp;
+        internal long HtTimestamp = KuduClient.NoTimestamp;
+        internal byte[] LowerBoundPrimaryKey = Array.Empty<byte>();
+        internal byte[] UpperBoundPrimaryKey = Array.Empty<byte>();
+        internal byte[] LowerBoundPartitionKey = Array.Empty<byte>(); // Not currently exposed.
+        internal byte[] UpperBoundPartitionKey = Array.Empty<byte>(); // Not currently exposed.
         internal List<string> ProjectedColumns;
         internal long ScanRequestTimeout; // TODO: Expose this, and expose as TimeSpan?
         internal ReplicaSelection ReplicaSelection = ReplicaSelection.LeaderOnly;
