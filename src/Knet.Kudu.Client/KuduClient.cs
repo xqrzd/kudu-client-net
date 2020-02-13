@@ -64,7 +64,7 @@ namespace Knet.Kudu.Client
             _options = options;
             _loggerFactory = loggerFactory;
             _logger = loggerFactory.CreateLogger<KuduClient>();
-            _scanLogger = loggerFactory.CreateLogger<KuduScanner>();
+            _scanLogger = loggerFactory.CreateLogger("Knet.Kudu.Client.Scanner");
             _securityContext = new SecurityContext();
             _connectionFactory = new KuduConnectionFactory(options, _securityContext, loggerFactory);
             _connectionCache = new ConnectionCache(_connectionFactory, loggerFactory);
@@ -402,9 +402,9 @@ namespace Knet.Kudu.Client
             return response;
         }
 
-        public ScanBuilder NewScanBuilder(KuduTable table)
+        public KuduScannerBuilder NewScanBuilder(KuduTable table)
         {
-            return new ScanBuilder(this, table, _scanLogger);
+            return new KuduScannerBuilder(this, table, _scanLogger);
         }
 
         public IKuduSession NewSession() => NewSession(new KuduSessionOptions());

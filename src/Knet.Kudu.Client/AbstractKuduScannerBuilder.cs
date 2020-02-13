@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Knet.Kudu.Client.Tablet;
 using Knet.Kudu.Client.Util;
@@ -6,7 +7,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client
 {
-    public class ScanBuilder
+    /// <summary>
+    /// Abstract class to extend in order to create builders for scanners.
+    /// </summary>
+    public abstract class AbstractKuduScannerBuilder<TBuilder, TOutput>
+        where TBuilder : AbstractKuduScannerBuilder<TBuilder, TOutput>
     {
         internal readonly ILogger Logger;
         internal readonly KuduClient Client;
@@ -32,7 +37,7 @@ namespace Knet.Kudu.Client
         internal long ScanRequestTimeout; // TODO: Expose this, and expose as TimeSpan?
         internal ReplicaSelection ReplicaSelection = ReplicaSelection.LeaderOnly;
 
-        public ScanBuilder(KuduClient client, KuduTable table, ILogger logger)
+        public AbstractKuduScannerBuilder(KuduClient client, KuduTable table, ILogger logger)
         {
             Client = client;
             Table = table;
@@ -46,10 +51,10 @@ namespace Knet.Kudu.Client
         /// The default is to read all columns.
         /// </summary>
         /// <param name="columns">The names of columns to read, or 'null' to read all columns.</param>
-        public ScanBuilder SetProjectedColumns(IEnumerable<string> columns)
+        public TBuilder SetProjectedColumns(IEnumerable<string> columns)
         {
             ProjectedColumns = columns.AsList();
-            return this;
+            return (TBuilder)this;
         }
 
         /// <summary>
@@ -57,29 +62,29 @@ namespace Knet.Kudu.Client
         /// The default is to read all columns.
         /// </summary>
         /// <param name="columns">The names of columns to read, or 'null' to read all columns.</param>
-        public ScanBuilder SetProjectedColumns(params string[] columns)
+        public TBuilder SetProjectedColumns(params string[] columns)
         {
             ProjectedColumns = columns?.ToList();
-            return this;
+            return (TBuilder)this;
         }
 
         /// <summary>
         /// Don't read any columns. Useful for counting.
         /// </summary>
-        public ScanBuilder SetEmptyProjection()
+        public TBuilder SetEmptyProjection()
         {
             ProjectedColumns = new List<string>();
-            return this;
+            return (TBuilder)this;
         }
 
         /// <summary>
         /// Sets the read mode, the default is to read the latest values.
         /// </summary>
         /// <param name="readMode">A read mode for the scanner.</param>
-        public ScanBuilder SetReadMode(ReadMode readMode)
+        public TBuilder SetReadMode(ReadMode readMode)
         {
             ReadMode = readMode;
-            return this;
+            return (TBuilder)this;
         }
 
         /// <summary>
@@ -87,10 +92,10 @@ namespace Knet.Kudu.Client
         /// The default is to read from the currently known leader.
         /// </summary>
         /// <param name="replicaSelection">Replication selection mechanism to use.</param>
-        public ScanBuilder SetReplicaSelection(ReplicaSelection replicaSelection)
+        public TBuilder SetReplicaSelection(ReplicaSelection replicaSelection)
         {
             ReplicaSelection = replicaSelection;
-            return this;
+            return (TBuilder)this;
         }
 
         /// <summary>
@@ -107,12 +112,12 @@ namespace Knet.Kudu.Client
         /// If no snapshot timestamp is provided, the server will pick one.
         /// </summary>
         /// <param name="isFaultTolerant">Indicates if scan is fault-tolerant.</param>
-        public ScanBuilder SetFaultTolerant(bool isFaultTolerant)
+        public TBuilder SetFaultTolerant(bool isFaultTolerant)
         {
             IsFaultTolerant = isFaultTolerant;
             if (isFaultTolerant)
                 ReadMode = ReadMode.ReadAtSnapshot;
-            return this;
+            return (TBuilder)this;
         }
 
         /// <summary>
@@ -121,10 +126,10 @@ namespace Knet.Kudu.Client
         /// because it will not truncate a rowResult in the middle.
         /// </summary>
         /// <param name="batchSizeBytes">A strictly positive number of bytes.</param>
-        public ScanBuilder SetBatchSizeBytes(int batchSizeBytes)
+        public TBuilder SetBatchSizeBytes(int batchSizeBytes)
         {
             BatchSizeBytes = batchSizeBytes;
-            return this;
+            return (TBuilder)this;
         }
 
         /// <summary>
@@ -132,10 +137,10 @@ namespace Knet.Kudu.Client
         /// There's no limit by default.
         /// </summary>
         /// <param name="limit">A positive long.</param>
-        public ScanBuilder SetLimit(long limit)
+        public TBuilder SetLimit(long limit)
         {
             Limit = limit;
-            return this;
+            return (TBuilder)this;
         }
 
         /// <summary>
@@ -143,10 +148,10 @@ namespace Knet.Kudu.Client
         /// be cached in memory and made available for future scans. Enabled by default.
         /// </summary>
         /// <param name="cacheBlocks">Indicates if data blocks should be cached or not.</param>
-        public ScanBuilder SetCacheBlocks(bool cacheBlocks)
+        public TBuilder SetCacheBlocks(bool cacheBlocks)
         {
             CacheBlocks = cacheBlocks;
-            return this;
+            return (TBuilder)this;
         }
 
         /// <summary>
@@ -154,10 +159,10 @@ namespace Knet.Kudu.Client
         /// None is used by default. Requires that the ReadMode is READ_AT_SNAPSHOT.
         /// </summary>
         /// <param name="timestamp">A long representing an instant in microseconds since the unix epoch.</param>
-        public ScanBuilder SnapshotTimestampMicros(long timestamp)
+        public TBuilder SnapshotTimestampMicros(long timestamp)
         {
             HtTimestamp = HybridTimeUtil.PhysicalAndLogicalToHTTimestamp(timestamp, 0);
-            return this;
+            return (TBuilder)this;
         }
 
         /// <summary>
@@ -165,7 +170,7 @@ namespace Knet.Kudu.Client
         /// If any bound is already added, this bound is intersected with that one.
         /// </summary>
         /// <param name="row">A partial row with specified key columns.</param>
-        public ScanBuilder LowerBound(PartialRow row)
+        public TBuilder LowerBound(PartialRow row)
         {
             byte[] startPrimaryKey = KeyEncoder.EncodePrimaryKey(row);
 
@@ -174,7 +179,7 @@ namespace Knet.Kudu.Client
             {
                 LowerBoundPrimaryKey = startPrimaryKey;
             }
-            return this;
+            return (TBuilder)this;
         }
 
         /// <summary>
@@ -182,7 +187,7 @@ namespace Knet.Kudu.Client
         /// If any bound is already added, this bound is intersected with that one.
         /// </summary>
         /// <param name="row">A partial row with specified key columns.</param>
-        public ScanBuilder ExclusiveUpperBound(PartialRow row)
+        public TBuilder ExclusiveUpperBound(PartialRow row)
         {
             byte[] endPrimaryKey = KeyEncoder.EncodePrimaryKey(row);
 
@@ -191,14 +196,14 @@ namespace Knet.Kudu.Client
             {
                 UpperBoundPrimaryKey = endPrimaryKey;
             }
-            return this;
+            return (TBuilder)this;
         }
 
         /// <summary>
         /// Adds a predicate to the scan.
         /// </summary>
         /// <param name="predicate">The predicate to add.</param>
-        public ScanBuilder AddPredicate(KuduPredicate predicate)
+        public TBuilder AddPredicate(KuduPredicate predicate)
         {
             var column = predicate.Column;
             var columnName = column.Name;
@@ -211,13 +216,13 @@ namespace Knet.Kudu.Client
             // KUDU-1652: Do not send an IS NOT NULL predicate to the server for a non-nullable column.
             if (!column.IsNullable && predicate.Type == PredicateType.IsNotNull)
             {
-                return this;
+                return (TBuilder)this;
             }
 
             Predicates[columnName] = predicate;
-            return this;
+            return (TBuilder)this;
         }
 
-        public KuduScanner Build() => new KuduScanner(this);
+        public abstract TOutput Build();
     }
 }
