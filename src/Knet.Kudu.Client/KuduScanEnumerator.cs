@@ -9,6 +9,7 @@ using Knet.Kudu.Client.Protocol.Tserver;
 using Knet.Kudu.Client.Requests;
 using Knet.Kudu.Client.Scanner;
 using Knet.Kudu.Client.Tablet;
+using Knet.Kudu.Client.Util;
 using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client
@@ -160,7 +161,7 @@ namespace Knet.Kudu.Client
             }
 
             _schema = new Schema(columns, isDeletedIndex);
-            _batchSizeBytes = batchSizeBytes ?? GetScannerBatchSizeEstimate(_schema);
+            _batchSizeBytes = batchSizeBytes ?? _schema.GetScannerBatchSizeEstimate();
 
             // If the partition pruner has pruned all partitions, then the scan can be
             // short circuited without contacting any tablet servers.
@@ -545,22 +546,6 @@ namespace Knet.Kudu.Client
                     Scale = columnSchema.TypeAttributes.Scale
                 }
             };
-        }
-
-        private static int GetScannerBatchSizeEstimate(Schema schema)
-        {
-            if (schema.VarLengthColumnCount == 0)
-            {
-                // No variable length data, we can do an
-                // exact ideal estimate here.
-                return 1024 * 1024 - schema.RowSize;
-            }
-            else
-            {
-                // Assume everything evens out.
-                // Most of the time it probably does.
-                return 1024 * 1024;
-            }
         }
     }
 }
