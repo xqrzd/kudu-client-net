@@ -9,8 +9,8 @@ namespace Knet.Kudu.Client
     /// <summary>
     /// Abstract class to extend in order to create builders for scanners.
     /// </summary>
-    public abstract class AbstractKuduScannerBuilder<TBuilder, TOutput>
-        where TBuilder : AbstractKuduScannerBuilder<TBuilder, TOutput>
+    public abstract class AbstractKuduScannerBuilder<TBuilder>
+        where TBuilder : AbstractKuduScannerBuilder<TBuilder>
     {
         internal readonly KuduClient Client;
         internal readonly KuduTable Table;
@@ -246,7 +246,5 @@ namespace Knet.Kudu.Client
             Predicates[columnName] = predicate;
             return (TBuilder)this;
         }
-
-        public abstract TOutput Build();
     }
 }
