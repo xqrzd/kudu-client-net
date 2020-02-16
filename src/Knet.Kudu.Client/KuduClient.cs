@@ -28,7 +28,7 @@ namespace Knet.Kudu.Client
         /// performing a lookup of a single partition (e.g. for a write), or
         /// re-looking-up a tablet with stale information.
         /// </summary>
-        private const int FetchTabletsPerPointLookup = 10;
+        private const int FetchTabletsPerPointLookup = 100;
         private const int MaxRpcAttempts = 100;
 
         public const long NoTimestamp = -1;
@@ -289,22 +289,17 @@ namespace Knet.Kudu.Client
             {
                 Table = new TableIdentifierPB { TableId = tableId.ToUtf8ByteArray() },
                 PartitionKeyStart = partitionKey,
-                MaxReturnedLocations = fetchBatchSize
+                MaxReturnedLocations = fetchBatchSize,
+                InternTsInfosInResponse = true
             };
 
             var rpc = new GetTableLocationsRequest(request);
             var result = await SendRpcToMasterAsync(rpc, cancellationToken).ConfigureAwait(false);
 
-            var tabletLocations = new List<RemoteTablet>(result.TabletLocations.Count);
+            var tableLocations = await _connectionFactory.GetTabletsAsync(tableId, result)
+                .ConfigureAwait(false);
 
-            foreach (var tabletLocation in result.TabletLocations)
-            {
-                var tablet = await _connectionFactory.GetTabletAsync(tableId, tabletLocation)
-                    .ConfigureAwait(false);
-                tabletLocations.Add(tablet);
-            }
-
-            return tabletLocations;
+            return tableLocations;
         }
 
         public async Task<KuduTable> OpenTableAsync(
