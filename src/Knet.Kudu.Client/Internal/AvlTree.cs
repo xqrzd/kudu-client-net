@@ -43,7 +43,7 @@ namespace Knet.Kudu.Client.Internal
 
             while (node != null)
             {
-                int compare = partitionKey.SequenceCompareTo(node.Tablet.Partition.PartitionKeyStart);
+                int compare = partitionKey.SequenceCompareTo(node.PartitionKeyStart);
 
                 if (compare < 0)
                 {
@@ -103,6 +103,40 @@ namespace Knet.Kudu.Client.Internal
             return false;
         }
 
+        public RemoteTablet First
+        {
+            get
+            {
+                AvlNode node = _root;
+                RemoteTablet value = null;
+
+                while (node != null)
+                {
+                    value = node.Tablet;
+                    node = node.Left;
+                }
+
+                return value;
+            }
+        }
+
+        public RemoteTablet Last
+        {
+            get
+            {
+                AvlNode node = _root;
+                RemoteTablet value = null;
+
+                while (node != null)
+                {
+                    value = node.Tablet;
+                    node = node.Right;
+                }
+
+                return value;
+            }
+        }
+
         public bool Insert(RemoteTablet tablet)
         {
             AvlNode node = _root;
@@ -147,7 +181,6 @@ namespace Knet.Kudu.Client.Internal
                 }
                 else
                 {
-                    //node.Value = value;
                     node.Tablet = tablet;
 
                     return false;
@@ -403,7 +436,7 @@ namespace Knet.Kudu.Client.Internal
 
             while (node != null)
             {
-                int compare = partitionKey.SequenceCompareTo(node.Tablet.Partition.PartitionKeyStart);
+                int compare = partitionKey.SequenceCompareTo(node.PartitionKeyStart);
 
                 if (compare < 0)
                 {
@@ -601,6 +634,11 @@ namespace Knet.Kudu.Client.Internal
             }
         }
 
+        public void Clear()
+        {
+            _root = null;
+        }
+
         public void ClearRange(ReadOnlySpan<byte> from, ReadOnlySpan<byte> to, bool upperBoundActive)
         {
             var results = new List<byte[]>();
@@ -619,8 +657,8 @@ namespace Knet.Kudu.Client.Internal
             if (node == null)
                 return;
 
-            int compare1 = min.SequenceCompareTo(node.Tablet.Partition.PartitionKeyStart);
-            int compare2 = upperBoundActive ? max.SequenceCompareTo(node.Tablet.Partition.PartitionKeyStart) : 1;
+            int compare1 = min.SequenceCompareTo(node.PartitionKeyStart);
+            int compare2 = upperBoundActive ? max.SequenceCompareTo(node.PartitionKeyStart) : 1;
 
             if (compare1 < 0)
             {
@@ -629,7 +667,7 @@ namespace Knet.Kudu.Client.Internal
 
             if (compare1 <= 0 && compare2 > 0)
             {
-                results.Add(node.Tablet.Partition.PartitionKeyStart);
+                results.Add(node.PartitionKeyStart);
             }
 
             if (compare2 > 0)
@@ -638,60 +676,6 @@ namespace Knet.Kudu.Client.Internal
             }
         }
 
-        public void Clear()
-        {
-            _root = null;
-        }
-
-        public RemoteTablet GetFloor(ReadOnlySpan<byte> partitionKey)
-        {
-            SearchLeftRight(partitionKey, out RemoteTablet left, out RemoteTablet right);
-            return left;
-        }
-
-        private static AvlNode GetFloor(AvlNode node, ReadOnlySpan<byte> partitionKey)
-        {
-            while (node != null)
-            {
-                int compare = partitionKey.SequenceCompareTo(node.Tablet.Partition.PartitionKeyStart);
-
-                if (compare > 0)
-                {
-                    if (node.Right != null)
-                    {
-                        node = node.Right;
-                    }
-                    else
-                    {
-                        return node;
-                    }
-                }
-                else if (compare < 0)
-                {
-                    if (node.Left != null)
-                    {
-                        node = node.Left;
-                    }
-                    else
-                    {
-                        AvlNode parent = node.Parent;
-                        AvlNode child = node;
-                        while (parent != null && child == parent.Left)
-                        {
-                            child = parent;
-                            parent = parent.Parent;
-                        }
-                        return parent;
-                    }
-                }
-                else
-                {
-                    return node;
-                }
-            }
-
-            return null;
-        }
 
         private static void Replace(AvlNode target, AvlNode source)
         {
@@ -699,8 +683,6 @@ namespace Knet.Kudu.Client.Internal
             AvlNode right = source.Right;
 
             target.Balance = source.Balance;
-            //target.Key = source.Key;
-            //target.Value = source.Value;
             target.Tablet = source.Tablet;
             target.Left = left;
             target.Right = right;
@@ -726,8 +708,6 @@ namespace Knet.Kudu.Client.Internal
             public AvlNode Parent;
             public AvlNode Left;
             public AvlNode Right;
-            //public TKey Key;
-            //public TValue Value;
             public int Balance;
 
             public RemoteTablet Tablet;
