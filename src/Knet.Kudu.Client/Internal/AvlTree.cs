@@ -32,11 +32,6 @@ namespace Knet.Kudu.Client.Internal
     {
         private AvlNode _root;
 
-        public IEnumerator<RemoteTablet> GetEnumerator()
-        {
-            return new AvlNodeEnumerator(_root);
-        }
-
         public bool Search(ReadOnlySpan<byte> partitionKey, out RemoteTablet value)
         {
             AvlNode node = _root;
@@ -698,6 +693,11 @@ namespace Knet.Kudu.Client.Internal
             }
         }
 
+        public IEnumerator<RemoteTablet> GetEnumerator()
+        {
+            return new AvlNodeEnumerator(_root);
+        }
+
         IEnumerator IEnumerable.GetEnumerator()
         {
             return GetEnumerator();
@@ -776,21 +776,9 @@ namespace Knet.Kudu.Client.Internal
                 _action = _root == null ? Action.End : Action.Right;
             }
 
-            public RemoteTablet Current
-            {
-                get
-                {
-                    return _current.Tablet;
-                }
-            }
+            public RemoteTablet Current => _current.Tablet;
 
-            object IEnumerator.Current
-            {
-                get
-                {
-                    return Current;
-                }
-            }
+            object IEnumerator.Current => Current;
 
             public void Dispose()
             {
