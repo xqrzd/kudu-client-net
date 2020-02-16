@@ -66,6 +66,43 @@ namespace Knet.Kudu.Client.Internal
             return false;
         }
 
+        public bool SearchLeftRight(
+            ReadOnlySpan<byte> partitionKey,
+            out RemoteTablet vleft,
+            out RemoteTablet vright)
+        {
+            AvlNode node = _root;
+            AvlNode leftnode = null;
+            AvlNode rightnode = null;
+
+            while (node != null)
+            {
+                int compare = partitionKey.SequenceCompareTo(node.PartitionKeyStart);
+
+                if (compare < 0)
+                {
+                    rightnode = node;
+                    node = node.Left;
+                }
+                else if (compare > 0)
+                {
+                    leftnode = node;
+                    node = node.Right;
+                }
+                else
+                {
+                    vleft = node.Tablet;
+                    vright = node.Tablet;
+                    return true;
+                }
+            }
+
+            vleft = leftnode?.Tablet;
+            vright = rightnode?.Tablet;
+
+            return false;
+        }
+
         public bool Insert(RemoteTablet tablet)
         {
             AvlNode node = _root;
@@ -608,8 +645,8 @@ namespace Knet.Kudu.Client.Internal
 
         public RemoteTablet GetFloor(ReadOnlySpan<byte> partitionKey)
         {
-            AvlNode node = GetFloor(_root, partitionKey);
-            return node == null ? default : node.Tablet;
+            SearchLeftRight(partitionKey, out RemoteTablet left, out RemoteTablet right);
+            return left;
         }
 
         private static AvlNode GetFloor(AvlNode node, ReadOnlySpan<byte> partitionKey)
@@ -694,6 +731,8 @@ namespace Knet.Kudu.Client.Internal
             public int Balance;
 
             public RemoteTablet Tablet;
+
+            public byte[] PartitionKeyStart => Tablet.Partition.PartitionKeyStart;
         }
 
         private sealed class AvlNodeEnumerator : IEnumerator<RemoteTablet>
