@@ -68,8 +68,8 @@ namespace Knet.Kudu.Client.Internal
 
         public bool SearchLeftRight(
             ReadOnlySpan<byte> partitionKey,
-            out RemoteTablet vleft,
-            out RemoteTablet vright)
+            out RemoteTablet left,
+            out RemoteTablet right)
         {
             AvlNode node = _root;
             AvlNode leftnode = null;
@@ -91,14 +91,14 @@ namespace Knet.Kudu.Client.Internal
                 }
                 else
                 {
-                    vleft = node.Tablet;
-                    vright = node.Tablet;
+                    left = node.Tablet;
+                    right = node.Tablet;
                     return true;
                 }
             }
 
-            vleft = leftnode?.Tablet;
-            vright = rightnode?.Tablet;
+            left = leftnode?.Tablet;
+            right = rightnode?.Tablet;
 
             return false;
         }
