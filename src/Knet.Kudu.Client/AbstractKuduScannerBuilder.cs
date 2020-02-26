@@ -12,28 +12,28 @@ namespace Knet.Kudu.Client
     public abstract class AbstractKuduScannerBuilder<TBuilder>
         where TBuilder : AbstractKuduScannerBuilder<TBuilder>
     {
-        internal readonly KuduClient Client;
-        internal readonly KuduTable Table;
+        protected internal readonly KuduClient Client;
+        protected internal readonly KuduTable Table;
 
         /// <summary>
         /// Map of column name to predicate.
         /// </summary>
-        internal readonly Dictionary<string, KuduPredicate> Predicates;
+        protected readonly Dictionary<string, KuduPredicate> Predicates;
 
-        internal ReadMode ReadMode = ReadMode.ReadLatest;
-        internal bool IsFaultTolerant = false;
-        internal int? BatchSizeBytes;
-        internal long Limit = long.MaxValue;
-        internal bool CacheBlocks = true;
-        internal long StartTimestamp = KuduClient.NoTimestamp;
-        internal long HtTimestamp = KuduClient.NoTimestamp;
-        internal byte[] LowerBoundPrimaryKey = Array.Empty<byte>();
-        internal byte[] UpperBoundPrimaryKey = Array.Empty<byte>();
-        internal byte[] LowerBoundPartitionKey = Array.Empty<byte>(); // Not currently exposed.
-        internal byte[] UpperBoundPartitionKey = Array.Empty<byte>(); // Not currently exposed.
-        internal List<string> ProjectedColumns;
-        internal long ScanRequestTimeout; // TODO: Expose this, and expose as TimeSpan?
-        internal ReplicaSelection ReplicaSelection = ReplicaSelection.LeaderOnly;
+        protected ReadMode ReadMode = ReadMode.ReadLatest;
+        protected bool IsFaultTolerant = false;
+        protected int? BatchSizeBytes;
+        protected long Limit = long.MaxValue;
+        protected bool CacheBlocks = true;
+        protected long StartTimestamp = KuduClient.NoTimestamp;
+        protected long HtTimestamp = KuduClient.NoTimestamp;
+        protected byte[] LowerBoundPrimaryKey = Array.Empty<byte>();
+        protected byte[] UpperBoundPrimaryKey = Array.Empty<byte>();
+        protected byte[] LowerBoundPartitionKey = Array.Empty<byte>();
+        protected byte[] UpperBoundPartitionKey = Array.Empty<byte>();
+        protected List<string> ProjectedColumns;
+        protected long ScanRequestTimeout; // TODO: Expose this, and expose as TimeSpan?
+        protected ReplicaSelection ReplicaSelection = ReplicaSelection.LeaderOnly;
 
         public AbstractKuduScannerBuilder(KuduClient client, KuduTable table)
         {
@@ -197,7 +197,16 @@ namespace Knet.Kudu.Client
         public TBuilder LowerBound(PartialRow row)
         {
             byte[] startPrimaryKey = KeyEncoder.EncodePrimaryKey(row);
+            return LowerBoundRaw(startPrimaryKey);
+        }
 
+        /// <summary>
+        /// Add a lower bound (inclusive) primary key for the scan.
+        /// If any bound is already added, this bound is intersected with that one.
+        /// </summary>
+        /// <param name="startPrimaryKey">An encoded start key.</param>
+        internal TBuilder LowerBoundRaw(byte[] startPrimaryKey)
+        {
             if (LowerBoundPrimaryKey.Length == 0 ||
                 startPrimaryKey.SequenceCompareTo(LowerBoundPrimaryKey) > 0)
             {
@@ -214,12 +223,48 @@ namespace Knet.Kudu.Client
         public TBuilder ExclusiveUpperBound(PartialRow row)
         {
             byte[] endPrimaryKey = KeyEncoder.EncodePrimaryKey(row);
+            return ExclusiveUpperBoundRaw(endPrimaryKey);
+        }
 
+        /// <summary>
+        /// Add an upper bound (exclusive) primary key for the scan.
+        /// If any bound is already added, this bound is intersected with that one.
+        /// </summary>
+        /// <param name="endPrimaryKey">An encoded end key.</param>
+        public TBuilder ExclusiveUpperBoundRaw(byte[] endPrimaryKey)
+        {
             if (UpperBoundPrimaryKey.Length == 0 ||
                 endPrimaryKey.SequenceCompareTo(UpperBoundPrimaryKey) < 0)
             {
                 UpperBoundPrimaryKey = endPrimaryKey;
             }
+            return (TBuilder)this;
+        }
+
+        /// <summary>
+        /// Set an encoded (inclusive) start partition key for the scan.
+        /// </summary>
+        /// <param name="partitionKey">The encoded partition key.</param>
+        internal TBuilder LowerBoundPartitionKeyRaw(byte[] partitionKey)
+        {
+            if (partitionKey.SequenceCompareTo(LowerBoundPartitionKey) > 0)
+                LowerBoundPartitionKey = partitionKey;
+
+            return (TBuilder)this;
+        }
+
+        /// <summary>
+        /// Set an encoded (exclusive) end partition key for the scan.
+        /// </summary>
+        /// <param name="partitionKey">The encoded partition key.</param>
+        internal TBuilder ExclusiveUpperBoundPartitionKeyRaw(byte[] partitionKey)
+        {
+            if (UpperBoundPartitionKey.Length == 0 ||
+                partitionKey.SequenceCompareTo(UpperBoundPartitionKey) < 0)
+            {
+                UpperBoundPartitionKey = partitionKey;
+            }
+
             return (TBuilder)this;
         }
 
