@@ -31,7 +31,8 @@ namespace Knet.Kudu.Client
         protected byte[] UpperBoundPrimaryKey = Array.Empty<byte>();
         protected byte[] LowerBoundPartitionKey = Array.Empty<byte>();
         protected byte[] UpperBoundPartitionKey = Array.Empty<byte>();
-        protected List<string> ProjectedColumns;
+        protected List<string> ProjectedColumnNames;
+        protected List<int> ProjectedColumnIndexes;
         protected long ScanRequestTimeout; // TODO: Expose this, and expose as TimeSpan?
         protected ReplicaSelection ReplicaSelection = ReplicaSelection.LeaderOnly;
 
@@ -47,10 +48,12 @@ namespace Knet.Kudu.Client
         /// Set which columns will be read by the Scanner.
         /// The default is to read all columns.
         /// </summary>
-        /// <param name="columns">The names of columns to read, or 'null' to read all columns.</param>
-        public TBuilder SetProjectedColumns(IEnumerable<string> columns)
+        /// <param name="columnNames">
+        /// The names of columns to read, or 'null' to read all columns.
+        /// </param>
+        public TBuilder SetProjectedColumns(IEnumerable<string> columnNames)
         {
-            ProjectedColumns = columns.AsList();
+            ProjectedColumnNames = columnNames.AsList();
             return (TBuilder)this;
         }
 
@@ -58,10 +61,38 @@ namespace Knet.Kudu.Client
         /// Set which columns will be read by the Scanner.
         /// The default is to read all columns.
         /// </summary>
-        /// <param name="columns">The names of columns to read, or 'null' to read all columns.</param>
-        public TBuilder SetProjectedColumns(params string[] columns)
+        /// <param name="columnNames">
+        /// The names of columns to read, or 'null' to read all columns.
+        /// </param>
+        public TBuilder SetProjectedColumns(params string[] columnNames)
         {
-            ProjectedColumns = columns?.ToList();
+            ProjectedColumnNames = columnNames?.ToList();
+            return (TBuilder)this;
+        }
+
+        /// <summary>
+        /// Set which columns will be read by the Scanner.
+        /// The default is to read all columns.
+        /// </summary>
+        /// <param name="columnIndexes">
+        /// The indexes of columns to read, or 'null' to read all columns.
+        /// </param>
+        public TBuilder SetProjectedColumns(IEnumerable<int> columnIndexes)
+        {
+            ProjectedColumnIndexes = columnIndexes.AsList();
+            return (TBuilder)this;
+        }
+
+        /// <summary>
+        /// Set which columns will be read by the Scanner.
+        /// The default is to read all columns.
+        /// </summary>
+        /// <param name="columnIndexes">
+        /// The indexes of columns to read, or 'null' to read all columns.
+        /// </param>
+        public TBuilder SetProjectedColumns(params int[] columnIndexes)
+        {
+            ProjectedColumnIndexes = columnIndexes?.ToList();
             return (TBuilder)this;
         }
 
@@ -70,7 +101,7 @@ namespace Knet.Kudu.Client
         /// </summary>
         public TBuilder SetEmptyProjection()
         {
-            ProjectedColumns = new List<string>();
+            ProjectedColumnNames = new List<string>();
             return (TBuilder)this;
         }
 

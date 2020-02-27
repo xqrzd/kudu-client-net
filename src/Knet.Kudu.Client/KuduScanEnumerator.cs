@@ -61,7 +61,8 @@ namespace Knet.Kudu.Client
             KuduClient client,
             KuduTable table,
             IKuduScanParser<T> parser,
-            List<string> projectedNames,
+            List<string> projectedColumnNames,
+            List<int> projectedColumnIndexes,
             ReadMode readMode,
             bool isFaultTolerant,
             Dictionary<string, KuduPredicate> predicates,
@@ -129,11 +130,20 @@ namespace Knet.Kudu.Client
             // If the user set this to 'null', we scan all columns.
             _columns = new List<ColumnSchemaPB>();
             var columns = new List<ColumnSchema>();
-            if (projectedNames != null)
+            if (projectedColumnNames != null)
             {
-                foreach (string columnName in projectedNames)
+                foreach (string columnName in projectedColumnNames)
                 {
                     ColumnSchema originalColumn = table.Schema.GetColumn(columnName);
+                    _columns.Add(ToColumnSchemaPb(originalColumn));
+                    columns.Add(originalColumn);
+                }
+            }
+            else if (projectedColumnIndexes != null)
+            {
+                foreach (int columnIndex in projectedColumnIndexes)
+                {
+                    ColumnSchema originalColumn = table.Schema.GetColumn(columnIndex);
                     _columns.Add(ToColumnSchemaPb(originalColumn));
                     columns.Add(originalColumn);
                 }
