@@ -1019,6 +1019,45 @@ namespace Knet.Kudu.Client
             }
         }
 
+        public static KuduPredicate FromPb(Schema schema, ColumnPredicatePB pb)
+        {
+            ColumnSchema column = schema.GetColumn(pb.Column);
+
+            if (pb.equality != null)
+            {
+                return new KuduPredicate(PredicateType.Equality, column,
+                    pb.equality.Value, null);
+            }
+            else if (pb.range != null)
+            {
+                var range = pb.range;
+
+                return new KuduPredicate(PredicateType.Range, column,
+                    range.Lower, range.Upper);
+            }
+            else if (pb.is_not_null != null)
+            {
+                return NewIsNotNullPredicate(column);
+            }
+            else if (pb.is_null != null)
+            {
+                return NewIsNullPredicate(column);
+            }
+            else if (pb.in_list != null)
+            {
+                var values = new SortedSet<byte[]>(new PredicateComparer(column));
+
+                foreach (var value in pb.in_list.Values)
+                    values.Add(value);
+
+                return BuildInList(column, values);
+            }
+            else
+            {
+                throw new Exception("Unknown predicate type");
+            }
+        }
+
         private sealed class PredicateComparer : IComparer<byte[]>
         {
             private readonly ColumnSchema _column;

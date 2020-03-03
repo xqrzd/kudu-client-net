@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Generic;
 
 namespace Knet.Kudu.Client
@@ -109,6 +110,20 @@ namespace Knet.Kudu.Client
             var column = scanBuilder.Table.Schema.GetColumn(columnName);
             var predicate = KuduPredicate.NewInListPredicate(column, values);
             return scanBuilder.AddPredicate(predicate);
+        }
+
+        public static TBuilder ApplyScanToken<TBuilder>(
+            this TBuilder scanBuilder, KuduScanToken scanToken)
+            where TBuilder : AbstractKuduScannerBuilder<TBuilder>
+        {
+            return scanToken.IntoScanner(scanBuilder);
+        }
+
+        public static TBuilder ApplyScanToken<TBuilder>(
+            this TBuilder scanBuilder, ReadOnlyMemory<byte> buffer)
+            where TBuilder : AbstractKuduScannerBuilder<TBuilder>
+        {
+            return KuduScanToken.DeserializeIntoScanner(scanBuilder, buffer);
         }
     }
 }
