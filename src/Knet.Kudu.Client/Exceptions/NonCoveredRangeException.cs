@@ -24,8 +24,11 @@ namespace Knet.Kudu.Client.Exceptions
 
         private static string GetMessage(byte[] start, byte[] end)
         {
-            var startStr = start.Length == 0 ? "<start>" : BitConverter.ToString(start);
-            var endStr = end.Length == 0 ? "<end>" : BitConverter.ToString(end);
+            var startStr = start == null || start.Length == 0 ?
+                "<start>" : BitConverter.ToString(start);
+
+            var endStr = end == null || end.Length == 0 ?
+                "<end>" : BitConverter.ToString(end);
 
             return $"[{startStr}, {endStr})";
         }

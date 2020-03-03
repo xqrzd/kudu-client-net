@@ -553,7 +553,6 @@ namespace Knet.Kudu.Client
 
             if (tablet == null)
             {
-                // TODO: Fix NRE here.
                 throw new NonCoveredRangeException(
                     partitionKey, tablets.GetNonCoveredRangeEnd(partitionKey));
             }
@@ -642,7 +641,6 @@ namespace Knet.Kudu.Client
                         partitionKey,
                         cancellationToken).ConfigureAwait(false);
                 }
-                catch (NullReferenceException) { }
                 catch (NonCoveredRangeException) { }
 
                 await LoopLocateTableAsync(
