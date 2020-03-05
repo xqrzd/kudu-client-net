@@ -386,7 +386,7 @@ namespace Knet.Kudu.Client
             var request = new WriteRequestPB
             {
                 TabletId = tablet.TabletId.ToUtf8ByteArray(),
-                Schema = table.SchemaPb.Schema,
+                Schema = table.SchemaPbNoIds.Schema,
                 RowOperations = rowOperations,
                 ExternalConsistencyMode = (ExternalConsistencyModePB)externalConsistencyMode
             };

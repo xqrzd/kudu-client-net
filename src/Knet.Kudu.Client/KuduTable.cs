@@ -8,6 +8,8 @@ namespace Knet.Kudu.Client
     {
         internal GetTableSchemaResponsePB SchemaPb { get; }
 
+        internal GetTableSchemaResponsePB SchemaPbNoIds { get; }
+
         public Schema Schema { get; }
 
         public PartitionSchema PartitionSchema { get; }
@@ -19,6 +21,7 @@ namespace Knet.Kudu.Client
         public KuduTable(GetTableSchemaResponsePB schemaPb)
         {
             Schema = new Schema(schemaPb.Schema);
+            SchemaPbNoIds = CreateWithNoColumnIds(schemaPb);
             SchemaPb = schemaPb;
             PartitionSchema = new PartitionSchema(schemaPb.PartitionSchema);
             TableId = schemaPb.TableId.ToStringUtf8();
@@ -40,6 +43,54 @@ namespace Knet.Kudu.Client
         private KuduOperation NewOperation(RowOperation rowOperation)
         {
             return new KuduOperation(this, rowOperation);
+        }
+
+        private static GetTableSchemaResponsePB CreateWithNoColumnIds(
+            GetTableSchemaResponsePB schemaPb)
+        {
+            var clone = schemaPb.Clone();
+
+            foreach (var column in clone.Schema.Columns)
+            {
+                column.ResetComment();
+                column.ResetId();
+            }
+
+            return clone;
+        }
+    }
+}
+
+namespace Knet.Kudu.Client.Protocol.Master
+{
+    public partial class GetTableSchemaResponsePB
+    {
+        public GetTableSchemaResponsePB Clone()
+        {
+            var clone = (GetTableSchemaResponsePB)MemberwiseClone();
+            var newSchema = new SchemaPB();
+            var numColumns = clone.Schema.Columns.Count;
+
+            for (int i = 0; i < numColumns; i++)
+            {
+                var column = clone.Schema.Columns[i].Clone();
+                newSchema.Columns.Add(column);
+            }
+
+            clone.Schema = newSchema;
+
+            return clone;
+        }
+    }
+}
+
+namespace Knet.Kudu.Client.Protocol
+{
+    public partial class ColumnSchemaPB
+    {
+        public ColumnSchemaPB Clone()
+        {
+            return (ColumnSchemaPB)MemberwiseClone();
         }
     }
 }
