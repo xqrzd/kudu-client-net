@@ -14,6 +14,7 @@ namespace Knet.Kudu.Client
     {
         // By default, a scan token is created for each tablet to be scanned.
         protected long SplitSizeBytes = -1;
+        protected int FetchTabletsPerRangeLookup = 1000;
 
         public KuduScanTokenBuilder(KuduClient client, KuduTable table)
             : base(client, table)
@@ -21,15 +22,30 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
-        /// Sets the data size of key range. It is used to split tablet's primary key range
-        /// into smaller ranges. The split doesn't change the layout of the tablet. This is a hint:
-        /// The tablet server may return the size of key range larger or smaller than this value.
-        /// If unset or less than or equal to 0, the key range includes all the data of the tablet.
+        /// Sets the data size of key range. It is used to split tablet's primary key
+        /// range into smaller ranges. The split doesn't change the layout of the
+        /// tablet. This is a hint: The tablet server may return the size of key range
+        /// larger or smaller than this value. If unset or less than or equal to 0, the
+        /// key range includes all the data of the tablet.
         /// </summary>
         /// <param name="splitSizeBytes">The data size of key range.</param>
         public KuduScanTokenBuilder SetSplitSizeBytes(long splitSizeBytes)
         {
             SplitSizeBytes = splitSizeBytes;
+            return this;
+        }
+
+        /// <summary>
+        /// The number of tablets to fetch from the master when looking up a range of
+        /// tablets.
+        /// </summary>
+        /// <param name="fetchTabletsPerRangeLookup">
+        /// Number of tablets to fetch per range lookup.
+        /// </param>
+        public KuduScanTokenBuilder SetFetchTabletsPerRangeLookup(
+            int fetchTabletsPerRangeLookup)
+        {
+            FetchTabletsPerRangeLookup = fetchTabletsPerRangeLookup;
             return this;
         }
 
@@ -152,7 +168,7 @@ namespace Knet.Kudu.Client
                     UpperBoundPrimaryKey,
                     partitionRange.Lower.Length == 0 ? null : partitionRange.Lower,
                     partitionRange.Upper.Length == 0 ? null : partitionRange.Upper,
-                    1000,
+                    FetchTabletsPerRangeLookup,
                     SplitSizeBytes,
                     cancellationToken).ConfigureAwait(false);
 
