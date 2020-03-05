@@ -418,7 +418,7 @@ namespace Knet.Kudu.Client
             });
 
             if (_request.Schema == null)
-                _request.Schema = _table.SchemaPb.Schema;
+                _request.Schema = _table.SchemaPbNoIds.Schema;
 
             return this;
         }
@@ -462,7 +462,7 @@ namespace Knet.Kudu.Client
             });
 
             if (_request.Schema == null)
-                _request.Schema = _table.SchemaPb.Schema;
+                _request.Schema = _table.SchemaPbNoIds.Schema;
 
             return this;
         }
@@ -538,7 +538,7 @@ namespace Knet.Kudu.Client
             });
 
             if (_request.Schema == null)
-                _request.Schema = _table.SchemaPb.Schema;
+                _request.Schema = _table.SchemaPbNoIds.Schema;
 
             return this;
         }
@@ -576,7 +576,7 @@ namespace Knet.Kudu.Client
             });
 
             if (_request.Schema == null)
-                _request.Schema = _table.SchemaPb.Schema;
+                _request.Schema = _table.SchemaPbNoIds.Schema;
 
             return this;
         }
