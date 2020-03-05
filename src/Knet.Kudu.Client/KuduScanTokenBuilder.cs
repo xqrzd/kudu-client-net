@@ -84,7 +84,6 @@ namespace Knet.Kudu.Client
                     int columnIndex = schema.GetColumnIndex(columnName);
                     var columnSchema = Table.SchemaPb.Schema.Columns[columnIndex];
 
-                    // TODO: Set columnId here.
                     proto.ProjectedColumns.Add(columnSchema);
                 }
             }
@@ -94,7 +93,6 @@ namespace Knet.Kudu.Client
                 {
                     var columnSchema = Table.SchemaPb.Schema.Columns[columnIndex];
 
-                    // TODO: Set columnId here.
                     proto.ProjectedColumns.Add(columnSchema);
                 }
             }

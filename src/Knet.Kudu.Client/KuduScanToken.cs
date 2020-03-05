@@ -194,8 +194,7 @@ namespace Knet.Kudu.Client
 
             foreach (var colSchemaFromPb in message.ProjectedColumns)
             {
-                // TODO: Check if schema has column ids.
-                int colIdx = colSchemaFromPb.ShouldSerializeId() && false ?
+                int colIdx = colSchemaFromPb.ShouldSerializeId() && schema.HasColumnIds ?
                     schema.GetColumnIndex((int)colSchemaFromPb.Id) :
                     schema.GetColumnIndex(colSchemaFromPb.Name);
 
