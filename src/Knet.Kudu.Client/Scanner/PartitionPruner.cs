@@ -242,6 +242,8 @@ namespace Knet.Kudu.Client.Scanner
                 }
             }
 
+            partitionKeyRangeBytes.Reverse();
+
             return new PartitionPruner(new Stack<PartitionKeyRange>(partitionKeyRangeBytes));
         }
 
