@@ -319,6 +319,12 @@ namespace Knet.Kudu.Client
             if (!response.HasMoreResults || response.ScannerId == null)
             {
                 ScanFinished();
+
+                if (response.NumRows == 0 && _partitionPruner.HasMorePartitionKeyRanges)
+                {
+                    return await MoveNextAsync().ConfigureAwait(false);
+                }
+
                 return response.NumRows > 0;
             }
 
