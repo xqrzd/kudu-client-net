@@ -591,42 +591,22 @@ namespace Knet.Kudu.Client
             CancellationToken cancellationToken = default)
         {
             // TODO: Use the cache instead of reaching out to a master every time.
-            var results = new List<RemoteTablet>();
+            var tablets = await GetTableLocationsAsync(
+                table.TableId,
+                startPartitionKey,
+                endPartitionKey,
+                int.MaxValue,
+                cancellationToken).ConfigureAwait(false);
 
-            while (true)
+            if (tablets.Count == 1)
             {
-                var tablets = await GetTableLocationsAsync(
-                    table.TableId,
-                    startPartitionKey,
-                    endPartitionKey,
-                    fetchBatchSize,
-                    cancellationToken).ConfigureAwait(false);
+                var tablet = tablets[0];
 
-                if (tablets.Count == 0)
-                    break;
-
-                if (tablets.Count == 1)
-                {
-                    var tablet = tablets[0];
-
-                    if (startPartitionKey.SequenceCompareTo(tablet.Partition.PartitionKeyStart) > 0)
-                        break;
-                }
-
-                results.AddRange(tablets);
-
-                var lastTablet = tablets[tablets.Count - 1];
-
-                startPartitionKey = lastTablet.Partition.PartitionKeyEnd;
-
-                if (startPartitionKey.Length == 0)
-                    break;
-
-                if (tablets.Count < fetchBatchSize)
-                    break;
+                if (startPartitionKey.SequenceCompareTo(tablet.Partition.PartitionKeyStart) > 0)
+                    return new List<RemoteTablet>();
             }
 
-            return results;
+            return tablets;
         }
 
         /// <summary>

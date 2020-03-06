@@ -41,9 +41,6 @@ namespace Knet.Kudu.Client.FunctionalTests
         [SkippableFact]
         public async Task TestScanTokens()
         {
-            // For this test, make sure that we cover the case that not all tablets
-            // are returned in a single batch.
-
             var builder = ClientTestUtil.CreateManyStringsSchema()
                 .SetTableName(_tableName)
                 .AddHashPartitions(8, "key")
@@ -74,6 +71,73 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(16, tokens.Count);
 
             await using var newClient = _harness.CreateClient();
+            var rowCount = await CountScanTokenRowsAsync(newClient, table, tokens);
+
+            Assert.Equal(100, rowCount);
+        }
+
+        /// <summary>
+        /// Tests scan token creation and execution on a table with non-covering
+        /// range partitions.
+        /// </summary>
+        [SkippableFact]
+        public async Task TestScanTokensNonCoveringRangePartitions()
+        {
+            var builder = ClientTestUtil.CreateManyStringsSchema()
+                .SetTableName(_tableName)
+                .AddHashPartitions(2, "key")
+                .CreateBasicRangePartition()
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetString("key", "a");
+                    upper.SetString("key", "f");
+                })
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetString("key", "h");
+                    upper.SetString("key", "z");
+                })
+                .AddSplitRow(row => row.SetString("key", "k"));
+
+            var table = await _client.CreateTableAsync(builder);
+
+            for (char c = 'a'; c < 'f'; c++)
+            {
+                var row = table.NewInsert();
+                row.SetString("key", "" + c);
+                row.SetString("c1", "c1_" + c);
+                row.SetString("c2", "c2_" + c);
+
+                await _session.EnqueueAsync(row);
+            }
+
+            for (char c = 'h'; c < 'z'; c++)
+            {
+                var row = table.NewInsert();
+                row.SetString("key", "" + c);
+                row.SetString("c1", "c1_" + c);
+                row.SetString("c2", "c2_" + c);
+
+                await _session.EnqueueAsync(row);
+            }
+
+            await _session.FlushAsync();
+
+            var tokenBuilder = _client.NewScanTokenBuilder(table)
+                .SetEmptyProjection();
+
+            List<KuduScanToken> tokens = await tokenBuilder.BuildAsync();
+            Assert.Equal(6, tokens.Count);
+
+            await using var newClient = _harness.CreateClient();
+            var rowCount = await CountScanTokenRowsAsync(newClient, table, tokens);
+
+            Assert.Equal('f' - 'a' + 'z' - 'h', rowCount);
+        }
+
+        private static async Task<int> CountScanTokenRowsAsync(
+            KuduClient client, KuduTable table, List<KuduScanToken> tokens)
+        {
             var tasks = new List<Task<int>>();
 
             foreach (var token in tokens)
@@ -83,7 +147,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                     var count = 0;
                     var tokenBytes = token.Serialize();
 
-                    var scanner = _client.NewScanBuilder(table)
+                    var scanner = client.NewScanBuilder(table)
                         .ApplyScanToken(tokenBytes)
                         .Build();
 
@@ -101,7 +165,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             var results = await Task.WhenAll(tasks);
             var rowCount = results.Sum();
 
-            Assert.Equal(100, rowCount);
+            return rowCount;
         }
     }
 }
