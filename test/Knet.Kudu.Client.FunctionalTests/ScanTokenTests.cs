@@ -135,6 +135,50 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal('f' - 'a' + 'z' - 'h', rowCount);
         }
 
+        /// <summary>
+        /// Tests the results of creating scan tokens, altering the columns being
+        /// scanned, and then executing the scan tokens.
+        /// </summary>
+        [SkippableFact]
+        public async Task TestScanTokensConcurrentAlterTable()
+        {
+            var builder = new TableBuilder(_tableName)
+                .SetNumReplicas(1)
+                .AddColumn("key", KuduType.Int64, opt => opt.Key(true))
+                .AddColumn("a", KuduType.Int64);
+
+            var table = await _client.CreateTableAsync(builder);
+
+            List<KuduScanToken> tokens = await _client.NewScanTokenBuilder(table)
+                .BuildAsync();
+            Assert.Single(tokens);
+
+            var token = tokens[0];
+
+            // Drop a column
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .DropColumn("a"));
+
+            table = await _client.OpenTableAsync(_tableName);
+
+            Assert.Throws<KeyNotFoundException>(() =>
+            {
+                _client.NewScanBuilder(table).ApplyScanToken(token);
+            });
+
+            // Add a column with the same name, type, and nullability. It will have a
+            // different id-- it's a  different column-- so the scan token will fail.
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .AddColumn("a", KuduType.Int64, opt => opt.DefaultValue(0L)));
+
+            table = await _client.OpenTableAsync(_tableName);
+
+            Assert.Throws<KeyNotFoundException>(() =>
+            {
+                _client.NewScanBuilder(table).ApplyScanToken(token);
+            });
+        }
+
         private static async Task<int> CountScanTokenRowsAsync(
             KuduClient client, KuduTable table, List<KuduScanToken> tokens)
         {
