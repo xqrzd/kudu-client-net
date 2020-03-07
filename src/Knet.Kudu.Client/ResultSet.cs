@@ -6,11 +6,12 @@ namespace Knet.Kudu.Client
 {
     public class ResultSet : IDisposable
     {
-        private readonly Schema _schema;
         private readonly IMemoryOwner<byte> _rowAlloc;
         private readonly IMemoryOwner<byte> _indirectData;
         private readonly int[] _columnOffsets;
         private readonly int _rowSize;
+
+        public Schema Schema { get; }
 
         public int Count { get; }
 
@@ -24,7 +25,7 @@ namespace Knet.Kudu.Client
             IMemoryOwner<byte> rowAlloc,
             IMemoryOwner<byte> indirectData)
         {
-            _schema = schema;
+            Schema = schema;
             _rowAlloc = rowAlloc;
             _indirectData = indirectData;
             Count = numRows;
@@ -73,12 +74,12 @@ namespace Knet.Kudu.Client
 
         internal int GetColumnIndex(string columnName)
         {
-            return _schema.GetColumnIndex(columnName);
+            return Schema.GetColumnIndex(columnName);
         }
 
         internal ColumnSchema GetColumnSchema(int columnIndex)
         {
-            return _schema.GetColumn(columnIndex);
+            return Schema.GetColumn(columnIndex);
         }
 
         public override string ToString() => $"{Count} rows";
