@@ -151,9 +151,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             List<KuduScanToken> tokens = await _client.NewScanTokenBuilder(table)
                 .BuildAsync();
-            Assert.Single(tokens);
-
-            var token = tokens[0];
+            var token = Assert.Single(tokens);
 
             // Drop a column
             await _client.AlterTableAsync(new AlterTableBuilder(table)
@@ -177,6 +175,227 @@ namespace Knet.Kudu.Client.FunctionalTests
             {
                 _client.NewScanBuilder(table).ApplyScanToken(token);
             });
+        }
+
+        /// <summary>
+        /// Tests scan token creation and execution on a table with interleaved
+        /// range partition drops.
+        /// </summary>
+        [SkippableFact]
+        public async Task TestScanTokensInterleavedRangePartitionDrops()
+        {
+            int numRows = 30;
+
+            var builder = ClientTestUtil.GetBasicSchema()
+                .SetTableName(_tableName)
+                .AddHashPartitions(2, "key")
+                .CreateBasicRangePartition()
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("key", 0);
+                    upper.SetInt32("key", numRows / 3);
+                })
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("key", numRows / 3);
+                    upper.SetInt32("key", 2 * numRows / 3);
+                })
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("key", 2 * numRows / 3);
+                    upper.SetInt32("key", numRows);
+                });
+
+            var table = await _client.CreateTableAsync(builder);
+
+            for (int i = 0; i < numRows; i++)
+            {
+                var row = ClientTestUtil.CreateBasicSchemaInsert(table, i);
+                await _session.EnqueueAsync(row);
+            }
+
+            await _session.FlushAsync();
+
+            // Build the scan tokens.
+            List<KuduScanToken> tokens = await _client.NewScanTokenBuilder(table)
+                .BuildAsync();
+            Assert.Equal(6, tokens.Count);
+
+            // Drop the range partition [10, 20).
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .DropRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("key", numRows / 3);
+                    upper.SetInt32("key", 2 * numRows / 3);
+                }));
+
+            // Rehydrate the tokens.
+            var scanners = new List<KuduScanner<ResultSet>>();
+            foreach (var token in tokens)
+            {
+                var scanner = _client.NewScanBuilder(table)
+                    .ApplyScanToken(token)
+                    .Build();
+
+                scanners.Add(scanner);
+            }
+
+            // Drop the range partition [20, 30).
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .DropRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("key", 2 * numRows / 3);
+                    upper.SetInt32("key", numRows);
+                }));
+
+            // Check the scanners work. The scanners for the tablets in the range
+            // [10, 20) definitely won't see any rows. The scanners for the tablets
+            // in the range [20, 30) might see rows.
+            int scannedRows = 0;
+            foreach (var scanner in scanners)
+            {
+                await foreach (var resultSet in scanner)
+                {
+                    scannedRows += resultSet.Count;
+                }
+            }
+
+            Assert.True(scannedRows >= numRows / 3);
+            Assert.True(scannedRows <= 2 * numRows / 3);
+        }
+
+        /// <summary>
+        /// Test that scan tokens work with diff scans.
+        /// </summary>
+        [SkippableFact]
+        public async Task TestDiffScanTokens()
+        {
+            var builder = ClientTestUtil.GetBasicSchema()
+                .SetTableName(_tableName)
+                .SetNumReplicas(1);
+
+            var table = await _client.CreateTableAsync(builder);
+
+            // Set up the table for a diff scan.
+            int numRows = 20;
+            long timestamp = await SetupTableForDiffScansAsync(table, numRows);
+
+            // Since the diff scan interval is [start, end), increment the start timestamp
+            // to exclude the last row inserted in the first group of ops, and increment the
+            // end timestamp to include the last row deleted in the second group of ops.
+            List<KuduScanToken> tokens = await _client.NewScanTokenBuilder(table)
+                .DiffScan(timestamp + 1, _client.LastPropagatedTimestamp + 1)
+                .BuildAsync();
+
+            var token = Assert.Single(tokens);
+
+            var scanner = _client.NewScanBuilder(table)
+                .ApplyScanToken(token)
+                .Build();
+
+            await CheckDiffScanResultsAsync(scanner, 3 * numRows / 4, numRows / 4);
+        }
+
+        /// <summary>
+        /// Test that scan tokens work with diff scans even when columns are renamed.
+        /// </summary>
+        [SkippableFact]
+        public async Task TestDiffScanTokensConcurrentColumnRename()
+        {
+            var builder = ClientTestUtil.GetBasicSchema()
+                .SetTableName(_tableName)
+                .SetNumReplicas(1);
+
+            var table = await _client.CreateTableAsync(builder);
+
+            // Set up the table for a diff scan.
+            int numRows = 20;
+            long timestamp = await SetupTableForDiffScansAsync(table, numRows);
+
+            // Since the diff scan interval is [start, end), increment the start timestamp
+            // to exclude the last row inserted in the first group of ops, and increment the
+            // end timestamp to include the last row deleted in the second group of ops.
+            List<KuduScanToken> tokens = await _client.NewScanTokenBuilder(table)
+                .DiffScan(timestamp + 1, _client.LastPropagatedTimestamp + 1)
+                .BuildAsync();
+
+            var token = Assert.Single(tokens);
+
+            // Rename a column between when the token is created and when it is
+            // rehydrated into a scanner
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .RenameColumn("column1_i", "column1_i_new"));
+
+            table = await _client.OpenTableAsync(_tableName);
+
+            var scanner = _client.NewScanBuilder(table)
+                .ApplyScanToken(token)
+                .Build();
+
+            await CheckDiffScanResultsAsync(scanner, 3 * numRows / 4, numRows / 4);
+        }
+
+        private async Task<long> SetupTableForDiffScansAsync(KuduTable table, int numRows)
+        {
+            //var one = _client.LastPropagatedTimestamp;
+            //Console.WriteLine("1: " + one);
+            for (int i = 0; i < numRows / 2; i++)
+            {
+                var row = ClientTestUtil.CreateBasicSchemaInsert(table, i);
+                await _session.EnqueueAsync(row);
+            }
+
+            await _session.FlushAsync();
+
+            // Grab the timestamp, then add more data so there's a diff.
+            long timestamp = _client.LastPropagatedTimestamp;
+            for (int i = numRows / 2; i < numRows; i++)
+            {
+                var row = ClientTestUtil.CreateBasicSchemaInsert(table, i);
+                await _session.EnqueueAsync(row);
+            }
+
+            await _session.FlushAsync();
+
+            // Delete some data so the is_deleted column can be tested.
+            for (int i = 0; i < numRows / 4; i++)
+            {
+                var row = table.NewDelete();
+                row.SetInt32(0, i);
+                await _session.EnqueueAsync(row);
+            }
+
+            await _session.FlushAsync();
+
+            return timestamp;
+        }
+
+        private async Task CheckDiffScanResultsAsync(
+            KuduScanner<ResultSet> scanner,
+            int numExpectedMutations,
+            int numExpectedDeletes)
+        {
+            int numMutations = 0;
+            int numDeletes = 0;
+
+            await foreach (var resultSet in scanner)
+            {
+                AccumulateResults(resultSet);
+            }
+
+            void AccumulateResults(ResultSet resultSet)
+            {
+                foreach (var rowResult in resultSet)
+                {
+                    numMutations++;
+
+                    if (rowResult.IsDeleted)
+                        numDeletes++;
+                }
+            }
+
+            Assert.Equal(numExpectedMutations, numMutations);
+            Assert.Equal(numExpectedDeletes, numDeletes);
         }
 
         private static async Task<int> CountScanTokenRowsAsync(
