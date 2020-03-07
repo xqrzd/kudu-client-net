@@ -337,8 +337,6 @@ namespace Knet.Kudu.Client.FunctionalTests
 
         private async Task<long> SetupTableForDiffScansAsync(KuduTable table, int numRows)
         {
-            //var one = _client.LastPropagatedTimestamp;
-            //Console.WriteLine("1: " + one);
             for (int i = 0; i < numRows / 2; i++)
             {
                 var row = ClientTestUtil.CreateBasicSchemaInsert(table, i);
