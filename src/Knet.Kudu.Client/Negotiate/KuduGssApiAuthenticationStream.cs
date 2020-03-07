@@ -17,7 +17,6 @@
 // OR MODIFICATIONS.
 
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Net.Security;
 using System.Threading;
@@ -187,7 +186,8 @@ namespace Knet.Kudu.Client.Negotiate
 
         private int ReadFrameHeaderLength(ReadOnlySpan<byte> buffer)
         {
-            Debug.Assert(buffer[0] == 22, "Expected 22");
+            if (buffer[0] != 22)
+                throw new Exception($"Expected HandshakeId (22), instead received {buffer[0]}");
 
             if (buffer[1] != DefaultMajorV)
                 throw new NotSupportedException($"Received frame header major v {buffer[1]} (different from {DefaultMajorV})");

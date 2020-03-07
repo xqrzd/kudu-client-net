@@ -30,7 +30,6 @@ namespace Knet.Kudu.Client.Negotiate
     /// </summary>
     public class Negotiator
     {
-        // TODO: Rework this class, and support more negotiation methods.
         private const byte CurrentRpcVersion = 9;
 
         private static readonly ReadOnlyMemory<byte> ConnectionHeader = new byte[]
@@ -90,24 +89,24 @@ namespace Knet.Kudu.Client.Negotiate
             _stream = networkStream;
 
             // After the client connects to a server, the client first sends a connection header.
-            // The connection header consists of a magic number "hrpc" and three byte flags, for a total of 7 bytes.
+            // The connection header consists of a magic number "hrpc" and three byte flags,
+            // for a total of 7 bytes.
             // https://github.com/apache/kudu/blob/master/docs/design-docs/rpc.md#wire-protocol
             await networkStream.WriteAsync(ConnectionHeader, cancellationToken).ConfigureAwait(false);
 
             var features = await NegotiateFeaturesAsync(cancellationToken).ConfigureAwait(false);
-            var useTls = false;
 
             // Check the negotiated authentication type sent by the server.
             var chosenAuthnType = ChooseAuthenticationType(features);
 
+            var useTls = false;
+
             // Always use TLS if the server supports it.
             if (features.HasRpcFeature(RpcFeatureFlag.Tls))
             {
-                var tlsHost = _options.TlsHost ?? _serverInfo.HostPort.Host;
-
                 // If we negotiated TLS, then we want to start the TLS handshake;
                 // otherwise, we can move directly to the authentication phase.
-                var tlsStream = await NegotiateTlsAsync(networkStream, tlsHost, chosenAuthnType)
+                var tlsStream = await NegotiateTlsAsync(networkStream, chosenAuthnType)
                     .ConfigureAwait(false);
 
                 // Don't wrap the TLS socket if we are using TLS for authentication only.
@@ -118,10 +117,10 @@ namespace Knet.Kudu.Client.Negotiate
                 }
             }
 
-            var result = await AuthenticateAsync(chosenAuthnType, cancellationToken)
+            var context = await AuthenticateAsync(chosenAuthnType, cancellationToken)
                 .ConfigureAwait(false);
 
-            await SendConnectionContextAsync(result.Nonce, cancellationToken).ConfigureAwait(false);
+            await SendConnectionContextAsync(context, cancellationToken).ConfigureAwait(false);
 
             IDuplexPipe pipe;
             if (useTls)
@@ -189,9 +188,9 @@ namespace Knet.Kudu.Client.Negotiate
 
         private async Task<SslStream> NegotiateTlsAsync(
             NetworkStream stream,
-            string tlsHost,
             AuthenticationType authenticationType)
         {
+            var tlsHost = _options.TlsHost ?? _serverInfo.HostPort.Host;
             var authenticationStream = new KuduTlsAuthenticationStream(this);
             var sslInnerStream = new StreamWrapper(authenticationStream);
 
@@ -245,7 +244,7 @@ namespace Knet.Kudu.Client.Negotiate
             }
         }
 
-        private Task<AuthenticationResult> AuthenticateAsync(
+        private Task<ConnectionContextPB> AuthenticateAsync(
             AuthenticationType authenticationType, CancellationToken cancellationToken)
         {
             // The client and server now authenticate to each other.
@@ -267,23 +266,23 @@ namespace Knet.Kudu.Client.Negotiate
             };
         }
 
-        private async Task<AuthenticationResult> AuthenticateSaslPlainAsync(CancellationToken cancellationToken)
+        private async Task<ConnectionContextPB> AuthenticateSaslPlainAsync(CancellationToken cancellationToken)
         {
             var request = new NegotiatePB { Step = NegotiateStep.SaslInitiate };
             request.SaslMechanisms.Add(new SaslMechanism { Mechanism = "PLAIN" });
             request.Token = SaslPlain.CreateToken(new NetworkCredential("demo", "demo"));
 
             await SendReceiveAsync(request, cancellationToken).ConfigureAwait(false);
-            return new AuthenticationResult();
+            return new ConnectionContextPB();
         }
 
-        private async Task<AuthenticationResult> AuthenticateSaslGssApiAsync(CancellationToken cancellationToken)
+        private async Task<ConnectionContextPB> AuthenticateSaslGssApiAsync(CancellationToken cancellationToken)
         {
             using var gssApiStream = new KuduGssApiAuthenticationStream(this);
             using var negotiateStream = new NegotiateStream(gssApiStream);
 
             var targetName = _options.KerberosSpn ?? $"kudu/{_serverInfo.HostPort.Host}";
-            _logMessage.NegotiateInfo = $"SaslGssApi [{targetName}]";
+            _logMessage.NegotiateInfo = $"SASL_GSSAPI [{targetName}]";
 
             // Hopefully a temporary hack-fix, until we can figure
             // out why EncryptAndSign doesn't work on Windows.
@@ -322,14 +321,17 @@ namespace Knet.Kudu.Client.Negotiate
                 cancellationToken).ConfigureAwait(false);
 
             if (response.Step != NegotiateStep.SaslSuccess)
-                throw new Exception($"Negotiate failed, expected step {NegotiateStep.SaslSuccess}, got {response.Step}");
+                ThrowExpectedStepException(NegotiateStep.SaslSuccess, response.Step);
 
             if (_remoteCertificate != null)
             {
                 byte[] expected = _remoteCertificate.GetEndpointChannelBindings();
 
                 if (response.ChannelBindings == null)
-                    throw new Exception("No channel bindings provided by remote peer");
+                {
+                    throw new NonRecoverableException(KuduStatus.IllegalState(
+                        "No channel bindings provided by remote peer"));
+                }
 
                 byte[] provided = response.ChannelBindings;
                 // Kudu supplies a length header in big-endian,
@@ -339,7 +341,10 @@ namespace Knet.Kudu.Client.Negotiate
                 var unwrapped = gssApiStream.DecryptBuffer(provided);
 
                 if (!unwrapped.Span.SequenceEqual(expected))
-                    throw new Exception("Invalid channel bindings provided by remote peer");
+                {
+                    throw new NonRecoverableException(KuduStatus.IllegalState(
+                        "Invalid channel bindings provided by remote peer"));
+                }
             }
 
             byte[] nonce = null;
@@ -353,34 +358,33 @@ namespace Knet.Kudu.Client.Negotiate
                 nonce.AsSpan(0, 4).Reverse();
             }
 
-            return new AuthenticationResult(nonce);
+            return new ConnectionContextPB { EncodedNonce = nonce };
         }
 
-        private async Task<AuthenticationResult> AuthenticateTokenAsync(CancellationToken cancellationToken)
+        private async Task<ConnectionContextPB> AuthenticateTokenAsync(CancellationToken cancellationToken)
         {
             var request = new NegotiatePB { Step = NegotiateStep.TokenExchange };
             request.AuthnToken = _authnToken;
 
-            _logMessage.NegotiateInfo = "TokenAuth";
+            _logMessage.NegotiateInfo = "TOKEN_AUTH";
 
             var response = await SendReceiveAsync(request, cancellationToken).ConfigureAwait(false);
 
             if (response.Step != NegotiateStep.TokenExchange)
-                throw new Exception($"Expected TokenExchange, got step {response.Step}");
+                ThrowExpectedStepException(NegotiateStep.TokenExchange, response.Step);
 
-            return new AuthenticationResult();
+            return new ConnectionContextPB();
         }
 
-        private Task SendConnectionContextAsync(byte[] nonce, CancellationToken cancellationToken)
+        private Task SendConnectionContextAsync(ConnectionContextPB context, CancellationToken cancellationToken)
         {
             // Once the SASL negotiation is complete, before the first request, the client sends the
             // server a special call with call_id -3. The body of this call is a ConnectionContextPB.
             // The server should not respond to this call.
 
             var header = new RequestHeader { CallId = ConnectionContextCallId };
-            var request = new ConnectionContextPB { EncodedNonce = nonce };
 
-            return SendAsync(header, request, cancellationToken);
+            return SendAsync(header, context, cancellationToken);
         }
 
         internal Task<NegotiatePB> SendTlsHandshakeAsync(byte[] tlsHandshake, CancellationToken cancellationToken)
@@ -448,8 +452,33 @@ namespace Knet.Kudu.Client.Negotiate
             var ms = new MemoryStream(buffer);
             var header = Serializer.DeserializeWithLengthPrefix<ResponseHeader>(ms, PrefixStyle.Base128);
 
+            if (header.IsError)
+            {
+                var error = Serializer.DeserializeWithLengthPrefix<ErrorStatusPB>(ms, PrefixStyle.Base128);
+                var code = error.Code;
+                KuduException exception;
+
+                if (code == ErrorStatusPB.RpcErrorCodePB.ErrorServerTooBusy ||
+                    code == ErrorStatusPB.RpcErrorCodePB.ErrorUnavailable)
+                {
+                    exception = new RecoverableException(
+                        KuduStatus.ServiceUnavailable(error.Message));
+                }
+                else
+                {
+                    exception = new RpcRemoteException(
+                        KuduStatus.RemoteError(error.Message), error);
+                }
+
+                throw exception;
+            }
+
             if (header.CallId != SaslNegotiationCallId)
-                throw new Exception($"Negotiate failed, expected {SaslNegotiationCallId}, got {header.CallId}");
+            {
+                throw new NonRecoverableException(KuduStatus.IllegalState(
+                    $"Expected CallId {SaslNegotiationCallId}, got {header.CallId}"));
+            }
+
             var response = Serializer.DeserializeWithLengthPrefix<NegotiatePB>(ms, PrefixStyle.Base128);
 
             return response;
@@ -467,10 +496,17 @@ namespace Knet.Kudu.Client.Negotiate
         private static string GetTlsInfoLogString(SslStream tlsStream)
         {
 #if NETCOREAPP3_0
-            return $"{tlsStream.SslProtocol} [{tlsStream.NegotiatedCipherSuite}]";
+            return $"{tlsStream.SslProtocol.ToString().ToUpper()} [{tlsStream.NegotiatedCipherSuite}]";
 #else
-            return $"{tlsStream.SslProtocol}";
+            return $"{tlsStream.SslProtocol.ToString().ToUpper()}";
 #endif
+        }
+
+        private static void ThrowExpectedStepException(
+            NegotiateStep expectedStep, NegotiateStep actualStep)
+        {
+            throw new NonRecoverableException(KuduStatus.IllegalState(
+                $"Expected NegotiateStep {expectedStep}, received {actualStep}"));
         }
 
         private enum AuthenticationType
@@ -480,24 +516,14 @@ namespace Knet.Kudu.Client.Negotiate
             Token
         }
 
-        private readonly struct AuthenticationResult
-        {
-            public byte[] Nonce { get; }
-
-            public AuthenticationResult(byte[] nonce)
-            {
-                Nonce = nonce;
-            }
-        }
-
         private class NegotiateLoggerMessage
         {
-            public string TlsInfo { get; set; } = "Plaintext";
+            public string TlsInfo { get; set; } = "PLAINTEXT";
 
-            public string NegotiateInfo { get; set; } = "SaslPlain";
+            public string NegotiateInfo { get; set; } = "SASL_PLAIN";
         }
 
-        private class DuplexPipe : IDuplexPipe
+        private sealed class DuplexPipe : IDuplexPipe
         {
             public PipeWriter Output { get; }
 
