@@ -116,5 +116,21 @@ namespace Knet.Kudu.Client.Util
             return negotiatePb.SupportedFeatures != null &&
                 negotiatePb.SupportedFeatures.Contains(flag);
         }
+
+        internal static int GetScannerBatchSizeEstimate(this Schema schema)
+        {
+            if (schema.VarLengthColumnCount == 0)
+            {
+                // No variable length data, we can do an
+                // exact ideal estimate here.
+                return 1024 * 1024 - schema.RowSize;
+            }
+            else
+            {
+                // Assume everything evens out.
+                // Most of the time it probably does.
+                return 1024 * 1024;
+            }
+        }
     }
 }

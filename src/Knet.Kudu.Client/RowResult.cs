@@ -19,6 +19,16 @@ namespace Knet.Kudu.Client
             _indirectData = indirectData;
         }
 
+        /// <summary>
+        /// True if the RowResult has the IS_DELETED virtual column.
+        /// </summary>
+        public bool HasIsDeleted => _resultSet.Schema.HasIsDeleted;
+
+        /// <summary>
+        /// The value of the IS_DELETED virtual column.
+        /// </summary>
+        public bool IsDeleted => GetBool(_resultSet.Schema.IsDeletedIndex);
+
         public bool GetBool(string columnName)
         {
             int columnIndex = _resultSet.GetColumnIndex(columnName);

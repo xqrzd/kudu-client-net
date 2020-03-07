@@ -28,7 +28,7 @@ namespace Knet.Kudu.Client
         /// performing a lookup of a single partition (e.g. for a write), or
         /// re-looking-up a tablet with stale information.
         /// </summary>
-        private const int FetchTabletsPerPointLookup = 10;
+        private const int FetchTabletsPerPointLookup = 100;
         private const int MaxRpcAttempts = 100;
 
         public const long NoTimestamp = -1;
@@ -279,32 +279,34 @@ namespace Knet.Kudu.Client
             return response.Servers;
         }
 
-        public async Task<List<RemoteTablet>> GetTableLocationsAsync(
-            string tableId, byte[] partitionKey, uint fetchBatchSize,
+        public Task<List<RemoteTablet>> GetTableLocationsAsync(
+            string tableId, byte[] partitionKeyStart, int fetchBatchSize,
             CancellationToken cancellationToken = default)
         {
-            // TODO: rate-limit master lookups.
+            return GetTableLocationsAsync(
+                tableId, partitionKeyStart, null, fetchBatchSize, cancellationToken);
+        }
 
+        public async Task<List<RemoteTablet>> GetTableLocationsAsync(
+            string tableId, byte[] partitionKeyStart, byte[] partitionKeyEnd,
+            int fetchBatchSize, CancellationToken cancellationToken = default)
+        {
             var request = new GetTableLocationsRequestPB
             {
                 Table = new TableIdentifierPB { TableId = tableId.ToUtf8ByteArray() },
-                PartitionKeyStart = partitionKey,
-                MaxReturnedLocations = fetchBatchSize
+                PartitionKeyStart = partitionKeyStart,
+                PartitionKeyEnd = partitionKeyEnd,
+                MaxReturnedLocations = (uint)fetchBatchSize,
+                InternTsInfosInResponse = true
             };
 
             var rpc = new GetTableLocationsRequest(request);
             var result = await SendRpcToMasterAsync(rpc, cancellationToken).ConfigureAwait(false);
 
-            var tabletLocations = new List<RemoteTablet>(result.TabletLocations.Count);
+            var tableLocations = await _connectionFactory.GetTabletsAsync(tableId, result)
+                .ConfigureAwait(false);
 
-            foreach (var tabletLocation in result.TabletLocations)
-            {
-                var tablet = await _connectionFactory.GetTabletAsync(tableId, tabletLocation)
-                    .ConfigureAwait(false);
-                tabletLocations.Add(tablet);
-            }
-
-            return tabletLocations;
+            return tableLocations;
         }
 
         public async Task<KuduTable> OpenTableAsync(
@@ -384,7 +386,7 @@ namespace Knet.Kudu.Client
             var request = new WriteRequestPB
             {
                 TabletId = tablet.TabletId.ToUtf8ByteArray(),
-                Schema = table.SchemaPb.Schema,
+                Schema = table.SchemaPbNoIds.Schema,
                 RowOperations = rowOperations,
                 ExternalConsistencyMode = (ExternalConsistencyModePB)externalConsistencyMode
             };
@@ -405,6 +407,11 @@ namespace Knet.Kudu.Client
         public KuduScannerBuilder NewScanBuilder(KuduTable table)
         {
             return new KuduScannerBuilder(this, table, _scanLogger);
+        }
+
+        public KuduScanTokenBuilder NewScanTokenBuilder(KuduTable table)
+        {
+            return new KuduScanTokenBuilder(this, table);
         }
 
         public IKuduSession NewSession() => NewSession(new KuduSessionOptions());
@@ -517,6 +524,13 @@ namespace Knet.Kudu.Client
             return cache.FindTablet(partitionKey);
         }
 
+        private bool FindTabletInCache(string tableId, ReadOnlySpan<byte> partitionKey,
+            out RemoteTablet left, out RemoteTablet right)
+        {
+            TableLocationsCache cache = GetTableLocationsCache(tableId);
+            return cache.SearchLeftRight(partitionKey, out left, out right);
+        }
+
         /// <summary>
         /// Locates a tablet by consulting a master and caches the results.
         /// </summary>
@@ -567,6 +581,151 @@ namespace Knet.Kudu.Client
         private TableLocationsCache GetTableLocationsCache(string tableId)
         {
             return _tableLocations.GetOrAdd(tableId, key => new TableLocationsCache());
+        }
+
+        public async Task<List<RemoteTablet>> LoopLocateTableAsync(
+            KuduTable table,
+            byte[] startPartitionKey,
+            byte[] endPartitionKey,
+            int fetchBatchSize,
+            CancellationToken cancellationToken = default)
+        {
+            // TODO: Use the cache instead of reaching out to a master every time.
+            var tablets = await GetTableLocationsAsync(
+                table.TableId,
+                startPartitionKey,
+                endPartitionKey,
+                int.MaxValue,
+                cancellationToken).ConfigureAwait(false);
+
+            if (tablets.Count == 1)
+            {
+                var tablet = tablets[0];
+
+                if (startPartitionKey.SequenceCompareTo(tablet.Partition.PartitionKeyStart) > 0)
+                    return new List<RemoteTablet>();
+            }
+
+            return tablets;
+        }
+
+        /// <summary>
+        /// Sends a splitKeyRange RPC to split the tablet's primary key range into
+        /// smaller ranges. This RPC doesn't change the layout of the tablet.
+        /// </summary>
+        /// <param name="tableId">Table to lookup.</param>
+        /// <param name="startPrimaryKey">
+        /// The primary key to begin splitting at (inclusive), pass null to
+        /// start splitting at the beginning of the tablet.
+        /// </param>
+        /// <param name="endPrimaryKey">
+        /// The primary key to stop splitting at (exclusive), pass null to
+        /// stop splitting at the end of the tablet.
+        /// </param>
+        /// <param name="partitionKey">The partition key of the tablet to find.</param>
+        /// <param name="splitSizeBytes">
+        /// The size of the data in each key range. This is a hint: The tablet
+        /// server may return a key range larger or smaller than this value.
+        /// </param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        private Task<List<KeyRangePB>> GetTabletKeyRangesAsync(
+            string tableId,
+            byte[] startPrimaryKey,
+            byte[] endPrimaryKey,
+            byte[] partitionKey,
+            long splitSizeBytes,
+            CancellationToken cancellationToken = default)
+        {
+            var rpc = new SplitKeyRangeRequest(
+                tableId,
+                startPrimaryKey,
+                endPrimaryKey,
+                partitionKey,
+                splitSizeBytes);
+
+            return SendRpcToTabletAsync(rpc, cancellationToken);
+        }
+
+        public async ValueTask<List<KeyRange>> GetTableKeyRangesAsync(
+            KuduTable table,
+            byte[] startPrimaryKey,
+            byte[] endPrimaryKey,
+            byte[] startPartitionKey,
+            byte[] endPartitionKey,
+            int fetchBatchSize,
+            long splitSizeBytes,
+            CancellationToken cancellationToken = default)
+        {
+            var tablets = await LoopLocateTableAsync(
+                table,
+                startPartitionKey,
+                endPartitionKey,
+                fetchBatchSize,
+                cancellationToken).ConfigureAwait(false);
+
+            var keyRanges = new List<KeyRange>(tablets.Count);
+
+            if (splitSizeBytes <= 0)
+            {
+                foreach (var tablet in tablets)
+                {
+                    var keyRange = new KeyRange(tablet, startPrimaryKey, endPrimaryKey, -1);
+                    keyRanges.Add(keyRange);
+                }
+
+                return keyRanges;
+            }
+
+            var tasks = new List<Task<SplitKeyRangeResponse>>(tablets.Count);
+
+            foreach (var tablet in tablets)
+            {
+                var task = GetTabletKeyRangesAsync(this,
+                    tablet,
+                    startPrimaryKey,
+                    endPrimaryKey,
+                    splitSizeBytes,
+                    cancellationToken);
+
+                tasks.Add(task);
+            }
+
+            var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+
+            foreach (var result in results)
+            {
+                foreach (var keyRangePb in result.KeyRanges)
+                {
+                    var newRange = new KeyRange(
+                        result.Tablet,
+                        keyRangePb.StartPrimaryKey,
+                        keyRangePb.StopPrimaryKey,
+                        (long)keyRangePb.SizeBytesEstimates);
+
+                    keyRanges.Add(newRange);
+                }
+            }
+
+            return keyRanges;
+
+            static async Task<SplitKeyRangeResponse> GetTabletKeyRangesAsync(
+                KuduClient client,
+                RemoteTablet tablet,
+                byte[] startPrimaryKey,
+                byte[] endPrimaryKey,
+                long splitSizeBytes,
+                CancellationToken cancellationToken)
+            {
+                var keyRanges = await client.GetTabletKeyRangesAsync(
+                    tablet.TableId,
+                    startPrimaryKey,
+                    endPrimaryKey,
+                    tablet.Partition.PartitionKeyStart,
+                    splitSizeBytes,
+                    cancellationToken).ConfigureAwait(false);
+
+                return new SplitKeyRangeResponse(tablet, keyRanges);
+            }
         }
 
         private async Task<bool> ConnectToClusterAsync(CancellationToken cancellationToken)
@@ -1212,6 +1371,21 @@ namespace Knet.Kudu.Client
             {
                 ResponsePB = responsePB;
                 ServerInfo = serverInfo;
+            }
+        }
+
+        private readonly struct SplitKeyRangeResponse
+        {
+            public RemoteTablet Tablet { get; }
+
+            public List<KeyRangePB> KeyRanges { get; }
+
+            public SplitKeyRangeResponse(
+                RemoteTablet tablet,
+                List<KeyRangePB> keyRanges)
+            {
+                Tablet = tablet;
+                KeyRanges = keyRanges;
             }
         }
     }

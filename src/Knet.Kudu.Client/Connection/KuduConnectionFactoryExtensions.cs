@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Protocol.Consensus;
 using Knet.Kudu.Client.Protocol.Master;
@@ -29,36 +30,92 @@ namespace Knet.Kudu.Client.Connection
             return connectionFactory.GetServerInfoAsync(uuid, location, hostPort);
         }
 
-        public static async Task<RemoteTablet> GetTabletAsync(
+        public static async Task<List<RemoteTablet>> GetTabletsAsync(
             this IKuduConnectionFactory connectionFactory,
-            string tableId, TabletLocationsPB tabletLocations)
+            string tableId, GetTableLocationsResponsePB locations)
         {
-            var tabletId = tabletLocations.TabletId.ToStringUtf8();
-            var partition = new Partition(
-                tabletLocations.Partition.PartitionKeyStart,
-                tabletLocations.Partition.PartitionKeyEnd,
-                tabletLocations.Partition.HashBuckets);
+            // TODO: Need error handling here.
+            var tsInfos = locations.TsInfos;
+            var internedServers = new List<ServerInfo>(tsInfos.Count);
+            var results = new List<RemoteTablet>(locations.TabletLocations.Count);
 
-            var replicas = new List<ServerInfo>(tabletLocations.Replicas.Count);
-            int leaderIndex = -1;
-
-            foreach (var replica in tabletLocations.Replicas)
+            foreach (var tsInfo in tsInfos)
             {
-                var serverInfo = await connectionFactory.GetServerInfoAsync(replica.TsInfo)
+                var serverInfo = await GetServerInfoAsync(connectionFactory, tsInfo)
                     .ConfigureAwait(false);
 
-                if (serverInfo != null)
-                {
-                    if (replica.Role == RaftPeerPB.Role.Leader)
-                        leaderIndex = replicas.Count;
-
-                    replicas.Add(serverInfo);
-                }
+                internedServers.Add(serverInfo);
             }
 
-            var cache = new ServerInfoCache(replicas, leaderIndex);
+            foreach (var tabletInfo in locations.TabletLocations)
+            {
+                var tabletId = tabletInfo.TabletId.ToStringUtf8();
+                var partition = new Partition(
+                    tabletInfo.Partition.PartitionKeyStart,
+                    tabletInfo.Partition.PartitionKeyEnd,
+                    tabletInfo.Partition.HashBuckets);
 
-            return new RemoteTablet(tableId, tabletId, partition, cache);
+                var numReplicas = Math.Max(
+                    tabletInfo.Replicas.Count,
+                    tabletInfo.InternedReplicas.Count);
+
+                var servers = new List<ServerInfo>(numReplicas);
+                var replicas = new List<Replica>(numReplicas);
+                int leaderIndex = -1;
+
+                // Handle interned replicas.
+                foreach (var replicaPb in tabletInfo.InternedReplicas)
+                {
+                    var tsInfoIdx = (int)replicaPb.TsInfoIdx;
+                    var serverInfo = internedServers[tsInfoIdx];
+
+                    var replica = new Replica(
+                        serverInfo.HostPort,
+                        replicaPb.Role,
+                        null); // TODO: Set dimensionLabel.
+
+                    if (replica.Role == RaftPeerPB.Role.Leader)
+                        leaderIndex = servers.Count;
+
+                    servers.Add(serverInfo);
+                    replicas.Add(replica);
+                }
+
+                // Handle "old-style" non-interned replicas.
+                // It's used for backward compatibility.
+                foreach (var replicaPb in tabletInfo.Replicas)
+                {
+                    var serverInfo = await connectionFactory.GetServerInfoAsync(
+                        replicaPb.TsInfo).ConfigureAwait(false);
+
+                    if (serverInfo != null)
+                    {
+                        var replica = new Replica(
+                            serverInfo.HostPort,
+                            replicaPb.Role,
+                            dimensionLabel: null);
+
+                        if (replica.Role == RaftPeerPB.Role.Leader)
+                            leaderIndex = servers.Count;
+
+                        servers.Add(serverInfo);
+                        replicas.Add(replica);
+                    }
+                }
+
+                var serverCache = new ServerInfoCache(servers, leaderIndex);
+
+                var tablet = new RemoteTablet(
+                    tableId,
+                    tabletId,
+                    partition,
+                    serverCache,
+                    replicas);
+
+                results.Add(tablet);
+            }
+
+            return results;
         }
     }
 }

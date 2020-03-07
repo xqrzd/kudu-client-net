@@ -6,7 +6,7 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
     {
         public static TableBuilder GetBasicSchema()
         {
-            var builder = new TableBuilder()
+            return new TableBuilder()
                 .AddColumn("key", KuduType.Int32, opt => opt.Key(true))
                 .AddColumn("column1_i", KuduType.Int32, opt => opt.Nullable(false))
                 .AddColumn("column2_i", KuduType.Int32, opt => opt.Nullable(false))
@@ -15,8 +15,16 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
                     .Encoding(EncodingType.DictEncoding)
                     .Compression(CompressionType.Lz4))
                 .AddColumn("column4_b", KuduType.Bool, opt => opt.Nullable(false));
+        }
 
-            return builder;
+        public static TableBuilder CreateManyStringsSchema()
+        {
+            return new TableBuilder()
+                .AddColumn("key", KuduType.String, opt => opt.Key(true))
+                .AddColumn("c1", KuduType.String, opt => opt.Nullable(false))
+                .AddColumn("c2", KuduType.String, opt => opt.Nullable(false))
+                .AddColumn("c3", KuduType.String)
+                .AddColumn("c4", KuduType.String);
         }
 
         public static TableBuilder CreateBasicRangePartition(this TableBuilder tableBuilder)

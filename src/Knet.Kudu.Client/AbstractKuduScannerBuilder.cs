@@ -3,38 +3,38 @@ using System.Collections.Generic;
 using System.Linq;
 using Knet.Kudu.Client.Tablet;
 using Knet.Kudu.Client.Util;
-using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client
 {
     /// <summary>
     /// Abstract class to extend in order to create builders for scanners.
     /// </summary>
-    public abstract class AbstractKuduScannerBuilder<TBuilder, TOutput>
-        where TBuilder : AbstractKuduScannerBuilder<TBuilder, TOutput>
+    public abstract class AbstractKuduScannerBuilder<TBuilder>
+        where TBuilder : AbstractKuduScannerBuilder<TBuilder>
     {
-        internal readonly KuduClient Client;
-        internal readonly KuduTable Table;
+        protected internal readonly KuduClient Client;
+        protected internal readonly KuduTable Table;
 
         /// <summary>
         /// Map of column name to predicate.
         /// </summary>
-        internal readonly Dictionary<string, KuduPredicate> Predicates;
+        protected readonly Dictionary<string, KuduPredicate> Predicates;
 
-        internal ReadMode ReadMode = ReadMode.ReadLatest;
-        internal bool IsFaultTolerant = false;
-        internal int? BatchSizeBytes;
-        internal long Limit = long.MaxValue;
-        internal bool CacheBlocks = true;
-        internal long StartTimestamp = -1; // Not currently exposed.
-        internal long HtTimestamp = -1;
-        internal byte[] LowerBoundPrimaryKey;
-        internal byte[] UpperBoundPrimaryKey;
-        internal byte[] LowerBoundPartitionKey; // Not currently exposed.
-        internal byte[] UpperBoundPartitionKey; // Not currently exposed.
-        internal List<string> ProjectedColumns;
-        internal long ScanRequestTimeout; // TODO: Expose this, and expose as TimeSpan?
-        internal ReplicaSelection ReplicaSelection = ReplicaSelection.LeaderOnly;
+        protected ReadMode ReadMode = ReadMode.ReadLatest;
+        protected bool IsFaultTolerant = false;
+        protected int? BatchSizeBytes;
+        protected long Limit = long.MaxValue;
+        protected bool CacheBlocks = true;
+        protected long StartTimestamp = KuduClient.NoTimestamp;
+        protected long HtTimestamp = KuduClient.NoTimestamp;
+        protected byte[] LowerBoundPrimaryKey = Array.Empty<byte>();
+        protected byte[] UpperBoundPrimaryKey = Array.Empty<byte>();
+        protected byte[] LowerBoundPartitionKey = Array.Empty<byte>();
+        protected byte[] UpperBoundPartitionKey = Array.Empty<byte>();
+        protected List<string> ProjectedColumnNames;
+        protected List<int> ProjectedColumnIndexes;
+        protected long ScanRequestTimeout; // TODO: Expose this, and expose as TimeSpan?
+        protected ReplicaSelection ReplicaSelection = ReplicaSelection.LeaderOnly;
 
         public AbstractKuduScannerBuilder(KuduClient client, KuduTable table)
         {
@@ -48,10 +48,12 @@ namespace Knet.Kudu.Client
         /// Set which columns will be read by the Scanner.
         /// The default is to read all columns.
         /// </summary>
-        /// <param name="columns">The names of columns to read, or 'null' to read all columns.</param>
-        public TBuilder SetProjectedColumns(IEnumerable<string> columns)
+        /// <param name="columnNames">
+        /// The names of columns to read, or 'null' to read all columns.
+        /// </param>
+        public TBuilder SetProjectedColumns(IEnumerable<string> columnNames)
         {
-            ProjectedColumns = columns.AsList();
+            ProjectedColumnNames = columnNames.AsList();
             return (TBuilder)this;
         }
 
@@ -59,10 +61,38 @@ namespace Knet.Kudu.Client
         /// Set which columns will be read by the Scanner.
         /// The default is to read all columns.
         /// </summary>
-        /// <param name="columns">The names of columns to read, or 'null' to read all columns.</param>
-        public TBuilder SetProjectedColumns(params string[] columns)
+        /// <param name="columnNames">
+        /// The names of columns to read, or 'null' to read all columns.
+        /// </param>
+        public TBuilder SetProjectedColumns(params string[] columnNames)
         {
-            ProjectedColumns = columns?.ToList();
+            ProjectedColumnNames = columnNames?.ToList();
+            return (TBuilder)this;
+        }
+
+        /// <summary>
+        /// Set which columns will be read by the Scanner.
+        /// The default is to read all columns.
+        /// </summary>
+        /// <param name="columnIndexes">
+        /// The indexes of columns to read, or 'null' to read all columns.
+        /// </param>
+        public TBuilder SetProjectedColumns(IEnumerable<int> columnIndexes)
+        {
+            ProjectedColumnIndexes = columnIndexes.AsList();
+            return (TBuilder)this;
+        }
+
+        /// <summary>
+        /// Set which columns will be read by the Scanner.
+        /// The default is to read all columns.
+        /// </summary>
+        /// <param name="columnIndexes">
+        /// The indexes of columns to read, or 'null' to read all columns.
+        /// </param>
+        public TBuilder SetProjectedColumns(params int[] columnIndexes)
+        {
+            ProjectedColumnIndexes = columnIndexes?.ToList();
             return (TBuilder)this;
         }
 
@@ -71,7 +101,7 @@ namespace Knet.Kudu.Client
         /// </summary>
         public TBuilder SetEmptyProjection()
         {
-            ProjectedColumns = new List<string>();
+            ProjectedColumnNames = new List<string>();
             return (TBuilder)this;
         }
 
@@ -198,7 +228,16 @@ namespace Knet.Kudu.Client
         public TBuilder LowerBound(PartialRow row)
         {
             byte[] startPrimaryKey = KeyEncoder.EncodePrimaryKey(row);
+            return LowerBoundRaw(startPrimaryKey);
+        }
 
+        /// <summary>
+        /// Add a lower bound (inclusive) primary key for the scan.
+        /// If any bound is already added, this bound is intersected with that one.
+        /// </summary>
+        /// <param name="startPrimaryKey">An encoded start key.</param>
+        internal TBuilder LowerBoundRaw(byte[] startPrimaryKey)
+        {
             if (LowerBoundPrimaryKey.Length == 0 ||
                 startPrimaryKey.SequenceCompareTo(LowerBoundPrimaryKey) > 0)
             {
@@ -215,12 +254,48 @@ namespace Knet.Kudu.Client
         public TBuilder ExclusiveUpperBound(PartialRow row)
         {
             byte[] endPrimaryKey = KeyEncoder.EncodePrimaryKey(row);
+            return ExclusiveUpperBoundRaw(endPrimaryKey);
+        }
 
+        /// <summary>
+        /// Add an upper bound (exclusive) primary key for the scan.
+        /// If any bound is already added, this bound is intersected with that one.
+        /// </summary>
+        /// <param name="endPrimaryKey">An encoded end key.</param>
+        public TBuilder ExclusiveUpperBoundRaw(byte[] endPrimaryKey)
+        {
             if (UpperBoundPrimaryKey.Length == 0 ||
                 endPrimaryKey.SequenceCompareTo(UpperBoundPrimaryKey) < 0)
             {
                 UpperBoundPrimaryKey = endPrimaryKey;
             }
+            return (TBuilder)this;
+        }
+
+        /// <summary>
+        /// Set an encoded (inclusive) start partition key for the scan.
+        /// </summary>
+        /// <param name="partitionKey">The encoded partition key.</param>
+        internal TBuilder LowerBoundPartitionKeyRaw(byte[] partitionKey)
+        {
+            if (partitionKey.SequenceCompareTo(LowerBoundPartitionKey) > 0)
+                LowerBoundPartitionKey = partitionKey;
+
+            return (TBuilder)this;
+        }
+
+        /// <summary>
+        /// Set an encoded (exclusive) end partition key for the scan.
+        /// </summary>
+        /// <param name="partitionKey">The encoded partition key.</param>
+        internal TBuilder ExclusiveUpperBoundPartitionKeyRaw(byte[] partitionKey)
+        {
+            if (UpperBoundPartitionKey.Length == 0 ||
+                partitionKey.SequenceCompareTo(UpperBoundPartitionKey) < 0)
+            {
+                UpperBoundPartitionKey = partitionKey;
+            }
+
             return (TBuilder)this;
         }
 
@@ -247,7 +322,5 @@ namespace Knet.Kudu.Client
             Predicates[columnName] = predicate;
             return (TBuilder)this;
         }
-
-        public abstract TOutput Build();
     }
 }

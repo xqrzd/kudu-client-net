@@ -9,6 +9,7 @@ using Knet.Kudu.Client.Protocol.Tserver;
 using Knet.Kudu.Client.Requests;
 using Knet.Kudu.Client.Scanner;
 using Knet.Kudu.Client.Tablet;
+using Knet.Kudu.Client.Util;
 using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client
@@ -60,7 +61,8 @@ namespace Knet.Kudu.Client
             KuduClient client,
             KuduTable table,
             IKuduScanParser<T> parser,
-            List<string> projectedNames,
+            List<string> projectedColumnNames,
+            List<int> projectedColumnIndexes,
             ReadMode readMode,
             bool isFaultTolerant,
             Dictionary<string, KuduPredicate> predicates,
@@ -128,11 +130,20 @@ namespace Knet.Kudu.Client
             // If the user set this to 'null', we scan all columns.
             _columns = new List<ColumnSchemaPB>();
             var columns = new List<ColumnSchema>();
-            if (projectedNames != null)
+            if (projectedColumnNames != null)
             {
-                foreach (string columnName in projectedNames)
+                foreach (string columnName in projectedColumnNames)
                 {
                     ColumnSchema originalColumn = table.Schema.GetColumn(columnName);
+                    _columns.Add(ToColumnSchemaPb(originalColumn));
+                    columns.Add(originalColumn);
+                }
+            }
+            else if (projectedColumnIndexes != null)
+            {
+                foreach (int columnIndex in projectedColumnIndexes)
+                {
+                    ColumnSchema originalColumn = table.Schema.GetColumn(columnIndex);
                     _columns.Add(ToColumnSchemaPb(originalColumn));
                     columns.Add(originalColumn);
                 }
@@ -160,7 +171,7 @@ namespace Knet.Kudu.Client
             }
 
             _schema = new Schema(columns, isDeletedIndex);
-            _batchSizeBytes = batchSizeBytes ?? GetScannerBatchSizeEstimate(_schema);
+            _batchSizeBytes = batchSizeBytes ?? _schema.GetScannerBatchSizeEstimate();
 
             // If the partition pruner has pruned all partitions, then the scan can be
             // short circuited without contacting any tablet servers.
@@ -308,6 +319,12 @@ namespace Knet.Kudu.Client
             if (!response.HasMoreResults || response.ScannerId == null)
             {
                 ScanFinished();
+
+                if (response.NumRows == 0 && _partitionPruner.HasMorePartitionKeyRanges)
+                {
+                    return await MoveNextAsync().ConfigureAwait(false);
+                }
+
                 return response.NumRows > 0;
             }
 
@@ -545,22 +562,6 @@ namespace Knet.Kudu.Client
                     Scale = columnSchema.TypeAttributes.Scale
                 }
             };
-        }
-
-        private static int GetScannerBatchSizeEstimate(Schema schema)
-        {
-            if (schema.VarLengthColumnCount == 0)
-            {
-                // No variable length data, we can do an
-                // exact ideal estimate here.
-                return 1024 * 1024 - schema.RowSize;
-            }
-            else
-            {
-                // Assume everything evens out.
-                // Most of the time it probably does.
-                return 1024 * 1024;
-            }
         }
     }
 }

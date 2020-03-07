@@ -3,8 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client
 {
-    public class KuduScannerBuilder :
-        AbstractKuduScannerBuilder<KuduScannerBuilder, KuduScanner<ResultSet>>
+    public class KuduScannerBuilder : AbstractKuduScannerBuilder<KuduScannerBuilder>
     {
         internal readonly ILogger Logger;
 
@@ -14,14 +13,15 @@ namespace Knet.Kudu.Client
             Logger = logger;
         }
 
-        public override KuduScanner<ResultSet> Build()
+        public KuduScanner<ResultSet> Build()
         {
             return new KuduScanner<ResultSet>(
                 Logger,
                 Client,
                 Table,
                 new ResultSetScanParser(),
-                ProjectedColumns,
+                ProjectedColumnNames,
+                ProjectedColumnIndexes,
                 Predicates,
                 ReadMode,
                 ReplicaSelection,

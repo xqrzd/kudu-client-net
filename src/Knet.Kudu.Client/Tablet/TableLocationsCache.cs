@@ -50,6 +50,20 @@ namespace Knet.Kudu.Client.Tablet
             return tablet;
         }
 
+        public bool SearchLeftRight(ReadOnlySpan<byte> partitionKey,
+            out RemoteTablet left, out RemoteTablet right)
+        {
+            _lock.EnterReadLock();
+            try
+            {
+                return _cache.SearchLeftRight(partitionKey, out left, out right);
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
+        }
+
         public void CacheTabletLocations(
             List<RemoteTablet> tablets,
             ReadOnlySpan<byte> requestPartitionKey)

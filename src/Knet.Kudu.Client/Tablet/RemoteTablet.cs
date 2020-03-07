@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Knet.Kudu.Client.Connection;
 
@@ -18,6 +19,7 @@ namespace Knet.Kudu.Client.Tablet
     public class RemoteTablet : IEquatable<RemoteTablet>
     {
         private readonly ServerInfoCache _cache;
+        private readonly List<Replica> _replicas;
 
         public string TableId { get; }
 
@@ -29,13 +31,17 @@ namespace Knet.Kudu.Client.Tablet
             string tableId,
             string tabletId,
             Partition partition,
-            ServerInfoCache cache)
+            ServerInfoCache cache,
+            List<Replica> replicas)
         {
             TableId = tableId;
             TabletId = tabletId;
             Partition = partition;
             _cache = cache;
+            _replicas = replicas;
         }
+
+        public IReadOnlyList<Replica> Replicas => _replicas;
 
         public ServerInfo GetServerInfo(
             ReplicaSelection replicaSelection, string location = null)

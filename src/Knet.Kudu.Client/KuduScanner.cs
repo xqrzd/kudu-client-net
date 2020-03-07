@@ -11,7 +11,8 @@ namespace Knet.Kudu.Client
         private readonly KuduClient _client;
         private readonly KuduTable _table;
         private readonly IKuduScanParser<T> _parser; // TODO: This should be a factory.
-        private readonly List<string> _projectedColumns;
+        private readonly List<string> _projectedColumnNames;
+        private readonly List<int> _projectedColumnIndexes;
         private readonly Dictionary<string, KuduPredicate> _predicates;
 
         private readonly ReadMode _readMode;
@@ -33,7 +34,8 @@ namespace Knet.Kudu.Client
             KuduClient client,
             KuduTable table,
             IKuduScanParser<T> parser,
-            List<string> projectedColumns,
+            List<string> projectedColumnNames,
+            List<int> projectedColumnIndexes,
             Dictionary<string, KuduPredicate> predicates,
             ReadMode readMode,
             ReplicaSelection replicaSelection,
@@ -52,7 +54,8 @@ namespace Knet.Kudu.Client
             _client = client;
             _table = table;
             _parser = parser;
-            _projectedColumns = projectedColumns;
+            _projectedColumnNames = projectedColumnNames;
+            _projectedColumnIndexes = projectedColumnIndexes;
             _predicates = predicates;
             _readMode = readMode;
             _replicaSelection = replicaSelection;
@@ -84,7 +87,8 @@ namespace Knet.Kudu.Client
                 _client,
                 _table,
                 _parser,
-                _projectedColumns,
+                _projectedColumnNames,
+                _projectedColumnIndexes,
                 _readMode,
                 _isFaultTolerant,
                 _predicates,

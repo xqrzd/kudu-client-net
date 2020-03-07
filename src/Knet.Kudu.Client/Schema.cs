@@ -142,9 +142,6 @@ namespace Knet.Kudu.Client
 
                 if (column.Type == DataTypePB.IsDeleted)
                     isDeletedIndex = i;
-
-                // TODO: Remove this hack-fix. Kudu throws an exception if columnId is supplied.
-                column.ResetId();
             }
 
             _columnOffsets = columnOffsets;
@@ -162,6 +159,13 @@ namespace Knet.Kudu.Client
         public IReadOnlyList<ColumnSchema> Columns => _columnsByIndex;
 
         public int PrimaryKeyColumnCount => _primaryKeyColumns.Count;
+
+        /// <summary>
+        /// Tells whether this schema includes IDs for columns. A schema created by a
+        /// client as part of table creation will not include IDs, but schemas for open
+        /// tables will include IDs.
+        /// </summary>
+        public bool HasColumnIds => _columnsById != null;
 
         public int GetColumnIndex(string name) => _columnsByName[name];
 
