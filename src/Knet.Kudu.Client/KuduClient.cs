@@ -1338,21 +1338,21 @@ namespace Knet.Kudu.Client
             return header;
         }
 
-        private async Task DelayRpcAsync(KuduRpc rpc, CancellationToken cancellationToken)
+        private Task DelayRpcAsync(KuduRpc rpc, CancellationToken cancellationToken)
         {
             int attemptCount = rpc.Attempt;
 
             if (attemptCount == 0)
             {
                 // If this is the first RPC attempt, don't sleep at all.
-                return;
+                return Task.CompletedTask;
             }
 
             // Randomized exponential backoff, truncated at 4096ms.
             int sleepTime = (int)(Math.Pow(2.0, Math.Min(attemptCount, 12)) *
                 ThreadSafeRandom.Instance.NextDouble());
 
-            await Task.Delay(sleepTime, cancellationToken).ConfigureAwait(false);
+            return Task.Delay(sleepTime, cancellationToken);
         }
 
         private static void ThrowIfRpcTimedOut(KuduRpc rpc, CancellationToken cancellationToken)
