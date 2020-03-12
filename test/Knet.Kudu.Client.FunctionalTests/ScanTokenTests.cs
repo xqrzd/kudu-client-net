@@ -53,8 +53,8 @@ namespace Knet.Kudu.Client.FunctionalTests
             {
                 var row = table.NewInsert();
                 row.SetString("key", $"key_{i}");
-                row.SetString("c1", "c1_" + i);
-                row.SetString("c2", "c2_" + i);
+                row.SetString("c1", $"c1_{i}");
+                row.SetString("c2", $"c2_{i}");
 
                 await _session.EnqueueAsync(row);
             }
@@ -104,9 +104,9 @@ namespace Knet.Kudu.Client.FunctionalTests
             for (char c = 'a'; c < 'f'; c++)
             {
                 var row = table.NewInsert();
-                row.SetString("key", "" + c);
-                row.SetString("c1", "c1_" + c);
-                row.SetString("c2", "c2_" + c);
+                row.SetString("key", $"{c}");
+                row.SetString("c1", $"c1_{c}");
+                row.SetString("c2", $"c2_{c}");
 
                 await _session.EnqueueAsync(row);
             }
@@ -114,9 +114,9 @@ namespace Knet.Kudu.Client.FunctionalTests
             for (char c = 'h'; c < 'z'; c++)
             {
                 var row = table.NewInsert();
-                row.SetString("key", "" + c);
-                row.SetString("c1", "c1_" + c);
-                row.SetString("c2", "c2_" + c);
+                row.SetString("key", $"{c}");
+                row.SetString("c1", $"c1_{c}");
+                row.SetString("c2", $"c2_{c}");
 
                 await _session.EnqueueAsync(row);
             }
