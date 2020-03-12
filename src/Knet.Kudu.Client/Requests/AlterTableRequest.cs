@@ -15,6 +15,9 @@ namespace Knet.Kudu.Client.Requests
         public AlterTableRequest(AlterTableRequestPB request)
         {
             _request = request;
+
+            // We don't need to set required feature ADD_DROP_RANGE_PARTITIONS here,
+            // as it's supported in Kudu 1.3, the oldest version this client supports.
         }
 
         public override void Serialize(Stream stream)

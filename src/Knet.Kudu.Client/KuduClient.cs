@@ -1289,15 +1289,15 @@ namespace Knet.Kudu.Client
 
         private RequestHeader CreateRequestHeader(KuduRpc rpc)
         {
-            // The callId is set by KuduConnection.SendReceiveAsync().
+            // CallId is set by KuduConnection.SendReceiveAsync().
             var header = new RequestHeader
             {
-                // TODO: Add required feature flags
                 RemoteMethod = new RemoteMethodPB
                 {
                     ServiceName = rpc.ServiceName,
                     MethodName = rpc.MethodName
                 },
+                RequiredFeatureFlags = rpc.RequiredFeatures,
                 TimeoutMillis = (uint)_defaultOperationTimeoutMs
             };
 

@@ -13,6 +13,11 @@ namespace Knet.Kudu.Client.Requests
 {
     public class ScanRequest<T> : KuduTabletRpc<ScanResponse<T>>, IDisposable
     {
+        private static readonly uint[] _columnPredicateRequiredFeature = new uint[]
+        {
+            (uint)TabletServerFeatures.ColumnPredicates
+        };
+
         private readonly ScanRequestState _state;
         private readonly ScanRequestPB _scanRequestPb;
         private readonly Schema _schema;
@@ -41,11 +46,15 @@ namespace Knet.Kudu.Client.Requests
             TableId = tableId;
             PartitionKey = partitionKey;
             NeedsAuthzToken = true;
+
+            if (scanRequestPb.NewScanRequest != null &&
+                scanRequestPb.NewScanRequest.ColumnPredicates.Count > 0)
+            {
+                RequiredFeatures = _columnPredicateRequiredFeature;
+            }
         }
 
         public override string MethodName => "Scan";
-
-        // TODO: Required features
 
         public override ReplicaSelection ReplicaSelection { get; }
 

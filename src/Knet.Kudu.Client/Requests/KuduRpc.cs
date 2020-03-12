@@ -21,6 +21,11 @@ namespace Knet.Kudu.Client.Requests
         public abstract string MethodName { get; }
 
         /// <summary>
+        /// Returns the set of application-specific feature flags required to service the RPC.
+        /// </summary>
+        public uint[] RequiredFeatures { get; protected set; }
+
+        /// <summary>
         /// The external consistency mode for this RPC.
         /// TODO make this cover most if not all RPCs (right now only scans and writes use this).
         /// </summary>
