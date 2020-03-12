@@ -6,8 +6,18 @@ namespace Knet.Kudu.Client.Requests
 {
     public class ConnectToMasterRequest : KuduMasterRpc<ConnectToMasterResponsePB>
     {
+        private static readonly uint[] _requiredFeatures = new uint[]
+        {
+            (uint)MasterFeatures.ConnectToMaster
+        };
+
         private static readonly ConnectToMasterResponsePB _request =
             new ConnectToMasterResponsePB();
+
+        public ConnectToMasterRequest()
+        {
+            RequiredFeatures = _requiredFeatures;
+        }
 
         public override string MethodName => "ConnectToMaster";
 
