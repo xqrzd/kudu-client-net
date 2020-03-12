@@ -430,11 +430,23 @@ namespace Knet.Kudu.Client
             return new KuduTable(response);
         }
 
+        private Task<GetTableSchemaResponsePB> GetTableSchemaAsync(
+            TableIdentifierPB tableIdentifier,
+            CancellationToken cancellationToken = default)
+        {
+            return GetTableSchemaAsync(
+                tableIdentifier,
+                requiresAuthzTokenSupport: false,
+                cancellationToken);
+        }
+
         private async Task<GetTableSchemaResponsePB> GetTableSchemaAsync(
-            TableIdentifierPB tableIdentifier, CancellationToken cancellationToken = default)
+            TableIdentifierPB tableIdentifier,
+            bool requiresAuthzTokenSupport,
+            CancellationToken cancellationToken = default)
         {
             var request = new GetTableSchemaRequestPB { Table = tableIdentifier };
-            var rpc = new GetTableSchemaRequest(request);
+            var rpc = new GetTableSchemaRequest(request, requiresAuthzTokenSupport);
 
             var schema = await SendRpcToMasterAsync(rpc, cancellationToken).ConfigureAwait(false);
 
@@ -970,7 +982,8 @@ namespace Knet.Kudu.Client
             // a retrying due to an invalid token and the client may have a new token.
             if (rpc.NeedsAuthzToken)
             {
-                rpc.AuthzToken = await GetAuthzTokenAsync(tableId).ConfigureAwait(false);
+                rpc.AuthzToken = await GetAuthzTokenAsync(tableId, cancellationToken)
+                    .ConfigureAwait(false);
             }
 
             byte[] partitionKey = rpc.PartitionKey;
@@ -1008,7 +1021,8 @@ namespace Knet.Kudu.Client
             return tablet.GetServerInfo(replicaSelection, _location);
         }
 
-        private async ValueTask<SignedTokenPB> GetAuthzTokenAsync(string tableId)
+        private async ValueTask<SignedTokenPB> GetAuthzTokenAsync(
+            string tableId, CancellationToken cancellationToken)
         {
             var authzToken = _authzTokenCache.GetAuthzToken(tableId);
             if (authzToken == null)
@@ -1019,7 +1033,11 @@ namespace Knet.Kudu.Client
                 };
 
                 // This call will also cache the authz token.
-                var schema = await GetTableSchemaAsync(tableIdPb).ConfigureAwait(false);
+                var schema = await GetTableSchemaAsync(
+                    tableIdPb,
+                    requiresAuthzTokenSupport: true,
+                    cancellationToken).ConfigureAwait(false);
+
                 authzToken = schema.AuthzToken;
 
                 if (authzToken == null)
