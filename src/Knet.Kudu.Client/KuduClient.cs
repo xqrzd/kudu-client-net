@@ -943,8 +943,6 @@ namespace Knet.Kudu.Client
                     throw;
                 }
 
-                Console.WriteLine($"NumAttempts: {rpc.Attempt}");
-
                 throw new OperationCanceledException(
                     $"Couldn't complete RPC before timeout: {lastException.Message}",
                     lastException);
@@ -1232,7 +1230,6 @@ namespace Knet.Kudu.Client
                     }
                     else if (rpc is KuduMasterRpc<T>)
                     {
-                        Console.WriteLine($"Invalidating master cache");
                         InvalidateMasterServerCache();
                     }
                 }
