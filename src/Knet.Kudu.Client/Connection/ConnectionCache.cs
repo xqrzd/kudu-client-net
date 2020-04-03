@@ -64,7 +64,7 @@ namespace Knet.Kudu.Client.Connection
                 // The upper-level caller should handle the exception and
                 // retry using a new connection.
                 throw new RecoverableException(
-                    KuduStatus.ServiceUnavailable(ex.Message), ex);
+                    KuduStatus.NetworkError(ex.Message), ex);
             }
         }
 

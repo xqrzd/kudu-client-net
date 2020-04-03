@@ -845,7 +845,7 @@ namespace Knet.Kudu.Client
                 }
 
                 throw new NoLeaderFoundException(
-                    KuduStatus.ServiceUnavailable(sb.ToString()),
+                    KuduStatus.NetworkError(sb.ToString()),
                     new AggregateException(results.Values));
             }
         }
@@ -1040,7 +1040,7 @@ namespace Knet.Kudu.Client
             {
                 RemoveTabletFromCache(tablet);
 
-                throw new RecoverableException(KuduStatus.ServiceUnavailable(
+                throw new RecoverableException(KuduStatus.IllegalState(
                     $"Unable to find {rpc.ReplicaSelection} replica in {tablet}"));
             }
 

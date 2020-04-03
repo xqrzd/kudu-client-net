@@ -124,7 +124,7 @@ namespace Knet.Kudu.Client.Connection
             catch (Exception ex)
             {
                 throw new RecoverableException(
-                    KuduStatus.ServiceUnavailable(ex.Message), ex);
+                    KuduStatus.NetworkError(ex.Message), ex);
             }
             finally
             {
