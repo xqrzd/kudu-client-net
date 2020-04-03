@@ -943,6 +943,8 @@ namespace Knet.Kudu.Client
                     throw;
                 }
 
+                Console.WriteLine($"NumAttempts: {rpc.Attempt}");
+
                 throw new OperationCanceledException(
                     $"Couldn't complete RPC before timeout: {lastException.Message}",
                     lastException);
