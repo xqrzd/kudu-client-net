@@ -1232,6 +1232,7 @@ namespace Knet.Kudu.Client
                     }
                     else if (rpc is KuduMasterRpc<T>)
                     {
+                        Console.WriteLine($"Invalidating master cache");
                         InvalidateMasterServerCache();
                     }
                 }
