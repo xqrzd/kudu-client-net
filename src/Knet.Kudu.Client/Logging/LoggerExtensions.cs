@@ -18,6 +18,7 @@ namespace Knet.Kudu.Client.Logging
         private static readonly Action<ILogger, HostAndPort, IPAddress, string, Exception> _unableToConnectToServer;
         private static readonly Action<ILogger, Exception> _exceptionSendingSessionData;
         private static readonly Action<ILogger, Exception> _exceptionClosingScanner;
+        private static readonly Action<ILogger, Exception> _recoverableRpcException;
 
         static LoggerExtensions()
         {
@@ -55,6 +56,11 @@ namespace Knet.Kudu.Client.Logging
                 eventId: new EventId(7, "ExceptionClosingScanner"),
                 logLevel: LogLevel.Warning,
                 formatString: "Exception occurred while closing scanner");
+
+            _recoverableRpcException = LoggerMessage.Define(
+                eventId: new EventId(8, "RecoverableRpcException"),
+                logLevel: LogLevel.Warning,
+                formatString: "RPC failed, will retry");
         }
 
         public static void ConnectedToServer(this ILogger logger, HostAndPort hostPort, IPAddress ipAddress, string tlsInfo, string negotiateInfo, bool isLocal)
@@ -92,6 +98,11 @@ namespace Knet.Kudu.Client.Logging
         public static void ExceptionClosingScanner(this ILogger logger, Exception ex)
         {
             _exceptionClosingScanner(logger, ex);
+        }
+
+        public static void RecoverableRpcException(this ILogger logger, Exception ex)
+        {
+            _recoverableRpcException(logger, ex);
         }
     }
 }
