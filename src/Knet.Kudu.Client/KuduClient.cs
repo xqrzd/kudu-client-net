@@ -930,20 +930,22 @@ namespace Knet.Kudu.Client
                         rpc.Attempt++;
                         await DelayRpcAsync(rpc, token).ConfigureAwait(false);
                     }
-                    catch (OperationCanceledException) when (token.IsCancellationRequested)
-                    {
-                        if (rpc.Exception == null)
-                        {
-                            // If we haven't recorded any exceptions then this
-                            // RPC really did just time out.
-                            throw;
-                        }
-
-                        throw new OperationCanceledException(
-                            "RPC timed out with exceptions",
-                            rpc.Exception);
-                    }
                 }
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                var lastException = rpc.Exception;
+
+                if (lastException == null)
+                {
+                    // If we haven't recorded any exceptions then this
+                    // RPC really did just time out.
+                    throw;
+                }
+
+                throw new OperationCanceledException(
+                    $"Couldn't complete RPC before timeout: {lastException.Message}",
+                    lastException);
             }
             finally
             {
