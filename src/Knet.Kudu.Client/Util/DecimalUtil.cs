@@ -168,8 +168,8 @@ namespace Knet.Kudu.Client.Util
 
             if (extraHigh > 0)
             {
-                // Uh oh
-                // What to do here? Throw an exception or truncate?
+                throw new OverflowException("Kudu decimal is too large for .NET decimal." +
+                    " Use GetRawFixed to read the raw value.");
             }
 
             var dec = new DecimalAccessor

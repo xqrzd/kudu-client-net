@@ -366,6 +366,30 @@ namespace Knet.Kudu.Client
             return KuduEncoder.DecodeDecimal(data, column.Type, scale);
         }
 
+        /// <summary>
+        /// Get the raw value of a fixed length data column.
+        /// </summary>
+        /// <param name="columnName">The column name.</param>
+        public ReadOnlySpan<byte> GetRawFixed(string columnName)
+        {
+            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            return GetRawFixed(columnIndex);
+        }
+
+        /// <summary>
+        /// Get the raw value of a fixed length data column.
+        /// </summary>
+        /// <param name="columnIndex">The column index.</param>
+        public ReadOnlySpan<byte> GetRawFixed(int columnIndex)
+        {
+            ColumnSchema column = _resultSet.GetColumnSchema(columnIndex);
+
+            int position = _resultSet.GetOffset(columnIndex);
+            ReadOnlySpan<byte> data = _rowData.Slice(position, column.Size);
+
+            return data;
+        }
+
         public string GetString(string columnName)
         {
             int columnIndex = _resultSet.GetColumnIndex(columnName);
