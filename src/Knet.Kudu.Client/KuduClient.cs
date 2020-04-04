@@ -1036,7 +1036,6 @@ namespace Knet.Kudu.Client
 
             if (serverInfo == null)
             {
-                Console.WriteLine($"Unable to find {rpc.ReplicaSelection} replica in {tablet}");
                 RemoveTabletFromCache(tablet);
 
                 throw new RecoverableException(KuduStatus.IllegalState(
