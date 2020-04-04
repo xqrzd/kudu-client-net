@@ -206,7 +206,7 @@ namespace Knet.Kudu.Client
 
                     try
                     {
-                        await _client.SendRpcToTabletAsync(rpc, cts.Token)
+                        await _client.SendRpcAsync(rpc, cts.Token)
                             .ConfigureAwait(false);
                     }
                     catch (Exception ex)
@@ -247,7 +247,7 @@ namespace Knet.Kudu.Client
 
             try
             {
-                response = await _client.SendRpcToTabletAsync(rpc, _cancellationToken)
+                response = await _client.SendRpcAsync(rpc, _cancellationToken)
                     .ConfigureAwait(false);
             }
             catch (NonCoveredRangeException ex)
@@ -341,7 +341,7 @@ namespace Knet.Kudu.Client
 
             try
             {
-                response = await _client.SendRpcToTabletAsync(rpc, _cancellationToken)
+                response = await _client.SendRpcAsync(rpc, _cancellationToken)
                     .ConfigureAwait(false);
             }
             catch (FaultTolerantScannerExpiredException)

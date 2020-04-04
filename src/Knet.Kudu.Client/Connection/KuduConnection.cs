@@ -123,8 +123,8 @@ namespace Knet.Kudu.Client.Connection
             }
             catch (Exception ex)
             {
-                throw new RecoverableException(KuduStatus.IllegalState(
-                    $"Connection {_ioPipe} is disconnected."), ex);
+                throw new RecoverableException(
+                    KuduStatus.NetworkError(ex.Message), ex);
             }
             finally
             {

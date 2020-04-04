@@ -55,10 +55,16 @@ namespace Knet.Kudu.Client.Connection
 
                 _logger.UnableToConnectToServer(serverInfo, ex);
 
+                if (ex is NonRecoverableException)
+                {
+                    // Always retry, except for these.
+                    throw;
+                }
+
                 // The upper-level caller should handle the exception and
                 // retry using a new connection.
                 throw new RecoverableException(
-                    KuduStatus.IllegalState("Connection is disconnected."), ex);
+                    KuduStatus.NetworkError(ex.Message), ex);
             }
         }
 

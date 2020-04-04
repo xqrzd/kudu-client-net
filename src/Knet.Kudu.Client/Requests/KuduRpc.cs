@@ -1,4 +1,5 @@
-﻿using System.Buffers;
+﻿using System;
+using System.Buffers;
 using System.IO;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Protocol.Master;
@@ -36,6 +37,11 @@ namespace Knet.Kudu.Client.Requests
         /// The number of times this RPC has been retried.
         /// </summary>
         internal int Attempt { get; set; }
+
+        /// <summary>
+        /// The last exception when handling this RPC.
+        /// </summary>
+        internal Exception Exception { get; set; }
 
         /// <summary>
         /// If this RPC needs to be tracked on the client and server-side.

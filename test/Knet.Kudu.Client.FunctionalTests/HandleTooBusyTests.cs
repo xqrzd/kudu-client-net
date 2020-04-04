@@ -24,7 +24,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 .AddMasterServerFlag("--rpc_service_queue_length=1")
                 // Low number of service threads, so things stay in the queue.
                 .AddMasterServerFlag("--rpc_num_service_threads=3")
-                // inject latency so lookups process slowly.
+                // Inject latency so lookups process slowly.
                 .AddMasterServerFlag("--master_inject_latency_on_tablet_lookups_ms=100")
                 .BuildHarness();
 
