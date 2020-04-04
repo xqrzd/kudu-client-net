@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Knet.Kudu.Client.Protocol;
+using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client
 {
@@ -254,12 +255,9 @@ namespace Knet.Kudu.Client
             }
             if (hasNullables)
             {
-                totalSize += BitsToBytes(columns.Length);
+                totalSize += KuduEncoder.BitsToBytes(columns.Length);
             }
             return totalSize;
         }
-
-        // TODO: Move this to shared location.
-        private static int BitsToBytes(int bits) => (bits + 7) / 8;
     }
 }
