@@ -12,8 +12,6 @@ namespace Knet.Kudu.Client
     {
         private readonly IReadOnlyList<HostAndPort> _masterAddresses;
         private ILoggerFactory _loggerFactory = NullLoggerFactory.Instance;
-        private string _kerberosSpn;
-        private string _tlsHost;
         private TimeSpan _defaultAdminOperationTimeout = TimeSpan.FromSeconds(30);
         private TimeSpan _defaultOperationTimeout = TimeSpan.FromSeconds(30);
         private PipeOptions _sendPipeOptions;
@@ -41,18 +39,6 @@ namespace Knet.Kudu.Client
         public KuduClientBuilder SetLoggerFactory(ILoggerFactory loggerFactory)
         {
             _loggerFactory = loggerFactory;
-            return this;
-        }
-
-        public KuduClientBuilder SetKerberosSpn(string kerberosSpn)
-        {
-            _kerberosSpn = kerberosSpn;
-            return this;
-        }
-
-        public KuduClientBuilder SetTlsHost(string tlsHost)
-        {
-            _tlsHost = tlsHost;
             return this;
         }
 
@@ -84,8 +70,6 @@ namespace Knet.Kudu.Client
         {
             var options = new KuduClientOptions(
                 _masterAddresses,
-                _kerberosSpn,
-                _tlsHost,
                 _defaultAdminOperationTimeout,
                 _defaultOperationTimeout,
                 _sendPipeOptions,

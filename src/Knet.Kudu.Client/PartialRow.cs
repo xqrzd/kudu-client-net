@@ -18,7 +18,7 @@ namespace Knet.Kudu.Client
         {
             Schema = schema;
 
-            var columnBitmapSize = BitsToBytes(schema.Columns.Count);
+            var columnBitmapSize = KuduEncoder.BitsToBytes(schema.Columns.Count);
             var headerSize = columnBitmapSize;
             if (schema.HasNullableColumns)
             {
@@ -812,8 +812,6 @@ namespace Knet.Kudu.Client
         {
             return (_rowAlloc[offset + (index / 8)] & (1 << (index % 8))) != 0;
         }
-
-        private static int BitsToBytes(int bits) => (bits + 7) / 8;
 
         private static byte[] CloneArray(byte[] array)
         {

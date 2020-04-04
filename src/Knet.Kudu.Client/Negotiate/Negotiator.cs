@@ -190,7 +190,7 @@ namespace Knet.Kudu.Client.Negotiate
             NetworkStream stream,
             AuthenticationType authenticationType)
         {
-            var tlsHost = _options.TlsHost ?? _serverInfo.HostPort.Host;
+            var tlsHost = _serverInfo.HostPort.Host;
             var authenticationStream = new KuduTlsAuthenticationStream(this);
             var sslInnerStream = new StreamWrapper(authenticationStream);
 
@@ -281,7 +281,7 @@ namespace Knet.Kudu.Client.Negotiate
             using var gssApiStream = new KuduGssApiAuthenticationStream(this);
             using var negotiateStream = new NegotiateStream(gssApiStream);
 
-            var targetName = _options.KerberosSpn ?? $"kudu/{_serverInfo.HostPort.Host}";
+            var targetName = $"kudu/{_serverInfo.HostPort.Host}";
             _logMessage.NegotiateInfo = $"SASL_GSSAPI [{targetName}]";
 
             // Hopefully a temporary hack-fix, until we can figure

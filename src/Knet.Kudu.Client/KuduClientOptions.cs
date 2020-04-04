@@ -10,10 +10,6 @@ namespace Knet.Kudu.Client
     {
         public IReadOnlyList<HostAndPort> MasterAddresses { get; }
 
-        public string KerberosSpn { get; }
-
-        public string TlsHost { get; }
-
         public TimeSpan DefaultAdminOperationTimeout { get; }
 
         public TimeSpan DefaultOperationTimeout { get; }
@@ -24,16 +20,12 @@ namespace Knet.Kudu.Client
 
         public KuduClientOptions(
             IReadOnlyList<HostAndPort> masterAddresses,
-            string kerberosSpn,
-            string tlsHost,
             TimeSpan defaultAdminOperationTimeout,
             TimeSpan defaultOperationTimeout,
             PipeOptions sendPipeOptions,
             PipeOptions receivePipeOptions)
         {
             MasterAddresses = masterAddresses;
-            KerberosSpn = kerberosSpn;
-            TlsHost = tlsHost;
             DefaultAdminOperationTimeout = defaultAdminOperationTimeout;
             DefaultOperationTimeout = defaultOperationTimeout;
 

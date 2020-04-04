@@ -857,7 +857,7 @@ namespace Knet.Kudu.Client
                 "master", location: null, hostPort).ConfigureAwait(false);
 
             var rpc = new ConnectToMasterRequest();
-            var response = await SendRpcToServerAsync(rpc, serverInfo, cancellationToken)
+            var response = await SendRpcToMasterAsync(rpc, serverInfo, cancellationToken)
                 .ConfigureAwait(false);
 
             return new ConnectToMasterResponse(response, serverInfo);
@@ -909,12 +909,12 @@ namespace Knet.Kudu.Client
                     {
                         if (rpc is KuduMasterRpc<T> masterRpc)
                         {
-                            return await SendRpcToMasterInternalAsync(masterRpc, token)
+                            return await SendRpcToMasterAsync(masterRpc, token)
                                 .ConfigureAwait(false);
                         }
                         else if (rpc is KuduTabletRpc<T> tabletRpc)
                         {
-                            return await SendRpcToTabletInternalAsync(tabletRpc, token)
+                            return await SendRpcToTabletAsync(tabletRpc, token)
                                 .ConfigureAwait(false);
                         }
                         else
@@ -981,7 +981,7 @@ namespace Knet.Kudu.Client
             }
         }
 
-        private async Task<T> SendRpcToMasterInternalAsync<T>(
+        private async Task<T> SendRpcToMasterAsync<T>(
             KuduMasterRpc<T> rpc, CancellationToken cancellationToken)
         {
             ServerInfo serverInfo = _masterLeaderInfo;
@@ -992,7 +992,7 @@ namespace Knet.Kudu.Client
                     .ConfigureAwait(false);
             }
 
-            return await SendRpcToServerAsync(rpc, serverInfo, cancellationToken)
+            return await SendRpcToMasterAsync(rpc, serverInfo, cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -1002,7 +1002,7 @@ namespace Knet.Kudu.Client
         /// </summary>
         /// <param name="rpc">The RPC to send.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
-        private async Task<T> SendRpcToTabletInternalAsync<T>(
+        private async Task<T> SendRpcToTabletAsync<T>(
             KuduTabletRpc<T> rpc, CancellationToken cancellationToken)
         {
             // Set the propagated timestamp so that the next time we send a message to
@@ -1042,7 +1042,7 @@ namespace Knet.Kudu.Client
                     $"Unable to find {rpc.ReplicaSelection} replica in {tablet}"));
             }
 
-            return await SendRpcToServerAsync(rpc, serverInfo, cancellationToken)
+            return await SendRpcToTabletAsync(rpc, serverInfo, cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -1106,12 +1106,12 @@ namespace Knet.Kudu.Client
             return serverInfo.HostPort;
         }
 
-        private async Task<T> SendRpcToServerAsync<T>(
+        private async Task<T> SendRpcToMasterAsync<T>(
             KuduMasterRpc<T> rpc,
             ServerInfo serverInfo,
             CancellationToken cancellationToken)
         {
-            await SendRpcGenericAsync(rpc, serverInfo, cancellationToken)
+            await SendRpcToServerGenericAsync(rpc, serverInfo, cancellationToken)
                 .ConfigureAwait(false);
 
             if (rpc.Error != null)
@@ -1137,12 +1137,12 @@ namespace Knet.Kudu.Client
             return rpc.Output;
         }
 
-        private async Task<T> SendRpcToServerAsync<T>(
+        private async Task<T> SendRpcToTabletAsync<T>(
             KuduTabletRpc<T> rpc,
             ServerInfo serverInfo,
             CancellationToken cancellationToken)
         {
-            await SendRpcGenericAsync(rpc, serverInfo, cancellationToken)
+            await SendRpcToServerGenericAsync(rpc, serverInfo, cancellationToken)
                 .ConfigureAwait(false);
 
             if (rpc.Error != null)
@@ -1181,7 +1181,7 @@ namespace Knet.Kudu.Client
             return rpc.Output;
         }
 
-        private async Task SendRpcGenericAsync<T>(
+        private async Task SendRpcToServerGenericAsync<T>(
             KuduRpc<T> rpc, ServerInfo serverInfo,
             CancellationToken cancellationToken = default)
         {

@@ -254,6 +254,8 @@ namespace Knet.Kudu.Client.Util
         public static string DecodeString(ReadOnlySpan<byte> source) =>
             Encoding.UTF8.GetString(source);
 
+        public static int BitsToBytes(int bits) => (int)(((uint)bits + 7) / 8);
+
         private static byte[] EncodeDefaultDecimal(decimal value)
         {
             var scale = DecimalUtil.GetScale(value);
