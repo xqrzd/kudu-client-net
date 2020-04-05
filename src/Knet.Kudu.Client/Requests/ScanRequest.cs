@@ -20,7 +20,7 @@ namespace Knet.Kudu.Client.Requests
 
         private readonly ScanRequestState _state;
         private readonly ScanRequestPB _scanRequestPb;
-        private readonly Schema _schema;
+        private readonly KuduSchema _schema;
         private readonly IKuduScanParser<T> _parser;
         private readonly bool _isFaultTolerant;
 
@@ -29,7 +29,7 @@ namespace Knet.Kudu.Client.Requests
         public ScanRequest(
             ScanRequestState state,
             ScanRequestPB scanRequestPb,
-            Schema schema,
+            KuduSchema schema,
             IKuduScanParser<T> parser,
             ReplicaSelection replicaSelection,
             string tableId,

@@ -15,7 +15,7 @@ namespace Knet.Kudu.Client.Scanner
         long remaining;
         long remainingSidecarLength;
         private List<ArrayMemoryPoolBuffer<byte>> _sidecars;
-        private Schema _scanSchema;
+        private KuduSchema _scanSchema;
         private ScanResponsePB _responsePB;
 
         public ResultSet Output { get; private set; }
@@ -33,7 +33,7 @@ namespace Knet.Kudu.Client.Scanner
         }
 
         public void BeginProcessingSidecars(
-            Schema scanSchema,
+            KuduSchema scanSchema,
             ScanResponsePB scanResponse,
             KuduSidecarOffsets sidecars)
         {

@@ -6,7 +6,7 @@ namespace Knet.Kudu.Client
 {
     public class PartialRow
     {
-        public Schema Schema { get; }
+        public KuduSchema Schema { get; }
 
         private readonly byte[] _rowAlloc;
         private readonly int _headerSize;
@@ -14,7 +14,7 @@ namespace Knet.Kudu.Client
 
         private readonly byte[][] _varLengthData;
 
-        public PartialRow(Schema schema)
+        public PartialRow(KuduSchema schema)
         {
             Schema = schema;
 

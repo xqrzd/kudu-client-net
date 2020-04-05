@@ -270,7 +270,7 @@ namespace Knet.Kudu.Client.Negotiate
         {
             var request = new NegotiatePB { Step = NegotiateStep.SaslInitiate };
             request.SaslMechanisms.Add(new SaslMechanism { Mechanism = "PLAIN" });
-            request.Token = SaslPlain.CreateToken(new NetworkCredential("demo", "demo"));
+            request.Token = SaslPlain.CreateToken(new NetworkCredential(Environment.UserName, ""));
 
             await SendReceiveAsync(request, cancellationToken).ConfigureAwait(false);
             return new ConnectionContextPB();

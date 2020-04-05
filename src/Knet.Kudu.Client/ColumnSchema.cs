@@ -41,8 +41,8 @@ namespace Knet.Kudu.Client
             Compression = compression;
             TypeAttributes = typeAttributes;
 
-            Size = Schema.GetTypeSize(type);
-            IsSigned = Schema.IsSigned(type);
+            Size = KuduSchema.GetTypeSize(type);
+            IsSigned = KuduSchema.IsSigned(type);
             IsFixedSize = !(type == KuduType.String || type == KuduType.Binary);
         }
 

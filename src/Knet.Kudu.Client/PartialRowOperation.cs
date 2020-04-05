@@ -6,7 +6,7 @@ namespace Knet.Kudu.Client
     {
         private readonly RowOperation _operation;
 
-        public PartialRowOperation(Schema schema, RowOperation operation)
+        public PartialRowOperation(KuduSchema schema, RowOperation operation)
             : base(schema)
         {
             _operation = operation;

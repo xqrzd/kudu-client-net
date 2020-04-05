@@ -10,7 +10,7 @@ namespace Knet.Kudu.Client.Scanner
         T Output { get; }
 
         void BeginProcessingSidecars(
-            Schema scanSchema,
+            KuduSchema scanSchema,
             ScanResponsePB scanResponse,
             KuduSidecarOffsets sidecars);
 

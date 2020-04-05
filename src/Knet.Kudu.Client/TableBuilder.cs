@@ -244,7 +244,7 @@ namespace Knet.Kudu.Client
                 RowOperation.RangeUpperBound :
                 RowOperation.InclusiveRangeUpperBound;
 
-            var schema = new Schema(columns);
+            var schema = new KuduSchema(columns);
             var lowerBoundRow = new PartialRowOperation(schema, lowerRowOp);
             var upperBoundRow = new PartialRowOperation(schema, upperRowOp);
 
@@ -279,7 +279,7 @@ namespace Knet.Kudu.Client
                 .Select(c => ColumnSchema.FromProtobuf(c))
                 .ToList();
 
-            var schema = new Schema(columns);
+            var schema = new KuduSchema(columns);
             var lowerBoundRow = new PartialRowOperation(
                 schema, RowOperation.RangeLowerBound);
             configure(lowerBoundRow);
@@ -305,7 +305,7 @@ namespace Knet.Kudu.Client
                 .Select(c => ColumnSchema.FromProtobuf(c))
                 .ToList();
 
-            var schema = new Schema(columns);
+            var schema = new KuduSchema(columns);
             var splitRow = new PartialRowOperation(schema, RowOperation.SplitRow);
 
             configure(splitRow);
