@@ -18,7 +18,7 @@ namespace Knet.Kudu.Client
         public PartitionSchema(
             RangeSchema rangeSchema,
             List<HashBucketSchema> hashBucketSchemas,
-            Schema schema)
+            KuduSchema schema)
         {
             RangeSchema = rangeSchema;
             HashBucketSchemas = hashBucketSchemas;

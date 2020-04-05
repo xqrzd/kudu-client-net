@@ -1019,7 +1019,7 @@ namespace Knet.Kudu.Client
             }
         }
 
-        public static KuduPredicate FromPb(Schema schema, ColumnPredicatePB pb)
+        public static KuduPredicate FromPb(KuduSchema schema, ColumnPredicatePB pb)
         {
             ColumnSchema column = schema.GetColumn(pb.Column);
 

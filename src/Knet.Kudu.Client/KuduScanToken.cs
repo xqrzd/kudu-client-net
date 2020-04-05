@@ -188,7 +188,7 @@ namespace Knet.Kudu.Client
         }
 
         private static List<int> ComputeProjectedColumnIndexes(
-            ScanTokenPB message, Schema schema)
+            ScanTokenPB message, KuduSchema schema)
         {
             var columns = new List<int>(message.ProjectedColumns.Count);
 

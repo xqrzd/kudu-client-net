@@ -21,7 +21,7 @@ namespace Knet.Kudu.Client
         private readonly KuduTable _table;
         private readonly IKuduScanParser<T> _parser;
         private readonly List<ColumnSchemaPB> _columns;
-        private readonly Schema _schema;
+        private readonly KuduSchema _schema;
         private readonly PartitionPruner _partitionPruner;
         private readonly Dictionary<string, KuduPredicate> _predicates;
         private readonly CancellationToken _cancellationToken;
@@ -170,7 +170,7 @@ namespace Knet.Kudu.Client
                 isDeletedIndex = columns.Count - 1;
             }
 
-            _schema = new Schema(columns, isDeletedIndex);
+            _schema = new KuduSchema(columns, isDeletedIndex);
             _batchSizeBytes = batchSizeBytes ?? _schema.GetScannerBatchSizeEstimate();
 
             // If the partition pruner has pruned all partitions, then the scan can be
@@ -526,7 +526,7 @@ namespace Knet.Kudu.Client
         /// The column name is generated to ensure there is never a collision.
         /// </summary>
         /// <param name="schema">The table schema.</param>
-        private static ColumnSchemaPB GenerateIsDeletedColumn(Schema schema)
+        private static ColumnSchemaPB GenerateIsDeletedColumn(KuduSchema schema)
         {
             var columnName = "is_deleted";
 

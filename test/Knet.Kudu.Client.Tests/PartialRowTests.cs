@@ -121,7 +121,7 @@ namespace Knet.Kudu.Client.Tests
 
         private PartialRow GetPartialRowWithAllTypes(bool isNullable = false)
         {
-            var schema = new Schema(new List<ColumnSchema>
+            var schema = new KuduSchema(new List<ColumnSchema>
             {
                 new ColumnSchema("int8", KuduType.Int8, false, isNullable),
                 new ColumnSchema("int16", KuduType.Int16, false, isNullable),

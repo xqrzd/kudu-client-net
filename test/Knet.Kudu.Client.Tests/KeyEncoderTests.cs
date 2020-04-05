@@ -100,7 +100,7 @@ namespace Knet.Kudu.Client.Tests
             Assert.Equal(expectedPartitionKey, partitionKey);
         }
 
-        private static Schema GetSchema(TableBuilder builder)
+        private static KuduSchema GetSchema(TableBuilder builder)
         {
             CreateTableRequestPB request = builder;
             // The builder doesn't support setting column ids, so for testing
@@ -109,7 +109,7 @@ namespace Knet.Kudu.Client.Tests
             {
                 request.Schema.Columns[i].Id = (uint)i;
             }
-            return new Schema(request.Schema);
+            return new KuduSchema(request.Schema);
         }
     }
 }

@@ -10,7 +10,7 @@ namespace Knet.Kudu.Client
 
         internal GetTableSchemaResponsePB SchemaPbNoIds { get; }
 
-        public Schema Schema { get; }
+        public KuduSchema Schema { get; }
 
         public PartitionSchema PartitionSchema { get; }
 
@@ -20,7 +20,7 @@ namespace Knet.Kudu.Client
 
         public KuduTable(GetTableSchemaResponsePB schemaPb)
         {
-            Schema = new Schema(schemaPb.Schema);
+            Schema = new KuduSchema(schemaPb.Schema);
             SchemaPbNoIds = CreateWithNoColumnIds(schemaPb);
             SchemaPb = schemaPb;
             PartitionSchema = new PartitionSchema(schemaPb.PartitionSchema);

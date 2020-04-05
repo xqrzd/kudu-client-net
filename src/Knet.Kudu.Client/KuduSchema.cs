@@ -8,7 +8,7 @@ namespace Knet.Kudu.Client
     /// <summary>
     /// Represents table's schema which is essentially a list of columns.
     /// </summary>
-    public class Schema
+    public class KuduSchema
     {
         /// <summary>
         /// Maps column index to column.
@@ -54,10 +54,10 @@ namespace Knet.Kudu.Client
         /// </summary>
         public int IsDeletedIndex { get; }
 
-        public Schema(List<ColumnSchema> columns, int isDeletedIndex = -1)
+        public KuduSchema(List<ColumnSchema> columns, int isDeletedIndex = -1)
             : this(columns, null, isDeletedIndex) { }
 
-        public Schema(List<ColumnSchema> columns, List<int> columnIds, int isDeletedIndex = -1)
+        public KuduSchema(List<ColumnSchema> columns, List<int> columnIds, int isDeletedIndex = -1)
         {
             var hasColumnIds = columnIds != null;
             if (hasColumnIds)
@@ -102,7 +102,7 @@ namespace Knet.Kudu.Client
             RowSize = GetRowSize(_columnsByIndex);
         }
 
-        public Schema(SchemaPB schema)
+        public KuduSchema(SchemaPB schema)
         {
             var columns = schema.Columns;
 

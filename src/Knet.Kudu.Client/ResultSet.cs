@@ -11,7 +11,7 @@ namespace Knet.Kudu.Client
         private readonly int[] _columnOffsets;
         private readonly int _rowSize;
 
-        public Schema Schema { get; }
+        public KuduSchema Schema { get; }
 
         public int Count { get; }
 
@@ -20,7 +20,7 @@ namespace Knet.Kudu.Client
         internal int NullBitSetOffset { get; }
 
         public ResultSet(
-            Schema schema,
+            KuduSchema schema,
             int numRows,
             IMemoryOwner<byte> rowAlloc,
             IMemoryOwner<byte> indirectData)

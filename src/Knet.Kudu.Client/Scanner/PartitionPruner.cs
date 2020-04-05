@@ -24,7 +24,7 @@ namespace Knet.Kudu.Client.Scanner
             new PartitionPruner(new Stack<PartitionKeyRange>());
 
         public static PartitionPruner Create(
-            Schema schema,
+            KuduSchema schema,
             PartitionSchema partitionSchema,
             Dictionary<string, KuduPredicate> predicates,
             ReadOnlySpan<byte> lowerBoundPrimaryKey,
@@ -292,7 +292,7 @@ namespace Knet.Kudu.Client.Scanner
             }
         }
 
-        private static List<int> IdsToIndexes(Schema schema, List<int> ids)
+        private static List<int> IdsToIndexes(KuduSchema schema, List<int> ids)
         {
             var indexes = new List<int>(ids.Count);
 
@@ -321,7 +321,7 @@ namespace Knet.Kudu.Client.Scanner
         /// <param name="rangeSchema">The range partition schema.</param>
         /// <param name="predicates">The predicates.</param>
         private static byte[] PushPredsIntoLowerBoundRangeKey(
-            Schema schema, RangeSchema rangeSchema, Dictionary<string, KuduPredicate> predicates)
+            KuduSchema schema, RangeSchema rangeSchema, Dictionary<string, KuduPredicate> predicates)
         {
             var row = new PartialRow(schema);
             int pushedPredicates = 0;
@@ -373,7 +373,7 @@ namespace Knet.Kudu.Client.Scanner
         }
 
         private static byte[] PushPredsIntoUpperBoundRangeKey(
-            Schema schema, RangeSchema rangeSchema, Dictionary<string, KuduPredicate> predicates)
+            KuduSchema schema, RangeSchema rangeSchema, Dictionary<string, KuduPredicate> predicates)
         {
             var row = new PartialRow(schema);
             int pushedPredicates = 0;
@@ -457,7 +457,7 @@ namespace Knet.Kudu.Client.Scanner
         /// Returns a bitset containing false bits for hash buckets which may be pruned.
         /// </summary>
         private static BitArray PruneHashComponent(
-            Schema schema,
+            KuduSchema schema,
             HashBucketSchema hashSchema,
             Dictionary<string, KuduPredicate> predicates)
         {

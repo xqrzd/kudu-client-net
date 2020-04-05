@@ -174,7 +174,7 @@ namespace Knet.Kudu.Client.FunctionalTests
         public async Task TestAlterRangePartitioning()
         {
             KuduTable table = await CreateTableAsync();
-            Schema schema = table.Schema;
+            KuduSchema schema = table.Schema;
 
             // Insert some rows, and then drop the partition and ensure that the table is empty.
             await InsertRowsAsync(table, 0, 100);

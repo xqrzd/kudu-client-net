@@ -117,7 +117,7 @@ namespace Knet.Kudu.Client.Util
                 negotiatePb.SupportedFeatures.Contains(flag);
         }
 
-        internal static int GetScannerBatchSizeEstimate(this Schema schema)
+        internal static int GetScannerBatchSizeEstimate(this KuduSchema schema)
         {
             if (schema.VarLengthColumnCount == 0)
             {
