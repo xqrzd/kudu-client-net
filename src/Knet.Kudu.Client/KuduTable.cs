@@ -32,6 +32,8 @@ namespace Knet.Kudu.Client
 
         public string TableName => SchemaPb.TableName;
 
+        public override string ToString() => TableName;
+
         public KuduOperation NewInsert() => NewOperation(RowOperation.Insert);
 
         public KuduOperation NewUpdate() => NewOperation(RowOperation.Update);
