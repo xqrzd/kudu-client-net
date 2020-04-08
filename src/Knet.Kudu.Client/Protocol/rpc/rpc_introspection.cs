@@ -123,24 +123,24 @@ namespace Knet.Kudu.Client.Protocol.Rpc
         private uint? __pbn__TotalRetrans;
 
         [global::ProtoBuf.ProtoMember(5, Name = @"pacing_rate")]
-        public uint PacingRate
+        public ulong PacingRate
         {
             get { return __pbn__PacingRate.GetValueOrDefault(); }
             set { __pbn__PacingRate = value; }
         }
         public bool ShouldSerializePacingRate() => __pbn__PacingRate != null;
         public void ResetPacingRate() => __pbn__PacingRate = null;
-        private uint? __pbn__PacingRate;
+        private ulong? __pbn__PacingRate;
 
         [global::ProtoBuf.ProtoMember(6, Name = @"max_pacing_rate")]
-        public uint MaxPacingRate
+        public ulong MaxPacingRate
         {
             get { return __pbn__MaxPacingRate.GetValueOrDefault(); }
             set { __pbn__MaxPacingRate = value; }
         }
         public bool ShouldSerializeMaxPacingRate() => __pbn__MaxPacingRate != null;
         public void ResetMaxPacingRate() => __pbn__MaxPacingRate = null;
-        private uint? __pbn__MaxPacingRate;
+        private ulong? __pbn__MaxPacingRate;
 
         [global::ProtoBuf.ProtoMember(7, Name = @"bytes_acked")]
         public ulong BytesAcked

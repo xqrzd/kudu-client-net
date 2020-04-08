@@ -15,6 +15,8 @@ namespace Knet.Kudu.Client.Protocol
         MurmurHash2 = 1,
         [global::ProtoBuf.ProtoEnum(Name = @"CITY_HASH")]
         CityHash = 2,
+        [global::ProtoBuf.ProtoEnum(Name = @"FAST_HASH")]
+        FastHash = 3,
     }
 
 }

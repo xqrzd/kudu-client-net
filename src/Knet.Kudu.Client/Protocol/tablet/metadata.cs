@@ -187,6 +187,46 @@ namespace Knet.Kudu.Client.Protocol.Tablet
         [global::ProtoBuf.ProtoMember(17, Name = @"extra_config")]
         public global::Knet.Kudu.Client.Protocol.TableExtraConfigPB ExtraConfig { get; set; }
 
+        [global::ProtoBuf.ProtoMember(18, Name = @"dimension_label")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string DimensionLabel
+        {
+            get { return __pbn__DimensionLabel ?? ""; }
+            set { __pbn__DimensionLabel = value; }
+        }
+        public bool ShouldSerializeDimensionLabel() => __pbn__DimensionLabel != null;
+        public void ResetDimensionLabel() => __pbn__DimensionLabel = null;
+        private string __pbn__DimensionLabel;
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class ReportedTabletStatsPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"on_disk_size")]
+        public ulong OnDiskSize
+        {
+            get { return __pbn__OnDiskSize.GetValueOrDefault(); }
+            set { __pbn__OnDiskSize = value; }
+        }
+        public bool ShouldSerializeOnDiskSize() => __pbn__OnDiskSize != null;
+        public void ResetOnDiskSize() => __pbn__OnDiskSize = null;
+        private ulong? __pbn__OnDiskSize;
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"live_row_count")]
+        public ulong LiveRowCount
+        {
+            get { return __pbn__LiveRowCount.GetValueOrDefault(); }
+            set { __pbn__LiveRowCount = value; }
+        }
+        public bool ShouldSerializeLiveRowCount() => __pbn__LiveRowCount != null;
+        public void ResetLiveRowCount() => __pbn__LiveRowCount = null;
+        private ulong? __pbn__LiveRowCount;
+
     }
 
     [global::ProtoBuf.ProtoContract()]

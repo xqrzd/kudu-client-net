@@ -217,6 +217,67 @@ namespace Knet.Kudu.Client.Protocol
     }
 
     [global::ProtoBuf.ProtoContract()]
+    public partial class ColumnarRowBlockPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"columns")]
+        public global::System.Collections.Generic.List<Column> Columns { get; } = new global::System.Collections.Generic.List<Column>();
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"num_rows")]
+        public long NumRows
+        {
+            get { return __pbn__NumRows.GetValueOrDefault(); }
+            set { __pbn__NumRows = value; }
+        }
+        public bool ShouldSerializeNumRows() => __pbn__NumRows != null;
+        public void ResetNumRows() => __pbn__NumRows = null;
+        private long? __pbn__NumRows;
+
+        [global::ProtoBuf.ProtoContract()]
+        public partial class Column : global::ProtoBuf.IExtensible
+        {
+            private global::ProtoBuf.IExtension __pbn__extensionData;
+            global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+                => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+            [global::ProtoBuf.ProtoMember(1, Name = @"data_sidecar")]
+            public int DataSidecar
+            {
+                get { return __pbn__DataSidecar.GetValueOrDefault(); }
+                set { __pbn__DataSidecar = value; }
+            }
+            public bool ShouldSerializeDataSidecar() => __pbn__DataSidecar != null;
+            public void ResetDataSidecar() => __pbn__DataSidecar = null;
+            private int? __pbn__DataSidecar;
+
+            [global::ProtoBuf.ProtoMember(2, Name = @"varlen_data_sidecar")]
+            public int VarlenDataSidecar
+            {
+                get { return __pbn__VarlenDataSidecar.GetValueOrDefault(); }
+                set { __pbn__VarlenDataSidecar = value; }
+            }
+            public bool ShouldSerializeVarlenDataSidecar() => __pbn__VarlenDataSidecar != null;
+            public void ResetVarlenDataSidecar() => __pbn__VarlenDataSidecar = null;
+            private int? __pbn__VarlenDataSidecar;
+
+            [global::ProtoBuf.ProtoMember(3, Name = @"non_null_bitmap_sidecar")]
+            public int NonNullBitmapSidecar
+            {
+                get { return __pbn__NonNullBitmapSidecar.GetValueOrDefault(); }
+                set { __pbn__NonNullBitmapSidecar = value; }
+            }
+            public bool ShouldSerializeNonNullBitmapSidecar() => __pbn__NonNullBitmapSidecar != null;
+            public void ResetNonNullBitmapSidecar() => __pbn__NonNullBitmapSidecar = null;
+            private int? __pbn__NonNullBitmapSidecar;
+
+        }
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
     public partial class RowOperationsPB : global::ProtoBuf.IExtensible
     {
         private global::ProtoBuf.IExtension __pbn__extensionData;
@@ -256,6 +317,8 @@ namespace Knet.Kudu.Client.Protocol
             Delete = 3,
             [global::ProtoBuf.ProtoEnum(Name = @"UPSERT")]
             Upsert = 5,
+            [global::ProtoBuf.ProtoEnum(Name = @"INSERT_IGNORE")]
+            InsertIgnore = 10,
             [global::ProtoBuf.ProtoEnum(Name = @"SPLIT_ROW")]
             SplitRow = 4,
             [global::ProtoBuf.ProtoEnum(Name = @"RANGE_LOWER_BOUND")]

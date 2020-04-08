@@ -22,7 +22,7 @@ namespace Knet.Kudu.Client.Protocol
     }
 
     [global::ProtoBuf.ProtoContract()]
-    public partial class PathSetPB : global::ProtoBuf.IExtensible
+    public partial class DirSetPB : global::ProtoBuf.IExtensible
     {
         private global::ProtoBuf.IExtension __pbn__extensionData;
         global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
@@ -37,20 +37,27 @@ namespace Knet.Kudu.Client.Protocol
     }
 
     [global::ProtoBuf.ProtoContract()]
-    public partial class PathInstanceMetadataPB : global::ProtoBuf.IExtensible
+    public partial class DirInstanceMetadataPB : global::ProtoBuf.IExtensible
     {
         private global::ProtoBuf.IExtension __pbn__extensionData;
         global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
             => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
 
-        [global::ProtoBuf.ProtoMember(1, Name = @"path_set", IsRequired = true)]
-        public PathSetPB PathSet { get; set; }
+        [global::ProtoBuf.ProtoMember(1, Name = @"dir_set", IsRequired = true)]
+        public DirSetPB DirSet { get; set; }
 
-        [global::ProtoBuf.ProtoMember(2, Name = @"block_manager_type", IsRequired = true)]
-        public string BlockManagerType { get; set; }
+        [global::ProtoBuf.ProtoMember(2, Name = @"dir_type", IsRequired = true)]
+        public string DirType { get; set; }
 
-        [global::ProtoBuf.ProtoMember(3, Name = @"filesystem_block_size_bytes", IsRequired = true)]
-        public ulong FilesystemBlockSizeBytes { get; set; }
+        [global::ProtoBuf.ProtoMember(3, Name = @"filesystem_block_size_bytes")]
+        public ulong FilesystemBlockSizeBytes
+        {
+            get { return __pbn__FilesystemBlockSizeBytes.GetValueOrDefault(); }
+            set { __pbn__FilesystemBlockSizeBytes = value; }
+        }
+        public bool ShouldSerializeFilesystemBlockSizeBytes() => __pbn__FilesystemBlockSizeBytes != null;
+        public void ResetFilesystemBlockSizeBytes() => __pbn__FilesystemBlockSizeBytes = null;
+        private ulong? __pbn__FilesystemBlockSizeBytes;
 
     }
 

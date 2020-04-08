@@ -482,6 +482,56 @@ namespace Knet.Kudu.Client.Protocol.Tserver
         public void ResetCfileCacheHitBytes() => __pbn__CfileCacheHitBytes = null;
         private long? __pbn__CfileCacheHitBytes;
 
+        [global::ProtoBuf.ProtoMember(3, Name = @"bytes_read")]
+        public long BytesRead
+        {
+            get { return __pbn__BytesRead.GetValueOrDefault(); }
+            set { __pbn__BytesRead = value; }
+        }
+        public bool ShouldSerializeBytesRead() => __pbn__BytesRead != null;
+        public void ResetBytesRead() => __pbn__BytesRead = null;
+        private long? __pbn__BytesRead;
+
+        [global::ProtoBuf.ProtoMember(4, Name = @"queue_duration_nanos")]
+        public long QueueDurationNanos
+        {
+            get { return __pbn__QueueDurationNanos.GetValueOrDefault(); }
+            set { __pbn__QueueDurationNanos = value; }
+        }
+        public bool ShouldSerializeQueueDurationNanos() => __pbn__QueueDurationNanos != null;
+        public void ResetQueueDurationNanos() => __pbn__QueueDurationNanos = null;
+        private long? __pbn__QueueDurationNanos;
+
+        [global::ProtoBuf.ProtoMember(5, Name = @"total_duration_nanos")]
+        public long TotalDurationNanos
+        {
+            get { return __pbn__TotalDurationNanos.GetValueOrDefault(); }
+            set { __pbn__TotalDurationNanos = value; }
+        }
+        public bool ShouldSerializeTotalDurationNanos() => __pbn__TotalDurationNanos != null;
+        public void ResetTotalDurationNanos() => __pbn__TotalDurationNanos = null;
+        private long? __pbn__TotalDurationNanos;
+
+        [global::ProtoBuf.ProtoMember(6, Name = @"cpu_user_nanos")]
+        public long CpuUserNanos
+        {
+            get { return __pbn__CpuUserNanos.GetValueOrDefault(); }
+            set { __pbn__CpuUserNanos = value; }
+        }
+        public bool ShouldSerializeCpuUserNanos() => __pbn__CpuUserNanos != null;
+        public void ResetCpuUserNanos() => __pbn__CpuUserNanos = null;
+        private long? __pbn__CpuUserNanos;
+
+        [global::ProtoBuf.ProtoMember(7, Name = @"cpu_system_nanos")]
+        public long CpuSystemNanos
+        {
+            get { return __pbn__CpuSystemNanos.GetValueOrDefault(); }
+            set { __pbn__CpuSystemNanos = value; }
+        }
+        public bool ShouldSerializeCpuSystemNanos() => __pbn__CpuSystemNanos != null;
+        public void ResetCpuSystemNanos() => __pbn__CpuSystemNanos = null;
+        private long? __pbn__CpuSystemNanos;
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -516,6 +566,9 @@ namespace Knet.Kudu.Client.Protocol.Tserver
 
         [global::ProtoBuf.ProtoMember(4, Name = @"data")]
         public global::Knet.Kudu.Client.Protocol.RowwiseRowBlockPB Data { get; set; }
+
+        [global::ProtoBuf.ProtoMember(5, Name = @"columnar_data")]
+        public global::Knet.Kudu.Client.Protocol.ColumnarRowBlockPB ColumnarData { get; set; }
 
         [global::ProtoBuf.ProtoMember(6, Name = @"snap_timestamp", DataFormat = global::ProtoBuf.DataFormat.FixedSize)]
         public ulong SnapTimestamp
@@ -646,6 +699,8 @@ namespace Knet.Kudu.Client.Protocol.Tserver
         NoFlags = 0,
         [global::ProtoBuf.ProtoEnum(Name = @"PAD_UNIX_TIME_MICROS_TO_16_BYTES")]
         PadUnixTimeMicrosTo16Bytes = 1,
+        [global::ProtoBuf.ProtoEnum(Name = @"COLUMNAR_LAYOUT")]
+        ColumnarLayout = 2,
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -657,6 +712,12 @@ namespace Knet.Kudu.Client.Protocol.Tserver
         ColumnPredicates = 1,
         [global::ProtoBuf.ProtoEnum(Name = @"PAD_UNIXTIME_MICROS_TO_16_BYTES")]
         PadUnixtimeMicrosTo16Bytes = 2,
+        [global::ProtoBuf.ProtoEnum(Name = @"QUIESCING")]
+        Quiescing = 3,
+        [global::ProtoBuf.ProtoEnum(Name = @"BLOOM_FILTER_PREDICATE")]
+        BloomFilterPredicate = 4,
+        [global::ProtoBuf.ProtoEnum(Name = @"COLUMNAR_LAYOUT_FEATURE")]
+        ColumnarLayoutFeature = 5,
     }
 
 }

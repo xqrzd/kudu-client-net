@@ -33,6 +33,16 @@ namespace Knet.Kudu.Client.Protocol
         public void ResetScale() => __pbn__Scale = null;
         private int? __pbn__Scale;
 
+        [global::ProtoBuf.ProtoMember(3, Name = @"length")]
+        public int Length
+        {
+            get { return __pbn__Length.GetValueOrDefault(); }
+            set { __pbn__Length = value; }
+        }
+        public bool ShouldSerializeLength() => __pbn__Length != null;
+        public void ResetLength() => __pbn__Length = null;
+        private int? __pbn__Length;
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -470,46 +480,6 @@ namespace Knet.Kudu.Client.Protocol
         public void Resetin_bloom_filter() => global::ProtoBuf.DiscriminatedUnionObject.Reset(ref __pbn__predicate, 7);
 
         [global::ProtoBuf.ProtoContract()]
-        public partial class BloomFilter : global::ProtoBuf.IExtensible
-        {
-            private global::ProtoBuf.IExtension __pbn__extensionData;
-            global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
-                => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
-
-            [global::ProtoBuf.ProtoMember(1, Name = @"nhash")]
-            public int Nhash
-            {
-                get { return __pbn__Nhash.GetValueOrDefault(); }
-                set { __pbn__Nhash = value; }
-            }
-            public bool ShouldSerializeNhash() => __pbn__Nhash != null;
-            public void ResetNhash() => __pbn__Nhash = null;
-            private int? __pbn__Nhash;
-
-            [global::ProtoBuf.ProtoMember(2, Name = @"bloom_data")]
-            public byte[] BloomData
-            {
-                get { return __pbn__BloomData; }
-                set { __pbn__BloomData = value; }
-            }
-            public bool ShouldSerializeBloomData() => __pbn__BloomData != null;
-            public void ResetBloomData() => __pbn__BloomData = null;
-            private byte[] __pbn__BloomData;
-
-            [global::ProtoBuf.ProtoMember(3, Name = @"hash_algorithm")]
-            [global::System.ComponentModel.DefaultValue(HashAlgorithm.CityHash)]
-            public HashAlgorithm HashAlgorithm
-            {
-                get { return __pbn__HashAlgorithm ?? HashAlgorithm.CityHash; }
-                set { __pbn__HashAlgorithm = value; }
-            }
-            public bool ShouldSerializeHashAlgorithm() => __pbn__HashAlgorithm != null;
-            public void ResetHashAlgorithm() => __pbn__HashAlgorithm = null;
-            private HashAlgorithm? __pbn__HashAlgorithm;
-
-        }
-
-        [global::ProtoBuf.ProtoContract()]
         public partial class Range : global::ProtoBuf.IExtensible
         {
             private global::ProtoBuf.IExtension __pbn__extensionData;
@@ -595,7 +565,7 @@ namespace Knet.Kudu.Client.Protocol
                 => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
 
             [global::ProtoBuf.ProtoMember(1, Name = @"bloom_filters")]
-            public global::System.Collections.Generic.List<ColumnPredicatePB.BloomFilter> BloomFilters { get; } = new global::System.Collections.Generic.List<ColumnPredicatePB.BloomFilter>();
+            public global::System.Collections.Generic.List<BlockBloomFilterPB> BloomFilters { get; } = new global::System.Collections.Generic.List<BlockBloomFilterPB>();
 
             [global::ProtoBuf.ProtoMember(2, Name = @"lower")]
             public byte[] Lower
@@ -670,6 +640,16 @@ namespace Knet.Kudu.Client.Protocol
         public void ResetHistoryMaxAgeSec() => __pbn__HistoryMaxAgeSec = null;
         private int? __pbn__HistoryMaxAgeSec;
 
+        [global::ProtoBuf.ProtoMember(2, Name = @"maintenance_priority")]
+        public int MaintenancePriority
+        {
+            get { return __pbn__MaintenancePriority.GetValueOrDefault(); }
+            set { __pbn__MaintenancePriority = value; }
+        }
+        public bool ShouldSerializeMaintenancePriority() => __pbn__MaintenancePriority != null;
+        public void ResetMaintenancePriority() => __pbn__MaintenancePriority = null;
+        private int? __pbn__MaintenancePriority;
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -715,6 +695,10 @@ namespace Knet.Kudu.Client.Protocol
         Decimal128 = 17,
         [global::ProtoBuf.ProtoEnum(Name = @"IS_DELETED")]
         IsDeleted = 18,
+        [global::ProtoBuf.ProtoEnum(Name = @"VARCHAR")]
+        Varchar = 19,
+        [global::ProtoBuf.ProtoEnum(Name = @"DATE")]
+        Date = 20,
     }
 
     [global::ProtoBuf.ProtoContract()]
