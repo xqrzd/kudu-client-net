@@ -153,6 +153,17 @@ namespace Knet.Kudu.Client.Protocol.Master
         [global::ProtoBuf.ProtoMember(6, Name = @"table_id", IsRequired = true)]
         public byte[] TableId { get; set; }
 
+        [global::ProtoBuf.ProtoMember(8, Name = @"dimension_label")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string DimensionLabel
+        {
+            get { return __pbn__DimensionLabel ?? ""; }
+            set { __pbn__DimensionLabel = value; }
+        }
+        public bool ShouldSerializeDimensionLabel() => __pbn__DimensionLabel != null;
+        public void ResetDimensionLabel() => __pbn__DimensionLabel = null;
+        private string __pbn__DimensionLabel;
+
         [global::ProtoBuf.ProtoContract()]
         public enum State
         {
@@ -315,6 +326,36 @@ namespace Knet.Kudu.Client.Protocol.Master
     }
 
     [global::ProtoBuf.ProtoContract()]
+    public partial class SysTServerStateEntryPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"state")]
+        [global::System.ComponentModel.DefaultValue(TServerStatePB.UnknownState)]
+        public TServerStatePB State
+        {
+            get { return __pbn__State ?? TServerStatePB.UnknownState; }
+            set { __pbn__State = value; }
+        }
+        public bool ShouldSerializeState() => __pbn__State != null;
+        public void ResetState() => __pbn__State = null;
+        private TServerStatePB? __pbn__State;
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"timestamp_secs")]
+        public long TimestampSecs
+        {
+            get { return __pbn__TimestampSecs.GetValueOrDefault(); }
+            set { __pbn__TimestampSecs = value; }
+        }
+        public bool ShouldSerializeTimestampSecs() => __pbn__TimestampSecs != null;
+        public void ResetTimestampSecs() => __pbn__TimestampSecs = null;
+        private long? __pbn__TimestampSecs;
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
     public partial class PingRequestPB : global::ProtoBuf.IExtensible
     {
         private global::ProtoBuf.IExtension __pbn__extensionData;
@@ -379,6 +420,9 @@ namespace Knet.Kudu.Client.Protocol.Master
         public bool ShouldSerializeSchemaVersion() => __pbn__SchemaVersion != null;
         public void ResetSchemaVersion() => __pbn__SchemaVersion = null;
         private uint? __pbn__SchemaVersion;
+
+        [global::ProtoBuf.ProtoMember(7, Name = @"stats")]
+        public global::Knet.Kudu.Client.Protocol.Tablet.ReportedTabletStatsPB Stats { get; set; }
 
     }
 
@@ -487,6 +531,10 @@ namespace Knet.Kudu.Client.Protocol.Master
         [global::ProtoBuf.ProtoMember(7, Name = @"replica_management_info")]
         public global::Knet.Kudu.Client.Protocol.Consensus.ReplicaManagementInfoPB ReplicaManagementInfo { get; set; }
 
+        [global::ProtoBuf.ProtoMember(8, Name = @"num_live_tablets_by_dimension")]
+        [global::ProtoBuf.ProtoMap]
+        public global::System.Collections.Generic.Dictionary<string, int> NumLiveTabletsByDimensions { get; } = new global::System.Collections.Generic.Dictionary<string, int>();
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -588,8 +636,8 @@ namespace Knet.Kudu.Client.Protocol.Master
         [global::ProtoBuf.ProtoMember(6, Name = @"partition")]
         public global::Knet.Kudu.Client.Protocol.PartitionPB Partition { get; set; }
 
-        [global::ProtoBuf.ProtoMember(4, Name = @"replicas")]
-        public global::System.Collections.Generic.List<ReplicaPB> Replicas { get; } = new global::System.Collections.Generic.List<ReplicaPB>();
+        [global::ProtoBuf.ProtoMember(4, Name = @"DEPRECATED_replicas")]
+        public global::System.Collections.Generic.List<DEPRECATEDReplicaPB> DEPRECATEDreplicas { get; } = new global::System.Collections.Generic.List<DEPRECATEDReplicaPB>();
 
         [global::ProtoBuf.ProtoMember(7, Name = @"interned_replicas")]
         public global::System.Collections.Generic.List<InternedReplicaPB> InternedReplicas { get; } = new global::System.Collections.Generic.List<InternedReplicaPB>();
@@ -604,8 +652,8 @@ namespace Knet.Kudu.Client.Protocol.Master
         public void ResetDEPRECATEDstale() => __pbn__DEPRECATEDstale = null;
         private bool? __pbn__DEPRECATEDstale;
 
-        [global::ProtoBuf.ProtoContract()]
-        public partial class ReplicaPB : global::ProtoBuf.IExtensible
+        [global::ProtoBuf.ProtoContract(Name = @"DEPRECATED_ReplicaPB")]
+        public partial class DEPRECATEDReplicaPB : global::ProtoBuf.IExtensible
         {
             private global::ProtoBuf.IExtension __pbn__extensionData;
             global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
@@ -616,6 +664,17 @@ namespace Knet.Kudu.Client.Protocol.Master
 
             [global::ProtoBuf.ProtoMember(2, Name = @"role", IsRequired = true)]
             public global::Knet.Kudu.Client.Protocol.Consensus.RaftPeerPB.Role Role { get; set; } = global::Knet.Kudu.Client.Protocol.Consensus.RaftPeerPB.Role.UnknownRole;
+
+            [global::ProtoBuf.ProtoMember(3, Name = @"dimension_label")]
+            [global::System.ComponentModel.DefaultValue("")]
+            public string DimensionLabel
+            {
+                get { return __pbn__DimensionLabel ?? ""; }
+                set { __pbn__DimensionLabel = value; }
+            }
+            public bool ShouldSerializeDimensionLabel() => __pbn__DimensionLabel != null;
+            public void ResetDimensionLabel() => __pbn__DimensionLabel = null;
+            private string __pbn__DimensionLabel;
 
         }
 
@@ -631,6 +690,17 @@ namespace Knet.Kudu.Client.Protocol.Master
 
             [global::ProtoBuf.ProtoMember(2, Name = @"role", IsRequired = true)]
             public global::Knet.Kudu.Client.Protocol.Consensus.RaftPeerPB.Role Role { get; set; } = global::Knet.Kudu.Client.Protocol.Consensus.RaftPeerPB.Role.UnknownRole;
+
+            [global::ProtoBuf.ProtoMember(3, Name = @"dimension_label")]
+            [global::System.ComponentModel.DefaultValue("")]
+            public string DimensionLabel
+            {
+                get { return __pbn__DimensionLabel ?? ""; }
+                set { __pbn__DimensionLabel = value; }
+            }
+            public bool ShouldSerializeDimensionLabel() => __pbn__DimensionLabel != null;
+            public void ResetDimensionLabel() => __pbn__DimensionLabel = null;
+            private string __pbn__DimensionLabel;
 
         }
 
@@ -683,6 +753,17 @@ namespace Knet.Kudu.Client.Protocol.Master
         public void ResetReplicaTypeFilter() => __pbn__ReplicaTypeFilter = null;
         private ReplicaTypeFilter? __pbn__ReplicaTypeFilter;
 
+        [global::ProtoBuf.ProtoMember(3, Name = @"intern_ts_infos_in_response")]
+        [global::System.ComponentModel.DefaultValue(false)]
+        public bool InternTsInfosInResponse
+        {
+            get { return __pbn__InternTsInfosInResponse ?? false; }
+            set { __pbn__InternTsInfosInResponse = value; }
+        }
+        public bool ShouldSerializeInternTsInfosInResponse() => __pbn__InternTsInfosInResponse != null;
+        public void ResetInternTsInfosInResponse() => __pbn__InternTsInfosInResponse = null;
+        private bool? __pbn__InternTsInfosInResponse;
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -697,6 +778,9 @@ namespace Knet.Kudu.Client.Protocol.Master
 
         [global::ProtoBuf.ProtoMember(2, Name = @"tablet_locations")]
         public global::System.Collections.Generic.List<TabletLocationsPB> TabletLocations { get; } = new global::System.Collections.Generic.List<TabletLocationsPB>();
+
+        [global::ProtoBuf.ProtoMember(4, Name = @"ts_infos")]
+        public global::System.Collections.Generic.List<TSInfoPB> TsInfos { get; } = new global::System.Collections.Generic.List<TSInfoPB>();
 
         [global::ProtoBuf.ProtoMember(3, Name = @"errors")]
         public global::System.Collections.Generic.List<Error> Errors { get; } = new global::System.Collections.Generic.List<Error>();
@@ -761,6 +845,17 @@ namespace Knet.Kudu.Client.Protocol.Master
         [global::ProtoBuf.ProtoMember(9, Name = @"extra_configs")]
         [global::ProtoBuf.ProtoMap]
         public global::System.Collections.Generic.Dictionary<string, string> ExtraConfigs { get; } = new global::System.Collections.Generic.Dictionary<string, string>();
+
+        [global::ProtoBuf.ProtoMember(10, Name = @"dimension_label")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string DimensionLabel
+        {
+            get { return __pbn__DimensionLabel ?? ""; }
+            set { __pbn__DimensionLabel = value; }
+        }
+        public bool ShouldSerializeDimensionLabel() => __pbn__DimensionLabel != null;
+        public void ResetDimensionLabel() => __pbn__DimensionLabel = null;
+        private string __pbn__DimensionLabel;
 
     }
 
@@ -902,6 +997,50 @@ namespace Knet.Kudu.Client.Protocol.Master
             public string Name { get; set; }
 
         }
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class GetTableStatisticsRequestPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"table", IsRequired = true)]
+        public TableIdentifierPB Table { get; set; }
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class GetTableStatisticsResponsePB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"error")]
+        public MasterErrorPB Error { get; set; }
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"on_disk_size")]
+        public long OnDiskSize
+        {
+            get { return __pbn__OnDiskSize.GetValueOrDefault(); }
+            set { __pbn__OnDiskSize = value; }
+        }
+        public bool ShouldSerializeOnDiskSize() => __pbn__OnDiskSize != null;
+        public void ResetOnDiskSize() => __pbn__OnDiskSize = null;
+        private long? __pbn__OnDiskSize;
+
+        [global::ProtoBuf.ProtoMember(3, Name = @"live_row_count")]
+        public long LiveRowCount
+        {
+            get { return __pbn__LiveRowCount.GetValueOrDefault(); }
+            set { __pbn__LiveRowCount = value; }
+        }
+        public bool ShouldSerializeLiveRowCount() => __pbn__LiveRowCount != null;
+        public void ResetLiveRowCount() => __pbn__LiveRowCount = null;
+        private long? __pbn__LiveRowCount;
 
     }
 
@@ -1101,6 +1240,17 @@ namespace Knet.Kudu.Client.Protocol.Master
 
             [global::ProtoBuf.ProtoMember(1, Name = @"range_bounds")]
             public global::Knet.Kudu.Client.Protocol.RowOperationsPB RangeBounds { get; set; }
+
+            [global::ProtoBuf.ProtoMember(2, Name = @"dimension_label")]
+            [global::System.ComponentModel.DefaultValue("")]
+            public string DimensionLabel
+            {
+                get { return __pbn__DimensionLabel ?? ""; }
+                set { __pbn__DimensionLabel = value; }
+            }
+            public bool ShouldSerializeDimensionLabel() => __pbn__DimensionLabel != null;
+            public void ResetDimensionLabel() => __pbn__DimensionLabel = null;
+            private string __pbn__DimensionLabel;
 
         }
 
@@ -1422,6 +1572,16 @@ namespace Knet.Kudu.Client.Protocol.Master
         global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
             => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
 
+        [global::ProtoBuf.ProtoMember(1, Name = @"include_states")]
+        public bool IncludeStates
+        {
+            get { return __pbn__IncludeStates.GetValueOrDefault(); }
+            set { __pbn__IncludeStates = value; }
+        }
+        public bool ShouldSerializeIncludeStates() => __pbn__IncludeStates != null;
+        public void ResetIncludeStates() => __pbn__IncludeStates = null;
+        private bool? __pbn__IncludeStates;
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -1471,7 +1631,106 @@ namespace Knet.Kudu.Client.Protocol.Master
             public void ResetLocation() => __pbn__Location = null;
             private string __pbn__Location;
 
+            [global::ProtoBuf.ProtoMember(5, Name = @"state")]
+            [global::System.ComponentModel.DefaultValue(TServerStatePB.UnknownState)]
+            public TServerStatePB State
+            {
+                get { return __pbn__State ?? TServerStatePB.UnknownState; }
+                set { __pbn__State = value; }
+            }
+            public bool ShouldSerializeState() => __pbn__State != null;
+            public void ResetState() => __pbn__State = null;
+            private TServerStatePB? __pbn__State;
+
         }
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class TServerStateChangePB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"uuid")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string Uuid
+        {
+            get { return __pbn__Uuid ?? ""; }
+            set { __pbn__Uuid = value; }
+        }
+        public bool ShouldSerializeUuid() => __pbn__Uuid != null;
+        public void ResetUuid() => __pbn__Uuid = null;
+        private string __pbn__Uuid;
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"change")]
+        [global::System.ComponentModel.DefaultValue(StateChange.UnknownStateChange)]
+        public StateChange Change
+        {
+            get { return __pbn__Change ?? StateChange.UnknownStateChange; }
+            set { __pbn__Change = value; }
+        }
+        public bool ShouldSerializeChange() => __pbn__Change != null;
+        public void ResetChange() => __pbn__Change = null;
+        private StateChange? __pbn__Change;
+
+        [global::ProtoBuf.ProtoContract()]
+        public enum StateChange
+        {
+            [global::ProtoBuf.ProtoEnum(Name = @"UNKNOWN_STATE_CHANGE")]
+            UnknownStateChange = 0,
+            [global::ProtoBuf.ProtoEnum(Name = @"ENTER_MAINTENANCE_MODE")]
+            EnterMaintenanceMode = 1,
+            [global::ProtoBuf.ProtoEnum(Name = @"EXIT_MAINTENANCE_MODE")]
+            ExitMaintenanceMode = 2,
+        }
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class ChangeTServerStateRequestPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"change")]
+        public TServerStateChangePB Change { get; set; }
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"handle_missing_tserver")]
+        [global::System.ComponentModel.DefaultValue(HandleMissingTS.DontAllowMissingTserver)]
+        public HandleMissingTS HandleMissingTserver
+        {
+            get { return __pbn__HandleMissingTserver ?? HandleMissingTS.DontAllowMissingTserver; }
+            set { __pbn__HandleMissingTserver = value; }
+        }
+        public bool ShouldSerializeHandleMissingTserver() => __pbn__HandleMissingTserver != null;
+        public void ResetHandleMissingTserver() => __pbn__HandleMissingTserver = null;
+        private HandleMissingTS? __pbn__HandleMissingTserver;
+
+        [global::ProtoBuf.ProtoContract()]
+        public enum HandleMissingTS
+        {
+            [global::ProtoBuf.ProtoEnum(Name = @"UNKNOWN_HANDLING")]
+            UnknownHandling = 0,
+            [global::ProtoBuf.ProtoEnum(Name = @"ALLOW_MISSING_TSERVER")]
+            AllowMissingTserver = 1,
+            [global::ProtoBuf.ProtoEnum(Name = @"DONT_ALLOW_MISSING_TSERVER")]
+            DontAllowMissingTserver = 2,
+        }
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class ChangeTServerStateResponsePB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"error")]
+        public MasterErrorPB Error { get; set; }
 
     }
 
@@ -1611,6 +1870,17 @@ namespace Knet.Kudu.Client.Protocol.Master
         AnyReplica = 0,
         [global::ProtoBuf.ProtoEnum(Name = @"VOTER_REPLICA")]
         VoterReplica = 1,
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public enum TServerStatePB
+    {
+        [global::ProtoBuf.ProtoEnum(Name = @"UNKNOWN_STATE")]
+        UnknownState = 0,
+        [global::ProtoBuf.ProtoEnum(Name = @"NONE")]
+        None = 1,
+        [global::ProtoBuf.ProtoEnum(Name = @"MAINTENANCE_MODE")]
+        MaintenanceMode = 2,
     }
 
     [global::ProtoBuf.ProtoContract()]

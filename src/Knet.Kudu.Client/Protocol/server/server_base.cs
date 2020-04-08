@@ -47,6 +47,9 @@ namespace Knet.Kudu.Client.Protocol.Server
         [global::ProtoBuf.ProtoMember(2, Name = @"tags")]
         public global::System.Collections.Generic.List<string> Tags { get; } = new global::System.Collections.Generic.List<string>();
 
+        [global::ProtoBuf.ProtoMember(3, Name = @"flags")]
+        public global::System.Collections.Generic.List<string> Flags { get; } = new global::System.Collections.Generic.List<string>();
+
     }
 
     [global::ProtoBuf.ProtoContract()]

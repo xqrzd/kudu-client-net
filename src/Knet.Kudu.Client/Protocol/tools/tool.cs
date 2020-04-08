@@ -43,6 +43,16 @@ namespace Knet.Kudu.Client.Protocol.Tools
         public void ResetEnableKerberos() => __pbn__EnableKerberos = null;
         private bool? __pbn__EnableKerberos;
 
+        [global::ProtoBuf.ProtoMember(9, Name = @"enable_ranger")]
+        public bool EnableRanger
+        {
+            get { return __pbn__EnableRanger.GetValueOrDefault(); }
+            set { __pbn__EnableRanger = value; }
+        }
+        public bool ShouldSerializeEnableRanger() => __pbn__EnableRanger != null;
+        public void ResetEnableRanger() => __pbn__EnableRanger = null;
+        private bool? __pbn__EnableRanger;
+
         [global::ProtoBuf.ProtoMember(7, Name = @"hms_mode")]
         [global::System.ComponentModel.DefaultValue(global::Knet.Kudu.Client.Protocol.HmsModePB.None)]
         public global::Knet.Kudu.Client.Protocol.HmsModePB HmsMode
@@ -297,6 +307,40 @@ namespace Knet.Kudu.Client.Protocol.Tools
     }
 
     [global::ProtoBuf.ProtoContract()]
+    public partial class SetDaemonFlagRequestPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"id")]
+        public DaemonIdentifierPB Id { get; set; }
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"flag")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string Flag
+        {
+            get { return __pbn__Flag ?? ""; }
+            set { __pbn__Flag = value; }
+        }
+        public bool ShouldSerializeFlag() => __pbn__Flag != null;
+        public void ResetFlag() => __pbn__Flag = null;
+        private string __pbn__Flag;
+
+        [global::ProtoBuf.ProtoMember(3, Name = @"value")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string Value
+        {
+            get { return __pbn__Value ?? ""; }
+            set { __pbn__Value = value; }
+        }
+        public bool ShouldSerializeValue() => __pbn__Value != null;
+        public void ResetValue() => __pbn__Value = null;
+        private string __pbn__Value;
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
     public partial class ControlShellResponsePB : global::ProtoBuf.IExtensible
     {
         private global::ProtoBuf.IExtension __pbn__extensionData;
@@ -445,6 +489,15 @@ namespace Knet.Kudu.Client.Protocol.Tools
         public bool ShouldSerializeKinit() => __pbn__request.Is(11);
         public void ResetKinit() => global::ProtoBuf.DiscriminatedUnionObject.Reset(ref __pbn__request, 11);
 
+        [global::ProtoBuf.ProtoMember(12, Name = @"set_daemon_flag")]
+        public SetDaemonFlagRequestPB SetDaemonFlag
+        {
+            get { return __pbn__request.Is(12) ? ((SetDaemonFlagRequestPB)__pbn__request.Object) : default; }
+            set { __pbn__request = new global::ProtoBuf.DiscriminatedUnionObject(12, value); }
+        }
+        public bool ShouldSerializeSetDaemonFlag() => __pbn__request.Is(12);
+        public void ResetSetDaemonFlag() => global::ProtoBuf.DiscriminatedUnionObject.Reset(ref __pbn__request, 12);
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -458,10 +511,10 @@ namespace Knet.Kudu.Client.Protocol.Tools
         public global::System.Collections.Generic.List<string> Errors { get; } = new global::System.Collections.Generic.List<string>();
 
         [global::ProtoBuf.ProtoMember(2, Name = @"master_summaries")]
-        public global::System.Collections.Generic.List<KsckServerHealthSummaryPB> MasterSummaries { get; } = new global::System.Collections.Generic.List<KsckServerHealthSummaryPB>();
+        public global::System.Collections.Generic.List<ServerHealthSummaryPB> MasterSummaries { get; } = new global::System.Collections.Generic.List<ServerHealthSummaryPB>();
 
         [global::ProtoBuf.ProtoMember(3, Name = @"tserver_summaries")]
-        public global::System.Collections.Generic.List<KsckServerHealthSummaryPB> TserverSummaries { get; } = new global::System.Collections.Generic.List<KsckServerHealthSummaryPB>();
+        public global::System.Collections.Generic.List<ServerHealthSummaryPB> TserverSummaries { get; } = new global::System.Collections.Generic.List<ServerHealthSummaryPB>();
 
         [global::ProtoBuf.ProtoMember(4, Name = @"master_uuids")]
         public global::System.Collections.Generic.List<string> MasterUuids { get; } = new global::System.Collections.Generic.List<string>();
@@ -477,13 +530,13 @@ namespace Knet.Kudu.Client.Protocol.Tools
         private bool? __pbn__MasterConsensusConflict;
 
         [global::ProtoBuf.ProtoMember(6, Name = @"master_consensus_states")]
-        public global::System.Collections.Generic.List<KsckConsensusStatePB> MasterConsensusStates { get; } = new global::System.Collections.Generic.List<KsckConsensusStatePB>();
+        public global::System.Collections.Generic.List<ConsensusStatePB> MasterConsensusStates { get; } = new global::System.Collections.Generic.List<ConsensusStatePB>();
 
         [global::ProtoBuf.ProtoMember(7, Name = @"tablet_summaries")]
-        public global::System.Collections.Generic.List<KsckTabletSummaryPB> TabletSummaries { get; } = new global::System.Collections.Generic.List<KsckTabletSummaryPB>();
+        public global::System.Collections.Generic.List<TabletSummaryPB> TabletSummaries { get; } = new global::System.Collections.Generic.List<TabletSummaryPB>();
 
         [global::ProtoBuf.ProtoMember(8, Name = @"table_summaries")]
-        public global::System.Collections.Generic.List<KsckTableSummaryPB> TableSummaries { get; } = new global::System.Collections.Generic.List<KsckTableSummaryPB>();
+        public global::System.Collections.Generic.List<TableSummaryPB> TableSummaries { get; } = new global::System.Collections.Generic.List<TableSummaryPB>();
 
         [global::ProtoBuf.ProtoMember(9, Name = @"checksum_results")]
         public KsckChecksumResultsPB ChecksumResults { get; set; }
@@ -497,7 +550,7 @@ namespace Knet.Kudu.Client.Protocol.Tools
     }
 
     [global::ProtoBuf.ProtoContract()]
-    public partial class KsckServerHealthSummaryPB : global::ProtoBuf.IExtensible
+    public partial class ServerHealthSummaryPB : global::ProtoBuf.IExtensible
     {
         private global::ProtoBuf.IExtension __pbn__extensionData;
         global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
@@ -587,7 +640,7 @@ namespace Knet.Kudu.Client.Protocol.Tools
     }
 
     [global::ProtoBuf.ProtoContract()]
-    public partial class KsckConsensusStatePB : global::ProtoBuf.IExtensible
+    public partial class ConsensusStatePB : global::ProtoBuf.IExtensible
     {
         private global::ProtoBuf.IExtension __pbn__extensionData;
         global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
@@ -657,7 +710,7 @@ namespace Knet.Kudu.Client.Protocol.Tools
     }
 
     [global::ProtoBuf.ProtoContract()]
-    public partial class KsckTabletSummaryPB : global::ProtoBuf.IExtensible
+    public partial class TabletSummaryPB : global::ProtoBuf.IExtensible
     {
         private global::ProtoBuf.IExtension __pbn__extensionData;
         global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
@@ -719,15 +772,15 @@ namespace Knet.Kudu.Client.Protocol.Tools
         private string __pbn__Status;
 
         [global::ProtoBuf.ProtoMember(6, Name = @"master_cstate")]
-        public KsckConsensusStatePB MasterCstate { get; set; }
+        public ConsensusStatePB MasterCstate { get; set; }
 
         [global::ProtoBuf.ProtoMember(7, Name = @"replicas")]
-        public global::System.Collections.Generic.List<KsckReplicaSummaryPB> Replicas { get; } = new global::System.Collections.Generic.List<KsckReplicaSummaryPB>();
+        public global::System.Collections.Generic.List<ReplicaSummaryPB> Replicas { get; } = new global::System.Collections.Generic.List<ReplicaSummaryPB>();
 
     }
 
     [global::ProtoBuf.ProtoContract()]
-    public partial class KsckReplicaSummaryPB : global::ProtoBuf.IExtensible
+    public partial class ReplicaSummaryPB : global::ProtoBuf.IExtensible
     {
         private global::ProtoBuf.IExtension __pbn__extensionData;
         global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
@@ -800,12 +853,12 @@ namespace Knet.Kudu.Client.Protocol.Tools
         public global::Knet.Kudu.Client.Protocol.Tablet.TabletStatusPB StatusPb { get; set; }
 
         [global::ProtoBuf.ProtoMember(8, Name = @"consensus_state")]
-        public KsckConsensusStatePB ConsensusState { get; set; }
+        public ConsensusStatePB ConsensusState { get; set; }
 
     }
 
     [global::ProtoBuf.ProtoContract()]
-    public partial class KsckTableSummaryPB : global::ProtoBuf.IExtensible
+    public partial class TableSummaryPB : global::ProtoBuf.IExtensible
     {
         private global::ProtoBuf.IExtension __pbn__extensionData;
         global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
@@ -1125,6 +1178,379 @@ namespace Knet.Kudu.Client.Protocol.Tools
         public bool ShouldSerializeReplicas() => __pbn__Replicas != null;
         public void ResetReplicas() => __pbn__Replicas = null;
         private int? __pbn__Replicas;
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class ColumnPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"column_name")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string ColumnName
+        {
+            get { return __pbn__ColumnName ?? ""; }
+            set { __pbn__ColumnName = value; }
+        }
+        public bool ShouldSerializeColumnName() => __pbn__ColumnName != null;
+        public void ResetColumnName() => __pbn__ColumnName = null;
+        private string __pbn__ColumnName;
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"column_type")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string ColumnType
+        {
+            get { return __pbn__ColumnType ?? ""; }
+            set { __pbn__ColumnType = value; }
+        }
+        public bool ShouldSerializeColumnType() => __pbn__ColumnType != null;
+        public void ResetColumnType() => __pbn__ColumnType = null;
+        private string __pbn__ColumnType;
+
+        [global::ProtoBuf.ProtoMember(3, Name = @"is_nullable")]
+        public bool IsNullable
+        {
+            get { return __pbn__IsNullable.GetValueOrDefault(); }
+            set { __pbn__IsNullable = value; }
+        }
+        public bool ShouldSerializeIsNullable() => __pbn__IsNullable != null;
+        public void ResetIsNullable() => __pbn__IsNullable = null;
+        private bool? __pbn__IsNullable;
+
+        [global::ProtoBuf.ProtoMember(4, Name = @"default_value")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string DefaultValue
+        {
+            get { return __pbn__DefaultValue ?? ""; }
+            set { __pbn__DefaultValue = value; }
+        }
+        public bool ShouldSerializeDefaultValue() => __pbn__DefaultValue != null;
+        public void ResetDefaultValue() => __pbn__DefaultValue = null;
+        private string __pbn__DefaultValue;
+
+        [global::ProtoBuf.ProtoMember(5, Name = @"comment")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string Comment
+        {
+            get { return __pbn__Comment ?? ""; }
+            set { __pbn__Comment = value; }
+        }
+        public bool ShouldSerializeComment() => __pbn__Comment != null;
+        public void ResetComment() => __pbn__Comment = null;
+        private string __pbn__Comment;
+
+        [global::ProtoBuf.ProtoMember(6, Name = @"encoding")]
+        [global::System.ComponentModel.DefaultValue(EncodingTypePB.AutoEncoding)]
+        public EncodingTypePB Encoding
+        {
+            get { return __pbn__Encoding ?? EncodingTypePB.AutoEncoding; }
+            set { __pbn__Encoding = value; }
+        }
+        public bool ShouldSerializeEncoding() => __pbn__Encoding != null;
+        public void ResetEncoding() => __pbn__Encoding = null;
+        private EncodingTypePB? __pbn__Encoding;
+
+        [global::ProtoBuf.ProtoMember(7, Name = @"compression")]
+        [global::System.ComponentModel.DefaultValue(CompressionTypePB.DefaultCompression)]
+        public CompressionTypePB Compression
+        {
+            get { return __pbn__Compression ?? CompressionTypePB.DefaultCompression; }
+            set { __pbn__Compression = value; }
+        }
+        public bool ShouldSerializeCompression() => __pbn__Compression != null;
+        public void ResetCompression() => __pbn__Compression = null;
+        private CompressionTypePB? __pbn__Compression;
+
+        [global::ProtoBuf.ProtoMember(8, Name = @"type_attributes")]
+        public ColumnAttributesPB TypeAttributes { get; set; }
+
+        [global::ProtoBuf.ProtoMember(9, Name = @"cfile_block_size")]
+        public int CfileBlockSize
+        {
+            get { return __pbn__CfileBlockSize.GetValueOrDefault(); }
+            set { __pbn__CfileBlockSize = value; }
+        }
+        public bool ShouldSerializeCfileBlockSize() => __pbn__CfileBlockSize != null;
+        public void ResetCfileBlockSize() => __pbn__CfileBlockSize = null;
+        private int? __pbn__CfileBlockSize;
+
+        [global::ProtoBuf.ProtoContract()]
+        public partial class ColumnAttributesPB : global::ProtoBuf.IExtensible
+        {
+            private global::ProtoBuf.IExtension __pbn__extensionData;
+            global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+                => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+            [global::ProtoBuf.ProtoMember(1, Name = @"precision")]
+            public int Precision
+            {
+                get { return __pbn__Precision.GetValueOrDefault(); }
+                set { __pbn__Precision = value; }
+            }
+            public bool ShouldSerializePrecision() => __pbn__Precision != null;
+            public void ResetPrecision() => __pbn__Precision = null;
+            private int? __pbn__Precision;
+
+            [global::ProtoBuf.ProtoMember(2, Name = @"scale")]
+            public int Scale
+            {
+                get { return __pbn__Scale.GetValueOrDefault(); }
+                set { __pbn__Scale = value; }
+            }
+            public bool ShouldSerializeScale() => __pbn__Scale != null;
+            public void ResetScale() => __pbn__Scale = null;
+            private int? __pbn__Scale;
+
+            [global::ProtoBuf.ProtoMember(3, Name = @"length")]
+            public int Length
+            {
+                get { return __pbn__Length.GetValueOrDefault(); }
+                set { __pbn__Length = value; }
+            }
+            public bool ShouldSerializeLength() => __pbn__Length != null;
+            public void ResetLength() => __pbn__Length = null;
+            private int? __pbn__Length;
+
+        }
+
+        [global::ProtoBuf.ProtoContract()]
+        public enum EncodingTypePB
+        {
+            [global::ProtoBuf.ProtoEnum(Name = @"AUTO_ENCODING")]
+            AutoEncoding = 0,
+            [global::ProtoBuf.ProtoEnum(Name = @"PLAIN_ENCODING")]
+            PlainEncoding = 1,
+            [global::ProtoBuf.ProtoEnum(Name = @"PREFIX_ENCODING")]
+            PrefixEncoding = 2,
+            [global::ProtoBuf.ProtoEnum(Name = @"RLE")]
+            Rle = 3,
+            [global::ProtoBuf.ProtoEnum(Name = @"DICT_ENCODING")]
+            DictEncoding = 4,
+            [global::ProtoBuf.ProtoEnum(Name = @"BIT_SHUFFLE")]
+            BitShuffle = 5,
+        }
+
+        [global::ProtoBuf.ProtoContract()]
+        public enum CompressionTypePB
+        {
+            [global::ProtoBuf.ProtoEnum(Name = @"DEFAULT_COMPRESSION")]
+            DefaultCompression = 0,
+            [global::ProtoBuf.ProtoEnum(Name = @"NO_COMPRESSION")]
+            NoCompression = 1,
+            [global::ProtoBuf.ProtoEnum(Name = @"SNAPPY")]
+            Snappy = 2,
+            [global::ProtoBuf.ProtoEnum(Name = @"LZ4")]
+            Lz4 = 3,
+            [global::ProtoBuf.ProtoEnum(Name = @"ZLIB")]
+            Zlib = 4,
+        }
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class PartitionPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"hash_partitions")]
+        public global::System.Collections.Generic.List<HashPartitionPB> HashPartitions { get; } = new global::System.Collections.Generic.List<HashPartitionPB>();
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"range_partition")]
+        public RangePartitionPB RangePartition { get; set; }
+
+        [global::ProtoBuf.ProtoContract()]
+        public partial class RangePartitionPB : global::ProtoBuf.IExtensible
+        {
+            private global::ProtoBuf.IExtension __pbn__extensionData;
+            global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+                => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+            [global::ProtoBuf.ProtoMember(1, Name = @"columns")]
+            public global::System.Collections.Generic.List<string> Columns { get; } = new global::System.Collections.Generic.List<string>();
+
+            [global::ProtoBuf.ProtoMember(2, Name = @"range_bounds")]
+            public global::System.Collections.Generic.List<RangeBoundPB> RangeBounds { get; } = new global::System.Collections.Generic.List<RangeBoundPB>();
+
+            [global::ProtoBuf.ProtoMember(3, Name = @"range_splits")]
+            public global::System.Collections.Generic.List<SplitValuePB> RangeSplits { get; } = new global::System.Collections.Generic.List<SplitValuePB>();
+
+            [global::ProtoBuf.ProtoContract()]
+            public partial class BoundPB : global::ProtoBuf.IExtensible
+            {
+                private global::ProtoBuf.IExtension __pbn__extensionData;
+                global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+                    => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+                [global::ProtoBuf.ProtoMember(1, Name = @"bound_type")]
+                [global::System.ComponentModel.DefaultValue(Type.UnknownBound)]
+                public Type BoundType
+                {
+                    get { return __pbn__BoundType ?? Type.UnknownBound; }
+                    set { __pbn__BoundType = value; }
+                }
+                public bool ShouldSerializeBoundType() => __pbn__BoundType != null;
+                public void ResetBoundType() => __pbn__BoundType = null;
+                private Type? __pbn__BoundType;
+
+                [global::ProtoBuf.ProtoMember(2, Name = @"bound_values")]
+                public global::System.Collections.Generic.List<string> BoundValues { get; } = new global::System.Collections.Generic.List<string>();
+
+                [global::ProtoBuf.ProtoContract()]
+                public enum Type
+                {
+                    [global::ProtoBuf.ProtoEnum(Name = @"UNKNOWN_BOUND")]
+                    UnknownBound = 0,
+                    [global::ProtoBuf.ProtoEnum(Name = @"EXCLUSIVE")]
+                    Exclusive = 1,
+                    [global::ProtoBuf.ProtoEnum(Name = @"INCLUSIVE")]
+                    Inclusive = 2,
+                }
+
+            }
+
+            [global::ProtoBuf.ProtoContract()]
+            public partial class RangeBoundPB : global::ProtoBuf.IExtensible
+            {
+                private global::ProtoBuf.IExtension __pbn__extensionData;
+                global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+                    => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+                [global::ProtoBuf.ProtoMember(1, Name = @"lower_bound")]
+                public PartitionPB.RangePartitionPB.BoundPB LowerBound { get; set; }
+
+                [global::ProtoBuf.ProtoMember(2, Name = @"upper_bound")]
+                public PartitionPB.RangePartitionPB.BoundPB UpperBound { get; set; }
+
+            }
+
+            [global::ProtoBuf.ProtoContract()]
+            public partial class SplitValuePB : global::ProtoBuf.IExtensible
+            {
+                private global::ProtoBuf.IExtension __pbn__extensionData;
+                global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+                    => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+                [global::ProtoBuf.ProtoMember(1, Name = @"split_values")]
+                public global::System.Collections.Generic.List<string> SplitValues { get; } = new global::System.Collections.Generic.List<string>();
+
+            }
+
+        }
+
+        [global::ProtoBuf.ProtoContract()]
+        public partial class HashPartitionPB : global::ProtoBuf.IExtensible
+        {
+            private global::ProtoBuf.IExtension __pbn__extensionData;
+            global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+                => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+            [global::ProtoBuf.ProtoMember(1, Name = @"columns")]
+            public global::System.Collections.Generic.List<string> Columns { get; } = new global::System.Collections.Generic.List<string>();
+
+            [global::ProtoBuf.ProtoMember(2, Name = @"num_buckets")]
+            public int NumBuckets
+            {
+                get { return __pbn__NumBuckets.GetValueOrDefault(); }
+                set { __pbn__NumBuckets = value; }
+            }
+            public bool ShouldSerializeNumBuckets() => __pbn__NumBuckets != null;
+            public void ResetNumBuckets() => __pbn__NumBuckets = null;
+            private int? __pbn__NumBuckets;
+
+            [global::ProtoBuf.ProtoMember(3, Name = @"seed")]
+            public uint Seed
+            {
+                get { return __pbn__Seed.GetValueOrDefault(); }
+                set { __pbn__Seed = value; }
+            }
+            public bool ShouldSerializeSeed() => __pbn__Seed != null;
+            public void ResetSeed() => __pbn__Seed = null;
+            private uint? __pbn__Seed;
+
+        }
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class ExtraConfigPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"configs")]
+        [global::ProtoBuf.ProtoMap]
+        public global::System.Collections.Generic.Dictionary<string, string> Configs { get; } = new global::System.Collections.Generic.Dictionary<string, string>();
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class SchemaPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"columns")]
+        public global::System.Collections.Generic.List<ColumnPB> Columns { get; } = new global::System.Collections.Generic.List<ColumnPB>();
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"key_column_names")]
+        public global::System.Collections.Generic.List<string> KeyColumnNames { get; } = new global::System.Collections.Generic.List<string>();
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class CreateTablePB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"table_name")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string TableName
+        {
+            get { return __pbn__TableName ?? ""; }
+            set { __pbn__TableName = value; }
+        }
+        public bool ShouldSerializeTableName() => __pbn__TableName != null;
+        public void ResetTableName() => __pbn__TableName = null;
+        private string __pbn__TableName;
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"schema")]
+        public SchemaPB Schema { get; set; }
+
+        [global::ProtoBuf.ProtoMember(3, Name = @"partition")]
+        public PartitionPB Partition { get; set; }
+
+        [global::ProtoBuf.ProtoMember(4, Name = @"num_replicas")]
+        public int NumReplicas
+        {
+            get { return __pbn__NumReplicas.GetValueOrDefault(); }
+            set { __pbn__NumReplicas = value; }
+        }
+        public bool ShouldSerializeNumReplicas() => __pbn__NumReplicas != null;
+        public void ResetNumReplicas() => __pbn__NumReplicas = null;
+        private int? __pbn__NumReplicas;
+
+        [global::ProtoBuf.ProtoMember(5, Name = @"extra_configs")]
+        public ExtraConfigPB ExtraConfigs { get; set; }
+
+        [global::ProtoBuf.ProtoMember(6, Name = @"dimension_label")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string DimensionLabel
+        {
+            get { return __pbn__DimensionLabel ?? ""; }
+            set { __pbn__DimensionLabel = value; }
+        }
+        public bool ShouldSerializeDimensionLabel() => __pbn__DimensionLabel != null;
+        public void ResetDimensionLabel() => __pbn__DimensionLabel = null;
+        private string __pbn__DimensionLabel;
 
     }
 

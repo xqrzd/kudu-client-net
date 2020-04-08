@@ -56,7 +56,7 @@ namespace Knet.Kudu.Client.Connection
                     tabletInfo.Partition.HashBuckets);
 
                 var numReplicas = Math.Max(
-                    tabletInfo.Replicas.Count,
+                    tabletInfo.DEPRECATEDreplicas.Count,
                     tabletInfo.InternedReplicas.Count);
 
                 var servers = new List<ServerInfo>(numReplicas);
@@ -83,7 +83,7 @@ namespace Knet.Kudu.Client.Connection
 
                 // Handle "old-style" non-interned replicas.
                 // It's used for backward compatibility.
-                foreach (var replicaPb in tabletInfo.Replicas)
+                foreach (var replicaPb in tabletInfo.DEPRECATEDreplicas)
                 {
                     var serverInfo = await connectionFactory.GetServerInfoAsync(
                         replicaPb.TsInfo).ConfigureAwait(false);

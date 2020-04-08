@@ -131,6 +131,17 @@ namespace Knet.Kudu.Client.Protocol.Tserver
         [global::ProtoBuf.ProtoMember(11, Name = @"extra_config")]
         public global::Knet.Kudu.Client.Protocol.TableExtraConfigPB ExtraConfig { get; set; }
 
+        [global::ProtoBuf.ProtoMember(12, Name = @"dimension_label")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string DimensionLabel
+        {
+            get { return __pbn__DimensionLabel ?? ""; }
+            set { __pbn__DimensionLabel = value; }
+        }
+        public bool ShouldSerializeDimensionLabel() => __pbn__DimensionLabel != null;
+        public void ResetDimensionLabel() => __pbn__DimensionLabel = null;
+        private string __pbn__DimensionLabel;
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -208,6 +219,77 @@ namespace Knet.Kudu.Client.Protocol.Tserver
 
         [global::ProtoBuf.ProtoMember(1, Name = @"error")]
         public TabletServerErrorPB Error { get; set; }
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class QuiesceTabletServerRequestPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"quiesce")]
+        public bool Quiesce
+        {
+            get { return __pbn__Quiesce.GetValueOrDefault(); }
+            set { __pbn__Quiesce = value; }
+        }
+        public bool ShouldSerializeQuiesce() => __pbn__Quiesce != null;
+        public void ResetQuiesce() => __pbn__Quiesce = null;
+        private bool? __pbn__Quiesce;
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"return_stats")]
+        public bool ReturnStats
+        {
+            get { return __pbn__ReturnStats.GetValueOrDefault(); }
+            set { __pbn__ReturnStats = value; }
+        }
+        public bool ShouldSerializeReturnStats() => __pbn__ReturnStats != null;
+        public void ResetReturnStats() => __pbn__ReturnStats = null;
+        private bool? __pbn__ReturnStats;
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class QuiesceTabletServerResponsePB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"error")]
+        public TabletServerErrorPB Error { get; set; }
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"is_quiescing")]
+        public bool IsQuiescing
+        {
+            get { return __pbn__IsQuiescing.GetValueOrDefault(); }
+            set { __pbn__IsQuiescing = value; }
+        }
+        public bool ShouldSerializeIsQuiescing() => __pbn__IsQuiescing != null;
+        public void ResetIsQuiescing() => __pbn__IsQuiescing = null;
+        private bool? __pbn__IsQuiescing;
+
+        [global::ProtoBuf.ProtoMember(3, Name = @"num_active_scanners")]
+        public int NumActiveScanners
+        {
+            get { return __pbn__NumActiveScanners.GetValueOrDefault(); }
+            set { __pbn__NumActiveScanners = value; }
+        }
+        public bool ShouldSerializeNumActiveScanners() => __pbn__NumActiveScanners != null;
+        public void ResetNumActiveScanners() => __pbn__NumActiveScanners = null;
+        private int? __pbn__NumActiveScanners;
+
+        [global::ProtoBuf.ProtoMember(4, Name = @"num_leaders")]
+        public int NumLeaders
+        {
+            get { return __pbn__NumLeaders.GetValueOrDefault(); }
+            set { __pbn__NumLeaders = value; }
+        }
+        public bool ShouldSerializeNumLeaders() => __pbn__NumLeaders != null;
+        public void ResetNumLeaders() => __pbn__NumLeaders = null;
+        private int? __pbn__NumLeaders;
 
     }
 
