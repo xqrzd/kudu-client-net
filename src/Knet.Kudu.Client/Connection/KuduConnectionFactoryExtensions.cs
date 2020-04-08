@@ -72,7 +72,7 @@ namespace Knet.Kudu.Client.Connection
                     var replica = new Replica(
                         serverInfo.HostPort,
                         replicaPb.Role,
-                        null); // TODO: Set dimensionLabel.
+                        replicaPb.DimensionLabel);
 
                     if (replica.Role == RaftPeerPB.Role.Leader)
                         leaderIndex = servers.Count;
@@ -93,7 +93,7 @@ namespace Knet.Kudu.Client.Connection
                         var replica = new Replica(
                             serverInfo.HostPort,
                             replicaPb.Role,
-                            dimensionLabel: null);
+                            replicaPb.DimensionLabel);
 
                         if (replica.Role == RaftPeerPB.Role.Leader)
                             leaderIndex = servers.Count;

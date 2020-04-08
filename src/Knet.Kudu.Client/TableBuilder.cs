@@ -69,7 +69,22 @@ namespace Knet.Kudu.Client
             return this;
         }
 
-        // TODO: Support dimension when protobuf contracts are regenerated.
+        /// <summary>
+        /// Sets the dimension label for all tablets created at table creation time.
+        /// 
+        /// By default, the master will try to place newly created tablet replicas on
+        /// tablet servers with a small number of tablet replicas. If the dimension label
+        /// is provided, newly created replicas will be evenly distributed in the cluster
+        /// based on the dimension label. In other words, the master will try to place
+        /// newly created tablet replicas on tablet servers with a small number of tablet
+        /// replicas belonging to this dimension label.
+        /// </summary>
+        /// <param name="dimensionLabel">The dimension label for the tablet to be created.</param>
+        public TableBuilder SetDimensionLabel(string dimensionLabel)
+        {
+            CreateTableRequest.DimensionLabel = dimensionLabel;
+            return this;
+        }
 
         /// <summary>
         /// Sets the table's extra configuration properties.
