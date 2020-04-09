@@ -405,13 +405,12 @@ namespace Knet.Kudu.Client
 
             configure(lowerBoundRow, upperBoundRow);
 
-            // TODO: Set dimensionLabel when protobuf contracts are regenerated.
-
             _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
             {
                 Type = AlterTableRequestPB.StepType.AddRangePartition,
                 AddRangePartition = new AlterTableRequestPB.AddRangePartition
                 {
+                    DimensionLabel = dimensionLabel,
                     RangeBounds = ProtobufHelper.EncodeRowOperations(
                         lowerBoundRow, upperBoundRow)
                 }
