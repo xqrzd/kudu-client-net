@@ -32,6 +32,31 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
             return tableBuilder.SetRangePartitionColumns("key");
         }
 
+        /// <summary>
+        /// Adds non-covering range partitioning for a table with the basic schema.
+        /// Range partition key ranges fall between the following values:
+        /// 
+        /// [  0,  50)
+        /// [ 50, 100)
+        /// [200, 300)
+        /// </summary>
+        public static TableBuilder CreateBasicNonCoveredRangePartitions(this TableBuilder tableBuilder)
+        {
+            return tableBuilder
+                .SetRangePartitionColumns("key")
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("key", 0);
+                    upper.SetInt32("key", 100);
+                })
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("key", 200);
+                    upper.SetInt32("key", 300);
+                })
+                .AddSplitRow(row => row.SetInt32("key", 50));
+        }
+
         public static KuduOperation CreateBasicSchemaInsert(KuduTable table, int key)
         {
             var row = table.NewInsert();
