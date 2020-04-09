@@ -280,6 +280,22 @@ namespace Knet.Kudu.Client
             return response.Servers;
         }
 
+        /// <summary>
+        /// Get a table's statistics from the master.
+        /// </summary>
+        /// <param name="tableName">The table name.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public async Task<KuduTableStatistics> GetTableStatisticsAsync(
+            string tableName, CancellationToken cancellationToken = default)
+        {
+            var table = new TableIdentifierPB { TableName = tableName };
+            var rpc = new GetTableStatisticsRequest(table);
+            var response = await SendRpcAsync(rpc, cancellationToken)
+                .ConfigureAwait(false);
+
+            return new KuduTableStatistics(response.OnDiskSize, response.LiveRowCount);
+        }
+
         public Task<List<RemoteTablet>> GetTableLocationsAsync(
             string tableId, byte[] partitionKeyStart, int fetchBatchSize,
             CancellationToken cancellationToken = default)
