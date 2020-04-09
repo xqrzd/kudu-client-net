@@ -28,7 +28,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _harness.DisposeAsync();
         }
 
-        [SkippableFact]
+        [SkippableFact(Skip = "Requires Kudu 1.11")]
         public async Task TestDimensionLabel()
         {
             // Create a table with dimension label.
