@@ -8,46 +8,33 @@ using Xunit;
 namespace Knet.Kudu.Client.FunctionalTests
 {
     [MiniKuduClusterTest]
-    public class TableTests : IAsyncLifetime
+    public class TableTests
     {
         private readonly string _tableName = "TestKuduTable";
-        private readonly KuduTestHarness _harness;
-        private readonly KuduClient _client;
-
-        public TableTests()
-        {
-            _harness = new MiniKuduClusterBuilder().BuildHarness();
-            _client = _harness.CreateClient();
-        }
-
-        public Task InitializeAsync() => Task.CompletedTask;
-
-        public async Task DisposeAsync()
-        {
-            await _client.DisposeAsync();
-            await _harness.DisposeAsync();
-        }
 
         [SkippableFact(Skip = "Requires Kudu 1.11")]
         public async Task TestDimensionLabel()
         {
+            await using var harness = new MiniKuduClusterBuilder().BuildHarness();
+            await using var client = harness.CreateClient();
+
             // Create a table with dimension label.
-            var tableBuilder = ClientTestUtil.GetBasicSchema()
+            var builder = ClientTestUtil.GetBasicSchema()
                 .SetTableName(_tableName)
                 .CreateBasicNonCoveredRangePartitions()
                 .SetDimensionLabel("labelA");
 
-            var table = await _client.CreateTableAsync(tableBuilder);
+            var table = await client.CreateTableAsync(builder);
 
             // Add a range partition to the table with dimension label.
-            await _client.AlterTableAsync(new AlterTableBuilder(table)
+            await client.AlterTableAsync(new AlterTableBuilder(table)
                 .AddRangePartition((lower, upper) =>
                 {
                     lower.SetInt32("key", 300);
                     upper.SetInt32("key", 400);
                 }, "labelB", RangePartitionBound.Inclusive, RangePartitionBound.Exclusive));
 
-            var tablets = await _client.GetTableLocationsAsync(table.TableId, null, 100);
+            var tablets = await client.GetTableLocationsAsync(table.TableId, null, 100);
 
             var dimensionMap = tablets
                 .SelectMany(t => t.Replicas)
@@ -63,6 +50,49 @@ namespace Knet.Kudu.Client.FunctionalTests
                 Assert.Equal("labelB", d.Key);
                 Assert.Equal(3, d.Count());
             });
+        }
+
+        [SkippableFact(Skip = "Requires Kudu 1.11")]
+        public async Task TestGetTableStatistics()
+        {
+            await using var harness = new MiniKuduClusterBuilder()
+                .AddTabletServerFlag("--update_tablet_stats_interval_ms=200")
+                .AddTabletServerFlag("--heartbeat_interval_ms=100")
+                .BuildHarness();
+
+            await using var client = harness.CreateClient();
+
+            // Create a table.
+            var builder = ClientTestUtil.GetBasicSchema().SetTableName(_tableName);
+            var table = await client.CreateTableAsync(builder);
+
+            // Insert some rows and test the statistics.
+            var prevStatistics = new KuduTableStatistics(-1, -1);
+            var currentStatistics = new KuduTableStatistics(-1, -1);
+            var session = client.NewSession();
+            int num = 100;
+            for (int i = 0; i < num; ++i)
+            {
+                // Get current table statistics.
+                currentStatistics = await client.GetTableStatisticsAsync(_tableName);
+                Assert.True(currentStatistics.OnDiskSize >= prevStatistics.OnDiskSize);
+                Assert.True(currentStatistics.LiveRowCount >= prevStatistics.LiveRowCount);
+                Assert.True(currentStatistics.LiveRowCount <= i + 1);
+                prevStatistics = currentStatistics;
+                // Insert row.
+                var insert = ClientTestUtil.CreateBasicSchemaInsert(table, i);
+                await session.EnqueueAsync(insert);
+                int numRows = await ClientTestUtil.CountRowsAsync(client, table);
+                Assert.Equal(i + 1, numRows);
+            }
+
+            // Final accuracy test.
+            // Wait for master to aggregate table statistics.
+            await Task.Delay(200 * 6);
+            currentStatistics = await client.GetTableStatisticsAsync(_tableName);
+            Assert.True(currentStatistics.OnDiskSize >= prevStatistics.OnDiskSize);
+            Assert.True(currentStatistics.LiveRowCount >= prevStatistics.LiveRowCount);
+            Assert.Equal(num, currentStatistics.LiveRowCount);
         }
     }
 }
