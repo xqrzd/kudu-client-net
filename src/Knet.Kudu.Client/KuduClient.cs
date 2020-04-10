@@ -1037,8 +1037,7 @@ namespace Knet.Kudu.Client
             // a retrying due to an invalid token and the client may have a new token.
             if (rpc.NeedsAuthzToken)
             {
-                rpc.AuthzToken = await GetAuthzTokenAsync(tableId, cancellationToken)
-                    .ConfigureAwait(false);
+                rpc.AuthzToken = _authzTokenCache.GetAuthzToken(tableId);
             }
 
             RemoteTablet tablet = await GetTabletAsync(
@@ -1065,35 +1064,6 @@ namespace Knet.Kudu.Client
         private ServerInfo GetServerInfo(RemoteTablet tablet, ReplicaSelection replicaSelection)
         {
             return tablet.GetServerInfo(replicaSelection, _location);
-        }
-
-        private async ValueTask<SignedTokenPB> GetAuthzTokenAsync(
-            string tableId, CancellationToken cancellationToken)
-        {
-            var authzToken = _authzTokenCache.GetAuthzToken(tableId);
-            if (authzToken == null)
-            {
-                var tableIdPb = new TableIdentifierPB
-                {
-                    TableId = tableId.ToUtf8ByteArray()
-                };
-
-                // This call will also cache the authz token.
-                var schema = await GetTableSchemaAsync(
-                    tableIdPb,
-                    requiresAuthzTokenSupport: true,
-                    cancellationToken).ConfigureAwait(false);
-
-                authzToken = schema.AuthzToken;
-
-                if (authzToken == null)
-                {
-                    throw new NonRecoverableException(KuduStatus.InvalidArgument(
-                        $"No authz token retrieved for {tableId}"));
-                }
-            }
-
-            return authzToken;
         }
 
         internal async ValueTask<HostAndPort> FindLeaderMasterServerAsync(
@@ -1229,7 +1199,9 @@ namespace Knet.Kudu.Client
             }
             catch (InvalidAuthzTokenException)
             {
-                RemoveCachedAuthzToken(rpc);
+                await HandleInvalidAuthzTokenAsync(rpc, cancellationToken)
+                    .ConfigureAwait(false);
+
                 throw;
             }
             catch (RecoverableException ex)
@@ -1259,7 +1231,8 @@ namespace Knet.Kudu.Client
             _masterLeaderInfo = null;
         }
 
-        private void RemoveCachedAuthzToken<T>(KuduRpc<T> rpc)
+        private async Task HandleInvalidAuthzTokenAsync<T>(
+            KuduRpc<T> rpc, CancellationToken cancellationToken)
         {
             if (rpc is KuduTabletRpc<T> tabletRpc)
             {
@@ -1270,12 +1243,34 @@ namespace Knet.Kudu.Client
                         KuduStatus.InvalidArgument("Rpc did not set TableId"));
                 }
 
-                _authzTokenCache.RemoveAuthzToken(tableId);
+                await RefreshAuthzTokenAsync(tableId, cancellationToken)
+                    .ConfigureAwait(false);
             }
             else
             {
                 throw new NonRecoverableException(KuduStatus.InvalidArgument(
                     "Expected InvalidAuthzTokenException on tablet RPCs"));
+            }
+        }
+
+        private async Task RefreshAuthzTokenAsync(
+            string tableId, CancellationToken cancellationToken)
+        {
+            var tableIdPb = new TableIdentifierPB
+            {
+                TableId = tableId.ToUtf8ByteArray()
+            };
+
+            // This call will also cache the authz token.
+            var schema = await GetTableSchemaAsync(
+                tableIdPb,
+                requiresAuthzTokenSupport: true,
+                cancellationToken).ConfigureAwait(false);
+
+            if (schema.AuthzToken == null)
+            {
+                throw new NonRecoverableException(KuduStatus.InvalidArgument(
+                    $"No authz token retrieved for {tableId}"));
             }
         }
 
