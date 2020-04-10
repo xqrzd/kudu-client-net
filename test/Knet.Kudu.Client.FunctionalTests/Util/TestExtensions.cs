@@ -1,0 +1,42 @@
+﻿using System.Collections.Generic;
+using System.Linq;
+
+namespace Knet.Kudu.Client.FunctionalTests.Util
+{
+    public static class TestExtensions
+    {
+        /// <summary>
+        /// Returns a view of the portion of this set whose elements are greater than
+        /// (or equal to, if inclusive is true) start.
+        /// </summary>
+        public static SortedSet<T> TailSet<T>(this SortedSet<T> set, T start, bool inclusive = true)
+        {
+            if (inclusive)
+            {
+                return set.GetViewBetween(start, set.Max);
+            }
+            else
+            {
+                // There's no overload of GetViewBetween that supports this.
+                return new SortedSet<T>(set.Where(v => Comparer<T>.Default.Compare(v, start) > 0));
+            }
+        }
+
+        /// <summary>
+        /// Returns a view of the portion of this set whose elements are less than
+        /// (or equal to, if inclusive is true) end.
+        /// </summary>
+        public static SortedSet<T> HeadSet<T>(this SortedSet<T> set, T end, bool inclusive = false)
+        {
+            if (inclusive)
+            {
+                return set.GetViewBetween(set.Min, end);
+            }
+            else
+            {
+                // There's no overload of GetViewBetween that supports this.
+                return new SortedSet<T>(set.Where(v => Comparer<T>.Default.Compare(v, end) < 0));
+            }
+        }
+    }
+}
