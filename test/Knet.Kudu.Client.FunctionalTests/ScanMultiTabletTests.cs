@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
@@ -187,7 +188,21 @@ namespace Knet.Kudu.Client.FunctionalTests
             lowerPredicate = KuduPredicate.NewComparisonPredicate(
                 _schema.GetColumn(2), ComparisonOp.GreaterEqual, "1");
             Assert.Equal(9, await ClientTestUtil.CountRowsInScanAsync(
-                GetScanner(null, null, null, null, lowerPredicate, upperPredicate)));
+                GetScanner(null, null, null, null, lowerPredicate)));
+        }
+
+        [SkippableFact]
+        public async Task TestProjections()
+        {
+            // Test with column names.
+            var builder = _client.NewScanBuilder(_table)
+                .SetProjectedColumns("key1", "key2");
+            await BuildScannerAndCheckColumnsCountAsync(builder, "key1", "key2");
+
+            // Test with column indexes.
+            builder = _client.NewScanBuilder(_table)
+                .SetProjectedColumns(0, 1);
+            await BuildScannerAndCheckColumnsCountAsync(builder, 0, 1);
         }
 
         private KuduScanner<ResultSet> GetScanner(
@@ -219,6 +234,38 @@ namespace Knet.Kudu.Client.FunctionalTests
                 builder.AddPredicate(predicate);
 
             return builder.Build();
+        }
+
+        private async Task BuildScannerAndCheckColumnsCountAsync(
+            KuduScannerBuilder builder, params string[] expectedColumnNames)
+        {
+            var scanner = builder.Build();
+            KuduSchema schema = null;
+
+            await foreach (var resultSet in scanner)
+            {
+                schema = resultSet.Schema;
+            }
+
+            Assert.Equal(
+                expectedColumnNames,
+                schema.Columns.Select(c => c.Name));
+        }
+
+        private async Task BuildScannerAndCheckColumnsCountAsync(
+            KuduScannerBuilder builder, params int[] expectedColumnIndexes)
+        {
+            var scanner = builder.Build();
+            KuduSchema schema = null;
+
+            await foreach (var resultSet in scanner)
+            {
+                schema = resultSet.Schema;
+            }
+
+            Assert.Equal(
+                expectedColumnIndexes,
+                schema.Columns.Select((c, i) => i));
         }
     }
 }
