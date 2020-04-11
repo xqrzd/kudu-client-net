@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
 using Knet.Kudu.Client.FunctionalTests.Util;
+using Knet.Kudu.Client.Util;
 using McMaster.Extensions.Xunit;
 using Xunit;
 
@@ -432,6 +433,68 @@ namespace Knet.Kudu.Client.FunctionalTests
                 // value < v
                 var less = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Less, v);
                 Assert.Equal(values.HeadSet(v).Count, await CountRowsAsync(table, less));
+            }
+
+            var isNotNull = KuduPredicate.NewIsNotNullPredicate(col);
+            Assert.Equal(values.Count, await CountRowsAsync(table, isNotNull));
+
+            var isNull = KuduPredicate.NewIsNullPredicate(col);
+            Assert.Equal(1, await CountRowsAsync(table, isNull));
+        }
+
+        [SkippableFact]
+        public async Task TestBinaryPredicates()
+        {
+            var builder = GetDefaultTableBuilder()
+                .SetTableName("binary-table")
+                .AddColumn("value", KuduType.Binary);
+
+            var table = await _client.CreateTableAsync(builder);
+
+            var values = CreateStringValues();
+            var testValues = CreateStringTestValues();
+
+            long i = 0;
+            foreach (var value in values)
+            {
+                var insert = table.NewInsert();
+                insert.SetInt64("key", i++);
+                insert.SetBinary("value", value.ToUtf8ByteArray());
+                await _session.EnqueueAsync(insert);
+            }
+
+            var nullInsert = table.NewInsert();
+            nullInsert.SetInt64("key", i);
+            nullInsert.SetNull("value");
+            await _session.EnqueueAsync(nullInsert);
+            await _session.FlushAsync();
+
+            var col = table.Schema.GetColumn("value");
+            Assert.Equal(values.Count + 1, await CountRowsAsync(table));
+
+            foreach (var s in testValues)
+            {
+                var v = s.ToUtf8ByteArray();
+
+                // value = v
+                var equal = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Equal, v);
+                Assert.Equal(values.GetViewBetween(s, s).Count, await CountRowsAsync(table, equal));
+
+                // value >= v
+                var greaterEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.GreaterEqual, v);
+                Assert.Equal(values.TailSet(s).Count, await CountRowsAsync(table, greaterEqual));
+
+                // value <= v
+                var lessEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.LessEqual, v);
+                Assert.Equal(values.HeadSet(s, true).Count, await CountRowsAsync(table, lessEqual));
+
+                // value > v
+                var greater = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Greater, v);
+                Assert.Equal(values.TailSet(s, false).Count, await CountRowsAsync(table, greater));
+
+                // value < v
+                var less = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Less, v);
+                Assert.Equal(values.HeadSet(s).Count, await CountRowsAsync(table, less));
             }
 
             var isNotNull = KuduPredicate.NewIsNotNullPredicate(col);
