@@ -586,7 +586,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             {
                 -99.99m,
                 -99.98m,
-                51.00m,
+                -51.00m,
                 -50.00m,
                 0.00m,
                 49.00m,
