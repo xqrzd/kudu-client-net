@@ -145,12 +145,21 @@ namespace Knet.Kudu.Client.FunctionalTests
         [SkippableFact]
         public async Task TestKeysAndPredicates()
         {
-            // Value that doesn't exist, predicates has primary column.
-            var predicate = KuduPredicate.NewComparisonPredicate(
-                _schema.GetColumn(1), ComparisonOp.LessEqual, "1");
+            KuduPredicate upperPredicate, lowerPredicate;
 
+            // Value that doesn't exist, predicates has primary column.
+            upperPredicate = KuduPredicate.NewComparisonPredicate(
+                _schema.GetColumn(1), ComparisonOp.LessEqual, "1");
             Assert.Equal(0, await ClientTestUtil.CountRowsInScanAsync(
-                GetScanner("1", "2", "1", "3", predicate)));
+                GetScanner("1", "2", "1", "3", upperPredicate)));
+
+            // First row from the 2nd tablet.
+            lowerPredicate = KuduPredicate.NewComparisonPredicate(
+                _schema.GetColumn(1), ComparisonOp.GreaterEqual, "1");
+            upperPredicate = KuduPredicate.NewComparisonPredicate(
+                _schema.GetColumn(1), ComparisonOp.LessEqual, "1");
+            Assert.Equal(0, await ClientTestUtil.CountRowsInScanAsync(
+                GetScanner("1", "", "2", "", lowerPredicate, upperPredicate)));
         }
 
         private KuduScanner<ResultSet> GetScanner(
@@ -158,7 +167,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             string lowerBoundKeyTwo,
             string exclusiveUpperBoundKeyOne,
             string exclusiveUpperBoundKeyTwo,
-            KuduPredicate predicate = null)
+            params KuduPredicate[] predicates)
         {
             var builder = _client.NewScanBuilder(_table);
 
@@ -178,7 +187,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 builder.ExclusiveUpperBound(upperBoundRow);
             }
 
-            if (predicate != null)
+            foreach (var predicate in predicates)
                 builder.AddPredicate(predicate);
 
             return builder.Build();
