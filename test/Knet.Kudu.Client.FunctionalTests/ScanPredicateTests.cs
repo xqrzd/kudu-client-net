@@ -199,6 +199,66 @@ namespace Knet.Kudu.Client.FunctionalTests
             await CheckIntPredicatesAsync(table, values, CreateIntegerTestValues(KuduType.Int64));
         }
 
+        [SkippableFact]
+        public async Task TestFloatPredicates()
+        {
+            var builder = GetDefaultTableBuilder()
+                .SetTableName("float-table")
+                .AddColumn("value", KuduType.Float);
+
+            var table = await _client.CreateTableAsync(builder);
+
+            var values = CreateFloatValues();
+            var testValues = CreateFloatTestValues();
+
+            long i = 0;
+            foreach (var value in values)
+            {
+                var insert = table.NewInsert();
+                insert.SetInt64("key", i++);
+                insert.SetFloat("value", value);
+                await _session.EnqueueAsync(insert);
+            }
+
+            var nullInsert = table.NewInsert();
+            nullInsert.SetInt64("key", i);
+            nullInsert.SetNull("value");
+            await _session.EnqueueAsync(nullInsert);
+            await _session.FlushAsync();
+
+            var col = table.Schema.GetColumn("value");
+            Assert.Equal(values.Count + 1, await CountRowsAsync(table));
+
+            foreach (var v in testValues)
+            {
+                // value = v
+                var equal = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Equal, v);
+                Assert.Equal(values.GetViewBetween(v, v).Count, await CountRowsAsync(table, equal));
+
+                // value >= v
+                var greaterEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.GreaterEqual, v);
+                Assert.Equal(values.TailSet(v).Count, await CountRowsAsync(table, greaterEqual));
+
+                // value <= v
+                var lessEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.LessEqual, v);
+                Assert.Equal(values.HeadSet(v, true).Count, await CountRowsAsync(table, lessEqual));
+
+                // value > v
+                var greater = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Greater, v);
+                Assert.Equal(values.TailSet(v, false).Count, await CountRowsAsync(table, greater));
+
+                // value < v
+                var less = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Less, v);
+                Assert.Equal(values.HeadSet(v).Count, await CountRowsAsync(table, less));
+            }
+
+            var isNotNull = KuduPredicate.NewIsNotNullPredicate(col);
+            Assert.Equal(values.Count, await CountRowsAsync(table, isNotNull));
+
+            var isNull = KuduPredicate.NewIsNullPredicate(col);
+            Assert.Equal(1, await CountRowsAsync(table, isNull));
+        }
+
         private TableBuilder GetDefaultTableBuilder()
         {
             return new TableBuilder()
@@ -251,6 +311,52 @@ namespace Knet.Kudu.Client.FunctionalTests
                 50L,
                 KuduPredicate.MaxIntValue(type) - 1,
                 KuduPredicate.MaxIntValue(type)
+            };
+        }
+
+        private SortedSet<float> CreateFloatValues()
+        {
+            var values = new SortedSet<float>();
+            for (long i = -50; i < 50; i++)
+            {
+                values.Add(i + i / 100.0f);
+            }
+
+            values.Add(float.NegativeInfinity);
+            values.Add(-float.MaxValue);
+            values.Add(-float.Epsilon);
+            values.Add(-float.MinValue);
+            values.Add(float.MinValue);
+            values.Add(float.Epsilon);
+            values.Add(float.MaxValue);
+            values.Add(float.PositiveInfinity);
+
+            // TODO: uncomment after fixing KUDU-1386
+            // values.add(Float.NaN);
+            return values;
+        }
+
+        private List<float> CreateFloatTestValues()
+        {
+            return new List<float>
+            {
+                float.NegativeInfinity,
+                -float.MaxValue,
+                -100.0F,
+                -1.1F,
+                -1.0F,
+                -float.Epsilon,
+                -float.MinValue,
+                0.0F,
+                float.MinValue,
+                float.Epsilon,
+                1.0F,
+                1.1F,
+                100.0F,
+                float.MaxValue,
+                float.PositiveInfinity
+            // TODO: uncomment after fixing KUDU-1386
+            // Float.NaN
             };
         }
 
