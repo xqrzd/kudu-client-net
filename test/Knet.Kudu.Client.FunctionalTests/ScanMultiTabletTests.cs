@@ -345,7 +345,6 @@ namespace Knet.Kudu.Client.FunctionalTests
             var scanEnumerator = scanner.GetAsyncEnumerator();
 
             Assert.Equal(ReadMode.ReadYourWrites, scanner.ReadMode);
-            Assert.Equal(KuduClient.NoTimestamp, _client.LastPropagatedTimestamp);
             Assert.Equal(KuduClient.NoTimestamp, scanEnumerator.SnapshotTimestamp);
 
             int count = 0;
@@ -353,6 +352,8 @@ namespace Knet.Kudu.Client.FunctionalTests
             {
                 count += scanEnumerator.Current.Count;
             }
+
+            Assert.Equal(9, count);
 
             // After the scan, verify that the chosen snapshot timestamp is
             // returned from the server and it is larger than the previous
@@ -390,6 +391,38 @@ namespace Knet.Kudu.Client.FunctionalTests
             // propagated timestamp.
             Assert.True(preTs < scanEnumerator.SnapshotTimestamp);
             await scanEnumerator.DisposeAsync();
+        }
+
+        [SkippableFact]
+        public async Task TestScanPropagatesLatestTimestamp()
+        {
+            // Initially, the client does not have the timestamp set.
+            Assert.Equal(KuduClient.NoTimestamp, _client.LastPropagatedTimestamp);
+
+            var scanner = _client.NewScanBuilder(_table).Build();
+            var scanEnumerator = scanner.GetAsyncEnumerator();
+
+            Assert.True(await scanEnumerator.MoveNextAsync());
+            int rowCount = scanEnumerator.Current.Count;
+
+            // At this point, the call to the first tablet server should have been
+            // done already, so the client should have received the propagated timestamp
+            // in the scanner response.
+            long tsRef = _client.LastPropagatedTimestamp;
+            Assert.NotEqual(KuduClient.NoTimestamp, tsRef);
+
+            while (await scanEnumerator.MoveNextAsync())
+            {
+                rowCount += scanEnumerator.Current.Count;
+                var ts = _client.LastPropagatedTimestamp;
+
+                // Next scan responses from tablet servers should move the propagated
+                // timestamp further.
+                Assert.True(ts > tsRef);
+                tsRef = ts;
+            }
+
+            Assert.NotEqual(0, rowCount);
         }
 
         private KuduScanner<ResultSet> GetScanner(
