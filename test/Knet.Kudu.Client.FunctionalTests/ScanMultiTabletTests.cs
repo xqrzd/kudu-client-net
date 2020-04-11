@@ -203,6 +203,22 @@ namespace Knet.Kudu.Client.FunctionalTests
             builder = _client.NewScanBuilder(_table)
                 .SetProjectedColumns(0, 1);
             await BuildScannerAndCheckColumnsCountAsync(builder, 0, 1);
+
+            // Test with column names overriding indexes.
+            builder = _client.NewScanBuilder(_table)
+               .SetProjectedColumns(0, 1)
+               .SetProjectedColumns("key1");
+            await BuildScannerAndCheckColumnsCountAsync(builder, "key1");
+
+            // Test with keys last with indexes.
+            builder = _client.NewScanBuilder(_table)
+               .SetProjectedColumns(2, 1, 0);
+            await BuildScannerAndCheckColumnsCountAsync(builder, 2, 1, 0);
+
+            // Test with keys last with column names.
+            builder = _client.NewScanBuilder(_table)
+               .SetProjectedColumns("val", "key1");
+            await BuildScannerAndCheckColumnsCountAsync(builder, "val", "key1");
         }
 
         private KuduScanner<ResultSet> GetScanner(
