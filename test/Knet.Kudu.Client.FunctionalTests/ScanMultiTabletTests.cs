@@ -202,7 +202,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             // Test with column indexes.
             builder = _client.NewScanBuilder(_table)
                 .SetProjectedColumns(0, 1);
-            await BuildScannerAndCheckColumnsCountAsync(builder, 0, 1);
+            await BuildScannerAndCheckColumnsCountAsync(builder, "key1", "key2");
 
             // Test with column names overriding indexes.
             builder = _client.NewScanBuilder(_table)
@@ -213,12 +213,24 @@ namespace Knet.Kudu.Client.FunctionalTests
             // Test with keys last with indexes.
             builder = _client.NewScanBuilder(_table)
                .SetProjectedColumns(2, 1, 0);
-            await BuildScannerAndCheckColumnsCountAsync(builder, 2, 1, 0);
+            await BuildScannerAndCheckColumnsCountAsync(builder, "val", "key2", "key1");
 
             // Test with keys last with column names.
             builder = _client.NewScanBuilder(_table)
                .SetProjectedColumns("val", "key1");
             await BuildScannerAndCheckColumnsCountAsync(builder, "val", "key1");
+        }
+
+        [SkippableTheory]
+        [InlineData(ReplicaSelection.LeaderOnly)]
+        [InlineData(ReplicaSelection.ClosestReplica)]
+        public async Task TestReplicaSelections(ReplicaSelection replicaSelection)
+        {
+            var scanner = _client.NewScanBuilder(_table)
+                .SetReplicaSelection(replicaSelection)
+                .Build();
+
+            Assert.Equal(9, await ClientTestUtil.CountRowsInScanAsync(scanner));
         }
 
         private KuduScanner<ResultSet> GetScanner(
@@ -266,22 +278,6 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(
                 expectedColumnNames,
                 schema.Columns.Select(c => c.Name));
-        }
-
-        private async Task BuildScannerAndCheckColumnsCountAsync(
-            KuduScannerBuilder builder, params int[] expectedColumnIndexes)
-        {
-            var scanner = builder.Build();
-            KuduSchema schema = null;
-
-            await foreach (var resultSet in scanner)
-            {
-                schema = resultSet.Schema;
-            }
-
-            Assert.Equal(
-                expectedColumnIndexes,
-                schema.Columns.Select((c, i) => i));
         }
     }
 }
