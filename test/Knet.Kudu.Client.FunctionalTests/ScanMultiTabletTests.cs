@@ -259,6 +259,38 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(9, totalRows);
         }
 
+        [SkippableFact]
+        public async Task TestReadAtSnapshotNoTimestamp()
+        {
+            // Perform scan in READ_AT_SNAPSHOT mode with no snapshot timestamp
+            // specified. Verify that the scanner timestamp is set from the tablet
+            // server response.
+
+            var scanner = _client.NewScanBuilder(_table)
+                .SetReadMode(ReadMode.ReadAtSnapshot)
+                .Build();
+
+            await using var scanEnumerator = scanner.GetAsyncEnumerator();
+
+            Assert.Equal(ReadMode.ReadAtSnapshot, scanner.ReadMode);
+            Assert.Equal(KuduClient.NoTimestamp, scanEnumerator.SnapshotTimestamp);
+
+            Assert.True(await scanEnumerator.MoveNextAsync());
+            // At this point, the call to the first tablet server should have been
+            // done already, so check the snapshot timestamp.
+            var tsRef = scanEnumerator.SnapshotTimestamp;
+            Assert.NotEqual(KuduClient.NoTimestamp, tsRef);
+
+            int rowCount = scanEnumerator.Current.Count;
+            while (await scanEnumerator.MoveNextAsync())
+            {
+                rowCount += scanEnumerator.Current.Count;
+                Assert.Equal(tsRef, scanEnumerator.SnapshotTimestamp);
+            }
+
+            Assert.Equal(9, rowCount);
+        }
+
         private KuduScanner<ResultSet> GetScanner(
             string lowerBoundKeyOne,
             string lowerBoundKeyTwo,
