@@ -233,6 +233,32 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(9, await ClientTestUtil.CountRowsInScanAsync(scanner));
         }
 
+        [SkippableFact]
+        public async Task TestScanTokenReplicaSelections()
+        {
+            var tokens = await _client.NewScanTokenBuilder(_table)
+                .SetReplicaSelection(ReplicaSelection.ClosestReplica)
+                .BuildAsync();
+
+            int totalRows = 0;
+
+            foreach (var token in tokens)
+            {
+                var serializedToken = token.Serialize();
+
+                // Deserialize the scan token into a scanner, and make sure it is using
+                // 'CLOSEST_REPLICA' selection policy.
+                var scanner = _client.NewScanBuilder(_table)
+                    .ApplyScanToken(serializedToken)
+                    .Build();
+
+                Assert.Equal(ReplicaSelection.ClosestReplica, scanner.ReplicaSelection);
+                totalRows += await ClientTestUtil.CountRowsInScanAsync(scanner);
+            }
+
+            Assert.Equal(9, totalRows);
+        }
+
         private KuduScanner<ResultSet> GetScanner(
             string lowerBoundKeyOne,
             string lowerBoundKeyTwo,
