@@ -823,7 +823,7 @@ namespace Knet.Kudu.Client
             }
         }
 
-        private static long MinIntValue(KuduType type)
+        internal static long MinIntValue(KuduType type)
         {
             return type switch
             {
@@ -836,7 +836,7 @@ namespace Knet.Kudu.Client
             };
         }
 
-        private static long MaxIntValue(KuduType type)
+        internal static long MaxIntValue(KuduType type)
         {
             return type switch
             {

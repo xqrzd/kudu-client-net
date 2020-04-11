@@ -71,7 +71,7 @@ namespace Knet.Kudu.Client.Util
         /// <param name="value">Starting floating-point value.</param>
         public static float NextUp(this float value)
         {
-            if (float.IsNaN(value) || float.IsInfinity(value))
+            if (!(value < float.PositiveInfinity))
                 return value;
 
 #if NETSTANDARD2_0
@@ -90,7 +90,7 @@ namespace Knet.Kudu.Client.Util
         /// <param name="value">Starting floating-point value.</param>
         public static double NextUp(this double value)
         {
-            if (double.IsNaN(value) || double.IsInfinity(value))
+            if (!(value < double.PositiveInfinity))
                 return value;
 
             long bits = BitConverter.DoubleToInt64Bits(value + 0.0d);
