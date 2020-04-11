@@ -281,7 +281,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             var tsRef = scanEnumerator.SnapshotTimestamp;
             Assert.NotEqual(KuduClient.NoTimestamp, tsRef);
 
-            int rowCount = scanEnumerator.Current.Count;
+            var rowCount = scanEnumerator.Current.Count;
             while (await scanEnumerator.MoveNextAsync())
             {
                 rowCount += scanEnumerator.Current.Count;
@@ -289,6 +289,41 @@ namespace Knet.Kudu.Client.FunctionalTests
             }
 
             Assert.Equal(9, rowCount);
+        }
+
+        /// <summary>
+        /// Regression test for KUDU-2415.
+        /// Scanning a never-written-to tablet from a fresh client with no propagated
+        /// timestamp in "read-your-writes' mode should not fail.
+        /// </summary>
+        [SkippableFact]
+        public async Task TestReadYourWritesFreshClientFreshTable()
+        {
+            // Perform scan in READ_YOUR_WRITES mode. Before the scan, verify that the
+            // propagated timestamp is unset, since this is a fresh client.
+            var scanner = _client.NewScanBuilder(_table)
+                .SetReadMode(ReadMode.ReadYourWrites)
+                .Build();
+
+            await using var scanEnumerator = scanner.GetAsyncEnumerator();
+
+            Assert.Equal(ReadMode.ReadYourWrites, scanner.ReadMode);
+            Assert.Equal(KuduClient.NoTimestamp, _client.LastPropagatedTimestamp);
+            Assert.Equal(KuduClient.NoTimestamp, scanEnumerator.SnapshotTimestamp);
+
+            // Since there isn't any write performed from the client, the count
+            // should range from [0, 9].
+            int count = 0;
+            while (await scanEnumerator.MoveNextAsync())
+            {
+                count += scanEnumerator.Current.Count;
+            }
+
+            Assert.True(count >= 0);
+            Assert.True(count <= 9);
+
+            Assert.NotEqual(KuduClient.NoTimestamp, _client.LastPropagatedTimestamp);
+            Assert.NotEqual(KuduClient.NoTimestamp, scanEnumerator.SnapshotTimestamp);
         }
 
         private KuduScanner<ResultSet> GetScanner(
