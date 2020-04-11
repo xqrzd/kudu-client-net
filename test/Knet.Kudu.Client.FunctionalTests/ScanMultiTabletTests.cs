@@ -155,11 +155,25 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             // First row from the 2nd tablet.
             lowerPredicate = KuduPredicate.NewComparisonPredicate(
-                _schema.GetColumn(1), ComparisonOp.GreaterEqual, "1");
+                _schema.GetColumn(2), ComparisonOp.GreaterEqual, "1");
             upperPredicate = KuduPredicate.NewComparisonPredicate(
-                _schema.GetColumn(1), ComparisonOp.LessEqual, "1");
-            Assert.Equal(0, await ClientTestUtil.CountRowsInScanAsync(
+                _schema.GetColumn(2), ComparisonOp.LessEqual, "1");
+            Assert.Equal(1, await ClientTestUtil.CountRowsInScanAsync(
                 GetScanner("1", "", "2", "", lowerPredicate, upperPredicate)));
+
+            // All the 2nd tablet.
+            lowerPredicate = KuduPredicate.NewComparisonPredicate(
+                _schema.GetColumn(2), ComparisonOp.GreaterEqual, "1");
+            upperPredicate = KuduPredicate.NewComparisonPredicate(
+                _schema.GetColumn(2), ComparisonOp.LessEqual, "3");
+            Assert.Equal(3, await ClientTestUtil.CountRowsInScanAsync(
+                GetScanner("1", "", "2", "", lowerPredicate, upperPredicate)));
+
+            // Value that doesn't exist.
+            lowerPredicate = KuduPredicate.NewComparisonPredicate(
+                _schema.GetColumn(2), ComparisonOp.GreaterEqual, "4");
+            Assert.Equal(0, await ClientTestUtil.CountRowsInScanAsync(
+                GetScanner("1", "", "2", "", lowerPredicate)));
         }
 
         private KuduScanner<ResultSet> GetScanner(
