@@ -42,6 +42,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             var table = await _client.CreateTableAsync(builder);
 
             var values = new SortedSet<bool> { true, false };
+            var testValues = new List<bool> { true, false };
 
             long i = 0;
             foreach (var value in values)
@@ -58,31 +59,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _session.EnqueueAsync(nullInsert);
             await _session.FlushAsync();
 
-            var col = table.Schema.GetColumn("value");
-            Assert.Equal(values.Count + 1, await CountRowsAsync(table));
-
-            foreach (var v in values)
-            {
-                // value = v
-                var equal = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Equal, v);
-                Assert.Equal(values.Contains(v) ? 1 : 0, await CountRowsAsync(table, equal));
-
-                // value >= v
-                var greaterEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.GreaterEqual, v);
-                Assert.Equal(values.TailSet(v).Count, await CountRowsAsync(table, greaterEqual));
-
-                // value <= v
-                var lessEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.LessEqual, v);
-                Assert.Equal(values.HeadSet(v, true).Count, await CountRowsAsync(table, lessEqual));
-
-                // value > v
-                var greater = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Greater, v);
-                Assert.Equal(values.TailSet(v, false).Count, await CountRowsAsync(table, greater));
-
-                // value < v
-                var less = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Less, v);
-                Assert.Equal(values.HeadSet(v).Count, await CountRowsAsync(table, less));
-            }
+            await CheckPredicatesAsync(table, values, testValues);
         }
 
         [SkippableFact]
@@ -111,7 +88,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _session.EnqueueAsync(nullInsert);
             await _session.FlushAsync();
 
-            await CheckIntPredicatesAsync(table, values, CreateIntegerTestValues(KuduType.Int8));
+            await CheckPredicatesAsync(table, values, CreateIntegerTestValues(KuduType.Int8));
         }
 
         [SkippableFact]
@@ -140,7 +117,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _session.EnqueueAsync(nullInsert);
             await _session.FlushAsync();
 
-            await CheckIntPredicatesAsync(table, values, CreateIntegerTestValues(KuduType.Int16));
+            await CheckPredicatesAsync(table, values, CreateIntegerTestValues(KuduType.Int16));
         }
 
         [SkippableFact]
@@ -169,7 +146,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _session.EnqueueAsync(nullInsert);
             await _session.FlushAsync();
 
-            await CheckIntPredicatesAsync(table, values, CreateIntegerTestValues(KuduType.Int32));
+            await CheckPredicatesAsync(table, values, CreateIntegerTestValues(KuduType.Int32));
         }
 
         [SkippableFact]
@@ -198,7 +175,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _session.EnqueueAsync(nullInsert);
             await _session.FlushAsync();
 
-            await CheckIntPredicatesAsync(table, values, CreateIntegerTestValues(KuduType.Int64));
+            await CheckPredicatesAsync(table, values, CreateIntegerTestValues(KuduType.Int64));
         }
 
         [SkippableFact]
@@ -228,37 +205,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _session.EnqueueAsync(nullInsert);
             await _session.FlushAsync();
 
-            var col = table.Schema.GetColumn("value");
-            Assert.Equal(values.Count + 1, await CountRowsAsync(table));
-
-            foreach (var v in testValues)
-            {
-                // value = v
-                var equal = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Equal, v);
-                Assert.Equal(values.GetViewBetween(v, v).Count, await CountRowsAsync(table, equal));
-
-                // value >= v
-                var greaterEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.GreaterEqual, v);
-                Assert.Equal(values.TailSet(v).Count, await CountRowsAsync(table, greaterEqual));
-
-                // value <= v
-                var lessEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.LessEqual, v);
-                Assert.Equal(values.HeadSet(v, true).Count, await CountRowsAsync(table, lessEqual));
-
-                // value > v
-                var greater = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Greater, v);
-                Assert.Equal(values.TailSet(v, false).Count, await CountRowsAsync(table, greater));
-
-                // value < v
-                var less = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Less, v);
-                Assert.Equal(values.HeadSet(v).Count, await CountRowsAsync(table, less));
-            }
-
-            var isNotNull = KuduPredicate.NewIsNotNullPredicate(col);
-            Assert.Equal(values.Count, await CountRowsAsync(table, isNotNull));
-
-            var isNull = KuduPredicate.NewIsNullPredicate(col);
-            Assert.Equal(1, await CountRowsAsync(table, isNull));
+            await CheckPredicatesAsync(table, values, testValues);
         }
 
         [SkippableFact]
@@ -288,37 +235,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _session.EnqueueAsync(nullInsert);
             await _session.FlushAsync();
 
-            var col = table.Schema.GetColumn("value");
-            Assert.Equal(values.Count + 1, await CountRowsAsync(table));
-
-            foreach (var v in testValues)
-            {
-                // value = v
-                var equal = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Equal, v);
-                Assert.Equal(values.GetViewBetween(v, v).Count, await CountRowsAsync(table, equal));
-
-                // value >= v
-                var greaterEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.GreaterEqual, v);
-                Assert.Equal(values.TailSet(v).Count, await CountRowsAsync(table, greaterEqual));
-
-                // value <= v
-                var lessEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.LessEqual, v);
-                Assert.Equal(values.HeadSet(v, true).Count, await CountRowsAsync(table, lessEqual));
-
-                // value > v
-                var greater = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Greater, v);
-                Assert.Equal(values.TailSet(v, false).Count, await CountRowsAsync(table, greater));
-
-                // value < v
-                var less = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Less, v);
-                Assert.Equal(values.HeadSet(v).Count, await CountRowsAsync(table, less));
-            }
-
-            var isNotNull = KuduPredicate.NewIsNotNullPredicate(col);
-            Assert.Equal(values.Count, await CountRowsAsync(table, isNotNull));
-
-            var isNull = KuduPredicate.NewIsNullPredicate(col);
-            Assert.Equal(1, await CountRowsAsync(table, isNull));
+            await CheckPredicatesAsync(table, values, testValues);
         }
 
         [SkippableFact]
@@ -348,37 +265,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _session.EnqueueAsync(nullInsert);
             await _session.FlushAsync();
 
-            var col = table.Schema.GetColumn("value");
-            Assert.Equal(values.Count + 1, await CountRowsAsync(table));
-
-            foreach (var v in testValues)
-            {
-                // value = v
-                var equal = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Equal, v);
-                Assert.Equal(values.GetViewBetween(v, v).Count, await CountRowsAsync(table, equal));
-
-                // value >= v
-                var greaterEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.GreaterEqual, v);
-                Assert.Equal(values.TailSet(v).Count, await CountRowsAsync(table, greaterEqual));
-
-                // value <= v
-                var lessEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.LessEqual, v);
-                Assert.Equal(values.HeadSet(v, true).Count, await CountRowsAsync(table, lessEqual));
-
-                // value > v
-                var greater = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Greater, v);
-                Assert.Equal(values.TailSet(v, false).Count, await CountRowsAsync(table, greater));
-
-                // value < v
-                var less = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Less, v);
-                Assert.Equal(values.HeadSet(v).Count, await CountRowsAsync(table, less));
-            }
-
-            var isNotNull = KuduPredicate.NewIsNotNullPredicate(col);
-            Assert.Equal(values.Count, await CountRowsAsync(table, isNotNull));
-
-            var isNull = KuduPredicate.NewIsNullPredicate(col);
-            Assert.Equal(1, await CountRowsAsync(table, isNull));
+            await CheckPredicatesAsync(table, values, testValues);
         }
 
         [SkippableFact]
@@ -409,37 +296,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _session.EnqueueAsync(nullInsert);
             await _session.FlushAsync();
 
-            var col = table.Schema.GetColumn("value");
-            Assert.Equal(values.Count + 1, await CountRowsAsync(table));
-
-            foreach (var v in testValues)
-            {
-                // value = v
-                var equal = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Equal, v);
-                Assert.Equal(values.GetViewBetween(v, v).Count, await CountRowsAsync(table, equal));
-
-                // value >= v
-                var greaterEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.GreaterEqual, v);
-                Assert.Equal(values.TailSet(v).Count, await CountRowsAsync(table, greaterEqual));
-
-                // value <= v
-                var lessEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.LessEqual, v);
-                Assert.Equal(values.HeadSet(v, true).Count, await CountRowsAsync(table, lessEqual));
-
-                // value > v
-                var greater = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Greater, v);
-                Assert.Equal(values.TailSet(v, false).Count, await CountRowsAsync(table, greater));
-
-                // value < v
-                var less = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Less, v);
-                Assert.Equal(values.HeadSet(v).Count, await CountRowsAsync(table, less));
-            }
-
-            var isNotNull = KuduPredicate.NewIsNotNullPredicate(col);
-            Assert.Equal(values.Count, await CountRowsAsync(table, isNotNull));
-
-            var isNull = KuduPredicate.NewIsNullPredicate(col);
-            Assert.Equal(1, await CountRowsAsync(table, isNull));
+            await CheckPredicatesAsync(table, values, testValues);
         }
 
         [SkippableFact]
@@ -469,37 +326,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _session.EnqueueAsync(nullInsert);
             await _session.FlushAsync();
 
-            var col = table.Schema.GetColumn("value");
-            Assert.Equal(values.Count + 1, await CountRowsAsync(table));
-
-            foreach (var v in testValues)
-            {
-                // value = v
-                var equal = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Equal, v);
-                Assert.Equal(values.GetViewBetween(v, v).Count, await CountRowsAsync(table, equal));
-
-                // value >= v
-                var greaterEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.GreaterEqual, v);
-                Assert.Equal(values.TailSet(v).Count, await CountRowsAsync(table, greaterEqual));
-
-                // value <= v
-                var lessEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.LessEqual, v);
-                Assert.Equal(values.HeadSet(v, true).Count, await CountRowsAsync(table, lessEqual));
-
-                // value > v
-                var greater = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Greater, v);
-                Assert.Equal(values.TailSet(v, false).Count, await CountRowsAsync(table, greater));
-
-                // value < v
-                var less = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Less, v);
-                Assert.Equal(values.HeadSet(v).Count, await CountRowsAsync(table, less));
-            }
-
-            var isNotNull = KuduPredicate.NewIsNotNullPredicate(col);
-            Assert.Equal(values.Count, await CountRowsAsync(table, isNotNull));
-
-            var isNull = KuduPredicate.NewIsNullPredicate(col);
-            Assert.Equal(1, await CountRowsAsync(table, isNull));
+            await CheckPredicatesAsync(table, values, testValues);
         }
 
         [SkippableFact]
@@ -793,10 +620,10 @@ namespace Knet.Kudu.Client.FunctionalTests
             };
         }
 
-        private async Task CheckIntPredicatesAsync(
+        private async Task CheckPredicatesAsync<T>(
             KuduTable table,
-            SortedSet<long> values,
-            List<long> testValues)
+            SortedSet<T> values,
+            List<T> testValues)
         {
             var col = table.Schema.GetColumn("value");
             Assert.Equal(values.Count + 1, await CountRowsAsync(table));
@@ -804,23 +631,23 @@ namespace Knet.Kudu.Client.FunctionalTests
             foreach (var v in testValues)
             {
                 // value = v
-                var equal = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Equal, v);
+                var equal = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Equal, (dynamic)v);
                 Assert.Equal(values.Contains(v) ? 1 : 0, await CountRowsAsync(table, equal));
 
                 // value >= v
-                var greaterEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.GreaterEqual, v);
+                var greaterEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.GreaterEqual, (dynamic)v);
                 Assert.Equal(values.TailSet(v).Count, await CountRowsAsync(table, greaterEqual));
 
                 // value <= v
-                var lessEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.LessEqual, v);
+                var lessEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.LessEqual, (dynamic)v);
                 Assert.Equal(values.HeadSet(v, true).Count, await CountRowsAsync(table, lessEqual));
 
                 // value > v
-                var greater = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Greater, v);
+                var greater = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Greater, (dynamic)v);
                 Assert.Equal(values.TailSet(v, false).Count, await CountRowsAsync(table, greater));
 
                 // value < v
-                var less = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Less, v);
+                var less = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Less, (dynamic)v);
                 Assert.Equal(values.HeadSet(v).Count, await CountRowsAsync(table, less));
             }
 
