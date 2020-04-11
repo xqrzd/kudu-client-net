@@ -202,6 +202,66 @@ namespace Knet.Kudu.Client.FunctionalTests
         }
 
         [SkippableFact]
+        public async Task TestTimestampPredicates()
+        {
+            var builder = GetDefaultTableBuilder()
+                .SetTableName("timestamp-table")
+                .AddColumn("value", KuduType.UnixtimeMicros);
+
+            var table = await _client.CreateTableAsync(builder);
+
+            var values = CreateTimestampValues();
+            var testValues = CreateTimestampTestValues();
+
+            long i = 0;
+            foreach (var value in values)
+            {
+                var insert = table.NewInsert();
+                insert.SetInt64("key", i++);
+                insert.SetDateTime("value", value);
+                await _session.EnqueueAsync(insert);
+            }
+
+            var nullInsert = table.NewInsert();
+            nullInsert.SetInt64("key", i);
+            nullInsert.SetNull("value");
+            await _session.EnqueueAsync(nullInsert);
+            await _session.FlushAsync();
+
+            var col = table.Schema.GetColumn("value");
+            Assert.Equal(values.Count + 1, await CountRowsAsync(table));
+
+            foreach (var v in testValues)
+            {
+                // value = v
+                var equal = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Equal, v);
+                Assert.Equal(values.GetViewBetween(v, v).Count, await CountRowsAsync(table, equal));
+
+                // value >= v
+                var greaterEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.GreaterEqual, v);
+                Assert.Equal(values.TailSet(v).Count, await CountRowsAsync(table, greaterEqual));
+
+                // value <= v
+                var lessEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.LessEqual, v);
+                Assert.Equal(values.HeadSet(v, true).Count, await CountRowsAsync(table, lessEqual));
+
+                // value > v
+                var greater = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Greater, v);
+                Assert.Equal(values.TailSet(v, false).Count, await CountRowsAsync(table, greater));
+
+                // value < v
+                var less = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Less, v);
+                Assert.Equal(values.HeadSet(v).Count, await CountRowsAsync(table, less));
+            }
+
+            var isNotNull = KuduPredicate.NewIsNotNullPredicate(col);
+            Assert.Equal(values.Count, await CountRowsAsync(table, isNotNull));
+
+            var isNull = KuduPredicate.NewIsNullPredicate(col);
+            Assert.Equal(1, await CountRowsAsync(table, isNull));
+        }
+
+        [SkippableFact]
         public async Task TestFloatPredicates()
         {
             var builder = GetDefaultTableBuilder()
@@ -550,12 +610,43 @@ namespace Knet.Kudu.Client.FunctionalTests
                 KuduPredicate.MinIntValue(type),
                 KuduPredicate.MinIntValue(type) + 1,
                 -51L,
-                50L,
+                -50L,
                 0L,
                 49L,
                 50L,
                 KuduPredicate.MaxIntValue(type) - 1,
                 KuduPredicate.MaxIntValue(type)
+            };
+        }
+
+        private SortedSet<DateTime> CreateTimestampValues()
+        {
+            var epoch = EpochTime.UnixEpoch;
+            var values = new SortedSet<DateTime>();
+            for (long i = -500; i < 500; i += 10)
+            {
+                values.Add(epoch.AddTicks(i));
+            }
+            values.Add(DateTimeOffset.MinValue.UtcDateTime);
+            values.Add(DateTimeOffset.MinValue.UtcDateTime.AddTicks(10));
+            values.Add(DateTimeOffset.MaxValue.UtcDateTime.AddTicks(-10));
+            values.Add(DateTimeOffset.MaxValue.UtcDateTime);
+            return values;
+        }
+
+        private List<DateTime> CreateTimestampTestValues()
+        {
+            return new List<DateTime>
+            {
+                DateTimeOffset.MinValue.UtcDateTime,
+                DateTimeOffset.MinValue.UtcDateTime.AddTicks(10),
+                EpochTime.UnixEpoch.AddTicks(-510),
+                EpochTime.UnixEpoch.AddTicks(-500),
+                EpochTime.UnixEpoch,
+                EpochTime.UnixEpoch.AddTicks(490),
+                EpochTime.UnixEpoch.AddTicks(500),
+                DateTimeOffset.MaxValue.UtcDateTime.AddTicks(-10),
+                DateTimeOffset.MaxValue.UtcDateTime
             };
         }
 
@@ -680,7 +771,16 @@ namespace Knet.Kudu.Client.FunctionalTests
 
         private SortedSet<string> CreateStringValues()
         {
-            return new SortedSet<string>(StringComparer.Ordinal) { "", "\0", "\0\0", "a", "a\0", "a\0a", "aa\0" };
+            return new SortedSet<string>(StringComparer.Ordinal)
+            {
+                "",
+                "\0",
+                "\0\0",
+                "a",
+                "a\0",
+                "a\0a",
+                "aa\0"
+            };
         }
 
         private List<string> CreateStringTestValues()
