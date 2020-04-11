@@ -174,6 +174,20 @@ namespace Knet.Kudu.Client.FunctionalTests
                 _schema.GetColumn(2), ComparisonOp.GreaterEqual, "4");
             Assert.Equal(0, await ClientTestUtil.CountRowsInScanAsync(
                 GetScanner("1", "", "2", "", lowerPredicate)));
+
+            // First row from every tablet.
+            lowerPredicate = KuduPredicate.NewComparisonPredicate(
+                _schema.GetColumn(2), ComparisonOp.GreaterEqual, "1");
+            upperPredicate = KuduPredicate.NewComparisonPredicate(
+                _schema.GetColumn(2), ComparisonOp.LessEqual, "1");
+            Assert.Equal(3, await ClientTestUtil.CountRowsInScanAsync(
+                GetScanner(null, null, null, null, lowerPredicate, upperPredicate)));
+
+            // All the rows.
+            lowerPredicate = KuduPredicate.NewComparisonPredicate(
+                _schema.GetColumn(2), ComparisonOp.GreaterEqual, "1");
+            Assert.Equal(9, await ClientTestUtil.CountRowsInScanAsync(
+                GetScanner(null, null, null, null, lowerPredicate, upperPredicate)));
         }
 
         private KuduScanner<ResultSet> GetScanner(
