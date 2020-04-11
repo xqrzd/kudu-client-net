@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System.Linq;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
 using Knet.Kudu.Client.FunctionalTests.Util;
@@ -423,6 +420,38 @@ namespace Knet.Kudu.Client.FunctionalTests
             }
 
             Assert.NotEqual(0, rowCount);
+        }
+
+        [SkippableFact]
+        public async Task TestScanTokenPropagatesTimestamp()
+        {
+            // Initially, the client does not have the timestamp set.
+            Assert.Equal(KuduClient.NoTimestamp, _client.LastPropagatedTimestamp);
+
+            var scanner = _client.NewScanBuilder(_table).Build();
+            await using var scanEnumerator = scanner.GetAsyncEnumerator();
+
+            // Let the client receive the propagated timestamp in the scanner response.
+            Assert.True(await scanEnumerator.MoveNextAsync());
+            var tsPrev = _client.LastPropagatedTimestamp;
+            var tsPropagated = tsPrev + 1000000;
+
+            var tokens = await _client.NewScanTokenBuilder(_table)
+                .SetReadMode(ReadMode.ReadAtSnapshot)
+                .SnapshotTimestampRaw(tsPropagated)
+                .BuildAsync();
+
+            var token = tokens.First();
+
+            // Deserialize scan tokens and make sure the client's last propagated
+            // timestamp is updated accordingly.
+            Assert.Equal(tsPrev, _client.LastPropagatedTimestamp);
+
+            var tokenScanner = _client.NewScanBuilder(_table)
+                .ApplyScanToken(token)
+                .Build();
+
+            Assert.Equal(tsPropagated, _client.LastPropagatedTimestamp);
         }
 
         private KuduScanner<ResultSet> GetScanner(
