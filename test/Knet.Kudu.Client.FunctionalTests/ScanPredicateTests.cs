@@ -319,6 +319,67 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(1, await CountRowsAsync(table, isNull));
         }
 
+        [SkippableFact]
+        public async Task TestDecimalPredicates()
+        {
+            var builder = GetDefaultTableBuilder()
+                .SetTableName("decimal-table")
+                .AddColumn("value", KuduType.Decimal32, opt => opt
+                    .DecimalAttributes(4, 2));
+
+            var table = await _client.CreateTableAsync(builder);
+
+            var values = CreateDecimalValues();
+            var testValues = CreateDecimalTestValues();
+
+            long i = 0;
+            foreach (var value in values)
+            {
+                var insert = table.NewInsert();
+                insert.SetInt64("key", i++);
+                insert.SetDecimal("value", value);
+                await _session.EnqueueAsync(insert);
+            }
+
+            var nullInsert = table.NewInsert();
+            nullInsert.SetInt64("key", i);
+            nullInsert.SetNull("value");
+            await _session.EnqueueAsync(nullInsert);
+            await _session.FlushAsync();
+
+            var col = table.Schema.GetColumn("value");
+            Assert.Equal(values.Count + 1, await CountRowsAsync(table));
+
+            foreach (var v in testValues)
+            {
+                // value = v
+                var equal = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Equal, v);
+                Assert.Equal(values.GetViewBetween(v, v).Count, await CountRowsAsync(table, equal));
+
+                // value >= v
+                var greaterEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.GreaterEqual, v);
+                Assert.Equal(values.TailSet(v).Count, await CountRowsAsync(table, greaterEqual));
+
+                // value <= v
+                var lessEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.LessEqual, v);
+                Assert.Equal(values.HeadSet(v, true).Count, await CountRowsAsync(table, lessEqual));
+
+                // value > v
+                var greater = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Greater, v);
+                Assert.Equal(values.TailSet(v, false).Count, await CountRowsAsync(table, greater));
+
+                // value < v
+                var less = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Less, v);
+                Assert.Equal(values.HeadSet(v).Count, await CountRowsAsync(table, less));
+            }
+
+            var isNotNull = KuduPredicate.NewIsNotNullPredicate(col);
+            Assert.Equal(values.Count, await CountRowsAsync(table, isNotNull));
+
+            var isNull = KuduPredicate.NewIsNullPredicate(col);
+            Assert.Equal(1, await CountRowsAsync(table, isNull));
+        }
+
         private TableBuilder GetDefaultTableBuilder()
         {
             return new TableBuilder()
@@ -455,6 +516,41 @@ namespace Knet.Kudu.Client.FunctionalTests
                 100.0,
                 double.MaxValue,
                 double.PositiveInfinity
+            };
+        }
+
+        // Returns a vector of decimal(4, 2) numbers from -50.50 (inclusive) to 50.50
+        // (exclusive) (100 values) and boundary values.
+        private SortedSet<decimal> CreateDecimalValues()
+        {
+            var values = new SortedSet<decimal>();
+            for (long i = -50; i < 50; i++)
+            {
+                var value = i + (i * .01m);
+                values.Add(value);
+            }
+
+            values.Add(-99.99m);
+            values.Add(-99.98m);
+            values.Add(99.98m);
+            values.Add(99.99m);
+
+            return values;
+        }
+
+        private List<decimal> CreateDecimalTestValues()
+        {
+            return new List<decimal>
+            {
+                -99.99m,
+                -99.98m,
+                51.00m,
+                -50.00m,
+                0.00m,
+                49.00m,
+                50.00m,
+                99.98m,
+                99.99m
             };
         }
 
