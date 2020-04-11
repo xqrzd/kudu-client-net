@@ -18,9 +18,10 @@ namespace Knet.Kudu.Client.FunctionalTests
         private IKuduSession _session;
 
         private KuduTable _table;
+        private KuduSchema _schema;
 
         /// <summary>
-        /// The timestamp after inserting the rows into the test table during setUp().
+        /// The timestamp after inserting the rows into the test table during initialize.
         /// </summary>
         private long _beforeWriteTimestamp;
 
@@ -79,6 +80,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             // Reopen the table using the new client.
             _table = await _client.OpenTableAsync(_tableName);
+            _schema = _table.Schema;
         }
 
         public async Task DisposeAsync()
@@ -125,9 +127,9 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(9, await ClientTestUtil.CountRowsInScanAsync(
                 GetScanner(null, null, null, null))); // Full table scan with empty bounds
 
-            // Test that we can close a scanner while in between two tablets. We start on the second
-            // tablet and our first nextRows() will get 3 rows. At that moment we want to close the scanner
-            // before getting on the 3rd tablet.
+            // Test that we can close a scanner while in between two tablets. We start on
+            // the second tablet and our first nextRows() will get 3 rows. At that moment
+            // we want to close the scanner before getting on the 3rd tablet.
             var scanner = GetScanner("1", "", null, null);
             var scanEnumerator = scanner.GetAsyncEnumerator();
             Assert.True(await scanEnumerator.MoveNextAsync());
@@ -137,11 +139,26 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.False(await scanEnumerator.MoveNextAsync());
         }
 
+        /// <summary>
+        /// Test mixing start/end row keys with predicates.
+        /// </summary>
+        [SkippableFact]
+        public async Task TestKeysAndPredicates()
+        {
+            // Value that doesn't exist, predicates has primary column.
+            var predicate = KuduPredicate.NewComparisonPredicate(
+                _schema.GetColumn(1), ComparisonOp.LessEqual, "1");
+
+            Assert.Equal(0, await ClientTestUtil.CountRowsInScanAsync(
+                GetScanner("1", "2", "1", "3", predicate)));
+        }
+
         private KuduScanner<ResultSet> GetScanner(
             string lowerBoundKeyOne,
             string lowerBoundKeyTwo,
             string exclusiveUpperBoundKeyOne,
-            string exclusiveUpperBoundKeyTwo)
+            string exclusiveUpperBoundKeyTwo,
+            KuduPredicate predicate = null)
         {
             var builder = _client.NewScanBuilder(_table);
 
@@ -160,6 +177,9 @@ namespace Knet.Kudu.Client.FunctionalTests
                 upperBoundRow.SetString(1, exclusiveUpperBoundKeyTwo);
                 builder.ExclusiveUpperBound(upperBoundRow);
             }
+
+            if (predicate != null)
+                builder.AddPredicate(predicate);
 
             return builder.Build();
         }
