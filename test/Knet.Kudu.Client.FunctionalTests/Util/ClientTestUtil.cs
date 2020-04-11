@@ -68,9 +68,14 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
             return row;
         }
 
-        public static async Task<int> CountRowsAsync(KuduClient client, KuduTable table)
+        public static Task<int> CountRowsAsync(KuduClient client, KuduTable table)
         {
             var scanner = client.NewScanBuilder(table).Build();
+            return CountRowsInScanAsync(scanner);
+        }
+
+        public static async Task<int> CountRowsInScanAsync(KuduScanner<ResultSet> scanner)
+        {
             var rows = 0;
 
             await foreach (var resultSet in scanner)
