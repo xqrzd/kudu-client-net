@@ -112,6 +112,93 @@ namespace Knet.Kudu.Client.FunctionalTests
             await CheckIntPredicatesAsync(table, values, CreateIntegerTestValues(KuduType.Int8));
         }
 
+        [SkippableFact]
+        public async Task TestShortPredicates()
+        {
+            var builder = GetDefaultTableBuilder()
+                .SetTableName("short-table")
+                .AddColumn("value", KuduType.Int16);
+
+            var table = await _client.CreateTableAsync(builder);
+
+            var values = CreateIntegerValues(KuduType.Int16);
+
+            long i = 0;
+            foreach (short value in values)
+            {
+                var insert = table.NewInsert();
+                insert.SetInt64("key", i++);
+                insert.SetInt16("value", value);
+                await _session.EnqueueAsync(insert);
+            }
+
+            var nullInsert = table.NewInsert();
+            nullInsert.SetInt64("key", i);
+            nullInsert.SetNull("value");
+            await _session.EnqueueAsync(nullInsert);
+            await _session.FlushAsync();
+
+            await CheckIntPredicatesAsync(table, values, CreateIntegerTestValues(KuduType.Int16));
+        }
+
+        [SkippableFact]
+        public async Task TestIntPredicates()
+        {
+            var builder = GetDefaultTableBuilder()
+                .SetTableName("int-table")
+                .AddColumn("value", KuduType.Int32);
+
+            var table = await _client.CreateTableAsync(builder);
+
+            var values = CreateIntegerValues(KuduType.Int32);
+
+            long i = 0;
+            foreach (int value in values)
+            {
+                var insert = table.NewInsert();
+                insert.SetInt64("key", i++);
+                insert.SetInt32("value", value);
+                await _session.EnqueueAsync(insert);
+            }
+
+            var nullInsert = table.NewInsert();
+            nullInsert.SetInt64("key", i);
+            nullInsert.SetNull("value");
+            await _session.EnqueueAsync(nullInsert);
+            await _session.FlushAsync();
+
+            await CheckIntPredicatesAsync(table, values, CreateIntegerTestValues(KuduType.Int32));
+        }
+
+        [SkippableFact]
+        public async Task TestLongPredicates()
+        {
+            var builder = GetDefaultTableBuilder()
+                .SetTableName("long-table")
+                .AddColumn("value", KuduType.Int64);
+
+            var table = await _client.CreateTableAsync(builder);
+
+            var values = CreateIntegerValues(KuduType.Int64);
+
+            long i = 0;
+            foreach (long value in values)
+            {
+                var insert = table.NewInsert();
+                insert.SetInt64("key", i++);
+                insert.SetInt64("value", value);
+                await _session.EnqueueAsync(insert);
+            }
+
+            var nullInsert = table.NewInsert();
+            nullInsert.SetInt64("key", i);
+            nullInsert.SetNull("value");
+            await _session.EnqueueAsync(nullInsert);
+            await _session.FlushAsync();
+
+            await CheckIntPredicatesAsync(table, values, CreateIntegerTestValues(KuduType.Int64));
+        }
+
         private TableBuilder GetDefaultTableBuilder()
         {
             return new TableBuilder()
