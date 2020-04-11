@@ -18,7 +18,8 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
             else
             {
                 // There's no overload of GetViewBetween that supports this.
-                return new SortedSet<T>(set.Where(v => Comparer<T>.Default.Compare(v, start) > 0));
+                var comparer = set.Comparer;
+                return new SortedSet<T>(set.Where(v => comparer.Compare(v, start) > 0), comparer);
             }
         }
 
@@ -35,7 +36,8 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
             else
             {
                 // There's no overload of GetViewBetween that supports this.
-                return new SortedSet<T>(set.Where(v => Comparer<T>.Default.Compare(v, end) < 0));
+                var comparer = set.Comparer;
+                return new SortedSet<T>(set.Where(v => comparer.Compare(v, end) < 0), comparer);
             }
         }
     }
