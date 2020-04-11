@@ -326,6 +326,72 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.NotEqual(KuduClient.NoTimestamp, scanEnumerator.SnapshotTimestamp);
         }
 
+        [SkippableFact]
+        public async Task TestReadYourWrites()
+        {
+            long preTs = _beforeWriteTimestamp;
+
+            // Update the propagated timestamp to ensure we see the rows written
+            // in the constructor.
+            _client.LastPropagatedTimestamp = preTs;
+
+            // Perform scan in READ_YOUR_WRITES mode. Before the scan, verify that the
+            // scanner timestamp is not yet set. It will get set only once the scan
+            // is opened.
+            var scanner = _client.NewScanBuilder(_table)
+                .SetReadMode(ReadMode.ReadYourWrites)
+                .Build();
+
+            var scanEnumerator = scanner.GetAsyncEnumerator();
+
+            Assert.Equal(ReadMode.ReadYourWrites, scanner.ReadMode);
+            Assert.Equal(KuduClient.NoTimestamp, _client.LastPropagatedTimestamp);
+            Assert.Equal(KuduClient.NoTimestamp, scanEnumerator.SnapshotTimestamp);
+
+            int count = 0;
+            while (await scanEnumerator.MoveNextAsync())
+            {
+                count += scanEnumerator.Current.Count;
+            }
+
+            // After the scan, verify that the chosen snapshot timestamp is
+            // returned from the server and it is larger than the previous
+            // propagated timestamp.
+            Assert.NotEqual(KuduClient.NoTimestamp, scanEnumerator.SnapshotTimestamp);
+            Assert.True(preTs < scanEnumerator.SnapshotTimestamp);
+            await scanEnumerator.DisposeAsync();
+
+            // Perform write in batch mode.
+            var rows = new[] { "11", "22", "33" }.Select(key =>
+            {
+                var insert = _table.NewInsert();
+                insert.SetString(0, key);
+                insert.SetString(1, key);
+                return insert;
+            });
+
+            await _client.WriteAsync(rows);
+
+            scanEnumerator = scanner.GetAsyncEnumerator();
+
+            Assert.True(preTs < _client.LastPropagatedTimestamp);
+            preTs = _client.LastPropagatedTimestamp;
+
+            count = 0;
+            while (await scanEnumerator.MoveNextAsync())
+            {
+                count += scanEnumerator.Current.Count;
+            }
+
+            Assert.Equal(12, count);
+
+            // After the scan, verify that the chosen snapshot timestamp is
+            // returned from the server and it is larger than the previous
+            // propagated timestamp.
+            Assert.True(preTs < scanEnumerator.SnapshotTimestamp);
+            await scanEnumerator.DisposeAsync();
+        }
+
         private KuduScanner<ResultSet> GetScanner(
             string lowerBoundKeyOne,
             string lowerBoundKeyTwo,
