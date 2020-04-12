@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
 using Knet.Kudu.Client.FunctionalTests.Util;
+using Knet.Kudu.Client.Protocol.Client;
 using McMaster.Extensions.Xunit;
 using Xunit;
 
@@ -436,27 +437,21 @@ namespace Knet.Kudu.Client.FunctionalTests
             var tsPrev = _client.LastPropagatedTimestamp;
             var tsPropagated = tsPrev + 1000000;
 
-            // Temporarily set the client's propagated timestamp so it's
-            // included in the scan token.
-            _client.LastPropagatedTimestamp = tsPropagated;
+            var tokenPb = new ScanTokenPB
+            {
+                TableName = _tableName,
+                PropagatedTimestamp = (ulong)tsPropagated
+            };
 
-            var tokens = await _client.NewScanTokenBuilder(_table)
-                .SetReadMode(ReadMode.ReadAtSnapshot)
-                .SnapshotTimestampRaw(tsPropagated)
-                .BuildAsync();
-
-            // Revert the update, so we can verify that applying the token updates
-            // the client's last propagated timestamp.
-            _client.LastPropagatedTimestamp = tsPrev;
-
-            var token = tokens.First();
+            var token = new KuduScanToken(null, tokenPb);
+            var serializedToken = token.Serialize();
 
             // Deserialize scan tokens and make sure the client's last propagated
             // timestamp is updated accordingly.
             Assert.Equal(tsPrev, _client.LastPropagatedTimestamp);
 
             var tokenScanner = _client.NewScanBuilder(_table)
-                .ApplyScanToken(token)
+                .ApplyScanToken(serializedToken)
                 .Build();
 
             Assert.Equal(tsPropagated, _client.LastPropagatedTimestamp);
