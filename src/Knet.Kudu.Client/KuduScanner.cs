@@ -15,8 +15,6 @@ namespace Knet.Kudu.Client
         private readonly List<int> _projectedColumnIndexes;
         private readonly Dictionary<string, KuduPredicate> _predicates;
 
-        private readonly ReadMode _readMode;
-        private readonly ReplicaSelection _replicaSelection;
         private readonly bool _isFaultTolerant;
         private readonly int? _batchSizeBytes;
         private readonly long _limit;
@@ -28,6 +26,10 @@ namespace Knet.Kudu.Client
         private readonly byte[] _upperBoundPrimaryKey;
         private readonly byte[] _lowerBoundPartitionKey;
         private readonly byte[] _upperBoundPartitionKey;
+
+        public ReplicaSelection ReplicaSelection { get; }
+
+        public ReadMode ReadMode { get; }
 
         public KuduScanner(
             ILogger logger,
@@ -57,8 +59,8 @@ namespace Knet.Kudu.Client
             _projectedColumnNames = projectedColumnNames;
             _projectedColumnIndexes = projectedColumnIndexes;
             _predicates = predicates;
-            _readMode = readMode;
-            _replicaSelection = replicaSelection;
+            ReadMode = readMode;
+            ReplicaSelection = replicaSelection;
             _isFaultTolerant = isFaultTolerant;
             _batchSizeBytes = batchSizeBytes;
             _limit = limit;
@@ -89,7 +91,7 @@ namespace Knet.Kudu.Client
                 _parser,
                 _projectedColumnNames,
                 _projectedColumnIndexes,
-                _readMode,
+                ReadMode,
                 _isFaultTolerant,
                 _predicates,
                 _limit,
@@ -100,7 +102,7 @@ namespace Knet.Kudu.Client
                 _htTimestamp,
                 _batchSizeBytes,
                 partitionPruner,
-                _replicaSelection,
+                ReplicaSelection,
                 cancellationToken);
         }
 

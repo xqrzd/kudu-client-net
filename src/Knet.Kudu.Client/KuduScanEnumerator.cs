@@ -41,7 +41,6 @@ namespace Knet.Kudu.Client
 
         private bool _closed;
         private long _numRowsReturned;
-        private long _htTimestamp;
         private uint _sequenceId;
         private byte[] _scannerId;
         private byte[] _lastPrimaryKey;
@@ -53,6 +52,8 @@ namespace Knet.Kudu.Client
         /// Otherwise it contains a proper tabletSlice name, and we're currently scanning.
         /// </summary>
         private RemoteTablet _tablet;
+
+        internal long SnapshotTimestamp { get; private set; }
 
         public T Current { get; private set; }
 
@@ -121,7 +122,7 @@ namespace Knet.Kudu.Client
             _startPrimaryKey = startPrimaryKey ?? Array.Empty<byte>();
             _endPrimaryKey = endPrimaryKey ?? Array.Empty<byte>();
             _startTimestamp = startTimestamp;
-            _htTimestamp = htTimestamp;
+            SnapshotTimestamp = htTimestamp;
             _lastPrimaryKey = Array.Empty<byte>();
             _cancellationToken = cancellationToken;
             // TODO: Register cancellation callback and cancel the scan.
@@ -275,14 +276,14 @@ namespace Knet.Kudu.Client
 
             _tablet = rpc.Tablet;
 
-            if (_htTimestamp == KuduClient.NoTimestamp &&
+            if (SnapshotTimestamp == KuduClient.NoTimestamp &&
                 response.ScanTimestamp != KuduClient.NoTimestamp)
             {
                 // If the server-assigned timestamp is present in the tablet
                 // server's response, store it in the scanner. The stored value
                 // is used for read operations in READ_AT_SNAPSHOT mode at
                 // other tablet servers in the context of the same scan.
-                _htTimestamp = response.ScanTimestamp;
+                SnapshotTimestamp = response.ScanTimestamp;
             }
 
             long lastPropagatedTimestamp = KuduClient.NoTimestamp;
@@ -407,8 +408,8 @@ namespace Knet.Kudu.Client
             // If the mode is set to read on snapshot set the snapshot timestamps.
             if (_readMode == ReadMode.ReadAtSnapshot)
             {
-                if (_htTimestamp != KuduClient.NoTimestamp)
-                    newRequest.SnapTimestamp = (ulong)_htTimestamp;
+                if (SnapshotTimestamp != KuduClient.NoTimestamp)
+                    newRequest.SnapTimestamp = (ulong)SnapshotTimestamp;
 
                 if (_startTimestamp != KuduClient.NoTimestamp)
                     newRequest.SnapStartTimestamp = (ulong)_startTimestamp;
