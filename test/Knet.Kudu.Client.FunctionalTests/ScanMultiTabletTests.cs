@@ -436,10 +436,18 @@ namespace Knet.Kudu.Client.FunctionalTests
             var tsPrev = _client.LastPropagatedTimestamp;
             var tsPropagated = tsPrev + 1000000;
 
+            // Temporarily set the client's propagated timestamp so it's
+            // included in the scan token.
+            _client.LastPropagatedTimestamp = tsPropagated;
+
             var tokens = await _client.NewScanTokenBuilder(_table)
                 .SetReadMode(ReadMode.ReadAtSnapshot)
                 .SnapshotTimestampRaw(tsPropagated)
                 .BuildAsync();
+
+            // Revert the update, so we can verify that applying the token updates
+            // the client's last propagated timestamp.
+            _client.LastPropagatedTimestamp = tsPrev;
 
             var token = tokens.First();
 
@@ -452,6 +460,26 @@ namespace Knet.Kudu.Client.FunctionalTests
                 .Build();
 
             Assert.Equal(tsPropagated, _client.LastPropagatedTimestamp);
+        }
+
+        [SkippableFact]
+        public async Task TestScanTokenReadMode()
+        {
+            var tokens = await _client.NewScanTokenBuilder(_table)
+                .SetReadMode(ReadMode.ReadYourWrites)
+                .BuildAsync();
+
+            Assert.NotEmpty(tokens);
+
+            // Deserialize scan tokens and make sure the read mode is updated accordingly.
+            foreach (var token in tokens)
+            {
+                var scanner = _client.NewScanBuilder(_table)
+                    .ApplyScanToken(token)
+                    .Build();
+
+                Assert.Equal(ReadMode.ReadYourWrites, scanner.ReadMode);
+            }
         }
 
         private KuduScanner<ResultSet> GetScanner(
