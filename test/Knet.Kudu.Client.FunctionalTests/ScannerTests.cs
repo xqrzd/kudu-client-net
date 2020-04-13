@@ -43,7 +43,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             {
                 var insert = table.NewInsert();
                 _generator.RandomizeRow(insert);
-                inserts.TryAdd(i, insert);
+                inserts.TryAdd(insert.GetInt32(0), insert);
                 await session.EnqueueAsync(insert);
             }
 
