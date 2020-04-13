@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
+using Knet.Kudu.Client.FunctionalTests.Util;
 using McMaster.Extensions.Xunit;
 using Xunit;
 
@@ -9,57 +11,68 @@ namespace Knet.Kudu.Client.FunctionalTests
     [MiniKuduClusterTest]
     public class ScannerTests
     {
-        [SkippableFact]
-        public async Task Scan()
+        private static readonly string _tableName = "TestKuduScanner";
+
+        private readonly Random _random;
+        private readonly DataGenerator _generator;
+
+        public ScannerTests()
         {
-            using var miniCluster = new MiniKuduClusterBuilder()
-                .NumMasters(3)
-                .NumTservers(3)
+            _random = new Random();
+            _generator = new DataGeneratorBuilder()
+                .Random(_random)
                 .Build();
+        }
 
+        [SkippableFact]
+        public async Task TestIterable()
+        {
+            using var miniCluster = new MiniKuduClusterBuilder().Build();
             await using var client = miniCluster.CreateClient();
+            await using var session = client.NewSession();
 
-            var tableName = Guid.NewGuid().ToString();
-            var builder = new TableBuilder()
-                .SetTableName(tableName)
-                .SetNumReplicas(1)
-                .AddColumn("column_x", KuduType.Int32, opt => opt.Key(true))
-                .AddColumn("column_y", KuduType.String);
+            var builder = ClientTestUtil.GetBasicSchema()
+                .SetTableName(_tableName)
+                .CreateBasicRangePartition();
 
             var table = await client.CreateTableAsync(builder);
-            Assert.Equal(tableName, table.TableName);
-            Assert.Equal(1, table.NumReplicas);
 
-            var row = table.NewInsert();
-            row.SetInt32(0, 7);
-            row.SetString(1, "test value");
-
-            var results = await client.WriteAsync(new[] { row });
-            Assert.Collection(results, r =>
+            IDictionary<int, PartialRow> inserts = new Dictionary<int, PartialRow>();
+            int numRows = 10;
+            for (int i = 0; i < numRows; i++)
             {
-                Assert.Empty(r.PerRowErrors);
-                Assert.NotEqual(0UL, r.Timestamp);
-            });
+                var insert = table.NewInsert();
+                _generator.RandomizeRow(insert);
+                inserts.TryAdd(i, insert);
+                await session.EnqueueAsync(insert);
+            }
 
-            var scanner = client.NewScanBuilder(table)
-                .SetProjectedColumns("column_x", "column_y")
-                .Build();
+            await session.FlushAsync();
+
+            var scanner = client.NewScanBuilder(table).Build();
 
             await foreach (var resultSet in scanner)
             {
                 CheckResults(resultSet);
             }
 
-            static void CheckResults(ResultSet rows)
+            void CheckResults(ResultSet resultSet)
             {
-                Assert.Equal(1, rows.Count);
-
-                foreach (var row in rows)
+                foreach (var row in resultSet)
                 {
-                    Assert.Equal(7, row.GetInt32(0));
-                    Assert.Equal("test value", row.GetString(1));
+                    var key = row.GetInt32(0);
+                    var insert = Assert.Contains(key, inserts);
+
+                    Assert.Equal(insert.GetInt32(1), row.GetInt32(1));
+                    Assert.Equal(insert.GetInt32(2), row.GetInt32(2));
+                    Assert.Equal(insert.GetString(3), row.GetString(3));
+                    Assert.Equal(insert.GetBool(4), row.GetBool(4));
+
+                    inserts.Remove(key);
                 }
             }
+
+            Assert.Empty(inserts);
         }
     }
 }

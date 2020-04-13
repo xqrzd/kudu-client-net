@@ -226,6 +226,12 @@ namespace Knet.Kudu.Client.Util
             return (int)dec.Scale;
         }
 
+        public static decimal SetScale(decimal value, int scale)
+        {
+            var dec = new DecimalAccessor(value) { Scale = (uint)scale };
+            return dec.Decimal;
+        }
+
         private static ulong ToLong(uint low, uint high)
         {
             return ((ulong)high << 32) | low;
