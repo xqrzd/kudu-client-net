@@ -33,6 +33,7 @@ namespace Knet.Kudu.Client.Requests
             KuduSchema schema,
             IKuduScanParser<T> parser,
             ReplicaSelection replicaSelection,
+            string tableId,
             RemoteTablet tablet,
             byte[] partitionKey,
             bool isFaultTolerant)
@@ -44,7 +45,7 @@ namespace Knet.Kudu.Client.Requests
             _isFaultTolerant = isFaultTolerant;
 
             ReplicaSelection = replicaSelection;
-            TableId = tablet.TableId;
+            TableId = tableId;
             Tablet = tablet;
             PartitionKey = partitionKey;
             NeedsAuthzToken = true;
