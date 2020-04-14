@@ -80,7 +80,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
         // TODO: Test keep alive
 
-        //[SkippableFact]
+        [SkippableFact]
         public async Task TestOpenScanWithDroppedPartition()
         {
             using var miniCluster = new MiniKuduClusterBuilder().Build();
