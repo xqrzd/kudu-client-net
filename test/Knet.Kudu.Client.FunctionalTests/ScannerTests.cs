@@ -63,7 +63,12 @@ namespace Knet.Kudu.Client.FunctionalTests
 
                     Assert.Equal(insert.GetInt32(1), row.GetInt32(1));
                     Assert.Equal(insert.GetInt32(2), row.GetInt32(2));
-                    Assert.Equal(insert.GetString(3), row.GetString(3));
+
+                    if (insert.IsNull(3))
+                        Assert.True(row.IsNull(3));
+                    else
+                        Assert.Equal(insert.GetString(3), row.GetString(3));
+
                     Assert.Equal(insert.GetBool(4), row.GetBool(4));
 
                     inserts.Remove(key);
