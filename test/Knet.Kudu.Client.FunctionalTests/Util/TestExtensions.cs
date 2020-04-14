@@ -49,5 +49,10 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
             random.NextBytes(buffer);
             return BinaryPrimitives.ReadInt64LittleEndian(buffer);
         }
+
+        public static bool NextBool(this Random random)
+        {
+            return random.Next(2) == 0;
+        }
     }
 }

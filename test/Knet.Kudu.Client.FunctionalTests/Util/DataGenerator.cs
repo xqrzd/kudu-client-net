@@ -72,7 +72,7 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
                 switch (type)
                 {
                     case KuduType.Bool:
-                        row.SetBool(name, _random.Next(2) == 0);
+                        row.SetBool(name, _random.NextBool());
                         break;
                     case KuduType.Int8:
                         row.SetByte(name, (byte)_random.Next());
