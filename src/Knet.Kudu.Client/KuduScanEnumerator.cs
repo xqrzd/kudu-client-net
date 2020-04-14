@@ -253,8 +253,20 @@ namespace Knet.Kudu.Client
             }
             catch (NonCoveredRangeException ex)
             {
-                return await HandleNonCoveredRangeExceptionAsync(ex)
-                    .ConfigureAwait(false);
+                Invalidate();
+                _partitionPruner.RemovePartitionKeyRange(ex.NonCoveredRangeEnd);
+
+                // Stop scanning if the non-covered range is past the end partition key.
+                if (!_partitionPruner.HasMorePartitionKeyRanges)
+                {
+                    // The scanner is closed on the other side at this point.
+                    _closed = true;
+                    return false;
+                }
+
+                _scannerId = null;
+                _sequenceId = 0;
+                return await MoveNextAsync().ConfigureAwait(false);
             }
             catch
             {
@@ -333,11 +345,6 @@ namespace Knet.Kudu.Client
                 response = await _client.SendRpcAsync(rpc, _cancellationToken)
                     .ConfigureAwait(false);
             }
-            catch (NonCoveredRangeException ex)
-            {
-                return await HandleNonCoveredRangeExceptionAsync(ex)
-                    .ConfigureAwait(false);
-            }
             catch (FaultTolerantScannerExpiredException)
             {
                 // If encountered FaultTolerantScannerExpiredException, it means the
@@ -358,7 +365,7 @@ namespace Knet.Kudu.Client
                 throw;
             }
 
-            _tablet = rpc.Tablet;
+            //_tablet = rpc.Tablet;
 
             _numRowsReturned += response.NumRows;
             Current = response.Data;
@@ -372,25 +379,6 @@ namespace Knet.Kudu.Client
             _sequenceId++;
 
             return response.NumRows > 0;
-        }
-
-        private ValueTask<bool> HandleNonCoveredRangeExceptionAsync(
-            NonCoveredRangeException ex)
-        {
-            Invalidate();
-            _partitionPruner.RemovePartitionKeyRange(ex.NonCoveredRangeEnd);
-
-            // Stop scanning if the non-covered range is past the end partition key.
-            if (!_partitionPruner.HasMorePartitionKeyRanges)
-            {
-                // The scanner is closed on the other side at this point.
-                _closed = true;
-                return new ValueTask<bool>(false);
-            }
-
-            _scannerId = null;
-            _sequenceId = 0;
-            return MoveNextAsync();
         }
 
         private ScanRequest<T> GetOpenRequest()
