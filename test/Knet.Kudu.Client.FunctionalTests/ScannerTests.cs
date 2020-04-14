@@ -204,20 +204,20 @@ namespace Knet.Kudu.Client.FunctionalTests
                     .ApplyScanToken(token)
                     .Build();
 
-                // Verify the IS_DELETED column is appended at the end of the projection.
-                //Schema projection = scanner.getProjectionSchema();
-                //int isDeletedIndex = projection.getIsDeletedIndex();
-                //assertEquals(projection.getColumnCount() - 1, isDeletedIndex);
-                //// Verify the IS_DELETED column has the correct types.
-                //ColumnSchema isDeletedCol = projection.getColumnByIndex(isDeletedIndex);
-                //assertEquals(Type.BOOL, isDeletedCol.getType());
-                //assertEquals(DataType.IS_DELETED, isDeletedCol.getWireType());
-                //// Verify the IS_DELETED column is named to avoid collision.
-                //assertEquals(projection.getColumnByIndex(isDeletedIndex),
-                //    projection.getColumn(DEFAULT_IS_DELETED_COL_NAME + "_"));
-
                 await foreach (var resultSet in scanner)
                 {
+                    // TODO: Expose this data on the scanner.
+                    // Verify the IS_DELETED column is appended at the end of the projection.
+                    var projection = resultSet.Schema;
+                    int isDeletedIndex = projection.IsDeletedIndex;
+                    Assert.Equal(projection.Columns.Count - 1, isDeletedIndex);
+                    // Verify the IS_DELETED column has the correct types.
+                    var isDeletedCol = projection.GetColumn(isDeletedIndex);
+                    Assert.Equal(KuduType.Bool, isDeletedCol.Type);
+                    // Verify the IS_DELETED column is named to avoid collision.
+                    Assert.Equal(projection.GetColumn(isDeletedIndex),
+                        projection.GetColumn("is_deleted_"));
+
                     AccumulateResults(resultSet);
                 }
 
