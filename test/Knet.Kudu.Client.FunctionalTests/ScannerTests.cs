@@ -165,7 +165,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             int numUpdates = _random.Next(beforeBounds);
             int numDeletes = _random.Next(beforeBounds);
             var beforeOps = GenerateMutationOperations(table, numInserts, numUpdates, numDeletes);
-            var before = await ApplyOperationsAsync(session, beforeOps);
+            var before = await ApplyOperationsAsync(client, beforeOps);
 
             // Set the start timestamp after the initial mutations by getting the propagated timestamp,
             // and incrementing by 1.
@@ -179,7 +179,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             int expectedNumDeletes = _random.Next(mutationBounds);
             var operations = GenerateMutationOperations(
                 table, expectedNumInserts, expectedNumUpdates, expectedNumDeletes);
-            var mutations = await ApplyOperationsAsync(session, operations);
+            var mutations = await ApplyOperationsAsync(client, operations);
 
             // Set the end timestamp after the test mutations by getting the propagated timestamp,
             // and incrementing by 1.
@@ -191,7 +191,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             numUpdates = _random.Next(afterBounds);
             numDeletes = _random.Next(afterBounds);
             var afterOps = GenerateMutationOperations(table, numInserts, numUpdates, numDeletes);
-            var after = await ApplyOperationsAsync(session, afterOps);
+            var after = await ApplyOperationsAsync(client, afterOps);
 
             // Diff scan the time range.
             // Pass through the scan token API to ensure serialization of tokens works too.
@@ -357,7 +357,7 @@ namespace Knet.Kudu.Client.FunctionalTests
         /// Applies a list of operations and returns the final change type for each key.
         /// </summary>
         private async Task<Dictionary<int, RowOperation>> ApplyOperationsAsync(
-            IKuduSession session, List<KuduOperation> operations)
+            KuduClient client, List<KuduOperation> operations)
         {
             var results = new Dictionary<int, RowOperation>();
 
@@ -378,8 +378,9 @@ namespace Knet.Kudu.Client.FunctionalTests
                 if (_random.Next(operations.Count) == flushInt)
                     await Task.Delay(2);
 
-                await session.EnqueueAsync(operation);
-                await session.FlushAsync();
+                //await session.EnqueueAsync(operation);
+                //await session.FlushAsync();
+                await client.WriteAsync(new[] { operation });
 
                 results[operation.GetInt32(0)] = operation.Operation;
             }
