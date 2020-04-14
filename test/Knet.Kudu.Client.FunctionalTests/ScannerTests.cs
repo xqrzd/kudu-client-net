@@ -85,7 +85,6 @@ namespace Knet.Kudu.Client.FunctionalTests
         {
             using var miniCluster = new MiniKuduClusterBuilder().Build();
             await using var client = miniCluster.CreateClient();
-            await using var session = client.NewSession();
 
             var builder = ClientTestUtil.GetBasicSchema()
                 .SetTableName("TestOpenScanWithDroppedPartition")
@@ -149,7 +148,6 @@ namespace Knet.Kudu.Client.FunctionalTests
                 .AddTabletServerFlag("--flush_threshold_secs=1")
                 .Build();
             await using var client = miniCluster.CreateClient();
-            await using var session = client.NewSession();
 
             var builder = new TableBuilder("TestDiffScan")
                 .AddColumn("key", KuduType.Int32, opt => opt.Key(true))
@@ -270,6 +268,53 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(expectedNumInserts, resultNumInserts);
             Assert.Equal(expectedNumUpdates, resultNumUpdates);
             Assert.Equal(0, resultExtra);
+        }
+
+        [SkippableFact]
+        public async Task TestDiffScanIsDeleted()
+        {
+            using var miniCluster = new MiniKuduClusterBuilder().Build();
+            await using var client = miniCluster.CreateClient();
+
+            var builder = new TableBuilder("TestDiffScanIsDeleted")
+                .AddColumn("key", KuduType.Int32, opt => opt.Key(true))
+                .CreateBasicRangePartition();
+
+            var table = await client.CreateTableAsync(builder);
+
+            // Test a very simple diff scan that should capture one deleted row.
+            var insert = table.NewInsert();
+            insert.SetInt32(0, 0);
+            await client.WriteAsync(new[] { insert });
+            long startHT = client.LastPropagatedTimestamp + 1;
+
+            var delete = table.NewDelete();
+            delete.SetInt32(0, 0);
+            await client.WriteAsync(new[] { delete });
+            long endHT = client.LastPropagatedTimestamp + 1;
+
+            var scanner = client.NewScanBuilder(table)
+                .DiffScan(startHT, endHT)
+                .Build();
+
+            int rowCount = 0;
+            await foreach (var resultSet in scanner)
+            {
+                rowCount += resultSet.Count;
+                CheckResults(resultSet);
+            }
+
+            Assert.Equal(1, rowCount);
+
+            static void CheckResults(ResultSet resultSet)
+            {
+                foreach (var row in resultSet)
+                {
+                    Assert.Equal(0, row.GetInt32(0));
+                    Assert.True(row.HasIsDeleted);
+                    Assert.True(row.IsDeleted);
+                }
+            }
         }
 
         /// <summary>
