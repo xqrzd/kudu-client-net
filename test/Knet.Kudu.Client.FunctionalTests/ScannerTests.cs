@@ -376,7 +376,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 await session.EnqueueAsync(operation);
                 await session.FlushAsync();
 
-                results.Add(operation.GetInt32(0), operation.Operation);
+                results[operation.GetInt32(0)] = operation.Operation;
             }
 
             return results;
