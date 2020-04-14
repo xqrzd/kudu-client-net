@@ -416,7 +416,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             // On some runs, wait long enough to flush at the start.
             if (_random.NextBool())
-                await Task.Delay(2);
+                await Task.Delay(2000);
 
             // Pick an int as a flush indicator so we flush once on average while applying operations.
             int flushInt = _random.Next(operations.Count);
@@ -425,7 +425,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             {
                 // On some runs, wait long enough to flush while applying operations.
                 if (_random.Next(operations.Count) == flushInt)
-                    await Task.Delay(2);
+                    await Task.Delay(2000);
 
                 //await session.EnqueueAsync(operation);
                 //await session.FlushAsync();
