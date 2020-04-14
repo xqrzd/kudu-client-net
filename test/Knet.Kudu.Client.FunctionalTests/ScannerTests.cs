@@ -342,8 +342,12 @@ namespace Knet.Kudu.Client.FunctionalTests
                     // Must be a delete, so we need an insert next.
                     op = table.NewInsert();
                 }
+
                 op.SetInt32(0, state.Key);
-                _generator.RandomizeRow(op, randomizeKeys: false);
+
+                if (op.Operation != RowOperation.Delete)
+                    _generator.RandomizeRow(op, randomizeKeys: false);
+
                 results.Add(op);
 
                 state.CurrentType = op.Operation;
