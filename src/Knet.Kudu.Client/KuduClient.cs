@@ -599,8 +599,11 @@ namespace Knet.Kudu.Client
             cache.CacheTabletLocations(tablets, partitionKey);
         }
 
-        private void RemoveTabletFromCache(RemoteTablet tablet)
+        private void RemoveTabletFromCache<T>(KuduTabletRpc<T> rpc)
         {
+            RemoteTablet tablet = rpc.Tablet;
+            rpc.Tablet = null;
+
             TableLocationsCache cache = GetTableLocationsCache(tablet.TableId);
             cache.RemoveTablet(tablet.Partition.PartitionKeyStart);
         }
@@ -1040,18 +1043,23 @@ namespace Knet.Kudu.Client
                 rpc.AuthzToken = _authzTokenCache.GetAuthzToken(tableId);
             }
 
-            RemoteTablet tablet = await GetTabletAsync(
-                tableId,
-                rpc.PartitionKey,
-                cancellationToken).ConfigureAwait(false);
+            RemoteTablet tablet = rpc.Tablet;
 
-            rpc.Tablet = tablet;
+            if (tablet == null)
+            {
+                tablet = await GetTabletAsync(
+                    tableId,
+                    rpc.PartitionKey,
+                    cancellationToken).ConfigureAwait(false);
+
+                rpc.Tablet = tablet;
+            }
 
             ServerInfo serverInfo = GetServerInfo(tablet, rpc.ReplicaSelection);
 
             if (serverInfo == null)
             {
-                RemoveTabletFromCache(tablet);
+                RemoveTabletFromCache(rpc);
 
                 throw new RecoverableException(KuduStatus.IllegalState(
                     $"Unable to find {rpc.ReplicaSelection} replica in {tablet}"));
@@ -1141,7 +1149,7 @@ namespace Knet.Kudu.Client
                 {
                     // We're handling a tablet server that's telling us it doesn't
                     // have the tablet we're asking for.
-                    RemoveTabletFromCache(rpc.Tablet);
+                    RemoveTabletFromCache(rpc);
                     throw new RecoverableException(status);
                 }
                 else if (errCode == TabletServerErrorPB.Code.TabletNotRunning ||
@@ -1155,7 +1163,7 @@ namespace Knet.Kudu.Client
                 {
                     // These two error codes are an indication that the tablet
                     // isn't a leader.
-                    RemoveTabletFromCache(rpc.Tablet);
+                    RemoveTabletFromCache(rpc);
                     throw new RecoverableException(status);
                 }
                 else
@@ -1214,7 +1222,7 @@ namespace Knet.Kudu.Client
 
                     if (rpc is KuduTabletRpc<T> tabletRpc)
                     {
-                        RemoveTabletFromCache(tabletRpc.Tablet);
+                        RemoveTabletFromCache(tabletRpc);
                     }
                     else if (rpc is KuduMasterRpc<T>)
                     {

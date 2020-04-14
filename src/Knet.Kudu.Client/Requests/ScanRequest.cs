@@ -6,6 +6,7 @@ using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Protocol.Tserver;
 using Knet.Kudu.Client.Scanner;
+using Knet.Kudu.Client.Tablet;
 using Knet.Kudu.Client.Util;
 using ProtoBuf;
 
@@ -32,7 +33,7 @@ namespace Knet.Kudu.Client.Requests
             KuduSchema schema,
             IKuduScanParser<T> parser,
             ReplicaSelection replicaSelection,
-            string tableId,
+            RemoteTablet tablet,
             byte[] partitionKey,
             bool isFaultTolerant)
         {
@@ -43,7 +44,8 @@ namespace Knet.Kudu.Client.Requests
             _isFaultTolerant = isFaultTolerant;
 
             ReplicaSelection = replicaSelection;
-            TableId = tableId;
+            TableId = tablet.TableId;
+            Tablet = tablet;
             PartitionKey = partitionKey;
             NeedsAuthzToken = true;
 

@@ -435,7 +435,7 @@ namespace Knet.Kudu.Client
                 _schema,
                 _parser,
                 _replicaSelection,
-                _table.TableId,
+                _tablet,
                 _partitionPruner.NextPartitionKey,
                 _isFaultTolerant);
         }
@@ -456,7 +456,7 @@ namespace Knet.Kudu.Client
                 _schema,
                 _parser,
                 _replicaSelection,
-                _table.TableId,
+                _tablet,
                 _partitionPruner.NextPartitionKey,
                 _isFaultTolerant);
         }
@@ -476,7 +476,7 @@ namespace Knet.Kudu.Client
                 _schema,
                 _parser,
                 _replicaSelection,
-                _table.TableId,
+                _tablet,
                 _partitionPruner.NextPartitionKey,
                 _isFaultTolerant);
         }
