@@ -197,7 +197,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 .DiffScan(startHT, endHT)
                 .BuildAsync();
 
-            var results = new List<TempRowResult>();
+            var results = new List<TestRowResult>();
             foreach (var token in tokens)
             {
                 var scanner = client.NewScanBuilder(table)
@@ -225,7 +225,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 {
                     foreach (var row in resultSet)
                     {
-                        results.Add(new TempRowResult(row));
+                        results.Add(new TestRowResult(row));
                     }
                 }
             }
@@ -242,7 +242,10 @@ namespace Knet.Kudu.Client.FunctionalTests
             foreach (var result in results)
             {
                 var key = result.Key;
-                var type = mutations[key];
+
+                if (!mutations.TryGetValue(key, out var type))
+                    type = 0;
+
                 if (type == RowOperation.Insert)
                 {
                     Assert.False(result.IsDeleted);
@@ -259,8 +262,9 @@ namespace Knet.Kudu.Client.FunctionalTests
                 }
                 else
                 {
-                    // The key was not found in the mutations map. This means that we somehow managed to scan
-                    // a row that was never mutated. It's an error and will trigger an assert below.
+                    // The key was not found in the mutations map. This means that we
+                    // somehow managed to scan a row that was never mutated.
+                    // It's an error and will trigger an assert below.
                     resultExtra++;
                 }
             }
@@ -427,8 +431,6 @@ namespace Knet.Kudu.Client.FunctionalTests
                 if (_random.Next(operations.Count) == flushInt)
                     await Task.Delay(2000);
 
-                //await session.EnqueueAsync(operation);
-                //await session.FlushAsync();
                 await client.WriteAsync(new[] { operation });
 
                 results[operation.GetInt32(0)] = operation.Operation;
@@ -454,13 +456,13 @@ namespace Knet.Kudu.Client.FunctionalTests
             }
         }
 
-        private class TempRowResult
+        private class TestRowResult
         {
             public int Key { get; }
 
             public bool IsDeleted { get; }
 
-            public TempRowResult(RowResult row)
+            public TestRowResult(RowResult row)
             {
                 Key = row.GetInt32(0);
                 IsDeleted = row.IsDeleted;
