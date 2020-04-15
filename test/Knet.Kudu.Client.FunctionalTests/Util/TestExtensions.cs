@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Knet.Kudu.Client.FunctionalTests.Util
@@ -39,6 +41,18 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
                 var comparer = set.Comparer;
                 return new SortedSet<T>(set.Where(v => comparer.Compare(v, end) < 0), comparer);
             }
+        }
+
+        public static long NextLong(this Random random)
+        {
+            Span<byte> buffer = stackalloc byte[8];
+            random.NextBytes(buffer);
+            return BinaryPrimitives.ReadInt64LittleEndian(buffer);
+        }
+
+        public static bool NextBool(this Random random)
+        {
+            return random.Next(2) == 0;
         }
     }
 }

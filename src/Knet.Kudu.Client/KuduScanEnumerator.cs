@@ -365,7 +365,7 @@ namespace Knet.Kudu.Client
                 throw;
             }
 
-            _tablet = rpc.Tablet;
+            //_tablet = rpc.Tablet;
 
             _numRowsReturned += response.NumRows;
             Current = response.Data;
@@ -436,6 +436,7 @@ namespace Knet.Kudu.Client
                 _parser,
                 _replicaSelection,
                 _table.TableId,
+                _tablet,
                 _partitionPruner.NextPartitionKey,
                 _isFaultTolerant);
         }
@@ -457,6 +458,7 @@ namespace Knet.Kudu.Client
                 _parser,
                 _replicaSelection,
                 _table.TableId,
+                _tablet,
                 _partitionPruner.NextPartitionKey,
                 _isFaultTolerant);
         }
@@ -477,6 +479,7 @@ namespace Knet.Kudu.Client
                 _parser,
                 _replicaSelection,
                 _table.TableId,
+                _tablet,
                 _partitionPruner.NextPartitionKey,
                 _isFaultTolerant);
         }

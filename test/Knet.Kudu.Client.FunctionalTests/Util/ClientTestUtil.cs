@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Linq;
+using System.Threading.Tasks;
 
 namespace Knet.Kudu.Client.FunctionalTests.Util
 {
@@ -55,6 +56,17 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
                     upper.SetInt32("key", 300);
                 })
                 .AddSplitRow(row => row.SetInt32("key", 50));
+        }
+
+        /// <summary>
+        /// Load a table of default schema with the specified number of records, in ascending key order.
+        /// </summary>
+        public static async Task LoadDefaultTableAsync(KuduClient client, KuduTable table, int numRows)
+        {
+            var rows = Enumerable.Range(0, numRows)
+                .Select(i => CreateBasicSchemaInsert(table, i));
+
+            await client.WriteAsync(rows);
         }
 
         public static KuduOperation CreateBasicSchemaInsert(KuduTable table, int key)

@@ -4,18 +4,18 @@ namespace Knet.Kudu.Client
 {
     public class PartialRowOperation : PartialRow
     {
-        private readonly RowOperation _operation;
+        internal RowOperation Operation { get; }
 
         public PartialRowOperation(KuduSchema schema, RowOperation operation)
             : base(schema)
         {
-            _operation = operation;
+            Operation = operation;
         }
 
         internal PartialRowOperation(PartialRowOperation row, RowOperation operation)
             : base(row)
         {
-            _operation = operation;
+            Operation = operation;
         }
 
         public void WriteToWithOperation(
@@ -25,7 +25,7 @@ namespace Knet.Kudu.Client
             out int rowBytesWritten,
             out int indirectBytesWritten)
         {
-            rowDestination[0] = (byte)_operation;
+            rowDestination[0] = (byte)Operation;
             rowDestination = rowDestination.Slice(1);
 
             WriteTo(
