@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Protocol;
+using Knet.Kudu.Client.Tablet;
 using Knet.Kudu.Client.Util;
 using Microsoft.Extensions.Logging;
 
@@ -18,6 +19,7 @@ namespace Knet.Kudu.Client.Logging
         private static readonly Action<ILogger, Exception> _exceptionSendingSessionData;
         private static readonly Action<ILogger, Exception> _exceptionClosingScanner;
         private static readonly Action<ILogger, Exception> _recoverableRpcException;
+        private static readonly Action<ILogger, string, string, Exception> _scannerExpired;
 
         static LoggerExtensions()
         {
@@ -55,6 +57,11 @@ namespace Knet.Kudu.Client.Logging
                 eventId: new EventId(7, "RecoverableRpcException"),
                 logLevel: LogLevel.Warning,
                 formatString: "RPC failed, will retry");
+
+            _scannerExpired = LoggerMessage.Define<string, string>(
+                eventId: new EventId(8, "ScannerExpired"),
+                logLevel: LogLevel.Warning,
+                formatString: "Scanner {ScannerId} expired, creating a new one Tablet: {Tablet}");
         }
 
         public static void ConnectedToServer(this ILogger logger, HostAndPort hostPort, IPAddress ipAddress, string tlsInfo, string negotiateInfo, bool isLocal)
@@ -92,6 +99,11 @@ namespace Knet.Kudu.Client.Logging
         public static void RecoverableRpcException(this ILogger logger, Exception ex)
         {
             _recoverableRpcException(logger, ex);
+        }
+
+        public static void ScannerExpired(this ILogger logger, byte[] scannerId, RemoteTablet tablet)
+        {
+            _scannerExpired(logger, scannerId?.ToStringUtf8(), tablet.ToString(), null);
         }
     }
 }

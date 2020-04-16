@@ -347,6 +347,8 @@ namespace Knet.Kudu.Client
             }
             catch (FaultTolerantScannerExpiredException)
             {
+                _logger.ScannerExpired(_scannerId, Tablet);
+
                 // If encountered FaultTolerantScannerExpiredException, it means the
                 // fault tolerant scanner on the server side expired. Therefore, open
                 // a new scanner.
@@ -354,7 +356,6 @@ namespace Knet.Kudu.Client
 
                 _scannerId = null;
                 _sequenceId = 0;
-                Console.WriteLine("Scanner expired, creating a new one");
 
                 return await MoveNextAsync().ConfigureAwait(false);
             }
@@ -495,8 +496,6 @@ namespace Knet.Kudu.Client
                 _closed = true; // The scanner is closed on the other side at this point.
                 return;
             }
-
-            //Console.WriteLine($"Done scanning tablet {_tablet.TabletId} for partition {_tablet.Partition} with scanner id {BitConverter.ToString(_scannerId)}");
 
             _scannerId = null;
             _sequenceId = 0;
