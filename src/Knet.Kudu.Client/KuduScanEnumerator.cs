@@ -51,7 +51,7 @@ namespace Knet.Kudu.Client
         /// If == DONE, then we're done scanning.
         /// Otherwise it contains a proper tabletSlice name, and we're currently scanning.
         /// </summary>
-        private RemoteTablet _tablet;
+        internal RemoteTablet Tablet { get; set; }
 
         internal long SnapshotTimestamp { get; private set; }
 
@@ -200,7 +200,7 @@ namespace Knet.Kudu.Client
             {
                 // Getting a null tablet here without being in a closed state
                 // means we were in between tablets.
-                if (_tablet != null)
+                if (Tablet != null)
                 {
                     using var rpc = GetCloseRequest();
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -230,7 +230,7 @@ namespace Knet.Kudu.Client
                 // We're already done scanning.
                 return new ValueTask<bool>(false);
             }
-            else if (_tablet == null)
+            else if (Tablet == null)
             {
                 // We need to open the scanner first.
                 return OpenScannerAsync();
@@ -274,7 +274,7 @@ namespace Knet.Kudu.Client
                 throw;
             }
 
-            _tablet = rpc.Tablet;
+            Tablet = rpc.Tablet;
 
             if (SnapshotTimestamp == KuduClient.NoTimestamp &&
                 response.ScanTimestamp != KuduClient.NoTimestamp)
@@ -365,7 +365,7 @@ namespace Knet.Kudu.Client
                 throw;
             }
 
-            //_tablet = rpc.Tablet;
+            Tablet = rpc.Tablet;
 
             _numRowsReturned += response.NumRows;
             Current = response.Data;
@@ -436,7 +436,7 @@ namespace Knet.Kudu.Client
                 _parser,
                 _replicaSelection,
                 _table.TableId,
-                _tablet,
+                Tablet,
                 _partitionPruner.NextPartitionKey,
                 _isFaultTolerant);
         }
@@ -458,7 +458,7 @@ namespace Knet.Kudu.Client
                 _parser,
                 _replicaSelection,
                 _table.TableId,
-                _tablet,
+                Tablet,
                 _partitionPruner.NextPartitionKey,
                 _isFaultTolerant);
         }
@@ -479,14 +479,14 @@ namespace Knet.Kudu.Client
                 _parser,
                 _replicaSelection,
                 _table.TableId,
-                _tablet,
+                Tablet,
                 _partitionPruner.NextPartitionKey,
                 _isFaultTolerant);
         }
 
         private void ScanFinished()
         {
-            Partition partition = _tablet.Partition;
+            Partition partition = Tablet.Partition;
             _partitionPruner.RemovePartitionKeyRange(partition.PartitionKeyEnd);
             // Stop scanning if we have scanned until or past the end partition key, or
             // if we have fulfilled the limit.
@@ -512,7 +512,7 @@ namespace Knet.Kudu.Client
         /// </summary>
         private void Invalidate()
         {
-            _tablet = null;
+            Tablet = null;
         }
 
         private void ClearCurrent()
