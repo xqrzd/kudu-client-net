@@ -36,10 +36,10 @@ namespace Knet.Kudu.Client.FunctionalTests
         [SkippableFact]
         public async Task TestMultipleSessions()
         {
-            var testRunTime = TimeSpan.FromSeconds(5);
             int numTasks = 60;
             var tasks = new List<Task>(numTasks);
-            bool stillRunning = true;
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var token = cts.Token;
 
             var builder = ClientTestUtil.GetBasicSchema()
                 .SetTableName("TestMultipleSessions")
@@ -51,7 +51,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             {
                 var task = Task.Run(async () =>
                 {
-                    while (Volatile.Read(ref stillRunning))
+                    while (!token.IsCancellationRequested)
                     {
                         await using var session = _client.NewSession();
 
@@ -70,9 +70,6 @@ namespace Knet.Kudu.Client.FunctionalTests
 
                 tasks.Add(task);
             }
-
-            await Task.Delay(testRunTime);
-            Volatile.Write(ref stillRunning, false);
 
             await Task.WhenAll(tasks);
         }
