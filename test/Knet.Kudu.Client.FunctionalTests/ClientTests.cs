@@ -29,6 +29,10 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _harness.DisposeAsync();
         }
 
+        /// <summary>
+        /// Stress test which performs upserts from many sessions on different threads
+        /// sharing the same KuduClient and KuduTable instance.
+        /// </summary>
         [SkippableFact]
         public async Task TestMultipleSessions()
         {
