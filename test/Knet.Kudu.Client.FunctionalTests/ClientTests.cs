@@ -32,7 +32,7 @@ namespace Knet.Kudu.Client.FunctionalTests
         [SkippableFact]
         public async Task TestMultipleSessions()
         {
-            var testRunTime = TimeSpan.FromSeconds(10);
+            var testRunTime = TimeSpan.FromSeconds(5);
             int numTasks = 60;
             var tasks = new List<Task>(numTasks);
             bool stillRunning = true;
