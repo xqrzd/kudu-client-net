@@ -38,14 +38,15 @@ namespace Knet.Kudu.Client.FunctionalTests
         {
             int numTasks = 60;
             var tasks = new List<Task>(numTasks);
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            var token = cts.Token;
 
             var builder = ClientTestUtil.GetBasicSchema()
                 .SetTableName("TestMultipleSessions")
                 .CreateBasicRangePartition();
 
             var table = await _client.CreateTableAsync(builder);
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var token = cts.Token;
 
             for (int i = 0; i < numTasks; i++)
             {
