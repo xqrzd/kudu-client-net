@@ -17,7 +17,10 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
 {
     public class MiniKuduCluster : IAsyncDisposable
     {
-        private static readonly SemaphoreSlim _testLimiter = new SemaphoreSlim(8, 8);
+        // Hack-fix to avoid resource issues on CI.
+        private static readonly int _maxConcurrentClusters = Environment.ProcessorCount * 2;
+        private static readonly SemaphoreSlim _testLimiter = new SemaphoreSlim(
+            _maxConcurrentClusters, _maxConcurrentClusters);
 
         private readonly CreateClusterRequestPB _createClusterRequestPB;
         private readonly Dictionary<HostAndPort, DaemonInfo> _masterServers;
