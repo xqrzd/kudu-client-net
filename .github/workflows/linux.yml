@@ -20,7 +20,7 @@ jobs:
       with:
         dotnet-version: 3.1.201
     - name: Install Apache Kudu
-      run:
+      run: |
         wget --output-document=kudu-binary.jar https://repository.apache.org/content/repositories/orgapachekudu-1061/org/apache/kudu/kudu-binary/1.12.0/kudu-binary-1.12.0-linux-x86_64.jar
         unzip kudu-binary.jar
         mv kudu-binary-1.12.0-linux-x86_64 kudu-binary
