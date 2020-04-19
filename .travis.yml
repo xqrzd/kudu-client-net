@@ -14,9 +14,9 @@ env:
 install:
   # Install Kudu binary for integration tests
   # https://kudu.apache.org/2019/03/19/testing-apache-kudu-applications-on-the-jvm.html
-  - wget --output-document=kudu-binary.jar https://repository.apache.org/content/repositories/releases/org/apache/kudu/kudu-binary/1.11.1/kudu-binary-1.11.1-linux-x86_64.jar
+  - wget --output-document=kudu-binary.jar https://repository.apache.org/content/repositories/orgapachekudu-1061/org/apache/kudu/kudu-binary/1.12.0/kudu-binary-1.12.0-linux-x86_64.jar
   - unzip kudu-binary.jar
-  - mv kudu-binary-1.11.1-linux-x86_64 kudu-binary
+  - mv kudu-binary-1.12.0-linux-x86_64 kudu-binary
   - chmod +x kudu-binary/bin/kudu
   - chmod +x kudu-binary/bin/kudu-master
   - chmod +x kudu-binary/bin/kudu-tserver
