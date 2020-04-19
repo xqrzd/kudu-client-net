@@ -19,10 +19,10 @@ namespace Knet.Kudu.Client.FunctionalTests
         [InlineData(false)]
         public async Task TestFailover(bool restart)
         {
-            await using var harness = new MiniKuduClusterBuilder()
+            await using var harness = await new MiniKuduClusterBuilder()
                 .NumMasters(3)
                 .NumTservers(3)
-                .BuildHarness();
+                .BuildHarnessAsync();
 
             await using var client = harness.CreateClient();
 

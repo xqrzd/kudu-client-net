@@ -12,23 +12,21 @@ namespace Knet.Kudu.Client.FunctionalTests
     public class MultiMasterAuthzTokenTests : IAsyncLifetime
     {
         private readonly string _tableName = "TestMultiMasterAuthzToken-table";
-        private readonly KuduTestHarness _harness;
-        private readonly KuduClient _client;
+        private KuduTestHarness _harness;
+        private KuduClient _client;
 
-        public MultiMasterAuthzTokenTests()
+        public async Task InitializeAsync()
         {
-            _harness = new MiniKuduClusterBuilder()
+            _harness = await new MiniKuduClusterBuilder()
                 .AddMasterServerFlag("--authz_token_validity_seconds=1")
                 .AddTabletServerFlag("--tserver_enforce_access_control=true")
                 // Inject invalid tokens such that operations will be forced to go
                 // back to the master for an authz token.
                 .AddTabletServerFlag("--tserver_inject_invalid_authz_token_ratio=0.5")
-                .BuildHarness();
+                .BuildHarnessAsync();
 
             _client = _harness.CreateClient();
         }
-
-        public Task InitializeAsync() => Task.CompletedTask;
 
         public async Task DisposeAsync()
         {
@@ -50,22 +48,22 @@ namespace Knet.Kudu.Client.FunctionalTests
             var table = await _client.CreateTableAsync(builder);
 
             // Restart the masters to trigger an election.
-            _harness.KillAllMasterServers();
-            _harness.StartAllMasterServers();
+            await _harness.KillAllMasterServersAsync();
+            await _harness.StartAllMasterServersAsync();
 
             int numReqs = 10;
             await InsertRowsAsync(session, table, 0, numReqs);
             await session.FlushAsync();
 
             // Do the same for batches of inserts.
-            _harness.KillAllMasterServers();
-            _harness.StartAllMasterServers();
+            await _harness.KillAllMasterServersAsync();
+            await _harness.StartAllMasterServersAsync();
             await InsertRowsAsync(session, table, numReqs, numReqs);
             await session.FlushAsync();
 
             // And for scans.
-            _harness.KillAllMasterServers();
-            _harness.StartAllMasterServers();
+            await _harness.KillAllMasterServersAsync();
+            await _harness.StartAllMasterServersAsync();
             for (int i = 0; i < numReqs; i++)
             {
                 var numRows = await ClientTestUtil.CountRowsAsync(_client, table);

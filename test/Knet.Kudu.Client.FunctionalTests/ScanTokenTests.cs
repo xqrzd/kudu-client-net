@@ -12,18 +12,16 @@ namespace Knet.Kudu.Client.FunctionalTests
     public class ScanTokenTests : IAsyncLifetime
     {
         private readonly string _tableName = "TestScanToken";
-        private readonly KuduTestHarness _harness;
-        private readonly KuduClient _client;
-        private readonly IKuduSession _session;
+        private KuduTestHarness _harness;
+        private KuduClient _client;
+        private IKuduSession _session;
 
-        public ScanTokenTests()
+        public async Task InitializeAsync()
         {
-            _harness = new MiniKuduClusterBuilder().BuildHarness();
+            _harness = await new MiniKuduClusterBuilder().BuildHarnessAsync();
             _client = _harness.CreateClient();
             _session = _client.NewSession();
         }
-
-        public Task InitializeAsync() => Task.CompletedTask;
 
         public async Task DisposeAsync()
         {

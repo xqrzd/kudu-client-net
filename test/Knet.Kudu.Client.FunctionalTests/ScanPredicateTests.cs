@@ -12,18 +12,16 @@ namespace Knet.Kudu.Client.FunctionalTests
     [MiniKuduClusterTest]
     public class ScanPredicateTests : IAsyncLifetime
     {
-        private readonly KuduTestHarness _harness;
-        private readonly KuduClient _client;
-        private readonly IKuduSession _session;
+        private KuduTestHarness _harness;
+        private KuduClient _client;
+        private IKuduSession _session;
 
-        public ScanPredicateTests()
+        public async Task InitializeAsync()
         {
-            _harness = new MiniKuduClusterBuilder().BuildHarness();
+            _harness = await new MiniKuduClusterBuilder().BuildHarnessAsync();
             _client = _harness.CreateClient();
             _session = _client.NewSession();
         }
-
-        public Task InitializeAsync() => Task.CompletedTask;
 
         public async Task DisposeAsync()
         {

@@ -12,7 +12,7 @@ namespace Knet.Kudu.Client.FunctionalTests
     public class ScanMultiTabletTests : IAsyncLifetime
     {
         private readonly string _tableName = "ScanMultiTabletTests";
-        private readonly KuduTestHarness _harness;
+        private KuduTestHarness _harness;
         private KuduClient _client;
         private IKuduSession _session;
 
@@ -24,13 +24,10 @@ namespace Knet.Kudu.Client.FunctionalTests
         /// </summary>
         private long _beforeWriteTimestamp;
 
-        public ScanMultiTabletTests()
-        {
-            _harness = new MiniKuduClusterBuilder().BuildHarness();
-        }
-
         public async Task InitializeAsync()
         {
+            _harness = await new MiniKuduClusterBuilder().BuildHarnessAsync();
+
             await using var client = _harness.CreateClient();
             await using var session = client.NewSession();
 

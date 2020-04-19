@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using System.Threading.Tasks;
 using Knet.Kudu.Client.Protocol.Tools;
 
 namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
@@ -19,7 +20,7 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
         /// <summary>
         /// Builds and starts a new <see cref="MiniKuduCluster"/>.
         /// </summary>
-        public MiniKuduCluster Build()
+        public async Task<MiniKuduCluster> BuildAsync()
         {
             if (string.IsNullOrWhiteSpace(_options.ClusterRoot))
             {
@@ -29,13 +30,13 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
             }
 
             var miniCluster = new MiniKuduCluster(_options);
-            miniCluster.Start();
+            await miniCluster.StartAsync();
             return miniCluster;
         }
 
-        public KuduTestHarness BuildHarness()
+        public async Task<KuduTestHarness> BuildHarnessAsync()
         {
-            var miniCluster = Build();
+            var miniCluster = await BuildAsync();
             return new KuduTestHarness(miniCluster, disposeMiniCluster: true);
         }
 

@@ -25,7 +25,7 @@ namespace Knet.Kudu.Client.FunctionalTests
         [SkippableFact]
         public async Task TestIterable()
         {
-            using var miniCluster = new MiniKuduClusterBuilder().Build();
+            await using var miniCluster = await new MiniKuduClusterBuilder().BuildAsync();
             await using var client = miniCluster.CreateClient();
             await using var session = client.NewSession();
 
@@ -83,7 +83,7 @@ namespace Knet.Kudu.Client.FunctionalTests
         [SkippableFact]
         public async Task TestOpenScanWithDroppedPartition()
         {
-            using var miniCluster = new MiniKuduClusterBuilder().Build();
+            await using var miniCluster = await new MiniKuduClusterBuilder().BuildAsync();
             await using var client = miniCluster.CreateClient();
 
             var builder = ClientTestUtil.GetBasicSchema()
@@ -144,9 +144,9 @@ namespace Knet.Kudu.Client.FunctionalTests
         [SkippableFact]
         public async Task TestDiffScan()
         {
-            using var miniCluster = new MiniKuduClusterBuilder()
+            await using var miniCluster = await new MiniKuduClusterBuilder()
                 .AddTabletServerFlag("--flush_threshold_secs=1")
-                .Build();
+                .BuildAsync();
             await using var client = miniCluster.CreateClient();
 
             var builder = new TableBuilder("TestDiffScan")
@@ -277,7 +277,7 @@ namespace Knet.Kudu.Client.FunctionalTests
         [SkippableFact]
         public async Task TestDiffScanIsDeleted()
         {
-            using var miniCluster = new MiniKuduClusterBuilder().Build();
+            await using var miniCluster = await new MiniKuduClusterBuilder().BuildAsync();
             await using var client = miniCluster.CreateClient();
 
             var builder = new TableBuilder("TestDiffScanIsDeleted")

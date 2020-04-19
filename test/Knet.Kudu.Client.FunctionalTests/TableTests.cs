@@ -12,10 +12,10 @@ namespace Knet.Kudu.Client.FunctionalTests
     {
         private readonly string _tableName = "TestKuduTable";
 
-        [SkippableFact(Skip = "Requires Kudu 1.11")]
+        [SkippableFact]
         public async Task TestDimensionLabel()
         {
-            await using var harness = new MiniKuduClusterBuilder().BuildHarness();
+            await using var harness = await new MiniKuduClusterBuilder().BuildHarnessAsync();
             await using var client = harness.CreateClient();
 
             // Create a table with dimension label.
@@ -52,13 +52,13 @@ namespace Knet.Kudu.Client.FunctionalTests
             });
         }
 
-        [SkippableFact(Skip = "Requires Kudu 1.11")]
+        [SkippableFact]
         public async Task TestGetTableStatistics()
         {
-            await using var harness = new MiniKuduClusterBuilder()
+            await using var harness = await new MiniKuduClusterBuilder()
                 .AddTabletServerFlag("--update_tablet_stats_interval_ms=200")
                 .AddTabletServerFlag("--heartbeat_interval_ms=100")
-                .BuildHarness();
+                .BuildHarnessAsync();
 
             await using var client = harness.CreateClient();
 
@@ -82,6 +82,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 // Insert row.
                 var insert = ClientTestUtil.CreateBasicSchemaInsert(table, i);
                 await session.EnqueueAsync(insert);
+                await session.FlushAsync();
                 int numRows = await ClientTestUtil.CountRowsAsync(client, table);
                 Assert.Equal(i + 1, numRows);
             }

@@ -13,10 +13,10 @@ namespace Knet.Kudu.Client.FunctionalTests
         [SkippableFact]
         public async Task CreateAndDeleteTable()
         {
-            using var miniCluster = new MiniKuduClusterBuilder()
+            await using var miniCluster = await new MiniKuduClusterBuilder()
                 .NumMasters(3)
                 .NumTservers(3)
-                .Build();
+                .BuildAsync();
 
             await using var client = miniCluster.CreateClient();
 
