@@ -12,8 +12,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      KUDU_BIN_PATH: '${{ env.GITHUB_WORKSPACE }}/kudu-binary/bin'
-      SASL_PATH: '${{ env.GITHUB_WORKSPACE }}/kudu-binary/lib/sasl2'
+      KUDU_BIN_PATH: ${{ github.workspace }}/kudu-binary/bin
+      SASL_PATH: ${{ github.workspace }}/kudu-binary/lib/sasl2
 
     steps:
     - uses: actions/checkout@v2
