@@ -25,10 +25,10 @@ namespace Knet.Kudu.Client.FunctionalTests
             int numIterations = 10;
             int totalRowsToInsert = rowsPerIteration + numIterations * rowsPerIteration;
 
-            await using var harness = new MiniKuduClusterBuilder()
+            await using var harness = await new MiniKuduClusterBuilder()
                 .NumMasters(3)
                 .NumTservers(3)
-                .BuildHarness();
+                .BuildHarnessAsync();
 
             await using var client = harness.CreateClient();
 
@@ -71,7 +71,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 await session.FlushAsync();
 
                 if (!restart)
-                    harness.StartAllTabletServers();
+                    await harness.StartAllTabletServersAsync();
 
                 rowCount = await ClientTestUtil.CountRowsAsync(client, table);
                 Assert.Equal(currentRows, rowCount);

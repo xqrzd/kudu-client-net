@@ -19,18 +19,18 @@ namespace Knet.Kudu.Client.FunctionalTests
         [InlineData(KillBefore.ScanTable, false)]
         public async Task TestMasterFailover(KillBefore killBefore, bool restart)
         {
-            await using var harness = new MiniKuduClusterBuilder()
+            await using var harness = await new MiniKuduClusterBuilder()
                 .NumMasters(3)
                 .NumTservers(3)
-                .BuildHarness();
+                .BuildHarnessAsync();
 
             if (killBefore == KillBefore.CreateClient)
-                await DoAction();
+                await DoActionAsync();
 
             await using var client = harness.CreateClient();
 
             if (killBefore == KillBefore.CreateTable)
-                await DoAction();
+                await DoActionAsync();
 
             var tableName = $"TestMasterFailover-killBefore={killBefore}";
             var builder = new TableBuilder()
@@ -44,12 +44,12 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(tableName, table.TableName);
 
             if (killBefore == KillBefore.OpenTable)
-                await DoAction();
+                await DoActionAsync();
 
             var table2 = await client.OpenTableAsync(tableName);
 
             if (killBefore == KillBefore.ScanTable)
-                await DoAction();
+                await DoActionAsync();
 
             var scanner = client.NewScanBuilder(table2)
                 .Build();
@@ -59,7 +59,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 Assert.True(false, "Scanner returned rows, but no rows were written");
             }
 
-            ValueTask DoAction()
+            Task DoActionAsync()
             {
                 if (restart)
                     return harness.RestartLeaderMasterAsync();

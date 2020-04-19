@@ -18,24 +18,26 @@ namespace Knet.Kudu.Client.FunctionalTests
         private readonly int _numTablets = 3;
         private readonly int _numRows = 20000;
 
-        private readonly KuduTestHarness _harness;
-        private readonly KuduClient _client;
-        private readonly IKuduSession _session;
         private readonly Random _random;
+
+        private AsyncKuduTestHarness _harness;
+        private KuduClient _client;
+        private IKuduSession _session;
 
         private KuduTable _table;
         private HashSet<int> _keys;
 
         public ScannerFaultToleranceTests()
         {
-            _harness = new MiniKuduClusterBuilder().BuildHarness();
-            _client = _harness.CreateClient();
-            _session = _client.NewSession();
             _random = new Random();
         }
 
         public async Task InitializeAsync()
         {
+            _harness = await new MiniKuduClusterBuilder().BuildHarnessAsync();
+            _client = _harness.CreateClient();
+            _session = _client.NewSession();
+
             var builder = ClientTestUtil.GetBasicSchema()
                 .SetTableName("ScannerFaultToleranceTests")
                 .AddHashPartitions(_numTablets, "key");
