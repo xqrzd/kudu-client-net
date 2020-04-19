@@ -17,6 +17,8 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
 {
     public class MiniKuduCluster : IAsyncDisposable
     {
+        private static readonly SemaphoreSlim _testLimiter = new SemaphoreSlim(8, 8);
+
         private readonly CreateClusterRequestPB _createClusterRequestPB;
         private readonly Dictionary<HostAndPort, DaemonInfo> _masterServers;
         private readonly Dictionary<HostAndPort, DaemonInfo> _tabletServers;
@@ -40,6 +42,7 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
 
         public async Task StartAsync()
         {
+            await _testLimiter.WaitAsync();
             Directory.CreateDirectory(_createClusterRequestPB.ClusterRoot);
 
             var kuduExe = KuduBinaryLocator.FindBinary("kudu");
@@ -108,6 +111,8 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
 
         public async ValueTask DisposeAsync()
         {
+            _testLimiter.Release();
+
             await StdIn.DisposeAsync();
             await StdOut.DisposeAsync();
             await StdErr.DisposeAsync();
