@@ -8,6 +8,7 @@ using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protocol.Tools;
 using Knet.Kudu.Client.Util;
+using Microsoft.Extensions.Logging;
 using ProtoBuf;
 
 namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
@@ -122,7 +123,16 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
 
         public KuduClient CreateClient()
         {
-            return KuduClient.NewBuilder(_masterServers.Keys.ToList()).Build();
+            var loggerFactory = LoggerFactory.Create(builder =>
+            {
+                builder
+                    .SetMinimumLevel(LogLevel.Trace)
+                    .AddConsole();
+            });
+
+            return KuduClient.NewBuilder(_masterServers.Keys.ToList())
+                .SetLoggerFactory(loggerFactory)
+                .Build();
         }
 
         /// <summary>
@@ -187,7 +197,7 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
 
         /// <summary>
         /// Kills a tablet server identified identified by an host and port.
-        /// Does nothing if the master was already dead.
+        /// Does nothing if the server was already dead.
         /// </summary>
         /// <param name="hostPort">Unique host and port identifying the server.</param>
         public void KillTabletServer(HostAndPort hostPort)
