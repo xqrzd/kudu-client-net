@@ -17,6 +17,8 @@ install:
   - unzip kudu-binary.jar
   - mv kudu-binary-1.12.0-linux-x86_64 kudu-binary
   - chmod +x kudu-binary/bin/kudu
+  - chmod +x kudu-binary/bin/kudu-master
+  - chmod +x kudu-binary/bin/kudu-tserver
 
 script:
   - dotnet build --configuration Release
