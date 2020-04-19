@@ -20,7 +20,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
         private readonly Random _random;
 
-        private AsyncKuduTestHarness _harness;
+        private KuduTestHarness _harness;
         private KuduClient _client;
         private IKuduSession _session;
 

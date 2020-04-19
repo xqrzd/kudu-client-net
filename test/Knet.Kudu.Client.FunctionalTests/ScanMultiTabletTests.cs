@@ -12,7 +12,7 @@ namespace Knet.Kudu.Client.FunctionalTests
     public class ScanMultiTabletTests : IAsyncLifetime
     {
         private readonly string _tableName = "ScanMultiTabletTests";
-        private AsyncKuduTestHarness _harness;
+        private KuduTestHarness _harness;
         private KuduClient _client;
         private IKuduSession _session;
 

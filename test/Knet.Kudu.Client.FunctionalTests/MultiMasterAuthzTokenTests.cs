@@ -12,7 +12,7 @@ namespace Knet.Kudu.Client.FunctionalTests
     public class MultiMasterAuthzTokenTests : IAsyncLifetime
     {
         private readonly string _tableName = "TestMultiMasterAuthzToken-table";
-        private AsyncKuduTestHarness _harness;
+        private KuduTestHarness _harness;
         private KuduClient _client;
 
         public async Task InitializeAsync()

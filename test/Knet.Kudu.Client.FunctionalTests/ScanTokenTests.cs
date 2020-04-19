@@ -12,7 +12,7 @@ namespace Knet.Kudu.Client.FunctionalTests
     public class ScanTokenTests : IAsyncLifetime
     {
         private readonly string _tableName = "TestScanToken";
-        private AsyncKuduTestHarness _harness;
+        private KuduTestHarness _harness;
         private KuduClient _client;
         private IKuduSession _session;
 

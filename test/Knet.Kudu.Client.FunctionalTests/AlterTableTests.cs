@@ -13,7 +13,7 @@ namespace Knet.Kudu.Client.FunctionalTests
     public class AlterTableTests : IAsyncLifetime
     {
         private readonly string _tableName = "AlterTableTests-table";
-        private AsyncKuduTestHarness _harness;
+        private KuduTestHarness _harness;
         private KuduClient _client;
         private IKuduSession _session;
 

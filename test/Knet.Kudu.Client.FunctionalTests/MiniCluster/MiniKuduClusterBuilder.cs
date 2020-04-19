@@ -20,7 +20,7 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
         /// <summary>
         /// Builds and starts a new <see cref="MiniKuduCluster"/>.
         /// </summary>
-        public MiniKuduCluster Build()
+        public async Task<MiniKuduCluster> BuildAsync()
         {
             if (string.IsNullOrWhiteSpace(_options.ClusterRoot))
             {
@@ -30,37 +30,14 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
             }
 
             var miniCluster = new MiniKuduCluster(_options);
-            miniCluster.Start();
-            return miniCluster;
-        }
-
-        /// <summary>
-        /// Builds and starts a new <see cref="AsyncMiniKuduCluster"/>.
-        /// </summary>
-        public async Task<AsyncMiniKuduCluster> BuildAsync()
-        {
-            if (string.IsNullOrWhiteSpace(_options.ClusterRoot))
-            {
-                _options.ClusterRoot = Path.Combine(
-                    Path.GetTempPath(),
-                    $"mini-kudu-cluster-{Path.GetFileNameWithoutExtension(Path.GetRandomFileName())}");
-            }
-
-            var miniCluster = new AsyncMiniKuduCluster(_options);
             await miniCluster.StartAsync();
             return miniCluster;
         }
 
-        public KuduTestHarness BuildHarness()
-        {
-            var miniCluster = Build();
-            return new KuduTestHarness(miniCluster, disposeMiniCluster: true);
-        }
-
-        public async Task<AsyncKuduTestHarness> BuildHarnessAsync()
+        public async Task<KuduTestHarness> BuildHarnessAsync()
         {
             var miniCluster = await BuildAsync();
-            return new AsyncKuduTestHarness(miniCluster, disposeMiniCluster: true);
+            return new KuduTestHarness(miniCluster, disposeMiniCluster: true);
         }
 
         public MiniKuduClusterBuilder NumMasters(int numMasters)
