@@ -6,14 +6,14 @@ using Xunit;
 
 namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
 {
-    public class KuduTestHarness : IAsyncDisposable
+    public class AsyncKuduTestHarness : IAsyncDisposable
     {
-        private readonly MiniKuduCluster _miniCluster;
+        private readonly AsyncMiniKuduCluster _miniCluster;
         private readonly bool _disposeMiniCluster;
         private readonly KuduClient _client;
 
-        public KuduTestHarness(
-            MiniKuduCluster miniCluster,
+        public AsyncKuduTestHarness(
+            AsyncMiniKuduCluster miniCluster,
             bool disposeMiniCluster = false)
         {
             _miniCluster = miniCluster;
@@ -26,28 +26,30 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
             await _client.DisposeAsync();
 
             if (_disposeMiniCluster)
-                _miniCluster.Dispose();
+                await _miniCluster.DisposeAsync();
         }
 
         public KuduClient CreateClient() => _miniCluster.CreateClient();
 
+        public KuduClientBuilder CreateClientBuilder() => _miniCluster.CreateClientBuilder();
+
         /// <summary>
         /// Helper method to easily kill the leader master.
         /// </summary>
-        public async ValueTask KillLeaderMasterServerAsync()
+        public async Task KillLeaderMasterServerAsync()
         {
             var hostPort = await _client.FindLeaderMasterServerAsync();
-            _miniCluster.KillMasterServer(hostPort);
+            await _miniCluster.KillMasterServerAsync(hostPort);
         }
 
         /// <summary>
         /// Kills and restarts the leader master.
         /// </summary>
-        public async ValueTask RestartLeaderMasterAsync()
+        public async Task RestartLeaderMasterAsync()
         {
             var hostPort = await _client.FindLeaderMasterServerAsync();
-            _miniCluster.KillMasterServer(hostPort);
-            _miniCluster.StartMasterServer(hostPort);
+            await _miniCluster.KillMasterServerAsync(hostPort);
+            await _miniCluster.StartMasterServerAsync(hostPort);
         }
 
         /// <summary>
@@ -57,57 +59,57 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
         /// or if the tablet server was already killed.
         /// </summary>
         /// <param name="tablet">A RemoteTablet which will get its leader killed.</param>
-        public async ValueTask KillTabletLeaderAsync(RemoteTablet tablet)
+        public async Task KillTabletLeaderAsync(RemoteTablet tablet)
         {
             var hostPort = await FindLeaderTabletServerAsync(tablet);
-            _miniCluster.KillTabletServer(hostPort);
+            await _miniCluster.KillTabletServerAsync(hostPort);
         }
 
         /// <summary>
         /// Kills a tablet server that serves the given tablet's leader and restarts it.
         /// </summary>
         /// <param name="tablet">A RemoteTablet which will get its leader killed and restarted.</param>
-        public async ValueTask RestartTabletServerAsync(RemoteTablet tablet)
+        public async Task RestartTabletServerAsync(RemoteTablet tablet)
         {
             var hostPort = await FindLeaderTabletServerAsync(tablet);
-            _miniCluster.KillTabletServer(hostPort);
-            _miniCluster.StartTabletServer(hostPort);
+            await _miniCluster.KillTabletServerAsync(hostPort);
+            await _miniCluster.StartTabletServerAsync(hostPort);
         }
 
         /// <summary>
         /// Starts all the master servers.
         /// Does nothing to the servers that are already running.
         /// </summary>
-        public void StartAllMasterServers()
+        public Task StartAllMasterServersAsync()
         {
-            _miniCluster.StartAllMasterServers();
+            return _miniCluster.StartAllMasterServersAsync();
         }
 
         /// <summary>
         /// Kills all the master servers.
         /// Does nothing to the servers that are already dead.
         /// </summary>
-        public void KillAllMasterServers()
+        public Task KillAllMasterServersAsync()
         {
-            _miniCluster.KillAllMasterServers();
+            return _miniCluster.KillAllMasterServersAsync();
         }
 
         /// <summary>
         /// Starts all the tablet servers.
         /// Does nothing to the servers that are already running.
         /// </summary>
-        public void StartAllTabletServers()
+        public Task StartAllTabletServersAsync()
         {
-            _miniCluster.StartAllTabletServers();
+            return _miniCluster.StartAllTabletServersAsync();
         }
 
         /// <summary>
         /// Kills all the tablet servers.
         /// Does nothing to the servers that are already dead.
         /// </summary>
-        public void KillAllTabletServers()
+        public Task KillAllTabletServersAsync()
         {
-            _miniCluster.KillAllTabletServers();
+            return _miniCluster.KillAllTabletServersAsync();
         }
 
         /// <summary>
@@ -115,9 +117,9 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
         /// Does nothing if the master was already dead.
         /// </summary>
         /// <param name="hostPort">Unique host and port identifying the server.</param>
-        public void KillMasterServer(HostAndPort hostPort)
+        public Task KillMasterServerAsync(HostAndPort hostPort)
         {
-            _miniCluster.KillMasterServer(hostPort);
+            return _miniCluster.KillMasterServerAsync(hostPort);
         }
 
         /// <summary>
@@ -125,9 +127,9 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
         /// Does nothing if the server was already dead.
         /// </summary>
         /// <param name="hostPort">Unique host and port identifying the server.</param>
-        public void KillTabletServer(HostAndPort hostPort)
+        public Task KillTabletServerAsync(HostAndPort hostPort)
         {
-            _miniCluster.KillTabletServer(hostPort);
+            return _miniCluster.KillTabletServerAsync(hostPort);
         }
 
         /// <summary>
@@ -135,9 +137,9 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
         /// Does nothing if the server was already running.
         /// </summary>
         /// <param name="hostPort">Unique host and port identifying the server.</param>
-        public void StartMasterServer(HostAndPort hostPort)
+        public Task StartMasterServerAsync(HostAndPort hostPort)
         {
-            _miniCluster.StartMasterServer(hostPort);
+            return _miniCluster.StartMasterServerAsync(hostPort);
         }
 
         /// <summary>
@@ -145,9 +147,9 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
         /// Does nothing if the server was already running.
         /// </summary>
         /// <param name="hostPort">Unique host and port identifying the server.</param>
-        public void StartTabletServer(HostAndPort hostPort)
+        public Task StartTabletServerAsync(HostAndPort hostPort)
         {
-            _miniCluster.StartTabletServer(hostPort);
+            return _miniCluster.StartTabletServerAsync(hostPort);
         }
 
         /// <summary>

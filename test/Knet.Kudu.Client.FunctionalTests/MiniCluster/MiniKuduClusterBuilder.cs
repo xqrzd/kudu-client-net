@@ -57,6 +57,12 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
             return new KuduTestHarness(miniCluster, disposeMiniCluster: true);
         }
 
+        public async Task<AsyncKuduTestHarness> BuildHarnessAsync()
+        {
+            var miniCluster = await BuildAsync();
+            return new AsyncKuduTestHarness(miniCluster, disposeMiniCluster: true);
+        }
+
         public MiniKuduClusterBuilder NumMasters(int numMasters)
         {
             _options.NumMasters = numMasters;

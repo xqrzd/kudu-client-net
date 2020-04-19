@@ -346,7 +346,7 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
             {
                 int read = await StdErr.ReadAsync(buffer);
                 var text = Encoding.UTF8.GetString(buffer, 0, read);
-                Console.Error.Write(text);
+                Console.Error.WriteLine(text);
             }
         }
 
