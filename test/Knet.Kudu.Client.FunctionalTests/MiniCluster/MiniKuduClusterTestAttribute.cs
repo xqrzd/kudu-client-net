@@ -20,7 +20,7 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
                 try
                 {
                     // This method throws an exception if Kudu can't be found.
-                    KuduBinaryLocator.FindBinaryLocation();
+                    var location = KuduBinaryLocator.BinaryLocation;
                     return true;
                 }
                 catch { }
