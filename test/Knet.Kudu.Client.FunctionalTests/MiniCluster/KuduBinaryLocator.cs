@@ -8,26 +8,28 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
     {
         public static string FindBinaryLocation()
         {
+            var binPath = Environment.GetEnvironmentVariable("KUDU_BIN_PATH");
+            if (binPath != null && Directory.Exists(binPath))
+                return binPath;
+
             // If the `kudu` binary is found on the PATH using `which kudu`, use its parent directory.
             try
             {
-                using (var process = new Process())
-                {
-                    process.StartInfo.UseShellExecute = false;
-                    process.StartInfo.RedirectStandardOutput = true;
-                    process.StartInfo.FileName = "which";
-                    process.StartInfo.Arguments = "kudu";
-                    process.Start();
+                using var process = new Process();
+                process.StartInfo.UseShellExecute = false;
+                process.StartInfo.RedirectStandardOutput = true;
+                process.StartInfo.FileName = "which";
+                process.StartInfo.Arguments = "kudu";
+                process.Start();
 
-                    // To avoid deadlocks, always read the output stream first and then wait.
-                    string output = process.StandardOutput.ReadToEnd();
-                    process.WaitForExit();
+                // To avoid deadlocks, always read the output stream first and then wait.
+                string output = process.StandardOutput.ReadToEnd();
+                process.WaitForExit();
 
-                    if (process.ExitCode == 0)
-                        return Path.GetDirectoryName(output);
-                    else
-                        throw new Exception($"which kudu failed with exit code {process.ExitCode}");
-                }
+                if (process.ExitCode == 0)
+                    return Path.GetDirectoryName(output);
+                else
+                    throw new Exception($"which kudu failed with exit code {process.ExitCode}");
             }
             catch (Exception ex)
             {
