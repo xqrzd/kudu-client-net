@@ -1,0 +1,33 @@
+name: Linux CI
+
+on: [push]
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  KUDU_BIN_PATH: $GITHUB_WORKSPACE/kudu-binary/bin
+  SASL_PATH: $GITHUB_WORKSPACE/kudu-binary/lib/sasl2
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 3.1.201
+    - name: Install Apache Kudu
+      run:
+        wget --output-document=kudu-binary.jar https://repository.apache.org/content/repositories/orgapachekudu-1061/org/apache/kudu/kudu-binary/1.12.0/kudu-binary-1.12.0-linux-x86_64.jar
+        unzip kudu-binary.jar
+        mv kudu-binary-1.12.0-linux-x86_64 kudu-binary
+        chmod +x kudu-binary/bin/kudu
+        chmod +x kudu-binary/bin/kudu-master
+        chmod +x kudu-binary/bin/kudu-tserver
+    - name: Build
+      run: dotnet build --configuration Release
+    - name: Test
+      run: dotnet test --no-restore --no-build --configuration Release
