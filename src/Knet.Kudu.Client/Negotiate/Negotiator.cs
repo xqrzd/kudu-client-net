@@ -488,8 +488,16 @@ namespace Knet.Kudu.Client.Negotiate
         {
             do
             {
-                var read = await _stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
-                buffer = buffer.Slice(read);
+                var bytesReceived = await _stream.ReadAsync(buffer, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (bytesReceived <= 0)
+                {
+                    throw new RecoverableException(
+                        KuduStatus.NetworkError("Connection closed during negotiate"));
+                }
+
+                buffer = buffer.Slice(bytesReceived);
             } while (buffer.Length > 0);
         }
 
