@@ -200,7 +200,7 @@ namespace Knet.Kudu.Client
         /// <param name="timestamp">A long representing an instant in microseconds since the unix epoch.</param>
         public TBuilder SnapshotTimestampMicros(long timestamp)
         {
-            HtTimestamp = HybridTimeUtil.PhysicalAndLogicalToHTTimestamp(timestamp, 0);
+            HtTimestamp = HybridTimeUtil.PhysicalAndLogicalToHtTimestamp(timestamp, 0);
             return (TBuilder)this;
         }
 
