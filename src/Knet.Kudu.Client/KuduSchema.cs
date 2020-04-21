@@ -233,7 +233,10 @@ namespace Knet.Kudu.Client
                 case KuduType.Int16:
                 case KuduType.Int32:
                 case KuduType.Int64:
-                    //case DataType.Int128: Not supported in Kudu yet.
+                case KuduType.UnixtimeMicros:
+                case KuduType.Decimal32:
+                case KuduType.Decimal64:
+                case KuduType.Decimal128:
                     return true;
                 default:
                     return false;
