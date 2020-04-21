@@ -132,7 +132,7 @@ namespace Knet.Kudu.Client.Tablet
                 slice.Reverse();
 
                 if (column.IsSigned)
-                    slice.SwapMostSignificantBitBigEndian();
+                    KuduEncoder.XorLeftMostBit(slice);
 
                 bytesWritten = size;
             }

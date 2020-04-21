@@ -256,6 +256,14 @@ namespace Knet.Kudu.Client.Util
 
         public static int BitsToBytes(int bits) => (int)(((uint)bits + 7) / 8);
 
+        /// <summary>
+        /// This method will apply xor on the left most bit of the first byte in
+        /// the buffer. This is used in Kudu to have unsigned data types sorting
+        /// correctly.
+        /// </summary>
+        /// <param name="buffer">Buffer whose left most bit will be xor'd.</param>
+        public static byte XorLeftMostBit(Span<byte> buffer) => buffer[0] ^= 1 << 7;
+
         private static byte[] EncodeDefaultDecimal(decimal value)
         {
             var scale = DecimalUtil.GetScale(value);
