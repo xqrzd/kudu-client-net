@@ -22,12 +22,6 @@ namespace Knet.Kudu.Client.Util
         public static HostAndPort ToHostAndPort(this HostPortPB hostPort) =>
             new HostAndPort(hostPort.Host, (int)hostPort.Port);
 
-        public static void SwapMostSignificantBitBigEndian(this byte[] span) =>
-            span[0] ^= 1 << 7;
-
-        public static void SwapMostSignificantBitBigEndian(this Span<byte> span) =>
-            span[0] ^= 1 << 7;
-
         public static int SequenceCompareTo<T>(this T[] array, ReadOnlySpan<T> other)
             where T : IComparable<T> => MemoryExtensions.SequenceCompareTo(array, other);
 

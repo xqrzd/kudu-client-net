@@ -169,9 +169,7 @@ namespace Knet.Kudu.Client.Tests
             Assert.Equal(12, column5.TypeAttributes.Precision);
             Assert.Equal(4, column5.TypeAttributes.Scale);
             Assert.Equal(8, column5.Size);
-            // TODO: Decimal types are written as signed integers.
-            // Should this reflect that?
-            Assert.False(column5.IsSigned);
+            Assert.True(column5.IsSigned);
 
             Assert.Equal(5, schema.GetColumnIndex(name: "timestamp"));
             Assert.Equal(5, schema.GetColumnIndex(id: 5));
@@ -185,9 +183,7 @@ namespace Knet.Kudu.Client.Tests
             Assert.Equal(CompressionType.DefaultCompression, column6.Compression);
             Assert.Null(column6.TypeAttributes);
             Assert.Equal(8, column6.Size);
-            // TODO: Timestamp types are written as signed integers.
-            // Should this reflect that?
-            Assert.False(column6.IsSigned);
+            Assert.True(column6.IsSigned);
 
             Assert.Equal(6, schema.GetColumnIndex(name: "double"));
             Assert.Equal(6, schema.GetColumnIndex(id: 6));
