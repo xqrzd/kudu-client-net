@@ -75,23 +75,26 @@ namespace Knet.Kudu.Client.FunctionalTests
                 .Build();
             Assert.Equal(1 + keys.Length, await ClientTestUtil.CountRowsInScanAsync(scanner));
 
-            // Now scan at multiple snapshots with READ_AT_SNAPSHOT. The logical timestamp from the 'i'th
-            // row (counted from 0) combined with the latest physical timestamp should observe 'i + 1' rows.
+            // Now scan at multiple snapshots with READ_AT_SNAPSHOT. The logical timestamp
+            // from the 'i'th row (counted from 0) combined with the latest physical timestamp
+            // should observe 'i + 1' rows.
             for (int i = 0; i < logicalValues.Count; i++)
             {
                 logicalValue = logicalValues[i];
-                long snapshotTime = HybridTimeUtil.PhysicalAndLogicalToHtTimestamp(futureTs, logicalValue);
+                long snapshotTime = HybridTimeUtil.PhysicalAndLogicalToHtTimestamp(
+                    futureTs, logicalValue);
                 int expected = i + 1;
                 int numRows = await ScanAtSnapshotAsync(snapshotTime);
                 Assert.Equal(expected, numRows);
             }
 
-            // The last snapshots needs to be one into the future w.r.t. the last write's timestamp
-            // to get all rows, but the snapshot timestamp can't be bigger than the propagated
-            // timestamp. Ergo increase the propagated timestamp first.
+            // The last snapshots needs to be one into the future w.r.t. the last write's
+            // timestamp to get all rows, but the snapshot timestamp can't be bigger than
+            // the propagated timestamp. Ergo increase the propagated timestamp first.
             long latestLogicalValue = logicalValues[^1];
             _client.LastPropagatedTimestamp++;
-            long snapshotTime2 = HybridTimeUtil.PhysicalAndLogicalToHtTimestamp(futureTs, latestLogicalValue + 1);
+            long snapshotTime2 = HybridTimeUtil.PhysicalAndLogicalToHtTimestamp(
+                futureTs, latestLogicalValue + 1);
             int numRows2 = await ScanAtSnapshotAsync(snapshotTime2);
             Assert.Equal(1 + keys.Length, numRows2);
         }
