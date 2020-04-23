@@ -94,11 +94,10 @@ namespace Knet.Kudu.Client.Requests
     {
         public override string ServiceName => TabletServerServiceName;
 
-        public long PropagatedTimestamp { get; set; } = -1;
+        public long PropagatedTimestamp { get; set; } = KuduClient.NoTimestamp;
 
         /// <summary>
-        /// Returns the partition key this RPC is for, or null if
-        /// the RPC is not tablet specific.
+        /// Returns the partition key this RPC is for.
         /// </summary>
         public byte[] PartitionKey { get; protected set; }
 
@@ -111,7 +110,7 @@ namespace Knet.Kudu.Client.Requests
         internal SignedTokenPB AuthzToken { get; set; }
 
         /// <summary>
-        /// Used to fetch an authz token if needed.
+        /// The table this RPC is for.
         /// </summary>
         public string TableId { get; protected set; }
 
