@@ -371,9 +371,7 @@ namespace Knet.Kudu.Client
                 tasks[i++] = task;
             }
 
-            var results = await Task.WhenAll(tasks).ConfigureAwait(false);
-            // TODO: Save timestamp.
-            return results;
+            return await Task.WhenAll(tasks).ConfigureAwait(false);
         }
 
         private async Task<WriteResponsePB> WriteAsync(

@@ -130,10 +130,9 @@ namespace Knet.Kudu.Client.Negotiate
                     new StreamPipeWriterOptions(leaveOpen: true));
 
                 var input = StreamConnection.GetReader(_stream,
-                    _options.ReceivePipeOptions,
-                    name: _serverInfo.ToString());
+                    _options.ReceivePipeOptions);
 
-                pipe = new DuplexPipe(output, input);
+                pipe = new DuplexPipe(output, input, _serverInfo.ToString());
             }
             else
             {
@@ -537,13 +536,16 @@ namespace Knet.Kudu.Client.Negotiate
 
             public PipeReader Input { get; }
 
-            public DuplexPipe(PipeWriter output, PipeReader input)
+            public string Name { get; }
+
+            public DuplexPipe(PipeWriter output, PipeReader input, string name)
             {
                 Output = output;
                 Input = input;
+                Name = name;
             }
 
-            public override string ToString() => Input.ToString();
+            public override string ToString() => Name;
         }
     }
 }
