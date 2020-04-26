@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -107,6 +106,7 @@ namespace Knet.Kudu.Client
                 {
                     _flushCts.Cancel();
                     await _flushTcs.Task.ConfigureAwait(false);
+                    // After this we'll have a new _flushCts for next time.
                 }
                 finally
                 {
@@ -229,17 +229,14 @@ namespace Knet.Kudu.Client
         private void CompletePendingFlush()
         {
             var flushCts = _flushCts;
-            Debug.Assert(flushCts.IsCancellationRequested);
-            if (flushCts.IsCancellationRequested)
-            {
-                // Make a new CancellationToken before releasing the
-                // flush task.
-                flushCts.Dispose();
-                _flushCts = new CancellationTokenSource();
 
-                // Complete the flush.
-                _flushTcs.TrySetResult(null);
-            }
+            // Make a new CancellationToken before releasing the
+            // flush task.
+            flushCts.Dispose();
+            _flushCts = new CancellationTokenSource();
+
+            // Complete the flush.
+            _flushTcs.TrySetResult(null);
         }
 
         private async Task SendAsync(List<KuduOperation> queue)
