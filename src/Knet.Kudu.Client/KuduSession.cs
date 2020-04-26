@@ -160,6 +160,12 @@ namespace Knet.Kudu.Client
                 }
             }
 
+            if (flushRequested)
+            {
+                Console.WriteLine("Short-circuit flush");
+                return true;
+            }
+
             try
             {
                 if (queue.Count == 0)
