@@ -175,7 +175,7 @@ namespace Knet.Kudu.Client
                 using var timeout = new CancellationTokenSource(_options.FlushInterval);
                 using var both = CancellationTokenSource.CreateLinkedTokenSource(
                     timeout.Token, flushToken);
-                CancellationToken cancellationToken = both.Token;
+                var cancellationToken = both.Token;
 
                 while (queue.Count < capacity)
                 {
@@ -185,14 +185,13 @@ namespace Knet.Kudu.Client
                     queue.Add(operation);
                 }
             }
-            catch (OperationCanceledException) when (flushToken.IsCancellationRequested)
+            catch (OperationCanceledException)
             {
                 while (queue.Count < capacity &&
                     reader.TryRead(out var operation))
                 {
                     queue.Add(operation);
                 }
-                flushRequested = true;
             }
             catch (ChannelClosedException) { }
 
