@@ -53,7 +53,6 @@ namespace Knet.Kudu.Client
 
         public async ValueTask DisposeAsync()
         {
-            // TODO: Handle pending flushes.
             _writer.TryComplete();
 
             await _consumeTask.ConfigureAwait(false);
