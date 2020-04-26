@@ -228,11 +228,9 @@ namespace Knet.Kudu.Client
 
         private void CompletePendingFlush()
         {
-            var flushCts = _flushCts;
-
             // Make a new CancellationToken before releasing the
             // flush task.
-            flushCts.Dispose();
+            _flushCts.Dispose();
             _flushCts = new CancellationTokenSource();
 
             // Complete the flush.
