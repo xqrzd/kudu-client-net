@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -53,7 +52,6 @@ namespace Knet.Kudu.Client
 
         public async ValueTask DisposeAsync()
         {
-            // TODO: Handle pending flushes.
             _writer.TryComplete();
 
             await _consumeTask.ConfigureAwait(false);
@@ -71,34 +69,53 @@ namespace Knet.Kudu.Client
 
         public async Task FlushAsync(CancellationToken cancellationToken = default)
         {
-            CancellationTokenRegistration registration = default;
+            var flushTask = DoFlushAsync();
 
-            await _singleFlush.WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (cancellationToken.CanBeCanceled)
+            {
+                var tcs = new TaskCompletionSource<object>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+
+                using var registration = cancellationToken.Register(
+                    s => ((TaskCompletionSource<object>)s).TrySetCanceled(),
+                    state: tcs,
+                    useSynchronizationContext: false);
+
+                var task = await Task.WhenAny(flushTask, tcs.Task).ConfigureAwait(false);
+                await task.ConfigureAwait(false);
+            }
+            else
+            {
+                await flushTask.ConfigureAwait(false);
+            }
+        }
+
+        private async Task DoFlushAsync()
+        {
+            await _singleFlush.WaitAsync().ConfigureAwait(false);
+
             try
             {
-                _flushCts.Cancel();
-
-                var flushTcs = _flushTcs;
-
-                if (cancellationToken.CanBeCanceled)
+                if (_reader.Completion.IsCompleted)
                 {
-                    registration = cancellationToken.Register(
-                        s => ((TaskCompletionSource<object>)s).TrySetCanceled(),
-                        state: flushTcs,
-                        useSynchronizationContext: false);
+                    // This session is disposed.
+                    return;
                 }
 
-                await flushTcs.Task.ConfigureAwait(false);
-                // TODO: After this we should have a new _flushCts for next time,
-                // *except* if the passed cancellationToken was cancelled.
+                try
+                {
+                    _flushCts.Cancel();
+                    await _flushTcs.Task.ConfigureAwait(false);
+                    // After this we'll have a new _flushCts for next time.
+                }
+                finally
+                {
+                    _flushTcs = new TaskCompletionSource<object>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                }
             }
             finally
             {
-                registration.Dispose();
-
-                _flushTcs = new TaskCompletionSource<object>(
-                    TaskCreationOptions.RunContinuationsAsynchronously);
-
                 _singleFlush.Release();
             }
         }
@@ -107,13 +124,13 @@ namespace Knet.Kudu.Client
         {
             var channelCompletionTask = _reader.Completion;
             int batchSize = _options.BatchSize;
-            var queue = new List<KuduOperation>(batchSize);
+            var batch = new List<KuduOperation>(batchSize);
 
             while (!channelCompletionTask.IsCompleted)
             {
-                bool flush = await DequeueAsync(queue).ConfigureAwait(false);
+                bool flush = await DequeueAsync(batch).ConfigureAwait(false);
 
-                if (queue.Count == 0)
+                if (batch.Count == 0)
                 {
                     // It's possible to read 0 items when,
                     // 1) A flush was triggered when the queue was empty.
@@ -127,110 +144,109 @@ namespace Knet.Kudu.Client
                     continue;
                 }
 
-                await SendAsync(queue).ConfigureAwait(false);
+                await SendAsync(batch).ConfigureAwait(false);
 
                 if (flush)
                 {
                     CompletePendingFlush();
                 }
 
-                queue.Clear();
+                batch.Clear();
             }
         }
 
-        private async Task<bool> DequeueAsync(List<KuduOperation> queue)
+        private async Task<bool> DequeueAsync(List<KuduOperation> batch)
         {
             ChannelReader<KuduOperation> reader = _reader;
             CancellationToken flushToken = _flushCts.Token;
             bool flushRequested = flushToken.IsCancellationRequested;
             int capacity = _options.BatchSize;
 
-            // First try to quickly drain any existing items
-            // in the queue, before we start waiting for new
-            // items to be added.
-            while (queue.Count < capacity &&
-                reader.TryRead(out var operation))
+            // First try to synchronously drain any existing queue items
+            // before we asynchronously wait until we've hit the capacity
+            // or flush interval.
+            while (reader.TryRead(out var operation))
             {
-                queue.Add(operation);
+                batch.Add(operation);
+
+                if (batch.Count >= capacity)
+                {
+                    // We've filled the batch, but we can't complete a pending
+                    // flush here as there may still be more items in the queue.
+                    return false;
+                }
             }
 
-            if (queue.Count == capacity)
+            if (flushRequested)
             {
-                // We can't complete a pending flush here, because we
-                // don't know if there are more items in the queue.
-                return false;
+                // Short-circuit if a flush was requested
+                // and we've completely emptied the queue.
+                return true;
             }
 
             try
             {
-                if (queue.Count == 0)
+                if (batch.Count == 0)
                 {
                     // Wait indefinitely for the first operation.
                     KuduOperation operation = await reader.ReadAsync(flushToken)
                         .ConfigureAwait(false);
 
-                    queue.Add(operation);
+                    batch.Add(operation);
                 }
 
                 using var timeout = new CancellationTokenSource(_options.FlushInterval);
                 using var both = CancellationTokenSource.CreateLinkedTokenSource(
                     timeout.Token, flushToken);
-                CancellationToken cancellationToken = both.Token;
+                var token = both.Token;
 
-                while (queue.Count < capacity)
+                while (batch.Count < capacity)
                 {
-                    KuduOperation operation = await reader.ReadAsync(cancellationToken)
+                    KuduOperation operation = await reader.ReadAsync(token)
                         .ConfigureAwait(false);
 
-                    queue.Add(operation);
+                    batch.Add(operation);
                 }
             }
-            catch (OperationCanceledException) when (flushToken.IsCancellationRequested)
+            catch (OperationCanceledException)
             {
-                while (queue.Count < capacity &&
+                // We've hit the flush interval, or someone called FlushAsync().
+                while (batch.Count < capacity &&
                     reader.TryRead(out var operation))
                 {
-                    queue.Add(operation);
+                    batch.Add(operation);
                 }
-                flushRequested = true;
             }
-            catch (ChannelClosedException) { }
+            catch (ChannelClosedException)
+            {
+                // This session was disposed. The queue is empty and is not
+                // accepting new items.
+            }
 
-            return flushRequested && queue.Count < capacity;
+            return flushRequested && batch.Count < capacity;
         }
 
         private void CompletePendingFlush()
         {
-            var flushCts = _flushCts;
-            Debug.Assert(flushCts.IsCancellationRequested);
-            if (flushCts.IsCancellationRequested)
-            {
-                // Make a new CancellationToken before releasing the
-                // flush task.
-                flushCts.Dispose();
-                _flushCts = new CancellationTokenSource();
+            // Make a new CancellationToken before releasing the
+            // flush task.
+            _flushCts.Dispose();
+            _flushCts = new CancellationTokenSource();
 
-                // Complete the flush.
-                _flushTcs.TrySetResult(null);
-            }
+            // Complete the flush.
+            _flushTcs.TrySetResult(null);
         }
 
         private async Task SendAsync(List<KuduOperation> queue)
         {
-            while (true)
+            try
             {
-                try
-                {
-                    await _client.WriteAsync(queue, _options.ExternalConsistencyMode)
-                        .ConfigureAwait(false);
-
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    _logger.ExceptionSendingSessionData(ex);
-                    await Task.Delay(4000).ConfigureAwait(false);
-                }
+                await _client.WriteAsync(queue, _options.ExternalConsistencyMode)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.ExceptionSendingSessionData(ex);
             }
         }
     }
