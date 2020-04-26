@@ -1,6 +1,7 @@
 ﻿using System.Buffers;
 using System.IO;
 using Knet.Kudu.Client.Protocol.Tserver;
+using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Requests
 {
@@ -26,6 +27,8 @@ namespace Knet.Kudu.Client.Requests
 
             if (PropagatedTimestamp != KuduClient.NoTimestamp)
                 _request.PropagatedTimestamp = (ulong)PropagatedTimestamp;
+
+            _request.TabletId = Tablet.TabletId.ToUtf8ByteArray();
 
             Serialize(stream, _request);
         }

@@ -363,8 +363,8 @@ namespace Knet.Kudu.Client
             foreach (var tabletOperations in operationsByTablet)
             {
                 var task = WriteAsync(
-                    tabletOperations.Value,
                     tabletOperations.Key,
+                    tabletOperations.Value,
                     externalConsistencyMode,
                     cancellationToken);
 
@@ -375,8 +375,8 @@ namespace Knet.Kudu.Client
         }
 
         private async Task<WriteResponsePB> WriteAsync(
-            List<KuduOperation> operations,
             RemoteTablet tablet,
+            List<KuduOperation> operations,
             ExternalConsistencyMode externalConsistencyMode,
             CancellationToken cancellationToken = default)
         {
@@ -400,7 +400,6 @@ namespace Knet.Kudu.Client
 
             var request = new WriteRequestPB
             {
-                TabletId = tablet.TabletId.ToUtf8ByteArray(),
                 Schema = table.SchemaPbNoIds.Schema,
                 RowOperations = rowOperations,
                 ExternalConsistencyMode = (ExternalConsistencyModePB)externalConsistencyMode
