@@ -107,13 +107,13 @@ namespace Knet.Kudu.Client
         {
             var channelCompletionTask = _reader.Completion;
             int batchSize = _options.BatchSize;
-            var queue = new List<KuduOperation>(batchSize);
+            var batch = new List<KuduOperation>(batchSize);
 
             while (!channelCompletionTask.IsCompleted)
             {
-                bool flush = await DequeueAsync(queue).ConfigureAwait(false);
+                bool flush = await DequeueAsync(batch).ConfigureAwait(false);
 
-                if (queue.Count == 0)
+                if (batch.Count == 0)
                 {
                     // It's possible to read 0 items when,
                     // 1) A flush was triggered when the queue was empty.
@@ -127,18 +127,18 @@ namespace Knet.Kudu.Client
                     continue;
                 }
 
-                await SendAsync(queue).ConfigureAwait(false);
+                await SendAsync(batch).ConfigureAwait(false);
 
                 if (flush)
                 {
                     CompletePendingFlush();
                 }
 
-                queue.Clear();
+                batch.Clear();
             }
         }
 
-        private async Task<bool> DequeueAsync(List<KuduOperation> queue)
+        private async Task<bool> DequeueAsync(List<KuduOperation> batch)
         {
             ChannelReader<KuduOperation> reader = _reader;
             CancellationToken flushToken = _flushCts.Token;
@@ -150,31 +150,32 @@ namespace Knet.Kudu.Client
             // or flush interval.
             while (reader.TryRead(out var operation))
             {
-                queue.Add(operation);
+                batch.Add(operation);
 
-                if (queue.Count >= capacity)
+                if (batch.Count >= capacity)
                 {
-                    // We can't complete a pending flush here as
-                    // there may still be more items in the queue.
+                    // We've filled the batch, but we can't complete a pending
+                    // flush here as there may still be more items in the queue.
                     return false;
                 }
             }
 
             if (flushRequested)
             {
-                Console.WriteLine("Short-circuit flush");
+                // Short-circuit if a flush was requested
+                // and we've completely emptied the queue.
                 return true;
             }
 
             try
             {
-                if (queue.Count == 0)
+                if (batch.Count == 0)
                 {
                     // Wait indefinitely for the first operation.
                     KuduOperation operation = await reader.ReadAsync(flushToken)
                         .ConfigureAwait(false);
 
-                    queue.Add(operation);
+                    batch.Add(operation);
                 }
 
                 using var timeout = new CancellationTokenSource(_options.FlushInterval);
@@ -182,21 +183,21 @@ namespace Knet.Kudu.Client
                     timeout.Token, flushToken);
                 var token = both.Token;
 
-                while (queue.Count < capacity)
+                while (batch.Count < capacity)
                 {
                     KuduOperation operation = await reader.ReadAsync(token)
                         .ConfigureAwait(false);
 
-                    queue.Add(operation);
+                    batch.Add(operation);
                 }
             }
             catch (OperationCanceledException)
             {
                 // We've hit the flush interval, or someone called FlushAsync().
-                while (queue.Count < capacity &&
+                while (batch.Count < capacity &&
                     reader.TryRead(out var operation))
                 {
-                    queue.Add(operation);
+                    batch.Add(operation);
                 }
             }
             catch (ChannelClosedException)
@@ -205,7 +206,7 @@ namespace Knet.Kudu.Client
                 // accepting new items.
             }
 
-            return flushRequested && queue.Count < capacity;
+            return flushRequested && batch.Count < capacity;
         }
 
         private void CompletePendingFlush()
