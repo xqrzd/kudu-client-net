@@ -227,20 +227,16 @@ namespace Knet.Kudu.Client
 
         private async Task SendAsync(List<KuduOperation> queue)
         {
-            while (true)
+            try
             {
-                try
-                {
-                    await _client.WriteAsync(queue, _options.ExternalConsistencyMode)
-                        .ConfigureAwait(false);
+                await _client.WriteAsync(queue, _options.ExternalConsistencyMode)
+                    .ConfigureAwait(false);
 
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    _logger.ExceptionSendingSessionData(ex);
-                    await Task.Delay(4000).ConfigureAwait(false);
-                }
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.ExceptionSendingSessionData(ex);
             }
         }
     }
