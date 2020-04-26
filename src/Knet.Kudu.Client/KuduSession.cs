@@ -74,7 +74,8 @@ namespace Knet.Kudu.Client
 
             if (cancellationToken.CanBeCanceled)
             {
-                var tcs = new TaskCompletionSource<object>();
+                var tcs = new TaskCompletionSource<object>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
 
                 using var registration = cancellationToken.Register(
                     s => ((TaskCompletionSource<object>)s).TrySetCanceled(),
