@@ -145,20 +145,19 @@ namespace Knet.Kudu.Client
             bool flushRequested = flushToken.IsCancellationRequested;
             int capacity = _options.BatchSize;
 
-            // First try to quickly drain any existing items
-            // in the queue, before we start waiting for new
-            // items to be added.
-            while (queue.Count < capacity &&
-                reader.TryRead(out var operation))
+            // First try to synchronously drain any existing queue items
+            // before we asynchronously wait until we've hit the capacity
+            // or flush interval.
+            while (reader.TryRead(out var operation))
             {
                 queue.Add(operation);
-            }
 
-            if (queue.Count == capacity)
-            {
-                // We can't complete a pending flush here, because we
-                // don't know if there are more items in the queue.
-                return false;
+                if (queue.Count >= capacity)
+                {
+                    // We can't complete a pending flush here as
+                    // there may still be more items in the queue.
+                    return false;
+                }
             }
 
             try
@@ -175,11 +174,11 @@ namespace Knet.Kudu.Client
                 using var timeout = new CancellationTokenSource(_options.FlushInterval);
                 using var both = CancellationTokenSource.CreateLinkedTokenSource(
                     timeout.Token, flushToken);
-                var cancellationToken = both.Token;
+                var token = both.Token;
 
                 while (queue.Count < capacity)
                 {
-                    KuduOperation operation = await reader.ReadAsync(cancellationToken)
+                    KuduOperation operation = await reader.ReadAsync(token)
                         .ConfigureAwait(false);
 
                     queue.Add(operation);
@@ -187,13 +186,18 @@ namespace Knet.Kudu.Client
             }
             catch (OperationCanceledException)
             {
+                // We've hit the flush interval, or someone called FlushAsync().
                 while (queue.Count < capacity &&
                     reader.TryRead(out var operation))
                 {
                     queue.Add(operation);
                 }
             }
-            catch (ChannelClosedException) { }
+            catch (ChannelClosedException)
+            {
+                // This session was disposed. The queue is empty and is not
+                // accepting new items.
+            }
 
             return flushRequested && queue.Count < capacity;
         }
