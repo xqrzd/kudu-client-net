@@ -243,8 +243,6 @@ namespace Knet.Kudu.Client
             {
                 await _client.WriteAsync(queue, _options.ExternalConsistencyMode)
                     .ConfigureAwait(false);
-
-                return;
             }
             catch (Exception ex)
             {
