@@ -71,34 +71,51 @@ namespace Knet.Kudu.Client
 
         public async Task FlushAsync(CancellationToken cancellationToken = default)
         {
-            CancellationTokenRegistration registration = default;
+            var flushTask = DoFlushAsync();
 
-            await _singleFlush.WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (cancellationToken.CanBeCanceled)
+            {
+                var tcs = new TaskCompletionSource<object>();
+
+                using var registration = cancellationToken.Register(
+                    s => ((TaskCompletionSource<object>)s).TrySetCanceled(),
+                    state: tcs,
+                    useSynchronizationContext: false);
+
+                var task = await Task.WhenAny(flushTask, tcs.Task).ConfigureAwait(false);
+                await task.ConfigureAwait(false);
+            }
+            else
+            {
+                await flushTask.ConfigureAwait(false);
+            }
+        }
+
+        private async Task DoFlushAsync()
+        {
+            await _singleFlush.WaitAsync().ConfigureAwait(false);
+
             try
             {
-                _flushCts.Cancel();
-
-                var flushTcs = _flushTcs;
-
-                if (cancellationToken.CanBeCanceled)
+                if (_reader.Completion.IsCompleted)
                 {
-                    registration = cancellationToken.Register(
-                        s => ((TaskCompletionSource<object>)s).TrySetCanceled(),
-                        state: flushTcs,
-                        useSynchronizationContext: false);
+                    // This session is disposed.
+                    return;
                 }
 
-                await flushTcs.Task.ConfigureAwait(false);
-                // TODO: After this we should have a new _flushCts for next time,
-                // *except* if the passed cancellationToken was cancelled.
+                try
+                {
+                    _flushCts.Cancel();
+                    await _flushTcs.Task.ConfigureAwait(false);
+                }
+                finally
+                {
+                    _flushTcs = new TaskCompletionSource<object>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                }
             }
             finally
             {
-                registration.Dispose();
-
-                _flushTcs = new TaskCompletionSource<object>(
-                    TaskCreationOptions.RunContinuationsAsynchronously);
-
                 _singleFlush.Release();
             }
         }
