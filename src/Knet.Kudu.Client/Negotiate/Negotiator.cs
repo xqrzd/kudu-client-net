@@ -319,8 +319,7 @@ namespace Knet.Kudu.Client.Negotiate
                 encryptedToken,
                 cancellationToken).ConfigureAwait(false);
 
-            if (response.Step != NegotiateStep.SaslSuccess)
-                ThrowExpectedStepException(NegotiateStep.SaslSuccess, response.Step);
+            ExpectStep(NegotiateStep.SaslSuccess, response.Step);
 
             if (_remoteCertificate != null)
             {
@@ -369,8 +368,7 @@ namespace Knet.Kudu.Client.Negotiate
 
             var response = await SendReceiveAsync(request, cancellationToken).ConfigureAwait(false);
 
-            if (response.Step != NegotiateStep.TokenExchange)
-                ThrowExpectedStepException(NegotiateStep.TokenExchange, response.Step);
+            ExpectStep(NegotiateStep.TokenExchange, response.Step);
 
             return new ConnectionContextPB();
         }
@@ -509,11 +507,13 @@ namespace Knet.Kudu.Client.Negotiate
 #endif
         }
 
-        private static void ThrowExpectedStepException(
-            NegotiateStep expectedStep, NegotiateStep actualStep)
+        private static void ExpectStep(NegotiateStep expected, NegotiateStep step)
         {
-            throw new NonRecoverableException(KuduStatus.IllegalState(
-                $"Expected NegotiateStep {expectedStep}, received {actualStep}"));
+            if (step != expected)
+            {
+                throw new NonRecoverableException(KuduStatus.IllegalState(
+                    $"Expected NegotiateStep {expected}, received {step}"));
+            }
         }
 
         private enum AuthenticationType
