@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Logging;
+using Knet.Kudu.Client.Util;
 using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client
@@ -67,27 +68,9 @@ namespace Knet.Kudu.Client
             return _writer.WriteAsync(operation, cancellationToken);
         }
 
-        public async Task FlushAsync(CancellationToken cancellationToken = default)
+        public Task FlushAsync(CancellationToken cancellationToken = default)
         {
-            var flushTask = DoFlushAsync();
-
-            if (cancellationToken.CanBeCanceled)
-            {
-                var tcs = new TaskCompletionSource<object>(
-                    TaskCreationOptions.RunContinuationsAsynchronously);
-
-                using var registration = cancellationToken.Register(
-                    s => ((TaskCompletionSource<object>)s).TrySetCanceled(),
-                    state: tcs,
-                    useSynchronizationContext: false);
-
-                var task = await Task.WhenAny(flushTask, tcs.Task).ConfigureAwait(false);
-                await task.ConfigureAwait(false);
-            }
-            else
-            {
-                await flushTask.ConfigureAwait(false);
-            }
+            return DoFlushAsync().WithCancellation(cancellationToken);
         }
 
         private async Task DoFlushAsync()

@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Protocol;
@@ -35,6 +36,29 @@ namespace Knet.Kudu.Client.Util
 #else
             return task.IsCompletedSuccessfully;
 #endif
+        }
+
+        public static async Task WithCancellation(
+            this Task task, CancellationToken cancellationToken)
+        {
+            if (cancellationToken.CanBeCanceled)
+            {
+                var tcs = new TaskCompletionSource<object>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+
+                using var registration = cancellationToken.Register(
+                    s => ((TaskCompletionSource<object>)s).TrySetCanceled(),
+                    state: tcs,
+                    useSynchronizationContext: false);
+
+                var eitherTask = await Task.WhenAny(task, tcs.Task)
+                    .ConfigureAwait(false);
+                await eitherTask.ConfigureAwait(false);
+            }
+            else
+            {
+                await task.ConfigureAwait(false);
+            }
         }
 
         public static int NextClearBit(this BitArray array, int from)
