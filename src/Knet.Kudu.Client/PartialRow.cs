@@ -532,40 +532,18 @@ namespace Knet.Kudu.Client
         internal void SetRaw(int index, byte[] value)
         {
             ColumnSchema column = Schema.GetColumn(index);
-            KuduType type = column.Type;
 
-            // TODO: Simplify this with IsFixed
-            switch (type)
+            if (column.IsFixedSize)
             {
-                case KuduType.Bool:
-                case KuduType.Int8:
-                case KuduType.Int16:
-                case KuduType.Int32:
-                case KuduType.Int64:
-                case KuduType.UnixtimeMicros:
-                case KuduType.Date:
-                case KuduType.Float:
-                case KuduType.Double:
-                case KuduType.Decimal32:
-                case KuduType.Decimal64:
-                case KuduType.Decimal128:
-                    {
-                        if (value.Length != column.Size)
-                            throw new ArgumentException();
+                if (value.Length != column.Size)
+                    throw new ArgumentOutOfRangeException(nameof(value));
 
-                        Span<byte> rowAlloc = GetSpanInRowAllocAndSetBitSet(index, value.Length);
-                        value.CopyTo(rowAlloc);
-
-                        break;
-                    }
-                case KuduType.String:
-                case KuduType.Binary:
-                    {
-                        SetVarLengthData(index, value);
-                        break;
-                    }
-                default:
-                    throw new Exception($"Unsupported data type {type}");
+                Span<byte> rowAlloc = GetSpanInRowAllocAndSetBitSet(index, value.Length);
+                value.CopyTo(rowAlloc);
+            }
+            else
+            {
+                SetVarLengthData(index, value);
             }
         }
 
