@@ -101,6 +101,21 @@ namespace Knet.Kudu.Client.Util
             return count;
         }
 
+        public static bool GetBit(this byte[] input, int offset, int index)
+        {
+            return (input[(int)((uint)offset + ((uint)index / 8))] & (1 << (int)((uint)index % 8))) != 0;
+        }
+
+        public static bool GetBit(this ReadOnlySpan<byte> input, int offset, int index)
+        {
+            return (input[(int)((uint)offset + ((uint)index / 8))] & (1 << (int)((uint)index % 8))) != 0;
+        }
+
+        public static void SetBit(this byte[] input, int offset, int index)
+        {
+            input[(int)((uint)offset + ((uint)index / 8))] |= (byte)(1 << (int)((uint)index % 8));
+        }
+
         internal static ArrayBufferWriter<T> Clone<T>(this ArrayBufferWriter<T> writer)
         {
             var newWriter = new ArrayBufferWriter<T>(writer.Capacity);
