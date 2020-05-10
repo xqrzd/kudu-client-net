@@ -314,9 +314,25 @@ namespace Knet.Kudu.Client
 
         public void SetDateTime(int columnIndex, DateTime value)
         {
-            CheckFixedColumnSize(columnIndex, KuduType.UnixtimeMicros, 8);
-            Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 8);
-            KuduEncoder.EncodeDateTime(span, value);
+            var column = Schema.GetColumn(columnIndex);
+            var type = column.Type;
+
+            if (type == KuduType.UnixtimeMicros)
+            {
+                Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 8);
+                KuduEncoder.EncodeDateTime(span, value);
+            }
+            else if (type == KuduType.Date)
+            {
+                Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 4);
+                KuduEncoder.EncodeDate(span, value);
+            }
+            else
+            {
+                throw new ArgumentException(
+                    $"Can't set {column.Name} ({type}) to either " +
+                    $"{KuduType.UnixtimeMicros} or {KuduType.Date}");
+            }
         }
 
         public DateTime GetDateTime(string columnName)
@@ -327,10 +343,27 @@ namespace Knet.Kudu.Client
 
         public DateTime GetDateTime(int columnIndex)
         {
-            CheckFixedColumnSize(columnIndex, KuduType.UnixtimeMicros, 8);
-            CheckValue(columnIndex);
-            ReadOnlySpan<byte> data = GetRowAllocColumn(columnIndex, 8);
-            return KuduEncoder.DecodeDateTime(data);
+            var column = Schema.GetColumn(columnIndex);
+            var type = column.Type;
+
+            if (type == KuduType.UnixtimeMicros)
+            {
+                CheckValue(columnIndex);
+                ReadOnlySpan<byte> data = GetRowAllocColumn(columnIndex, 8);
+                return KuduEncoder.DecodeDateTime(data);
+            }
+            else if (type == KuduType.Date)
+            {
+                CheckValue(columnIndex);
+                ReadOnlySpan<byte> data = GetRowAllocColumn(columnIndex, 4);
+                return KuduEncoder.DecodeDate(data);
+            }
+            else
+            {
+                throw new ArgumentException(
+                    $"Column {column.Name} ({type}) isn't either " +
+                    $"{KuduType.UnixtimeMicros} or {KuduType.Date}");
+            }
         }
 
         public void SetFloat(string columnName, float value)
@@ -499,38 +532,18 @@ namespace Knet.Kudu.Client
         internal void SetRaw(int index, byte[] value)
         {
             ColumnSchema column = Schema.GetColumn(index);
-            KuduType type = column.Type;
 
-            switch (type)
+            if (column.IsFixedSize)
             {
-                case KuduType.Bool:
-                case KuduType.Int8:
-                case KuduType.Int16:
-                case KuduType.Int32:
-                case KuduType.Int64:
-                case KuduType.UnixtimeMicros:
-                case KuduType.Float:
-                case KuduType.Double:
-                case KuduType.Decimal32:
-                case KuduType.Decimal64:
-                case KuduType.Decimal128:
-                    {
-                        if (value.Length != column.Size)
-                            throw new ArgumentException();
+                if (value.Length != column.Size)
+                    throw new ArgumentOutOfRangeException(nameof(value));
 
-                        Span<byte> rowAlloc = GetSpanInRowAllocAndSetBitSet(index, value.Length);
-                        value.CopyTo(rowAlloc);
-
-                        break;
-                    }
-                case KuduType.String:
-                case KuduType.Binary:
-                    {
-                        SetVarLengthData(index, value);
-                        break;
-                    }
-                default:
-                    throw new Exception($"Unsupported data type {type}");
+                Span<byte> rowAlloc = GetSpanInRowAllocAndSetBitSet(index, value.Length);
+                value.CopyTo(rowAlloc);
+            }
+            else
+            {
+                SetVarLengthData(index, value);
             }
         }
 
@@ -556,6 +569,9 @@ namespace Knet.Kudu.Client
                     break;
                 case KuduType.Int32:
                     SetInt32(index, int.MinValue);
+                    break;
+                case KuduType.Date:
+                    SetInt32(index, EpochTime.MinDateValue);
                     break;
                 case KuduType.Int64:
                 case KuduType.UnixtimeMicros:
@@ -638,6 +654,15 @@ namespace Knet.Kudu.Client
                         {
                             int existing = KuduEncoder.DecodeInt32(data);
                             if (existing == int.MaxValue)
+                                return false;
+
+                            KuduEncoder.EncodeInt32(data, existing + 1);
+                            return true;
+                        }
+                    case KuduType.Date:
+                        {
+                            int existing = KuduEncoder.DecodeInt32(data);
+                            if (existing == EpochTime.MaxDateValue)
                                 return false;
 
                             KuduEncoder.EncodeInt32(data, existing + 1);

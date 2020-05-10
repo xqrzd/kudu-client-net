@@ -318,6 +318,7 @@ namespace Knet.Kudu.Client
                 KuduType.Int32 => KuduEncoder.DecodeInt32(value).ToString(),
                 KuduType.Int64 => KuduEncoder.DecodeInt64(value).ToString(),
                 KuduType.UnixtimeMicros => KuduEncoder.DecodeDateTime(value).ToString(),
+                KuduType.Date => KuduEncoder.DecodeDate(value).ToString(),
                 KuduType.Float => KuduEncoder.DecodeFloat(value).ToString(),
                 KuduType.Double => KuduEncoder.DecodeDouble(value).ToString(),
                 KuduType.String => $@"""{KuduEncoder.DecodeString(value)}""",
@@ -460,9 +461,25 @@ namespace Knet.Kudu.Client
         public static KuduPredicate NewComparisonPredicate(
             ColumnSchema column, ComparisonOp op, DateTime value)
         {
-            CheckColumn(column, KuduType.UnixtimeMicros);
-            long micros = EpochTime.ToUnixEpochMicros(value);
-            return NewComparisonPredicate(column, op, micros);
+            long rawValue;
+            var type = column.Type;
+
+            if (type == KuduType.UnixtimeMicros)
+            {
+                rawValue = EpochTime.ToUnixTimeMicros(value);
+            }
+            else if (type == KuduType.Date)
+            {
+                rawValue = EpochTime.ToUnixTimeDays(value);
+            }
+            else
+            {
+                throw new ArgumentException(
+                    $"Expected either {KuduType.UnixtimeMicros} or {KuduType.Date} " +
+                    $"but received {type}");
+            }
+
+            return NewComparisonPredicate(column, op, rawValue);
         }
 
         /// <summary>
@@ -792,16 +809,19 @@ namespace Knet.Kudu.Client
                 IEnumerable<double> x => GetZ(x, KuduEncoder.EncodeDouble),
                 IEnumerable<string> x => GetZ(x, KuduEncoder.EncodeString),
                 IEnumerable<byte[]> x => GetZ(x, y => y),
+                IEnumerable<DateTime> x when column.Type == KuduType.UnixtimeMicros =>
+                    GetZ(x, KuduEncoder.EncodeDateTime),
+                IEnumerable<DateTime> x when column.Type == KuduType.Date =>
+                    GetZ(x, KuduEncoder.EncodeDate),
                 IEnumerable<decimal> x when column.Type == KuduType.Decimal32 =>
-                GetZ(x, i => KuduEncoder.EncodeDecimal32(
-                    i, column.TypeAttributes.Precision, column.TypeAttributes.Scale)),
+                    GetZ(x, i => KuduEncoder.EncodeDecimal32(
+                        i, column.TypeAttributes.Precision, column.TypeAttributes.Scale)),
                 IEnumerable<decimal> x when column.Type == KuduType.Decimal64 =>
-                GetZ(x, i => KuduEncoder.EncodeDecimal64(
-                    i, column.TypeAttributes.Precision, column.TypeAttributes.Scale)),
+                    GetZ(x, i => KuduEncoder.EncodeDecimal64(
+                        i, column.TypeAttributes.Precision, column.TypeAttributes.Scale)),
                 IEnumerable<decimal> x when column.Type == KuduType.Decimal128 =>
-                GetZ(x, i => KuduEncoder.EncodeDecimal128(
-                    i, column.TypeAttributes.Precision, column.TypeAttributes.Scale)),
-
+                    GetZ(x, i => KuduEncoder.EncodeDecimal128(
+                        i, column.TypeAttributes.Precision, column.TypeAttributes.Scale)),
                 _ => throw new Exception()
             };
 
@@ -830,6 +850,7 @@ namespace Knet.Kudu.Client
                 KuduType.Int8 => sbyte.MinValue,
                 KuduType.Int16 => short.MinValue,
                 KuduType.Int32 => int.MinValue,
+                KuduType.Date => EpochTime.MinDateValue,
                 KuduType.Int64 => long.MinValue,
                 KuduType.UnixtimeMicros => long.MinValue,
                 _ => throw new Exception()
@@ -843,6 +864,7 @@ namespace Knet.Kudu.Client
                 KuduType.Int8 => sbyte.MaxValue,
                 KuduType.Int16 => short.MaxValue,
                 KuduType.Int32 => int.MaxValue,
+                KuduType.Date => EpochTime.MaxDateValue,
                 KuduType.Int64 => long.MaxValue,
                 KuduType.UnixtimeMicros => long.MaxValue,
                 _ => throw new Exception()
@@ -856,6 +878,7 @@ namespace Knet.Kudu.Client
                 KuduType.Int8 => KuduEncoder.EncodeInt8((sbyte)value),
                 KuduType.Int16 => KuduEncoder.EncodeInt16((short)value),
                 KuduType.Int32 => KuduEncoder.EncodeInt32((int)value),
+                KuduType.Date => KuduEncoder.EncodeInt32((int)value),
                 KuduType.Decimal32 => KuduEncoder.EncodeInt32((int)value),
                 KuduType.Int64 => KuduEncoder.EncodeInt64(value),
                 KuduType.UnixtimeMicros => KuduEncoder.EncodeInt64(value),
@@ -881,6 +904,7 @@ namespace Knet.Kudu.Client
                 case KuduType.Int16:
                     return KuduEncoder.DecodeInt16(a).CompareTo(KuduEncoder.DecodeInt16(b));
                 case KuduType.Int32:
+                case KuduType.Date:
                 case KuduType.Decimal32:
                     return KuduEncoder.DecodeInt32(a).CompareTo(KuduEncoder.DecodeInt32(b));
                 case KuduType.Int64:
@@ -924,6 +948,7 @@ namespace Knet.Kudu.Client
                         return m < n && m + 1 == n;
                     }
                 case KuduType.Int32:
+                case KuduType.Date:
                 case KuduType.Decimal32:
                     {
                         int m = KuduEncoder.DecodeInt32(a);

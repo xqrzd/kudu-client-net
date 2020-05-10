@@ -83,7 +83,9 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
                     case KuduType.Int32:
                         row.SetInt32(name, _random.Next());
                         break;
-                    // TODO: Date
+                    case KuduType.Date:
+                        row.SetDateTime(name, RandomDate(_random));
+                        break;
                     case KuduType.Int64:
                     case KuduType.UnixtimeMicros:
                         row.SetInt64(name, _random.NextLong());
@@ -120,6 +122,16 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
             int numBits = NumBits(attributes.Precision);
             var randomUnscaled = NextBigInteger(numBits, random);
             return DecimalUtil.SetScale((decimal)randomUnscaled, attributes.Scale);
+        }
+
+        /// <summary>
+        /// Utility method to return a random date value.
+        /// </summary>
+        public static DateTime RandomDate(Random random)
+        {
+            int bound = EpochTime.MaxDateValue - EpochTime.MinDateValue + 1;
+            int days = random.Next(bound) + EpochTime.MinDateValue;
+            return EpochTime.FromUnixTimeDays(days);
         }
 
         /// <summary>

@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Knet.Kudu.Client.Util;
 using Xunit;
 
 namespace Knet.Kudu.Client.Tests
@@ -19,6 +20,7 @@ namespace Knet.Kudu.Client.Tests
             Assert.Equal(int.MinValue, row.GetInt32("int32"));
             Assert.Equal(long.MinValue, row.GetInt64("int64"));
             Assert.Equal(long.MinValue, row.GetInt64("timestamp"));
+            Assert.Equal(EpochTime.FromUnixTimeDays(EpochTime.MinDateValue), row.GetDateTime("date"));
             Assert.Equal(float.MinValue, row.GetFloat("float"));
             Assert.Equal(double.MinValue, row.GetDouble("double"));
             Assert.Equal("", row.GetString("string"));
@@ -68,6 +70,13 @@ namespace Knet.Kudu.Client.Tests
             Assert.Equal(long.MaxValue, row.GetInt64(int64Index));
             Assert.False(row.IncrementColumn(int64Index));
 
+            // Date
+            int dateIndex = row.Schema.GetColumnIndex("date");
+            row.SetDateTime(dateIndex, EpochTime.FromUnixTimeDays(EpochTime.MaxDateValue - 1));
+            Assert.True(row.IncrementColumn(dateIndex));
+            Assert.Equal(EpochTime.FromUnixTimeDays(EpochTime.MaxDateValue), row.GetDateTime(dateIndex));
+            Assert.False(row.IncrementColumn(dateIndex));
+
             // Float
             int floatIndex = row.Schema.GetColumnIndex("float");
             row.SetFloat(floatIndex, float.MaxValue);
@@ -75,7 +84,7 @@ namespace Knet.Kudu.Client.Tests
             Assert.Equal(float.PositiveInfinity, row.GetFloat(floatIndex));
             Assert.False(row.IncrementColumn(floatIndex));
 
-            // Float
+            // Double
             int doubleIndex = row.Schema.GetColumnIndex("double");
             row.SetDouble(doubleIndex, double.MaxValue);
             Assert.True(row.IncrementColumn(doubleIndex));
@@ -133,6 +142,7 @@ namespace Knet.Kudu.Client.Tests
                 new ColumnSchema("double", KuduType.Double, false, isNullable),
                 new ColumnSchema("binary", KuduType.Binary, false, isNullable),
                 new ColumnSchema("timestamp", KuduType.UnixtimeMicros, false, isNullable),
+                new ColumnSchema("date", KuduType.Date, false, isNullable),
                 new ColumnSchema("decimal32", KuduType.Decimal32, false, isNullable,
                     typeAttributes: new ColumnTypeAttributes(5, 3)),
                 new ColumnSchema("decimal64", KuduType.Decimal64, false, isNullable,

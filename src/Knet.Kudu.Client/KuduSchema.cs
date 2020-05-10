@@ -211,13 +211,13 @@ namespace Knet.Kudu.Client
                 case KuduType.Int32:
                 case KuduType.Float:
                 case KuduType.Decimal32:
+                case KuduType.Date:
                     return 4;
                 case KuduType.Int64:
                 case KuduType.Double:
                 case KuduType.UnixtimeMicros:
                 case KuduType.Decimal64:
                     return 8;
-                //case DataType.Int128: Not supported in Kudu yet.
                 case KuduType.Decimal128:
                     return 16;
                 default:
@@ -233,6 +233,7 @@ namespace Knet.Kudu.Client
                 case KuduType.Int16:
                 case KuduType.Int32:
                 case KuduType.Int64:
+                case KuduType.Date:
                 case KuduType.UnixtimeMicros:
                 case KuduType.Decimal32:
                 case KuduType.Decimal64:

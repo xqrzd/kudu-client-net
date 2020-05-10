@@ -29,8 +29,14 @@ namespace Knet.Kudu.Client.Util
 
         public static void EncodeDateTime(Span<byte> destination, DateTime value)
         {
-            long micros = EpochTime.ToUnixEpochMicros(value);
+            long micros = EpochTime.ToUnixTimeMicros(value);
             EncodeInt64(destination, micros);
+        }
+
+        public static void EncodeDate(Span<byte> destination, DateTime value)
+        {
+            int days = EpochTime.ToUnixTimeDays(value);
+            EncodeInt32(destination, days);
         }
 
         public static void EncodeFloat(Span<byte> destination, float value)
@@ -107,6 +113,13 @@ namespace Knet.Kudu.Client.Util
             return buffer;
         }
 
+        public static byte[] EncodeDate(DateTime value)
+        {
+            var buffer = new byte[8];
+            EncodeDate(buffer, value);
+            return buffer;
+        }
+
         public static byte[] EncodeFloat(float value)
         {
             int bits = value.AsInt();
@@ -154,6 +167,7 @@ namespace Knet.Kudu.Client.Util
                 KuduType.Double => EncodeDouble((double)value),
                 KuduType.Binary => (byte[])value,
                 KuduType.UnixtimeMicros => EncodeDateTime((DateTime)value),
+                KuduType.Date => EncodeDate((DateTime)value),
                 KuduType.Decimal32 => EncodeDefaultDecimal((decimal)value),
                 KuduType.Decimal64 => EncodeDefaultDecimal((decimal)value),
                 KuduType.Decimal128 => EncodeDefaultDecimal((decimal)value),
@@ -184,6 +198,7 @@ namespace Knet.Kudu.Client.Util
                 double v => EncodeDouble(v),
                 byte[] v => v,
                 DateTime v => EncodeDateTime(v),
+                // TODO: Add Date support here. For that, we need the data type.
                 decimal v => EncodeDefaultDecimal(v),
                 _ => throw new Exception($"Unsupported data type {value.GetType().Name}"),
             };
@@ -215,7 +230,13 @@ namespace Knet.Kudu.Client.Util
         public static DateTime DecodeDateTime(ReadOnlySpan<byte> source)
         {
             long micros = DecodeInt64(source);
-            return EpochTime.FromUnixEpochMicros(micros);
+            return EpochTime.FromUnixTimeMicros(micros);
+        }
+
+        public static DateTime DecodeDate(ReadOnlySpan<byte> source)
+        {
+            int days = DecodeInt32(source);
+            return EpochTime.FromUnixTimeDays(days);
         }
 
         public static float DecodeFloat(ReadOnlySpan<byte> source)
