@@ -207,6 +207,36 @@ namespace Knet.Kudu.Client.FunctionalTests
         }
 
         [SkippableFact]
+        public async Task TestDatePredicates()
+        {
+            var builder = GetDefaultTableBuilder()
+                .SetTableName("date-table")
+                .AddColumn("value", KuduType.Date);
+
+            var table = await _client.CreateTableAsync(builder);
+
+            var values = CreateDateValues();
+            var testValues = CreateDateTestValues();
+
+            long i = 0;
+            foreach (var value in values)
+            {
+                var insert = table.NewInsert();
+                insert.SetInt64("key", i++);
+                insert.SetDateTime("value", value);
+                await _session.EnqueueAsync(insert);
+            }
+
+            var nullInsert = table.NewInsert();
+            nullInsert.SetInt64("key", i);
+            nullInsert.SetNull("value");
+            await _session.EnqueueAsync(nullInsert);
+            await _session.FlushAsync();
+
+            await CheckPredicatesAsync(table, values, testValues);
+        }
+
+        [SkippableFact]
         public async Task TestFloatPredicates()
         {
             var builder = GetDefaultTableBuilder()
@@ -472,6 +502,36 @@ namespace Knet.Kudu.Client.FunctionalTests
                 EpochTime.UnixEpoch.AddTicks(500),
                 DateTimeOffset.MaxValue.UtcDateTime.AddTicks(-10),
                 DateTimeOffset.MaxValue.UtcDateTime
+            };
+        }
+
+        private SortedSet<DateTime> CreateDateValues()
+        {
+            var values = new SortedSet<DateTime>();
+            for (long i = -50; i < 50; i++)
+            {
+                values.Add(EpochTime.UnixEpoch.AddDays(i));
+            }
+            values.Add(EpochTime.FromUnixTimeDays((int)KuduPredicate.MinIntValue(KuduType.Date)));
+            values.Add(EpochTime.FromUnixTimeDays((int)KuduPredicate.MinIntValue(KuduType.Date) + 1));
+            values.Add(EpochTime.FromUnixTimeDays((int)KuduPredicate.MaxIntValue(KuduType.Date) - 1));
+            values.Add(EpochTime.FromUnixTimeDays((int)KuduPredicate.MaxIntValue(KuduType.Date)));
+            return values;
+        }
+
+        private List<DateTime> CreateDateTestValues()
+        {
+            return new List<DateTime>
+            {
+                EpochTime.FromUnixTimeDays((int)KuduPredicate.MinIntValue(KuduType.Date)),
+                EpochTime.FromUnixTimeDays((int)KuduPredicate.MinIntValue(KuduType.Date) + 1),
+                EpochTime.UnixEpoch.AddDays(-51),
+                EpochTime.UnixEpoch.AddDays(-50),
+                EpochTime.UnixEpoch,
+                EpochTime.UnixEpoch.AddDays(49),
+                EpochTime.UnixEpoch.AddDays(50),
+                EpochTime.FromUnixTimeDays((int)KuduPredicate.MaxIntValue(KuduType.Date) - 1),
+                EpochTime.FromUnixTimeDays((int)KuduPredicate.MaxIntValue(KuduType.Date))
             };
         }
 
