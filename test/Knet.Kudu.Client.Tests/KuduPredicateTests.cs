@@ -16,13 +16,13 @@ namespace Knet.Kudu.Client.Tests
         private readonly ColumnSchema binaryCol = CreateColumnSchema("binary", KuduType.Binary);
 
         private readonly ColumnSchema decimal32Col = CreateColumnSchema("decimal32", KuduType.Decimal32,
-            new ColumnTypeAttributes(DecimalUtil.MaxDecimal32Precision, 2));
+            new ColumnTypeAttributes(DecimalUtil.MaxDecimal32Precision, 2, null));
 
         private readonly ColumnSchema decimal64Col = CreateColumnSchema("decimal64", KuduType.Decimal64,
-            new ColumnTypeAttributes(DecimalUtil.MaxDecimal64Precision, 2));
+            new ColumnTypeAttributes(DecimalUtil.MaxDecimal64Precision, 2, null));
 
         private readonly ColumnSchema decimal128Col = CreateColumnSchema("decimal128", KuduType.Decimal128,
-            new ColumnTypeAttributes(DecimalUtil.MaxDecimal128Precision, 2));
+            new ColumnTypeAttributes(DecimalUtil.MaxDecimal128Precision, 2, null));
 
         /// <summary>
         /// Tests merges on all types of integer predicates.

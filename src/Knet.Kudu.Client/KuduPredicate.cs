@@ -333,7 +333,7 @@ namespace Knet.Kudu.Client
 
         private decimal DecodeDecimal(ReadOnlySpan<byte> value)
         {
-            int scale = Column.TypeAttributes.Scale;
+            int scale = Column.TypeAttributes.Scale.GetValueOrDefault();
 
             return KuduEncoder.DecodeDecimal(value, Column.Type, scale);
         }
@@ -604,8 +604,8 @@ namespace Knet.Kudu.Client
         {
             //checkColumn(column, Type.DECIMAL);
             var typeAttributes = column.TypeAttributes;
-            int precision = typeAttributes.Precision;
-            int scale = typeAttributes.Scale;
+            int precision = typeAttributes.Precision.GetValueOrDefault();
+            int scale = typeAttributes.Scale.GetValueOrDefault();
 
             long maxValue;
             long longValue;
@@ -814,14 +814,17 @@ namespace Knet.Kudu.Client
                 IEnumerable<DateTime> x when column.Type == KuduType.Date =>
                     GetZ(x, KuduEncoder.EncodeDate),
                 IEnumerable<decimal> x when column.Type == KuduType.Decimal32 =>
-                    GetZ(x, i => KuduEncoder.EncodeDecimal32(
-                        i, column.TypeAttributes.Precision, column.TypeAttributes.Scale)),
+                    GetZ(x, i => KuduEncoder.EncodeDecimal32(i,
+                        column.TypeAttributes.Precision.GetValueOrDefault(),
+                        column.TypeAttributes.Scale.GetValueOrDefault())),
                 IEnumerable<decimal> x when column.Type == KuduType.Decimal64 =>
-                    GetZ(x, i => KuduEncoder.EncodeDecimal64(
-                        i, column.TypeAttributes.Precision, column.TypeAttributes.Scale)),
+                    GetZ(x, i => KuduEncoder.EncodeDecimal64(i,
+                        column.TypeAttributes.Precision.GetValueOrDefault(),
+                        column.TypeAttributes.Scale.GetValueOrDefault())),
                 IEnumerable<decimal> x when column.Type == KuduType.Decimal128 =>
-                    GetZ(x, i => KuduEncoder.EncodeDecimal128(
-                        i, column.TypeAttributes.Precision, column.TypeAttributes.Scale)),
+                    GetZ(x, i => KuduEncoder.EncodeDecimal128(i,
+                        column.TypeAttributes.Precision.GetValueOrDefault(),
+                        column.TypeAttributes.Scale.GetValueOrDefault())),
                 _ => throw new Exception()
             };
 

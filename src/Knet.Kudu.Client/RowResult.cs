@@ -393,7 +393,7 @@ namespace Knet.Kudu.Client
         private decimal ReadDecimal(int columnIndex)
         {
             ColumnSchema column = _resultSet.GetColumnSchema(columnIndex);
-            int scale = column.TypeAttributes.Scale;
+            int scale = column.TypeAttributes.Scale.GetValueOrDefault();
 
             int position = _resultSet.GetOffset(columnIndex);
             ReadOnlySpan<byte> data = _rowData.Slice(position, column.Size);

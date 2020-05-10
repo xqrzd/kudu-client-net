@@ -202,6 +202,7 @@ namespace Knet.Kudu.Client
             {
                 case KuduType.String:
                 case KuduType.Binary:
+                case KuduType.Varchar:
                     return 8 + 8; // Offset then string length.
                 case KuduType.Bool:
                 case KuduType.Int8:

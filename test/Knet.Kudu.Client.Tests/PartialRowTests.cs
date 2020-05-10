@@ -144,11 +144,11 @@ namespace Knet.Kudu.Client.Tests
                 new ColumnSchema("timestamp", KuduType.UnixtimeMicros, false, isNullable),
                 new ColumnSchema("date", KuduType.Date, false, isNullable),
                 new ColumnSchema("decimal32", KuduType.Decimal32, false, isNullable,
-                    typeAttributes: new ColumnTypeAttributes(5, 3)),
+                    typeAttributes: new ColumnTypeAttributes(5, 3, null)),
                 new ColumnSchema("decimal64", KuduType.Decimal64, false, isNullable,
-                    typeAttributes: new ColumnTypeAttributes(5, 3)),
+                    typeAttributes: new ColumnTypeAttributes(5, 3, null)),
                 new ColumnSchema("decimal128", KuduType.Decimal128, false, isNullable,
-                    typeAttributes: new ColumnTypeAttributes(5, 3))
+                    typeAttributes: new ColumnTypeAttributes(5, 3, null))
             });
 
             return new PartialRow(schema);

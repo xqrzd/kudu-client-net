@@ -119,9 +119,9 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
         /// </summary>
         public static decimal RandomDecimal(ColumnTypeAttributes attributes, Random random)
         {
-            int numBits = NumBits(attributes.Precision);
+            int numBits = NumBits(attributes.Precision.GetValueOrDefault());
             var randomUnscaled = NextBigInteger(numBits, random);
-            return DecimalUtil.SetScale((decimal)randomUnscaled, attributes.Scale);
+            return DecimalUtil.SetScale((decimal)randomUnscaled, attributes.Scale.GetValueOrDefault());
         }
 
         /// <summary>
