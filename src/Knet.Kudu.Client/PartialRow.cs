@@ -111,14 +111,14 @@ namespace Knet.Kudu.Client
             }
         }
 
-        private bool IsSet(int columnIndex) => BitmapGet(0, columnIndex);
+        private bool IsSet(int columnIndex) => _rowAlloc.GetBit(0, columnIndex);
 
-        private void Set(int columnIndex) => BitmapSet(0, columnIndex);
+        private void Set(int columnIndex) => _rowAlloc.SetBit(0, columnIndex);
 
         private bool IsSetToNull(int columnIndex) =>
-            Schema.HasNullableColumns ? BitmapGet(_nullOffset, columnIndex) : false;
+            Schema.HasNullableColumns ? _rowAlloc.GetBit(_nullOffset, columnIndex) : false;
 
-        private void SetToNull(int columnIndex) => BitmapSet(_nullOffset, columnIndex);
+        private void SetToNull(int columnIndex) => _rowAlloc.SetBit(_nullOffset, columnIndex);
 
         public void SetNull(string columnName)
         {
@@ -826,16 +826,6 @@ namespace Knet.Kudu.Client
         {
             var varLenColumnIndex = Schema.GetColumnOffset(columnIndex);
             return _varLengthData[varLenColumnIndex];
-        }
-
-        private void BitmapSet(int offset, int index)
-        {
-            _rowAlloc[offset + (index / 8)] |= (byte)(1 << (index % 8));
-        }
-
-        private bool BitmapGet(int offset, int index)
-        {
-            return (_rowAlloc[offset + (index / 8)] & (1 << (index % 8))) != 0;
         }
 
         private static byte[] CloneArray(byte[] array)

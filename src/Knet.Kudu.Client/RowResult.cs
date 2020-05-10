@@ -477,7 +477,7 @@ namespace Knet.Kudu.Client
                 return false;
 
             int nullBitSetOffset = _resultSet.NullBitSetOffset;
-            bool isNull = BitmapGet(nullBitSetOffset, columnIndex);
+            bool isNull = _rowData.GetBit(nullBitSetOffset, columnIndex);
             return isNull;
         }
 
@@ -526,11 +526,6 @@ namespace Knet.Kudu.Client
                     $" index: {columnIndex}) is fixed size but was" +
                     $" read as variable length");
             }
-        }
-
-        private bool BitmapGet(int offset, int index)
-        {
-            return (_rowData[offset + (index / 8)] & (1 << (index % 8))) != 0;
         }
     }
 }
