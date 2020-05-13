@@ -145,8 +145,7 @@ namespace Knet.Kudu.Client
 
         public bool IsNull(int columnIndex)
         {
-            ColumnSchema column = Schema.GetColumn(columnIndex);
-            return column.IsNullable && IsSetToNull(columnIndex);
+            return IsSetToNull(columnIndex);
         }
 
         public void SetBool(string columnName, bool value)
@@ -472,7 +471,25 @@ namespace Knet.Kudu.Client
 
         public void SetString(int columnIndex, string value)
         {
-            CheckColumn(columnIndex, KuduType.String);
+            var column = Schema.GetColumn(columnIndex);
+            var type = column.Type;
+
+            if (type == KuduType.String)
+            {
+            }
+            else if (type == KuduType.Varchar)
+            {
+                int maxLength = column.TypeAttributes.Length.GetValueOrDefault();
+
+                if (value.Length > maxLength)
+                    value = value.Substring(0, maxLength);
+            }
+            else
+            {
+                throw new ArgumentException(
+                    $"Can't set {column.Name} ({column.Type}) to {type}");
+            }
+
             var data = KuduEncoder.EncodeString(value);
             SetVarLengthData(columnIndex, data);
         }
@@ -485,7 +502,7 @@ namespace Knet.Kudu.Client
 
         public string GetString(int columnIndex)
         {
-            CheckColumn(columnIndex, KuduType.String);
+            //CheckColumn(columnIndex, KuduType.String);
             CheckValue(columnIndex);
             ReadOnlySpan<byte> data = GetVarLengthColumn(columnIndex);
             return KuduEncoder.DecodeString(data);
@@ -600,6 +617,7 @@ namespace Knet.Kudu.Client
                         break;
                     }
                 case KuduType.String:
+                case KuduType.Varchar:
                     SetString(index, string.Empty);
                     break;
                 case KuduType.Binary:
@@ -737,9 +755,9 @@ namespace Knet.Kudu.Client
             }
             else
             {
-                // Column is either string or binary.
+                // Column is either string, binary, or varchar.
                 ReadOnlySpan<byte> data = GetVarLengthColumn(index);
-                byte[] incremented = new byte[data.Length + 1];
+                var incremented = new byte[data.Length + 1];
                 data.CopyTo(incremented);
                 SetVarLengthData(index, incremented);
                 return true;

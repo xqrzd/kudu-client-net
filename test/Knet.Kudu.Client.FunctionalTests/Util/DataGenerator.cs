@@ -101,9 +101,11 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
                     case KuduType.Decimal128:
                         row.SetDecimal(name, RandomDecimal(col.TypeAttributes, _random));
                         break;
-                    // TODO: varchar
                     case KuduType.String:
                         row.SetString(name, RandomString(_stringLength, _random));
+                        break;
+                    case KuduType.Varchar:
+                        row.SetString(name, RandomString(col.TypeAttributes.Length.Value, _random));
                         break;
                     case KuduType.Binary:
                         row.SetBinary(name, RandomBinary(_binaryLength, _random));

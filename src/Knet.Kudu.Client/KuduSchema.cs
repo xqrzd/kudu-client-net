@@ -73,18 +73,18 @@ namespace Knet.Kudu.Client
             {
                 var column = columns[i];
 
-                if (column.Type == KuduType.String || column.Type == KuduType.Binary)
+                if (column.IsFixedSize)
+                {
+                    _columnOffsets[i] = RowAllocSize;
+                    RowAllocSize += column.Size;
+                }
+                else
                 {
                     _columnOffsets[i] = VarLengthColumnCount;
                     VarLengthColumnCount++;
 
                     // Don't increment size here, these types are stored separately
                     // in PartialRow (_varLengthData).
-                }
-                else
-                {
-                    _columnOffsets[i] = RowAllocSize;
-                    RowAllocSize += column.Size;
                 }
 
                 HasNullableColumns |= column.IsNullable;
@@ -120,7 +120,9 @@ namespace Knet.Kudu.Client
             {
                 var column = columns[i];
 
-                if (column.Type == DataTypePB.String || column.Type == DataTypePB.Binary)
+                if (column.Type == DataTypePB.String ||
+                    column.Type == DataTypePB.Binary ||
+                    column.Type == DataTypePB.Varchar)
                 {
                     columnOffsets[i] = varLenCnt;
                     varLenCnt++;

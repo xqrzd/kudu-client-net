@@ -44,7 +44,7 @@ namespace Knet.Kudu.Client
 
             Size = KuduSchema.GetTypeSize(type);
             IsSigned = KuduSchema.IsSigned(type);
-            IsFixedSize = !(type == KuduType.String || type == KuduType.Binary);
+            IsFixedSize = IsTypeFixedSize(type);
         }
 
         public bool Equals(ColumnSchema other)
@@ -73,6 +73,14 @@ namespace Knet.Kudu.Client
             var key = IsKey ? " PK" : "";
 
             return $"{Name} {Type}{typeAttributes}{nullable}{key}";
+        }
+
+        public static bool IsTypeFixedSize(KuduType type)
+        {
+            return
+                type != KuduType.String &&
+                type != KuduType.Binary &&
+                type != KuduType.Varchar;
         }
 
         public static ColumnSchema FromProtobuf(ColumnSchemaPB columnSchemaPb)
