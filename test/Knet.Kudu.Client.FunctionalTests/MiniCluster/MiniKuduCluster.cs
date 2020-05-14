@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Protocol.Tools;
 using Knet.Kudu.Client.Util;
+using Microsoft.Extensions.Logging;
 using ProtoBuf;
 
 namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
@@ -133,7 +134,16 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
 
         public KuduClient CreateClient()
         {
-            return KuduClient.NewBuilder(_masterServers.Keys.ToList()).Build();
+            var loggerFactory = LoggerFactory.Create(builder =>
+            {
+                builder
+                    .SetMinimumLevel(LogLevel.Trace)
+                    .AddConsole();
+            });
+
+            return KuduClient.NewBuilder(_masterServers.Keys.ToList())
+                .SetLoggerFactory(loggerFactory)
+                .Build();
         }
 
         public KuduClientBuilder CreateClientBuilder()
