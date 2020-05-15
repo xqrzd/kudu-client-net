@@ -819,7 +819,7 @@ namespace Knet.Kudu.Client.Tests
                           KuduEncoder.EncodeDecimal128(67891011121314151617.18m, DecimalUtil.MaxDecimal128Precision, 2)));
 
             TestMerge(KuduPredicate.NewComparisonPredicate(binaryCol, ComparisonOp.GreaterEqual,
-                                                            new byte[] { 0, 1, 2, 3, 4, 5, 6 }),
+                                                           new byte[] { 0, 1, 2, 3, 4, 5, 6 }),
                       KuduPredicate.NewComparisonPredicate(binaryCol, ComparisonOp.Less, new byte[] { 10 }),
                       new KuduPredicate(PredicateType.Range,
                                         binaryCol,
