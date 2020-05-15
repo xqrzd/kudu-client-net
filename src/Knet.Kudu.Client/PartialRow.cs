@@ -83,9 +83,15 @@ namespace Knet.Kudu.Client
                 {
                     var column = schema.GetColumn(i);
                     var size = column.Size;
-                    var type = column.Type;
 
-                    if (type == KuduType.String || type == KuduType.Binary)
+                    if (column.IsFixedSize)
+                    {
+                        var data = rowAlloc.Slice(0, size);
+                        data.CopyTo(rowDestination);
+
+                        rowAlloc = rowAlloc.Slice(size);
+                    }
+                    else
                     {
                         var data = GetVarLengthColumn(i);
                         data.CopyTo(indirectDestination);
@@ -95,13 +101,6 @@ namespace Knet.Kudu.Client
                         indirectDestination = indirectDestination.Slice(data.Length);
                         varLengthOffset += data.Length;
                         indirectBytesWritten += data.Length;
-                    }
-                    else
-                    {
-                        var data = rowAlloc.Slice(0, size);
-                        data.CopyTo(rowDestination);
-
-                        rowAlloc = rowAlloc.Slice(size);
                     }
 
                     // Advance RowAlloc buffer only if we wrote that column.
