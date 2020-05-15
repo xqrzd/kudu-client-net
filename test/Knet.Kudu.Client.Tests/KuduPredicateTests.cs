@@ -16,13 +16,16 @@ namespace Knet.Kudu.Client.Tests
         private readonly ColumnSchema binaryCol = CreateColumnSchema("binary", KuduType.Binary);
 
         private readonly ColumnSchema decimal32Col = CreateColumnSchema("decimal32", KuduType.Decimal32,
-            new ColumnTypeAttributes(DecimalUtil.MaxDecimal32Precision, 2));
+            new ColumnTypeAttributes(DecimalUtil.MaxDecimal32Precision, 2, null));
 
         private readonly ColumnSchema decimal64Col = CreateColumnSchema("decimal64", KuduType.Decimal64,
-            new ColumnTypeAttributes(DecimalUtil.MaxDecimal64Precision, 2));
+            new ColumnTypeAttributes(DecimalUtil.MaxDecimal64Precision, 2, null));
 
         private readonly ColumnSchema decimal128Col = CreateColumnSchema("decimal128", KuduType.Decimal128,
-            new ColumnTypeAttributes(DecimalUtil.MaxDecimal128Precision, 2));
+            new ColumnTypeAttributes(DecimalUtil.MaxDecimal128Precision, 2, null));
+
+        private readonly ColumnSchema varcharCol = CreateColumnSchema("varchar", KuduType.Varchar,
+            new ColumnTypeAttributes(null, null, 10));
 
         /// <summary>
         /// Tests merges on all types of integer predicates.
@@ -823,6 +826,13 @@ namespace Knet.Kudu.Client.Tests
                                         new byte[] { 0, 1, 2, 3, 4, 5, 6 },
                                         new byte[] { 10 }));
 
+            TestMerge(KuduPredicate.NewComparisonPredicate(varcharCol, ComparisonOp.GreaterEqual, "bar"),
+                      KuduPredicate.NewComparisonPredicate(varcharCol, ComparisonOp.Less, "foo"),
+                      new KuduPredicate(PredicateType.Range,
+                                        varcharCol,
+                                        new byte[] { 98, 97, 114 },
+                                        new byte[] { 102, 111, 111 }));
+
             byte[] bA = "a".ToUtf8ByteArray();
             byte[] bB = "b".ToUtf8ByteArray();
             byte[] bC = "c".ToUtf8ByteArray();
@@ -861,6 +871,8 @@ namespace Knet.Kudu.Client.Tests
                          KuduPredicate.NewComparisonPredicate(stringCol, ComparisonOp.Less, "a\0"));
             Assert.Equal(KuduPredicate.NewComparisonPredicate(binaryCol, ComparisonOp.LessEqual, new byte[] { 10 }),
                          KuduPredicate.NewComparisonPredicate(binaryCol, ComparisonOp.Less, new byte[] { 10, 0 }));
+            Assert.Equal(KuduPredicate.NewComparisonPredicate(varcharCol, ComparisonOp.LessEqual, "a"),
+                         KuduPredicate.NewComparisonPredicate(varcharCol, ComparisonOp.Less, "a\0"));
             Assert.Equal(KuduPredicate.NewComparisonPredicate(byteCol, ComparisonOp.LessEqual, sbyte.MaxValue),
                          KuduPredicate.NewIsNotNullPredicate(byteCol));
             Assert.Equal(KuduPredicate.NewComparisonPredicate(shortCol, ComparisonOp.LessEqual, short.MaxValue),
@@ -958,6 +970,8 @@ namespace Knet.Kudu.Client.Tests
                          KuduPredicate.None(stringCol));
             Assert.Equal(KuduPredicate.NewComparisonPredicate(binaryCol, ComparisonOp.Less, new byte[] { }),
                          KuduPredicate.None(binaryCol));
+            Assert.Equal(KuduPredicate.NewComparisonPredicate(varcharCol, ComparisonOp.Less, ""),
+                         KuduPredicate.None(varcharCol));
         }
 
         [Fact]
@@ -1001,6 +1015,8 @@ namespace Knet.Kudu.Client.Tests
                          KuduPredicate.NewComparisonPredicate(decimal32Col, ComparisonOp.Equal, 9999999.99m));
             Assert.Equal(KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.GreaterEqual, 9999999999999999.99m),
                          KuduPredicate.NewComparisonPredicate(decimal64Col, ComparisonOp.Equal, 9999999999999999.99m));
+            Assert.Equal(KuduPredicate.NewComparisonPredicate(varcharCol, ComparisonOp.GreaterEqual, ""),
+                         KuduPredicate.NewIsNotNullPredicate(varcharCol));
         }
 
         [Fact]
@@ -1039,6 +1055,12 @@ namespace Knet.Kudu.Client.Tests
                          KuduPredicate.NewIsNotNullPredicate(stringCol).ToString());
             Assert.Equal("`string` IS NULL",
                          KuduPredicate.NewIsNullPredicate(stringCol).ToString());
+            Assert.Equal("`varchar` = \"my varchar\"",
+                         KuduPredicate.NewComparisonPredicate(varcharCol, ComparisonOp.Equal, "my varchar").ToString());
+            Assert.Equal("`varchar` IS NOT NULL",
+                         KuduPredicate.NewIsNotNullPredicate(varcharCol).ToString());
+            Assert.Equal("`varchar` IS NULL",
+                         KuduPredicate.NewIsNullPredicate(varcharCol).ToString());
             // IS NULL predicate on non-nullable column = NONE predicate
             Assert.Equal("`int` NONE",
                     KuduPredicate.NewIsNullPredicate(intCol).ToString());
@@ -1061,8 +1083,8 @@ namespace Knet.Kudu.Client.Tests
                 floatCol, new float[] { 123.456f, 78.9f }).ToString());
             Assert.Equal("`double` IN (78.9, 123.456)", KuduPredicate.NewInListPredicate(
                 doubleCol, new double[] { 123.456d, 78.9d }).ToString());
-            Assert.Equal("`string` IN (\"a\", \"my string\")",
-                         KuduPredicate.NewInListPredicate(stringCol, new string[] { "my string", "a" }).ToString());
+            Assert.Equal("`string` IN (\"a\", \"my string\")", KuduPredicate.NewInListPredicate(
+                stringCol, new string[] { "my string", "a" }).ToString());
             Assert.Equal("`binary` IN (00, AB-01-CD)", KuduPredicate.NewInListPredicate(
                 binaryCol, new byte[][] { new byte[] { 0xAB, 0x01, 0xCD }, new byte[] { 0x00 } }).ToString());
         }
@@ -1129,7 +1151,7 @@ namespace Knet.Kudu.Client.Tests
                 name,
                 dataType,
                 false,
-                dataType == KuduType.String,
+                dataType == KuduType.String || dataType == KuduType.Varchar,
                 EncodingType.AutoEncoding,
                 CompressionType.DefaultCompression,
                 attributes);

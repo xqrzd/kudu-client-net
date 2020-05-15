@@ -83,9 +83,15 @@ namespace Knet.Kudu.Client
                 {
                     var column = schema.GetColumn(i);
                     var size = column.Size;
-                    var type = column.Type;
 
-                    if (type == KuduType.String || type == KuduType.Binary)
+                    if (column.IsFixedSize)
+                    {
+                        var data = rowAlloc.Slice(0, size);
+                        data.CopyTo(rowDestination);
+
+                        rowAlloc = rowAlloc.Slice(size);
+                    }
+                    else
                     {
                         var data = GetVarLengthColumn(i);
                         data.CopyTo(indirectDestination);
@@ -95,13 +101,6 @@ namespace Knet.Kudu.Client
                         indirectDestination = indirectDestination.Slice(data.Length);
                         varLengthOffset += data.Length;
                         indirectBytesWritten += data.Length;
-                    }
-                    else
-                    {
-                        var data = rowAlloc.Slice(0, size);
-                        data.CopyTo(rowDestination);
-
-                        rowAlloc = rowAlloc.Slice(size);
                     }
 
                     // Advance RowAlloc buffer only if we wrote that column.
@@ -145,8 +144,7 @@ namespace Knet.Kudu.Client
 
         public bool IsNull(int columnIndex)
         {
-            ColumnSchema column = Schema.GetColumn(columnIndex);
-            return column.IsNullable && IsSetToNull(columnIndex);
+            return IsSetToNull(columnIndex);
         }
 
         public void SetBool(string columnName, bool value)
@@ -429,8 +427,8 @@ namespace Knet.Kudu.Client
         public void SetDecimal(int columnIndex, decimal value)
         {
             ColumnSchema column = Schema.GetColumn(columnIndex);
-            int precision = column.TypeAttributes.Precision;
-            int scale = column.TypeAttributes.Scale;
+            int precision = column.TypeAttributes.Precision.GetValueOrDefault();
+            int scale = column.TypeAttributes.Scale.GetValueOrDefault();
             Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, column.Size);
 
             switch (column.Type)
@@ -459,7 +457,7 @@ namespace Knet.Kudu.Client
         {
             // TODO: Check type here.
             ColumnSchema column = Schema.GetColumn(columnIndex);
-            int scale = column.TypeAttributes.Scale;
+            int scale = column.TypeAttributes.Scale.GetValueOrDefault();
             ReadOnlySpan<byte> data = GetRowAllocColumn(columnIndex, column.Size);
             return KuduEncoder.DecodeDecimal(data, column.Type, scale);
         }
@@ -472,7 +470,25 @@ namespace Knet.Kudu.Client
 
         public void SetString(int columnIndex, string value)
         {
-            CheckColumn(columnIndex, KuduType.String);
+            var column = Schema.GetColumn(columnIndex);
+            var type = column.Type;
+
+            if (type == KuduType.String)
+            {
+            }
+            else if (type == KuduType.Varchar)
+            {
+                int maxLength = column.TypeAttributes.Length.GetValueOrDefault();
+
+                if (value.Length > maxLength)
+                    value = value.Substring(0, maxLength);
+            }
+            else
+            {
+                throw new ArgumentException(
+                    $"Can't set {column.Name} ({column.Type}) to {type}");
+            }
+
             var data = KuduEncoder.EncodeString(value);
             SetVarLengthData(columnIndex, data);
         }
@@ -485,7 +501,7 @@ namespace Knet.Kudu.Client
 
         public string GetString(int columnIndex)
         {
-            CheckColumn(columnIndex, KuduType.String);
+            //CheckColumn(columnIndex, KuduType.String);
             CheckValue(columnIndex);
             ReadOnlySpan<byte> data = GetVarLengthColumn(columnIndex);
             return KuduEncoder.DecodeString(data);
@@ -584,19 +600,23 @@ namespace Knet.Kudu.Client
                     SetDouble(index, double.MinValue);
                     break;
                 case KuduType.Decimal32:
-                    SetInt32(index, DecimalUtil.MinDecimal32(column.TypeAttributes.Precision));
+                    SetInt32(index, DecimalUtil.MinDecimal32(
+                        column.TypeAttributes.Precision.GetValueOrDefault()));
                     break;
                 case KuduType.Decimal64:
-                    SetInt64(index, DecimalUtil.MinDecimal64(column.TypeAttributes.Precision));
+                    SetInt64(index, DecimalUtil.MinDecimal64(
+                        column.TypeAttributes.Precision.GetValueOrDefault()));
                     break;
                 case KuduType.Decimal128:
                     {
-                        KuduInt128 min = DecimalUtil.MinDecimal128(column.TypeAttributes.Precision);
+                        KuduInt128 min = DecimalUtil.MinDecimal128(
+                            column.TypeAttributes.Precision.GetValueOrDefault());
                         Span<byte> span = GetSpanInRowAllocAndSetBitSet(index, 16);
                         KuduEncoder.EncodeInt128(span, min);
                         break;
                     }
                 case KuduType.String:
+                case KuduType.Varchar:
                     SetString(index, string.Empty);
                     break;
                 case KuduType.Binary:
@@ -701,7 +721,7 @@ namespace Knet.Kudu.Client
                     case KuduType.Decimal32:
                         {
                             int existing = KuduEncoder.DecodeInt32(data);
-                            int precision = column.TypeAttributes.Precision;
+                            int precision = column.TypeAttributes.Precision.GetValueOrDefault();
                             if (existing == DecimalUtil.MaxDecimal32(precision))
                                 return false;
 
@@ -711,7 +731,7 @@ namespace Knet.Kudu.Client
                     case KuduType.Decimal64:
                         {
                             long existing = KuduEncoder.DecodeInt64(data);
-                            int precision = column.TypeAttributes.Precision;
+                            int precision = column.TypeAttributes.Precision.GetValueOrDefault();
                             if (existing == DecimalUtil.MaxDecimal64(precision))
                                 return false;
 
@@ -721,7 +741,7 @@ namespace Knet.Kudu.Client
                     case KuduType.Decimal128:
                         {
                             KuduInt128 existing = KuduEncoder.DecodeInt128(data);
-                            int precision = column.TypeAttributes.Precision;
+                            int precision = column.TypeAttributes.Precision.GetValueOrDefault();
                             if (existing == DecimalUtil.MaxDecimal128(precision))
                                 return false;
 
@@ -734,9 +754,9 @@ namespace Knet.Kudu.Client
             }
             else
             {
-                // Column is either string or binary.
+                // Column is either string, binary, or varchar.
                 ReadOnlySpan<byte> data = GetVarLengthColumn(index);
-                byte[] incremented = new byte[data.Length + 1];
+                var incremented = new byte[data.Length + 1];
                 data.CopyTo(incremented);
                 SetVarLengthData(index, incremented);
                 return true;

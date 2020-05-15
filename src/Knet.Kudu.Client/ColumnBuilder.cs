@@ -107,6 +107,22 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// Set the varchar attributes for this column.
+        /// </summary>
+        /// <param name="length">
+        /// Max length for this column, between 1 and 65535 inclusive.
+        /// </param>
+        public ColumnBuilder VarcharAttributes(int length)
+        {
+            _column.TypeAttributes = new ColumnTypeAttributesPB
+            {
+                Length = length
+            };
+
+            return this;
+        }
+
+        /// <summary>
         /// Set the comment for this column.
         /// </summary>
         /// <param name="comment">The comment to set on the column.</param>

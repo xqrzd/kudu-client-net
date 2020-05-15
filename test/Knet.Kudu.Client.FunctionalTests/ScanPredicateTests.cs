@@ -358,6 +358,36 @@ namespace Knet.Kudu.Client.FunctionalTests
         }
 
         [SkippableFact]
+        public async Task TestVarcharPredicates()
+        {
+            var builder = GetDefaultTableBuilder()
+                .SetTableName("varchar-table")
+                .AddColumn("value", KuduType.Varchar, opt => opt.VarcharAttributes(10));
+
+            var table = await _client.CreateTableAsync(builder);
+
+            var values = CreateStringValues();
+            var testValues = CreateStringTestValues();
+
+            long i = 0;
+            foreach (var value in values)
+            {
+                var insert = table.NewInsert();
+                insert.SetInt64("key", i++);
+                insert.SetString("value", value);
+                await _session.EnqueueAsync(insert);
+            }
+
+            var nullInsert = table.NewInsert();
+            nullInsert.SetInt64("key", i);
+            nullInsert.SetNull("value");
+            await _session.EnqueueAsync(nullInsert);
+            await _session.FlushAsync();
+
+            await CheckPredicatesAsync(table, values, testValues);
+        }
+
+        [SkippableFact]
         public async Task TestBinaryPredicates()
         {
             var builder = GetDefaultTableBuilder()

@@ -322,6 +322,7 @@ namespace Knet.Kudu.Client
                 KuduType.Float => KuduEncoder.DecodeFloat(value).ToString(),
                 KuduType.Double => KuduEncoder.DecodeDouble(value).ToString(),
                 KuduType.String => $@"""{KuduEncoder.DecodeString(value)}""",
+                KuduType.Varchar => $@"""{KuduEncoder.DecodeString(value)}""",
                 KuduType.Binary => BitConverter.ToString(value),
                 KuduType.Decimal32 => DecodeDecimal(value).ToString(),
                 KuduType.Decimal64 => DecodeDecimal(value).ToString(),
@@ -333,7 +334,7 @@ namespace Knet.Kudu.Client
 
         private decimal DecodeDecimal(ReadOnlySpan<byte> value)
         {
-            int scale = Column.TypeAttributes.Scale;
+            int scale = Column.TypeAttributes.Scale.GetValueOrDefault();
 
             return KuduEncoder.DecodeDecimal(value, Column.Type, scale);
         }
@@ -604,8 +605,8 @@ namespace Knet.Kudu.Client
         {
             //checkColumn(column, Type.DECIMAL);
             var typeAttributes = column.TypeAttributes;
-            int precision = typeAttributes.Precision;
-            int scale = typeAttributes.Scale;
+            int precision = typeAttributes.Precision.GetValueOrDefault();
+            int scale = typeAttributes.Scale.GetValueOrDefault();
 
             long maxValue;
             long longValue;
@@ -703,7 +704,10 @@ namespace Knet.Kudu.Client
         public static KuduPredicate NewComparisonPredicate(
             ColumnSchema column, ComparisonOp op, string value)
         {
-            CheckColumn(column, KuduType.String);
+            var type = column.Type;
+            if (type != KuduType.String && type != KuduType.Varchar)
+                throw new ArgumentException($"Expected either {KuduType.String}" +
+                    $" or {KuduType.Varchar}, but received {type}");
 
             var bytes = KuduEncoder.EncodeString(value);
             return NewComparisonPredicateNoCheck(column, op, bytes);
@@ -814,14 +818,17 @@ namespace Knet.Kudu.Client
                 IEnumerable<DateTime> x when column.Type == KuduType.Date =>
                     GetZ(x, KuduEncoder.EncodeDate),
                 IEnumerable<decimal> x when column.Type == KuduType.Decimal32 =>
-                    GetZ(x, i => KuduEncoder.EncodeDecimal32(
-                        i, column.TypeAttributes.Precision, column.TypeAttributes.Scale)),
+                    GetZ(x, i => KuduEncoder.EncodeDecimal32(i,
+                        column.TypeAttributes.Precision.GetValueOrDefault(),
+                        column.TypeAttributes.Scale.GetValueOrDefault())),
                 IEnumerable<decimal> x when column.Type == KuduType.Decimal64 =>
-                    GetZ(x, i => KuduEncoder.EncodeDecimal64(
-                        i, column.TypeAttributes.Precision, column.TypeAttributes.Scale)),
+                    GetZ(x, i => KuduEncoder.EncodeDecimal64(i,
+                        column.TypeAttributes.Precision.GetValueOrDefault(),
+                        column.TypeAttributes.Scale.GetValueOrDefault())),
                 IEnumerable<decimal> x when column.Type == KuduType.Decimal128 =>
-                    GetZ(x, i => KuduEncoder.EncodeDecimal128(
-                        i, column.TypeAttributes.Precision, column.TypeAttributes.Scale)),
+                    GetZ(x, i => KuduEncoder.EncodeDecimal128(i,
+                        column.TypeAttributes.Precision.GetValueOrDefault(),
+                        column.TypeAttributes.Scale.GetValueOrDefault())),
                 _ => throw new Exception()
             };
 
@@ -917,6 +924,7 @@ namespace Knet.Kudu.Client
                     return KuduEncoder.DecodeDouble(a).CompareTo(KuduEncoder.DecodeDouble(b));
                 case KuduType.String:
                 case KuduType.Binary:
+                case KuduType.Varchar:
                     return a.SequenceCompareTo(b);
                 case KuduType.Decimal128:
                     return KuduEncoder.DecodeInt128(a).CompareTo(KuduEncoder.DecodeInt128(b));
@@ -977,6 +985,7 @@ namespace Knet.Kudu.Client
                     }
                 case KuduType.String:
                 case KuduType.Binary:
+                case KuduType.Varchar:
                     {
                         if (a.Length + 1 != b.Length || b[a.Length] != 0)
                         {

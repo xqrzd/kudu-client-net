@@ -54,5 +54,37 @@ namespace Knet.Kudu.Client.Util
 
             return true;
         }
+
+        public static ColumnTypeAttributes ToTypeAttributes(
+            this ColumnTypeAttributesPB pb)
+        {
+            if (pb is null)
+                return null;
+
+            return new ColumnTypeAttributes(
+                pb.ShouldSerializePrecision() ? pb.Precision : default,
+                pb.ShouldSerializeScale() ? pb.Scale : default,
+                pb.ShouldSerializeLength() ? pb.Length : default);
+        }
+
+        public static ColumnTypeAttributesPB ToTypeAttributesPb(
+            this ColumnTypeAttributes attr)
+        {
+            if (attr is null)
+                return null;
+
+            var pb = new ColumnTypeAttributesPB();
+
+            if (attr.Precision.HasValue)
+                pb.Precision = attr.Precision.GetValueOrDefault();
+
+            if (attr.Scale.HasValue)
+                pb.Scale = attr.Scale.GetValueOrDefault();
+
+            if (attr.Length.HasValue)
+                pb.Length = attr.Length.GetValueOrDefault();
+
+            return pb;
+        }
     }
 }

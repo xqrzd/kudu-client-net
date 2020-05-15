@@ -17,6 +17,7 @@ namespace Knet.Kudu.Client
         Decimal32 = DataTypePB.Decimal32,
         Decimal64 = DataTypePB.Decimal64,
         Decimal128 = DataTypePB.Decimal128,
+        Varchar = DataTypePB.Varchar,
         Date = DataTypePB.Date
     }
 }

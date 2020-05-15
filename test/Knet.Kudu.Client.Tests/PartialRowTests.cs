@@ -24,6 +24,7 @@ namespace Knet.Kudu.Client.Tests
             Assert.Equal(float.MinValue, row.GetFloat("float"));
             Assert.Equal(double.MinValue, row.GetDouble("double"));
             Assert.Equal("", row.GetString("string"));
+            Assert.Equal("", row.GetString("varchar"));
             Assert.Equal(new byte[0], row.GetBinary("binary"));
             Assert.Equal(-99.999m, row.GetDecimal("decimal32"));
             Assert.Equal(-99.999m, row.GetDecimal("decimal64"));
@@ -126,6 +127,12 @@ namespace Knet.Kudu.Client.Tests
             row.SetBinary(binaryIndex, new byte[] { 0, 1, 2, 3, 4 });
             Assert.True(row.IncrementColumn(binaryIndex));
             Assert.Equal(new byte[] { 0, 1, 2, 3, 4, 0 }, row.GetBinary(binaryIndex));
+
+            // Varchar
+            int varcharIndex = row.Schema.GetColumnIndex("varchar");
+            row.SetString(varcharIndex, "hello");
+            Assert.True(row.IncrementColumn(varcharIndex));
+            Assert.Equal("hello\0", row.GetString(varcharIndex));
         }
 
         private PartialRow GetPartialRowWithAllTypes(bool isNullable = false)
@@ -144,11 +151,13 @@ namespace Knet.Kudu.Client.Tests
                 new ColumnSchema("timestamp", KuduType.UnixtimeMicros, false, isNullable),
                 new ColumnSchema("date", KuduType.Date, false, isNullable),
                 new ColumnSchema("decimal32", KuduType.Decimal32, false, isNullable,
-                    typeAttributes: new ColumnTypeAttributes(5, 3)),
+                    typeAttributes: new ColumnTypeAttributes(5, 3, null)),
                 new ColumnSchema("decimal64", KuduType.Decimal64, false, isNullable,
-                    typeAttributes: new ColumnTypeAttributes(5, 3)),
+                    typeAttributes: new ColumnTypeAttributes(5, 3, null)),
                 new ColumnSchema("decimal128", KuduType.Decimal128, false, isNullable,
-                    typeAttributes: new ColumnTypeAttributes(5, 3))
+                    typeAttributes: new ColumnTypeAttributes(5, 3, null)),
+                new ColumnSchema("varchar", KuduType.Varchar, false, isNullable,
+                    typeAttributes: new ColumnTypeAttributes(null, null, 10))
             });
 
             return new PartialRow(schema);

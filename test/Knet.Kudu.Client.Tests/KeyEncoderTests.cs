@@ -72,7 +72,6 @@ namespace Knet.Kudu.Client.Tests
         [Fact]
         public void TestPrimaryKeyEncoding()
         {
-            // TODO: Test varchar when it's added.
             var schema = GetSchema(new TableBuilder()
                 .AddColumn("int8", KuduType.Int8, opt => opt.Key(true))
                 .AddColumn("int16", KuduType.Int16, opt => opt.Key(true))
@@ -84,6 +83,8 @@ namespace Knet.Kudu.Client.Tests
                     .DecimalAttributes(DecimalUtil.MaxDecimal64Precision, 0))
                 .AddColumn("decimal128", KuduType.Decimal128, opt => opt.Key(true)
                     .DecimalAttributes(DecimalUtil.MaxDecimal128Precision, 0))
+                .AddColumn("varchar", KuduType.Varchar, opt => opt.Key(true)
+                    .VarcharAttributes(10))
                 .AddColumn("string", KuduType.String, opt => opt.Key(true))
                 .AddColumn("binary", KuduType.Binary, opt => opt.Key(true)));
 
@@ -97,6 +98,7 @@ namespace Knet.Kudu.Client.Tests
             rowA.SetDecimal("decimal32", 5m);
             rowA.SetDecimal("decimal64", 6m);
             rowA.SetDecimal("decimal128", 7m);
+            rowA.SetString("varchar", "");
             rowA.SetString("string", "");
             rowA.SetBinary("binary", new byte[0]);
 
@@ -110,6 +112,7 @@ namespace Knet.Kudu.Client.Tests
                 0x80, 0, 0, 5,
                 0x80, 0, 0, 0, 0, 0, 0, 6,
                 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7,
+                0, 0,
                 0, 0
             }, rowAEncoded);
 
@@ -123,12 +126,12 @@ namespace Knet.Kudu.Client.Tests
             rowB.SetDecimal("decimal32", 5m);
             rowB.SetDecimal("decimal64", 6m);
             rowB.SetDecimal("decimal128", 7m);
-            //rowB.addVarchar("varchar", "abc\u0001\0defghij");
+            rowB.SetString("varchar", "abc\u0001\0defghij");
             rowB.SetString("string", "abc\u0001\0def");
             rowB.SetBinary("binary", "\0\u0001binary".ToUtf8ByteArray());
 
             var rowBEncoded = KeyEncoder.EncodePrimaryKey(rowB);
-            Assert.Equal(new byte[]
+            Assert.Equal(ToByteArray(new int[]
             {
                 0xff,
                 0xff, 0xff,
@@ -137,24 +140,25 @@ namespace Knet.Kudu.Client.Tests
                 0x80, 0, 0, 5,
                 0x80, 0, 0, 0, 0, 0, 0, 6,
                 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7,
-                (byte)'a', (byte)'b', (byte)'c', 1, 0, 1, (byte)'d', (byte)'e', (byte)'f', 0, 0,
-                0, 1, (byte)'b', (byte)'i', (byte)'n', (byte)'a', (byte)'r', (byte)'y'
-            }, rowBEncoded);
+                'a', 'b', 'c', 1, 0, 1, 'd', 'e', 'f', 'g', 'h', 0, 0,
+                'a', 'b', 'c', 1, 0, 1, 'd', 'e', 'f', 0, 0,
+                0, 1, 'b', 'i', 'n', 'a', 'r', 'y'
+            }), rowBEncoded);
 
             var rowC = new PartialRow(schema);
             rowC.SetSByte("int8", 1);
-            rowC.SetInt16("int16", (short)2);
+            rowC.SetInt16("int16", 2);
             rowC.SetInt32("int32", 3);
             rowC.SetInt64("int64", 4);
             rowC.SetDecimal("decimal32", 5m);
             rowC.SetDecimal("decimal64", 6m);
             rowC.SetDecimal("decimal128", 7m);
-            //rowC.addVarchar("varchar", "abc\n12345678");
+            rowC.SetString("varchar", "abc\n12345678");
             rowC.SetString("string", "abc\n123");
             rowC.SetBinary("binary", "\0\u0001\u0002\u0003\u0004\u0005".ToUtf8ByteArray());
 
             var rowCEncoded = KeyEncoder.EncodePrimaryKey(rowC);
-            Assert.Equal(new byte[]
+            Assert.Equal(ToByteArray(new int[]
             {
                 0x81,
                 0x80, 2,
@@ -163,9 +167,10 @@ namespace Knet.Kudu.Client.Tests
                 0x80, 0, 0, 5,
                 0x80, 0, 0, 0, 0, 0, 0, 6,
                 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7,
-                (byte)'a', (byte)'b', (byte)'c', (byte)'\n', (byte)'1', (byte)'2', (byte)'3', 0, 0,
+                'a', 'b', 'c', '\n', '1', '2', '3', '4', '5', '6', 0, 0,
+                'a', 'b', 'c', '\n', '1', '2', '3', 0, 0,
                 0, 1, 2, 3, 4, 5
-            }, rowCEncoded);
+            }), rowCEncoded);
 
             var rowD = new PartialRow(schema);
             rowD.SetSByte("int8", -1);
@@ -175,26 +180,24 @@ namespace Knet.Kudu.Client.Tests
             rowD.SetDecimal("decimal32", -5m);
             rowD.SetDecimal("decimal64", -6m);
             rowD.SetDecimal("decimal128", -7m);
-            //rowD.addVarchar("varchar", "\0abc\n\1\1\0 123\1\0");
+            rowD.SetString("varchar", "\0abc\n\u0001\u0001\0 123\u0001\0");
             rowD.SetString("string", "\0abc\n\u0001\u0001\0 123\u0001\0");
             rowD.SetBinary("binary", "\0\u0001\u0002\u0003\u0004\u0005\0".ToUtf8ByteArray());
 
             var rowDEncoded = KeyEncoder.EncodePrimaryKey(rowD);
-            unchecked
+            Assert.Equal(ToByteArray(new int[]
             {
-                Assert.Equal(new byte[]
-                {
-                    127,
-                    127, (byte)-2,
-                    127, (byte)-1, (byte)-1, (byte)-3,
-                    127, (byte)-1, (byte)-1, (byte)-1, (byte)-1, (byte)-1, (byte)-1, (byte)-4,
-                    127, (byte)-1, (byte)-1, (byte)-5,
-                    127, (byte)-1, (byte)-1, (byte)-1, (byte)-1, (byte)-1, (byte)-1, (byte)-6,
-                    127, (byte)-1, (byte)-1, (byte)-1, (byte)-1, (byte)-1, (byte)-1, (byte)-1, (byte)-1, (byte)-1, (byte)-1, (byte)-1, (byte)-1, (byte)-1, (byte)-1, (byte)-7,
-                    0, 1, (byte)'a', (byte)'b', (byte)'c', (byte)'\n', 1, 1, 0, 1, (byte)' ', (byte)'1', (byte)'2', (byte)'3', 1, 0, 1, 0, 0,
-                    0, 1, 2, 3, 4, 5, 0
-                }, rowDEncoded);
-            }
+                127,
+                127, -2,
+                127, -1, -1, -3,
+                127, -1, -1, -1, -1, -1, -1, -4,
+                127, -1, -1, -5,
+                127, -1, -1, -1, -1, -1, -1, -6,
+                127, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -7,
+                0, 1, 'a', 'b', 'c', '\n', 1, 1, 0, 1, ' ', '1', 0, 0,
+                0, 1, 'a', 'b', 'c', '\n', 1, 1, 0, 1, ' ', '1', '2', '3', 1, 0, 1, 0, 0,
+                0, 1, 2, 3, 4, 5, 0,
+            }), rowDEncoded);
         }
 
         [Fact]
@@ -299,6 +302,16 @@ namespace Knet.Kudu.Client.Tests
                 request.Schema.Columns[i].Id = (uint)i;
             }
             return new KuduSchema(request.Schema);
+        }
+
+        private static byte[] ToByteArray(int[] source)
+        {
+            var bytes = new byte[source.Length];
+
+            for (int i = 0; i < bytes.Length; i++)
+                bytes[i] = (byte)source[i];
+
+            return bytes;
         }
     }
 }

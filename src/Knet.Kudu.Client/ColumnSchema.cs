@@ -1,5 +1,6 @@
 ﻿using System;
 using Knet.Kudu.Client.Protocol;
+using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client
 {
@@ -43,7 +44,7 @@ namespace Knet.Kudu.Client
 
             Size = KuduSchema.GetTypeSize(type);
             IsSigned = KuduSchema.IsSigned(type);
-            IsFixedSize = !(type == KuduType.String || type == KuduType.Binary);
+            IsFixedSize = IsTypeFixedSize(type);
         }
 
         public bool Equals(ColumnSchema other)
@@ -67,13 +68,19 @@ namespace Knet.Kudu.Client
 
         public override string ToString()
         {
-            var typeAttributes = TypeAttributes == null ? "" :
-                $"({TypeAttributes.Precision}, {TypeAttributes.Scale})";
-
+            var typeAttributes = TypeAttributes?.ToStringForType(Type);
             var nullable = IsNullable ? "?" : "";
             var key = IsKey ? " PK" : "";
 
             return $"{Name} {Type}{typeAttributes}{nullable}{key}";
+        }
+
+        public static bool IsTypeFixedSize(KuduType type)
+        {
+            return
+                type != KuduType.String &&
+                type != KuduType.Binary &&
+                type != KuduType.Varchar;
         }
 
         public static ColumnSchema FromProtobuf(ColumnSchemaPB columnSchemaPb)
@@ -85,31 +92,44 @@ namespace Knet.Kudu.Client
                 columnSchemaPb.IsNullable,
                 (EncodingType)columnSchemaPb.Encoding,
                 (CompressionType)columnSchemaPb.Compression,
-                FromProtobuf(columnSchemaPb.TypeAttributes));
-        }
-
-        private static ColumnTypeAttributes FromProtobuf(
-            ColumnTypeAttributesPB typeAttributesPb)
-        {
-            if (typeAttributesPb is null)
-                return null;
-
-            return new ColumnTypeAttributes(
-                typeAttributesPb.Precision,
-                typeAttributesPb.Scale);
+                columnSchemaPb.TypeAttributes.ToTypeAttributes());
         }
     }
 
     public class ColumnTypeAttributes
     {
-        public int Precision { get; }
+        public int? Precision { get; }
 
-        public int Scale { get; }
+        public int? Scale { get; }
 
-        public ColumnTypeAttributes(int precision, int scale)
+        public int? Length { get; }
+
+        public ColumnTypeAttributes(int? precision, int? scale, int? length)
         {
             Precision = precision;
             Scale = scale;
+            Length = length;
+        }
+
+        /// <summary>
+        /// Return a string representation appropriate for `type`.
+        /// This is meant to be postfixed to the name of a primitive type to
+        /// describe the full type, e.g. decimal(10, 4).
+        /// </summary>
+        /// <param name="type">The data type.</param>
+        public string ToStringForType(KuduType type)
+        {
+            switch (type)
+            {
+                case KuduType.Decimal32:
+                case KuduType.Decimal64:
+                case KuduType.Decimal128:
+                    return $"({Precision}, {Scale})";
+                case KuduType.Varchar:
+                    return $"({Length})";
+                default:
+                    return "";
+            }
         }
     }
 }
