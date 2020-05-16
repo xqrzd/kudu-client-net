@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Buffers.Binary;
+using System.Runtime.CompilerServices;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client
@@ -35,7 +37,8 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
-        /// Creates a new partial row by deep-copying the data-fields of the provided partial row.
+        /// Creates a new partial row by deep-copying the data-fields of the
+        /// provided partial row.
         /// </summary>
         /// <param name="row">The partial row to copy.</param>
         internal PartialRow(PartialRow row)
@@ -48,9 +51,6 @@ namespace Knet.Kudu.Client
             for (int i = 0; i < _varLengthData.Length; i++)
                 _varLengthData[i] = CloneArray(row._varLengthData[i]);
         }
-
-        // TODO:
-        //public int PrimaryKeySize { get; private set; }
 
         public void WriteTo(
             Span<byte> rowDestination,
@@ -114,10 +114,12 @@ namespace Knet.Kudu.Client
 
         private void Set(int columnIndex) => _rowAlloc.SetBit(0, columnIndex);
 
-        private bool IsSetToNull(int columnIndex) =>
-            Schema.HasNullableColumns ? _rowAlloc.GetBit(_nullOffset, columnIndex) : false;
+        private bool IsSetToNull(int columnIndex) => Schema.HasNullableColumns
+            ? _rowAlloc.GetBit(_nullOffset, columnIndex)
+            : false;
 
-        private void SetToNull(int columnIndex) => _rowAlloc.SetBit(_nullOffset, columnIndex);
+        private void SetToNull(int columnIndex) =>
+            _rowAlloc.SetBit(_nullOffset, columnIndex);
 
         public void SetNull(string columnName)
         {
@@ -130,7 +132,7 @@ namespace Knet.Kudu.Client
             ColumnSchema column = Schema.GetColumn(columnIndex);
 
             if (!column.IsNullable)
-                throw new ArgumentException($"{column.Name} cannot be set to null.");
+                KuduTypeValidation.ThrowNotNullableException(column);
 
             Set(columnIndex);
             SetToNull(columnIndex);
@@ -155,7 +157,7 @@ namespace Knet.Kudu.Client
 
         public void SetBool(int columnIndex, bool value)
         {
-            CheckColumn(columnIndex, KuduType.Bool);
+            CheckType(columnIndex, KuduType.Bool);
             Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 1);
             KuduEncoder.EncodeBool(span, value);
         }
@@ -168,7 +170,7 @@ namespace Knet.Kudu.Client
 
         public bool GetBool(int columnIndex)
         {
-            CheckColumn(columnIndex, KuduType.Bool);
+            CheckType(columnIndex, KuduType.Bool);
             CheckValue(columnIndex);
             ReadOnlySpan<byte> data = GetRowAllocColumn(columnIndex, 1);
             return KuduEncoder.DecodeBool(data);
@@ -182,7 +184,9 @@ namespace Knet.Kudu.Client
 
         public void SetByte(int columnIndex, byte value)
         {
-            SetSByte(columnIndex, (sbyte)value);
+            CheckType(columnIndex, KuduType.Int8);
+            Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 1);
+            KuduEncoder.EncodeUInt8(span, value);
         }
 
         public byte GetByte(string columnName)
@@ -193,7 +197,10 @@ namespace Knet.Kudu.Client
 
         public byte GetByte(int columnIndex)
         {
-            return (byte)GetSByte(columnIndex);
+            CheckType(columnIndex, KuduType.Int8);
+            CheckValue(columnIndex);
+            ReadOnlySpan<byte> data = GetRowAllocColumn(columnIndex, 1);
+            return KuduEncoder.DecodeUInt8(data);
         }
 
         public void SetSByte(string columnName, sbyte value)
@@ -204,7 +211,7 @@ namespace Knet.Kudu.Client
 
         public void SetSByte(int columnIndex, sbyte value)
         {
-            CheckColumn(columnIndex, KuduType.Int8);
+            CheckType(columnIndex, KuduType.Int8);
             Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 1);
             KuduEncoder.EncodeInt8(span, value);
         }
@@ -217,7 +224,7 @@ namespace Knet.Kudu.Client
 
         public sbyte GetSByte(int columnIndex)
         {
-            CheckColumn(columnIndex, KuduType.Int8);
+            CheckType(columnIndex, KuduType.Int8);
             CheckValue(columnIndex);
             ReadOnlySpan<byte> data = GetRowAllocColumn(columnIndex, 1);
             return KuduEncoder.DecodeInt8(data);
@@ -231,7 +238,7 @@ namespace Knet.Kudu.Client
 
         public void SetInt16(int columnIndex, short value)
         {
-            CheckFixedColumnSize(columnIndex, KuduType.Int16, 2);
+            CheckType(columnIndex, KuduType.Int16);
             Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 2);
             KuduEncoder.EncodeInt16(span, value);
         }
@@ -244,7 +251,7 @@ namespace Knet.Kudu.Client
 
         public short GetInt16(int columnIndex)
         {
-            CheckFixedColumnSize(columnIndex, KuduType.Int16, 2);
+            CheckType(columnIndex, KuduType.Int16);
             CheckValue(columnIndex);
             ReadOnlySpan<byte> data = GetRowAllocColumn(columnIndex, 2);
             return KuduEncoder.DecodeInt16(data);
@@ -258,7 +265,12 @@ namespace Knet.Kudu.Client
 
         public void SetInt32(int columnIndex, int value)
         {
-            CheckFixedColumnSize(columnIndex, KuduType.Int32, 4);
+            CheckType(columnIndex, KuduTypeFlags.Int32 | KuduTypeFlags.Date);
+            WriteInt32(columnIndex, value);
+        }
+
+        private void WriteInt32(int columnIndex, int value)
+        {
             Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 4);
             KuduEncoder.EncodeInt32(span, value);
         }
@@ -271,7 +283,7 @@ namespace Knet.Kudu.Client
 
         public int GetInt32(int columnIndex)
         {
-            CheckFixedColumnSize(columnIndex, KuduType.Int32, 4);
+            CheckType(columnIndex, KuduTypeFlags.Int32 | KuduTypeFlags.Date);
             CheckValue(columnIndex);
             ReadOnlySpan<byte> data = GetRowAllocColumn(columnIndex, 4);
             return KuduEncoder.DecodeInt32(data);
@@ -285,7 +297,12 @@ namespace Knet.Kudu.Client
 
         public void SetInt64(int columnIndex, long value)
         {
-            CheckFixedColumnSize(columnIndex, KuduType.Int64, 8);
+            CheckType(columnIndex, KuduTypeFlags.Int64 | KuduTypeFlags.UnixtimeMicros);
+            WriteInt64(columnIndex, value);
+        }
+
+        private void WriteInt64(int columnIndex, long value)
+        {
             Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 8);
             KuduEncoder.EncodeInt64(span, value);
         }
@@ -298,7 +315,7 @@ namespace Knet.Kudu.Client
 
         public long GetInt64(int columnIndex)
         {
-            CheckFixedColumnSize(columnIndex, KuduType.Int64, 8);
+            CheckType(columnIndex, KuduTypeFlags.Int64 | KuduTypeFlags.UnixtimeMicros);
             CheckValue(columnIndex);
             ReadOnlySpan<byte> data = GetRowAllocColumn(columnIndex, 8);
             return KuduEncoder.DecodeInt64(data);
@@ -327,9 +344,9 @@ namespace Knet.Kudu.Client
             }
             else
             {
-                throw new ArgumentException(
-                    $"Can't set {column.Name} ({type}) to either " +
-                    $"{KuduType.UnixtimeMicros} or {KuduType.Date}");
+                KuduTypeValidation.ThrowException(column,
+                    KuduTypeFlags.UnixtimeMicros |
+                    KuduTypeFlags.Date);
             }
         }
 
@@ -356,12 +373,10 @@ namespace Knet.Kudu.Client
                 ReadOnlySpan<byte> data = GetRowAllocColumn(columnIndex, 4);
                 return KuduEncoder.DecodeDate(data);
             }
-            else
-            {
-                throw new ArgumentException(
-                    $"Column {column.Name} ({type}) isn't either " +
-                    $"{KuduType.UnixtimeMicros} or {KuduType.Date}");
-            }
+
+            return KuduTypeValidation.ThrowException<DateTime>(column,
+                KuduTypeFlags.UnixtimeMicros |
+                KuduTypeFlags.Date);
         }
 
         public void SetFloat(string columnName, float value)
@@ -372,7 +387,7 @@ namespace Knet.Kudu.Client
 
         public void SetFloat(int columnIndex, float value)
         {
-            CheckColumn(columnIndex, KuduType.Float);
+            CheckType(columnIndex, KuduType.Float);
             Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 4);
             KuduEncoder.EncodeFloat(span, value);
         }
@@ -385,7 +400,7 @@ namespace Knet.Kudu.Client
 
         public float GetFloat(int columnIndex)
         {
-            CheckColumn(columnIndex, KuduType.Float);
+            CheckType(columnIndex, KuduType.Float);
             CheckValue(columnIndex);
             ReadOnlySpan<byte> data = GetRowAllocColumn(columnIndex, 4);
             return KuduEncoder.DecodeFloat(data);
@@ -399,7 +414,7 @@ namespace Knet.Kudu.Client
 
         public void SetDouble(int columnIndex, double value)
         {
-            CheckColumn(columnIndex, KuduType.Double);
+            CheckType(columnIndex, KuduType.Double);
             Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 8);
             KuduEncoder.EncodeDouble(span, value);
         }
@@ -412,7 +427,7 @@ namespace Knet.Kudu.Client
 
         public double GetDouble(int columnIndex)
         {
-            CheckColumn(columnIndex, KuduType.Double);
+            CheckType(columnIndex, KuduType.Double);
             CheckValue(columnIndex);
             ReadOnlySpan<byte> data = GetRowAllocColumn(columnIndex, 8);
             return KuduEncoder.DecodeDouble(data);
@@ -443,7 +458,11 @@ namespace Knet.Kudu.Client
                     KuduEncoder.EncodeDecimal128(span, value, precision, scale);
                     break;
                 default:
-                    throw new ArgumentException($"Column {column.Name} is not a decimal.");
+                    KuduTypeValidation.ThrowException(column,
+                        KuduTypeFlags.Decimal32 |
+                        KuduTypeFlags.Decimal64 |
+                        KuduTypeFlags.Decimal128);
+                    break;
             }
         }
 
@@ -455,8 +474,11 @@ namespace Knet.Kudu.Client
 
         public decimal GetDecimal(int columnIndex)
         {
-            // TODO: Check type here.
-            ColumnSchema column = Schema.GetColumn(columnIndex);
+            ColumnSchema column = CheckType(columnIndex,
+                KuduTypeFlags.Decimal32 |
+                KuduTypeFlags.Decimal64 |
+                KuduTypeFlags.Decimal128);
+
             int scale = column.TypeAttributes.Scale.GetValueOrDefault();
             ReadOnlySpan<byte> data = GetRowAllocColumn(columnIndex, column.Size);
             return KuduEncoder.DecodeDecimal(data, column.Type, scale);
@@ -485,8 +507,9 @@ namespace Knet.Kudu.Client
             }
             else
             {
-                throw new ArgumentException(
-                    $"Can't set {column.Name} ({column.Type}) to {type}");
+                KuduTypeValidation.ThrowException(column,
+                    KuduTypeFlags.String |
+                    KuduTypeFlags.Varchar);
             }
 
             var data = KuduEncoder.EncodeString(value);
@@ -501,7 +524,7 @@ namespace Knet.Kudu.Client
 
         public string GetString(int columnIndex)
         {
-            //CheckColumn(columnIndex, KuduType.String);
+            CheckType(columnIndex, KuduTypeFlags.String | KuduTypeFlags.Varchar);
             CheckValue(columnIndex);
             ReadOnlySpan<byte> data = GetVarLengthColumn(columnIndex);
             return KuduEncoder.DecodeString(data);
@@ -515,7 +538,7 @@ namespace Knet.Kudu.Client
 
         public void SetBinary(int columnIndex, byte[] value)
         {
-            CheckColumn(columnIndex, KuduType.Binary);
+            CheckType(columnIndex, KuduType.Binary);
             SetVarLengthData(columnIndex, value);
         }
 
@@ -527,7 +550,7 @@ namespace Knet.Kudu.Client
 
         public byte[] GetBinary(int columnIndex)
         {
-            CheckColumn(columnIndex, KuduType.Binary);
+            CheckType(columnIndex, KuduType.Binary);
             CheckValue(columnIndex);
             int varLenColumnIndex = Schema.GetColumnOffset(columnIndex);
             return _varLengthData[varLenColumnIndex];
@@ -584,14 +607,14 @@ namespace Knet.Kudu.Client
                     SetInt16(index, short.MinValue);
                     break;
                 case KuduType.Int32:
-                    SetInt32(index, int.MinValue);
+                    WriteInt32(index, int.MinValue);
                     break;
                 case KuduType.Date:
-                    SetInt32(index, EpochTime.MinDateValue);
+                    WriteInt32(index, EpochTime.MinDateValue);
                     break;
                 case KuduType.Int64:
                 case KuduType.UnixtimeMicros:
-                    SetInt64(index, long.MinValue);
+                    WriteInt64(index, long.MinValue);
                     break;
                 case KuduType.Float:
                     SetFloat(index, float.MinValue);
@@ -600,11 +623,11 @@ namespace Knet.Kudu.Client
                     SetDouble(index, double.MinValue);
                     break;
                 case KuduType.Decimal32:
-                    SetInt32(index, DecimalUtil.MinDecimal32(
+                    WriteInt32(index, DecimalUtil.MinDecimal32(
                         column.TypeAttributes.Precision.GetValueOrDefault()));
                     break;
                 case KuduType.Decimal64:
-                    SetInt64(index, DecimalUtil.MinDecimal64(
+                    WriteInt64(index, DecimalUtil.MinDecimal64(
                         column.TypeAttributes.Precision.GetValueOrDefault()));
                     break;
                 case KuduType.Decimal128:
@@ -790,34 +813,45 @@ namespace Knet.Kudu.Client
             indirectSize = localIndirectSize;
         }
 
-        private void CheckColumn(int columnIndex, KuduType type)
+        public ColumnSchema CheckType(int columnIndex, KuduType type)
         {
-            ColumnSchema column = Schema.GetColumn(columnIndex);
-
-            if (column.Type != type)
-                throw new ArgumentException(
-                    $"Can't set {column.Name} ({column.Type}) to {type}");
+            var columnSchema = Schema.GetColumn(columnIndex);
+            KuduTypeValidation.ValidateColumnType(columnSchema, type);
+            return columnSchema;
         }
 
-        private void CheckFixedColumnSize(int columnIndex, KuduType type, int size)
+        private ColumnSchema CheckType(int columnIndex, KuduTypeFlags typeFlags)
         {
-            ColumnSchema column = Schema.GetColumn(columnIndex);
-
-            if (!column.IsFixedSize || column.Size != size)
-                throw new ArgumentException(
-                    $"Can't set {column.Name} ({column.Type}) to {type}");
+            var columnSchema = Schema.GetColumn(columnIndex);
+            KuduTypeValidation.ValidateColumnType(columnSchema, typeFlags);
+            return columnSchema;
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void ThrowNotSetException(int columnIndex)
+        {
+            var column = Schema.GetColumn(columnIndex);
+            throw new Exception($"Column {column} is not set");
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void ThrowNullException(int columnIndex)
+        {
+            var column = Schema.GetColumn(columnIndex);
+            throw new Exception($"Column {column} is null");
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void CheckValue(int columnIndex)
         {
             if (!IsSet(columnIndex))
             {
-                throw new ArgumentException("Column value is not set");
+                ThrowNotSetException(columnIndex);
             }
 
             if (IsNull(columnIndex))
             {
-                throw new ArgumentException("Column value is null");
+                ThrowNullException(columnIndex);
             }
         }
 

@@ -12,6 +12,9 @@ namespace Knet.Kudu.Client.Util
         public static void EncodeInt8(Span<byte> destination, sbyte value) =>
             destination[0] = (byte)value;
 
+        public static void EncodeUInt8(Span<byte> destination, byte value) =>
+            destination[0] = value;
+
         public static void EncodeInt16(Span<byte> destination, short value) =>
             BinaryPrimitives.WriteInt16LittleEndian(destination, value);
 

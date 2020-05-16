@@ -51,5 +51,11 @@ namespace Knet.Kudu.Client.Internal
         {
             throw new Exception($"Column {column} is null");
         }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void ThrowNotNullableException(ColumnSchema column)
+        {
+            throw new Exception($"Column {column} is not nullable");
+        }
     }
 }
