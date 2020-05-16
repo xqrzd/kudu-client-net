@@ -158,6 +158,11 @@ namespace Knet.Kudu.Client
         public void SetBool(int columnIndex, bool value)
         {
             CheckType(columnIndex, KuduType.Bool);
+            WriteBool(columnIndex, value);
+        }
+
+        private void WriteBool(int columnIndex, bool value)
+        {
             Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 1);
             KuduEncoder.EncodeBool(span, value);
         }
@@ -185,6 +190,11 @@ namespace Knet.Kudu.Client
         public void SetByte(int columnIndex, byte value)
         {
             CheckType(columnIndex, KuduType.Int8);
+            WriteByte(columnIndex, value);
+        }
+
+        private void WriteByte(int columnIndex, byte value)
+        {
             Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 1);
             KuduEncoder.EncodeUInt8(span, value);
         }
@@ -212,6 +222,11 @@ namespace Knet.Kudu.Client
         public void SetSByte(int columnIndex, sbyte value)
         {
             CheckType(columnIndex, KuduType.Int8);
+            WriteSByte(columnIndex, value);
+        }
+
+        private void WriteSByte(int columnIndex, sbyte value)
+        {
             Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 1);
             KuduEncoder.EncodeInt8(span, value);
         }
@@ -239,6 +254,11 @@ namespace Knet.Kudu.Client
         public void SetInt16(int columnIndex, short value)
         {
             CheckType(columnIndex, KuduType.Int16);
+            WriteInt16(columnIndex, value);
+        }
+
+        private void WriteInt16(int columnIndex, short value)
+        {
             Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 2);
             KuduEncoder.EncodeInt16(span, value);
         }
@@ -334,13 +354,11 @@ namespace Knet.Kudu.Client
 
             if (type == KuduType.UnixtimeMicros)
             {
-                Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 8);
-                KuduEncoder.EncodeDateTime(span, value);
+                WriteDateTime(columnIndex, value);
             }
             else if (type == KuduType.Date)
             {
-                Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 4);
-                KuduEncoder.EncodeDate(span, value);
+                WriteDate(columnIndex, value);
             }
             else
             {
@@ -348,6 +366,18 @@ namespace Knet.Kudu.Client
                     KuduTypeFlags.UnixtimeMicros |
                     KuduTypeFlags.Date);
             }
+        }
+
+        private void WriteDateTime(int columnIndex, DateTime value)
+        {
+            Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 8);
+            KuduEncoder.EncodeDateTime(span, value);
+        }
+
+        private void WriteDate(int columnIndex, DateTime value)
+        {
+            Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 4);
+            KuduEncoder.EncodeDate(span, value);
         }
 
         public DateTime GetDateTime(string columnName)
@@ -388,6 +418,11 @@ namespace Knet.Kudu.Client
         public void SetFloat(int columnIndex, float value)
         {
             CheckType(columnIndex, KuduType.Float);
+            WriteFloat(columnIndex, value);
+        }
+
+        private void WriteFloat(int columnIndex, float value)
+        {
             Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 4);
             KuduEncoder.EncodeFloat(span, value);
         }
@@ -415,6 +450,11 @@ namespace Knet.Kudu.Client
         public void SetDouble(int columnIndex, double value)
         {
             CheckType(columnIndex, KuduType.Double);
+            WriteDouble(columnIndex, value);
+        }
+
+        private void WriteDouble(int columnIndex, double value)
+        {
             Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 8);
             KuduEncoder.EncodeDouble(span, value);
         }
@@ -512,8 +552,13 @@ namespace Knet.Kudu.Client
                     KuduTypeFlags.Varchar);
             }
 
+            WriteString(columnIndex, value);
+        }
+
+        private void WriteString(int columnIndex, string value)
+        {
             var data = KuduEncoder.EncodeString(value);
-            SetVarLengthData(columnIndex, data);
+            WriteBinary(columnIndex, data);
         }
 
         public string GetString(string columnName)
@@ -539,7 +584,14 @@ namespace Knet.Kudu.Client
         public void SetBinary(int columnIndex, byte[] value)
         {
             CheckType(columnIndex, KuduType.Binary);
-            SetVarLengthData(columnIndex, value);
+            WriteBinary(columnIndex, value);
+        }
+
+        private void WriteBinary(int columnIndex, byte[] value)
+        {
+            Set(columnIndex);
+            int varLenColumnIndex = Schema.GetColumnOffset(columnIndex);
+            _varLengthData[varLenColumnIndex] = value;
         }
 
         public byte[] GetBinary(string columnName)
@@ -554,13 +606,6 @@ namespace Knet.Kudu.Client
             CheckValue(columnIndex);
             int varLenColumnIndex = Schema.GetColumnOffset(columnIndex);
             return _varLengthData[varLenColumnIndex];
-        }
-
-        private void SetVarLengthData(int columnIndex, byte[] value)
-        {
-            Set(columnIndex);
-            int varLenColumnIndex = Schema.GetColumnOffset(columnIndex);
-            _varLengthData[varLenColumnIndex] = value;
         }
 
         /// <summary>
@@ -582,7 +627,7 @@ namespace Knet.Kudu.Client
             }
             else
             {
-                SetVarLengthData(index, value);
+                WriteBinary(index, value);
             }
         }
 
@@ -598,13 +643,13 @@ namespace Knet.Kudu.Client
             switch (type)
             {
                 case KuduType.Bool:
-                    SetBool(index, false);
+                    WriteBool(index, false);
                     break;
                 case KuduType.Int8:
-                    SetSByte(index, sbyte.MinValue);
+                    WriteSByte(index, sbyte.MinValue);
                     break;
                 case KuduType.Int16:
-                    SetInt16(index, short.MinValue);
+                    WriteInt16(index, short.MinValue);
                     break;
                 case KuduType.Int32:
                     WriteInt32(index, int.MinValue);
@@ -617,10 +662,10 @@ namespace Knet.Kudu.Client
                     WriteInt64(index, long.MinValue);
                     break;
                 case KuduType.Float:
-                    SetFloat(index, float.MinValue);
+                    WriteFloat(index, float.MinValue);
                     break;
                 case KuduType.Double:
-                    SetDouble(index, double.MinValue);
+                    WriteDouble(index, double.MinValue);
                     break;
                 case KuduType.Decimal32:
                     WriteInt32(index, DecimalUtil.MinDecimal32(
@@ -640,10 +685,10 @@ namespace Knet.Kudu.Client
                     }
                 case KuduType.String:
                 case KuduType.Varchar:
-                    SetString(index, string.Empty);
+                    WriteString(index, string.Empty);
                     break;
                 case KuduType.Binary:
-                    SetBinary(index, Array.Empty<byte>());
+                    WriteBinary(index, Array.Empty<byte>());
                     break;
                 default:
                     throw new Exception($"Unsupported data type {type}");
@@ -781,7 +826,7 @@ namespace Knet.Kudu.Client
                 ReadOnlySpan<byte> data = GetVarLengthColumn(index);
                 var incremented = new byte[data.Length + 1];
                 data.CopyTo(incremented);
-                SetVarLengthData(index, incremented);
+                WriteBinary(index, incremented);
                 return true;
             }
         }
