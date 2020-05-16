@@ -12,6 +12,9 @@ namespace Knet.Kudu.Client.Util
         public static void EncodeInt8(Span<byte> destination, sbyte value) =>
             destination[0] = (byte)value;
 
+        public static void EncodeUInt8(Span<byte> destination, byte value) =>
+            destination[0] = value;
+
         public static void EncodeInt16(Span<byte> destination, short value) =>
             BinaryPrimitives.WriteInt16LittleEndian(destination, value);
 
@@ -204,11 +207,11 @@ namespace Knet.Kudu.Client.Util
             };
         }
 
-        public static bool DecodeBool(ReadOnlySpan<byte> source) =>
-            source[0] > 0;
+        public static bool DecodeBool(ReadOnlySpan<byte> source) => source[0] > 0;
 
-        public static sbyte DecodeInt8(ReadOnlySpan<byte> source) =>
-            (sbyte)source[0];
+        public static sbyte DecodeInt8(ReadOnlySpan<byte> source) => (sbyte)source[0];
+
+        public static byte DecodeUInt8(ReadOnlySpan<byte> source) => source[0];
 
         public static short DecodeInt16(ReadOnlySpan<byte> source) =>
             BinaryPrimitives.ReadInt16LittleEndian(source);
@@ -263,12 +266,9 @@ namespace Knet.Kudu.Client.Util
                     long longVal = DecodeInt64(source);
                     return DecimalUtil.DecodeDecimal64(longVal, scale);
 
-                case KuduType.Decimal128:
+                default:
                     KuduInt128 int128Val = DecodeInt128(source);
                     return DecimalUtil.DecodeDecimal128(int128Val, scale);
-
-                default:
-                    throw new Exception($"Unsupported data type: {kuduType}.");
             }
         }
 

@@ -20,7 +20,7 @@ jobs:
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v1
       with:
-        dotnet-version: 3.1.201
+        dotnet-version: 3.1.202
     - name: Install Apache Kudu
       run: |
         wget --output-document=kudu-binary.jar https://repository.apache.org/content/repositories/releases/org/apache/kudu/kudu-binary/1.12.0/kudu-binary-1.12.0-linux-x86_64.jar
