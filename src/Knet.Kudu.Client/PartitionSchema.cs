@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client
 {
@@ -40,33 +39,6 @@ namespace Knet.Kudu.Client
             }
 
             IsSimpleRangePartitioning = isSimple;
-        }
-
-        public PartitionSchema(PartitionSchemaPB partitionSchemaPb)
-        {
-            RangeSchema = new RangeSchema(ToColumnIds(partitionSchemaPb.RangeSchema.Columns));
-
-            HashBucketSchemas = new List<HashBucketSchema>(partitionSchemaPb.HashBucketSchemas.Count);
-            foreach (var hashSchema in partitionSchemaPb.HashBucketSchemas)
-            {
-                var newSchema = new HashBucketSchema(
-                    ToColumnIds(hashSchema.Columns),
-                    hashSchema.NumBuckets,
-                    hashSchema.Seed);
-
-                HashBucketSchemas.Add(newSchema);
-            }
-        }
-
-        private static List<int> ToColumnIds(
-            List<PartitionSchemaPB.ColumnIdentifierPB> columns)
-        {
-            var columnIds = new List<int>(columns.Count);
-
-            foreach (var column in columns)
-                columnIds.Add(column.Id);
-
-            return columnIds;
         }
     }
 

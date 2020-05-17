@@ -23,7 +23,8 @@ namespace Knet.Kudu.Client
             Schema = new KuduSchema(schemaPb.Schema);
             SchemaPbNoIds = CreateWithNoColumnIds(schemaPb);
             SchemaPb = schemaPb;
-            PartitionSchema = new PartitionSchema(schemaPb.PartitionSchema);
+            PartitionSchema = ProtobufHelper.CreatePartitionSchema(
+                schemaPb.PartitionSchema, Schema);
             TableId = schemaPb.TableId.ToStringUtf8();
             ExtraConfig = schemaPb.ExtraConfigs;
         }
