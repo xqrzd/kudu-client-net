@@ -551,8 +551,7 @@ namespace Knet.Kudu.Client
         /// <returns>The requested tablet, or null if the tablet doesn't exist.</returns>
         private RemoteTablet GetTabletFromCache(string tableId, ReadOnlySpan<byte> partitionKey)
         {
-            TableLocationsCache cache = GetTableLocationsCache(tableId);
-            TabletLocationEntry entry = cache.GetEntry(partitionKey);
+            var entry = GetTableLocationEntry(tableId, partitionKey);
 
             if (entry is null)
                 return null;
@@ -565,6 +564,20 @@ namespace Knet.Kudu.Client
             }
 
             return entry.Tablet;
+        }
+
+        /// <summary>
+        /// Gets the tablet location cache entry for the tablet
+        /// in the table covering a partition key. Returns null
+        /// if the partition key has not been discovered.
+        /// </summary>
+        /// <param name="tableId">The table.</param>
+        /// <param name="partitionKey">The partition key of the tablet to find.</param>
+        private TableLocationEntry GetTableLocationEntry(
+            string tableId, ReadOnlySpan<byte> partitionKey)
+        {
+            var cache = GetTableLocationsCache(tableId);
+            return cache.GetEntry(partitionKey);
         }
 
         /// <summary>
@@ -633,37 +646,65 @@ namespace Knet.Kudu.Client
             return _tableLocations.GetOrAdd(tableId, key => new TableLocationsCache());
         }
 
-        public async Task<List<RemoteTablet>> LoopLocateTableAsync(
+        public async Task LoopLocateTableAsync(
             KuduTable table,
             byte[] startPartitionKey,
             byte[] endPartitionKey,
             int fetchBatchSize,
+            List<RemoteTablet> ret,
             CancellationToken cancellationToken = default)
         {
-            // TODO: Use the cache instead of reaching out to a master every time.
-            var tablets = await GetTableLocationsAsync(
-                table.TableId,
-                startPartitionKey,
-                endPartitionKey,
-                int.MaxValue,
-                cancellationToken).ConfigureAwait(false);
+            // We rely on the keys initially not being empty.
+            if (startPartitionKey != null && startPartitionKey.Length == 0)
+                throw new ArgumentException("Use null for unbounded start partition key");
 
-            if (tablets.Count == 1)
+            if (endPartitionKey != null && endPartitionKey.Length == 0)
+                throw new ArgumentException("Use null for unbounded end partition key");
+
+            // The next partition key to look up. If null, then it represents
+            // the minimum partition key, If empty, it represents the maximum key.
+            byte[] partitionKey = startPartitionKey;
+            string tableId = table.TableId;
+
+            // Continue while the partition key is the minimum, or it is not the maximum
+            // and it is less than the end partition key.
+            while (partitionKey == null ||
+                   (partitionKey.Length > 0 &&
+                    (endPartitionKey == null || partitionKey.SequenceCompareTo(endPartitionKey) < 0)))
             {
-                var tablet = tablets[0];
+                byte[] key = partitionKey ?? Array.Empty<byte>();
+                var entry = GetTableLocationEntry(tableId, key);
 
-                if (startPartitionKey.SequenceCompareTo(tablet.Partition.PartitionKeyStart) > 0)
-                    return new List<RemoteTablet>();
+                if (entry != null)
+                {
+                    if (entry.IsNonCoveredRange)
+                        ret.Add(entry.Tablet);
+
+                    partitionKey = entry.UpperBoundPartitionKey;
+                    continue;
+                }
+
+                //timeout tracker; not needed here
+
+                // If the partition key location isn't cached, and the request hasn't timed out,
+                // then kick off a new tablet location lookup and try again when it completes.
+                // When lookup completes, the tablet (or non-covered range) for the next
+                // partition key will be located and added to the client's cache.
+                byte[] lookupKey = partitionKey;
+
+                await GetTableLocationsAsync(tableId, key, fetchBatchSize, cancellationToken)
+                    .ConfigureAwait(false);
+
+                await LoopLocateTableAsync(
+                    table,
+                    lookupKey,
+                    endPartitionKey,
+                    fetchBatchSize,
+                    ret,
+                    cancellationToken).ConfigureAwait(false);
+
+                break;
             }
-
-            if (tablets.Count > 1 && endPartitionKey != null)
-            {
-                var tablet = tablets[tablets.Count - 1];
-                if (tablet.Partition.PartitionKeyStart.SequenceCompareTo(endPartitionKey) >= 0)
-                    tablets.RemoveAt(tablets.Count - 1);
-            }
-
-            return tablets;
         }
 
         /// <summary>
@@ -713,11 +754,14 @@ namespace Knet.Kudu.Client
             long splitSizeBytes,
             CancellationToken cancellationToken = default)
         {
-            var tablets = await LoopLocateTableAsync(
+            var tablets = new List<RemoteTablet>();
+
+            await LoopLocateTableAsync(
                 table,
                 startPartitionKey,
                 endPartitionKey,
                 fetchBatchSize,
+                tablets,
                 cancellationToken).ConfigureAwait(false);
 
             var keyRanges = new List<KeyRange>(tablets.Count);

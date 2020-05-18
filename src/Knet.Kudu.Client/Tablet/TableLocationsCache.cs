@@ -24,14 +24,19 @@ namespace Knet.Kudu.Client.Tablet
             _lock = new ReaderWriterLockSlim();
         }
 
+        public void Dispose()
+        {
+            _lock.Dispose();
+        }
+
         /// <summary>
         /// Retrieves the tablet that the given partition key should go to, or null if
         /// a tablet couldn't be found.
         /// </summary>
         /// <param name="partitionKey">The partition key to look up.</param>
-        public TabletLocationEntry GetEntry(ReadOnlySpan<byte> partitionKey)
+        public TableLocationEntry GetEntry(ReadOnlySpan<byte> partitionKey)
         {
-            TabletLocationEntry entry = GetFloorEntry(partitionKey);
+            TableLocationEntry entry = GetFloorEntry(partitionKey);
 
             if (entry != null)
             {
@@ -73,7 +78,7 @@ namespace Knet.Kudu.Client.Tablet
             long ttl)
         {
             long expiration = _systemClock.TickCount + ttl;
-            var newEntries = new List<TabletLocationEntry>();
+            var newEntries = new List<TableLocationEntry>();
 
             if (tablets.Count == 0)
             {
@@ -83,7 +88,7 @@ namespace Knet.Kudu.Client.Tablet
                 // range, the previous tablet will be returned, and we did not set an upper
                 // bound partition key on the request.
 
-                newEntries.Add(TabletLocationEntry.NewNonCoveredRange(
+                newEntries.Add(TableLocationEntry.NewNonCoveredRange(
                     Array.Empty<byte>(),
                     Array.Empty<byte>(),
                     expiration));
@@ -111,7 +116,7 @@ namespace Knet.Kudu.Client.Tablet
                 {
                     // If the first tablet is past the requested partition key, then the
                     // partition key falls in an initial non-covered range, such as A.
-                    newEntries.Add(TabletLocationEntry.NewNonCoveredRange(
+                    newEntries.Add(TableLocationEntry.NewNonCoveredRange(
                         Array.Empty<byte>(), firstLowerBound, expiration));
                 }
 
@@ -128,14 +133,14 @@ namespace Knet.Kudu.Client.Tablet
                     {
                         // There is a non-covered range between the previous tablet and this tablet.
                         // This will discover C while processing the tablet location for D.
-                        newEntries.Add(TabletLocationEntry.NewNonCoveredRange(
+                        newEntries.Add(TableLocationEntry.NewNonCoveredRange(
                             lastUpperBound, tabletLowerBound, expiration));
                     }
 
                     lastUpperBound = tabletUpperBound;
 
                     // Now add the tablet itself (such as B, D, or E).
-                    newEntries.Add(TabletLocationEntry.NewTablet(tablet, expiration));
+                    newEntries.Add(TableLocationEntry.NewTablet(tablet, expiration));
                 }
 
                 if (lastUpperBound.Length > 0 &&
@@ -143,7 +148,7 @@ namespace Knet.Kudu.Client.Tablet
                 {
                     // There is a non-covered range between the last tablet and the end
                     // of the partition key space, such as F.
-                    newEntries.Add(TabletLocationEntry.NewNonCoveredRange(
+                    newEntries.Add(TableLocationEntry.NewNonCoveredRange(
                         lastUpperBound, Array.Empty<byte>(), expiration));
                 }
             }
@@ -155,7 +160,7 @@ namespace Knet.Kudu.Client.Tablet
             try
             {
                 // Remove all existing overlapping entries, and add the new entries.
-                TabletLocationEntry floorEntry = _cache.FloorEntry(discoveredlowerBound);
+                TableLocationEntry floorEntry = _cache.FloorEntry(discoveredlowerBound);
                 if (floorEntry != null &&
                     requestPartitionKey.SequenceCompareTo(floorEntry.UpperBoundPartitionKey) < 0)
                 {
@@ -200,12 +205,7 @@ namespace Knet.Kudu.Client.Tablet
             }
         }
 
-        public void Dispose()
-        {
-            _lock.Dispose();
-        }
-
-        private TabletLocationEntry GetFloorEntry(ReadOnlySpan<byte> partitionKey)
+        private TableLocationEntry GetFloorEntry(ReadOnlySpan<byte> partitionKey)
         {
             _lock.EnterReadLock();
             try
@@ -219,7 +219,7 @@ namespace Knet.Kudu.Client.Tablet
         }
     }
 
-    public class TabletLocationEntry
+    public class TableLocationEntry
     {
         /// <summary>
         /// The lower bound partition key, only set if this is a non-covered range.
@@ -242,7 +242,7 @@ namespace Knet.Kudu.Client.Tablet
         /// </summary>
         public long Expiration { get; }
 
-        public TabletLocationEntry(
+        public TableLocationEntry(
             RemoteTablet tablet,
             byte[] lowerBoundPartitionKey,
             byte[] upperBoundPartitionKey,
@@ -259,6 +259,11 @@ namespace Knet.Kudu.Client.Tablet
         /// </summary>
         public bool IsNonCoveredRange => Tablet is null;
 
+        /// <summary>
+        /// If this entry is a covered range.
+        /// </summary>
+        public bool IsCoveredRange => Tablet != null;
+
         public byte[] LowerBoundPartitionKey => Tablet is null
             ? _lowerBoundPartitionKey
             : Tablet.Partition.PartitionKeyStart;
@@ -267,22 +272,22 @@ namespace Knet.Kudu.Client.Tablet
             ? _upperBoundPartitionKey
             : Tablet.Partition.PartitionKeyEnd;
 
-        public static TabletLocationEntry NewNonCoveredRange(
+        public static TableLocationEntry NewNonCoveredRange(
             byte[] lowerBoundPartitionKey,
             byte[] upperBoundPartitionKey,
             long expiration)
         {
-            return new TabletLocationEntry(
+            return new TableLocationEntry(
                 null,
                 lowerBoundPartitionKey,
                 upperBoundPartitionKey,
                 expiration);
         }
 
-        public static TabletLocationEntry NewTablet(
+        public static TableLocationEntry NewTablet(
             RemoteTablet tablet, long expiration)
         {
-            return new TabletLocationEntry(tablet, null, null, expiration);
+            return new TableLocationEntry(tablet, null, null, expiration);
         }
     }
 }

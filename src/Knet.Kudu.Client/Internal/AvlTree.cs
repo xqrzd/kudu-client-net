@@ -29,11 +29,11 @@ using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Internal
 {
-    public class AvlTree : IEnumerable<TabletLocationEntry>
+    public class AvlTree : IEnumerable<TableLocationEntry>
     {
         private AvlNode _root;
 
-        public bool Search(ReadOnlySpan<byte> partitionKey, out TabletLocationEntry value)
+        public bool Search(ReadOnlySpan<byte> partitionKey, out TableLocationEntry value)
         {
             AvlNode node = _root;
 
@@ -64,8 +64,8 @@ namespace Knet.Kudu.Client.Internal
 
         public bool SearchLeftRight(
             ReadOnlySpan<byte> partitionKey,
-            out TabletLocationEntry left,
-            out TabletLocationEntry right)
+            out TableLocationEntry left,
+            out TableLocationEntry right)
         {
             AvlNode node = _root;
             AvlNode leftnode = null;
@@ -99,12 +99,12 @@ namespace Knet.Kudu.Client.Internal
             return false;
         }
 
-        public TabletLocationEntry First
+        public TableLocationEntry First
         {
             get
             {
                 AvlNode node = _root;
-                TabletLocationEntry value = null;
+                TableLocationEntry value = null;
 
                 while (node != null)
                 {
@@ -116,12 +116,12 @@ namespace Knet.Kudu.Client.Internal
             }
         }
 
-        public TabletLocationEntry Last
+        public TableLocationEntry Last
         {
             get
             {
                 AvlNode node = _root;
-                TabletLocationEntry value = null;
+                TableLocationEntry value = null;
 
                 while (node != null)
                 {
@@ -133,7 +133,7 @@ namespace Knet.Kudu.Client.Internal
             }
         }
 
-        public bool Insert(TabletLocationEntry entry)
+        public bool Insert(TableLocationEntry entry)
         {
             AvlNode node = _root;
 
@@ -694,7 +694,7 @@ namespace Knet.Kudu.Client.Internal
             }
         }
 
-        public IEnumerator<TabletLocationEntry> GetEnumerator()
+        public IEnumerator<TableLocationEntry> GetEnumerator()
         {
             return new AvlNodeEnumerator(_root);
         }
@@ -711,12 +711,12 @@ namespace Knet.Kudu.Client.Internal
             public AvlNode Right;
             public int Balance;
 
-            public TabletLocationEntry Entry;
+            public TableLocationEntry Entry;
 
             public byte[] PartitionKeyStart => Entry.LowerBoundPartitionKey;
         }
 
-        private sealed class AvlNodeEnumerator : IEnumerator<TabletLocationEntry>
+        private sealed class AvlNodeEnumerator : IEnumerator<TableLocationEntry>
         {
             private readonly AvlNode _root;
             private Action _action;
@@ -777,7 +777,7 @@ namespace Knet.Kudu.Client.Internal
                 _action = _root == null ? Action.End : Action.Right;
             }
 
-            public TabletLocationEntry Current => _current.Entry;
+            public TableLocationEntry Current => _current.Entry;
 
             object IEnumerator.Current => Current;
 
