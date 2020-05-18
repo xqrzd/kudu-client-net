@@ -79,17 +79,16 @@ namespace Knet.Kudu.Client
 
             for (int i = 0; i < numColumns; i++)
             {
+                var column = schema.GetColumn(i);
+                var isFixed = column.IsFixedSize;
+                var size = column.Size;
+
                 if (IsSet(i) && !IsSetToNull(i))
                 {
-                    var column = schema.GetColumn(i);
-                    var size = column.Size;
-
                     if (column.IsFixedSize)
                     {
                         var data = rowAlloc.Slice(0, size);
                         data.CopyTo(rowDestination);
-
-                        rowAlloc = rowAlloc.Slice(size);
                     }
                     else
                     {
@@ -103,9 +102,15 @@ namespace Knet.Kudu.Client
                         indirectBytesWritten += data.Length;
                     }
 
-                    // Advance RowAlloc buffer only if we wrote that column.
                     rowDestination = rowDestination.Slice(size);
                     rowBytesWritten += size;
+                }
+
+                if (isFixed)
+                {
+                    // Advance rowAlloc even if it doesn't have a value.
+                    // It was pre-allocated to store space for every value.
+                    rowAlloc = rowAlloc.Slice(size);
                 }
             }
         }
