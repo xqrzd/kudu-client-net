@@ -597,12 +597,15 @@ namespace Knet.Kudu.Client
         /// Adds the given tablets to the table location cache.
         /// </summary>
         /// <param name="tableId">The table identifier.</param>
-        /// <param name="tablets">The tablets to cache.</param>
-        /// <param name="requestPartitionKey">
-        /// The partition key used to locate the given tablets.
+        /// <param name="tablets">The discovered tablets to cache.</param>
+        /// <param name="requestPartitionKey">The lookup partition key.</param>
+        /// <param name="requestedBatchSize">
+        /// The number of tablet locations requested from the master in the
+        /// original request.
         /// </param>
-        /// <param name="requestedBatchSize">TODO</param>
-        /// <param name="ttl">TODO</param>
+        /// <param name="ttl">
+        /// The time in milliseconds that the tablets may be cached for.
+        /// </param>
         private void CacheTablets(
             string tableId,
             List<RemoteTablet> tablets,

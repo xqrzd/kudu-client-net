@@ -259,11 +259,11 @@ namespace Knet.Kudu.Client.Tablet
         /// </summary>
         public bool IsNonCoveredRange => Tablet is null;
 
-        public byte[] LowerBoundPartitionKey => Tablet == null
+        public byte[] LowerBoundPartitionKey => Tablet is null
             ? _lowerBoundPartitionKey
             : Tablet.Partition.PartitionKeyStart;
 
-        public byte[] UpperBoundPartitionKey => Tablet == null
+        public byte[] UpperBoundPartitionKey => Tablet is null
             ? _upperBoundPartitionKey
             : Tablet.Partition.PartitionKeyEnd;
 

@@ -9,9 +9,9 @@ namespace Knet.Kudu.Client.Internal
             this AvlTree avlTree, ReadOnlySpan<byte> partitionKey)
         {
             avlTree.SearchLeftRight(
-                    partitionKey,
-                    out TabletLocationEntry left,
-                    out _);
+                partitionKey,
+                out TabletLocationEntry left,
+                out _);
 
             return left;
         }
