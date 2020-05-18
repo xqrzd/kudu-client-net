@@ -2,7 +2,6 @@
 {
     public interface ISystemClock
     {
-        // TODO: Rename to CurrentMilliseconds?
-        long TickCount { get; }
+        long CurrentMilliseconds { get; }
     }
 }

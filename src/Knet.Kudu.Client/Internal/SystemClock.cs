@@ -4,7 +4,7 @@ namespace Knet.Kudu.Client.Internal
 {
     public class SystemClock : ISystemClock
     {
-        public long TickCount
+        public long CurrentMilliseconds
         {
             get
             {

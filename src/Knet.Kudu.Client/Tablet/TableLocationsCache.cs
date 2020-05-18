@@ -49,9 +49,9 @@ namespace Knet.Kudu.Client.Tablet
                     return null;
                 }
 
-                long currentTicks = _systemClock.TickCount;
+                long now = _systemClock.CurrentMilliseconds;
 
-                if (currentTicks > entry.Expiration)
+                if (now > entry.Expiration)
                     return null;
             }
 
@@ -77,7 +77,7 @@ namespace Knet.Kudu.Client.Tablet
             int requestedBatchSize,
             long ttl)
         {
-            long expiration = _systemClock.TickCount + ttl;
+            long expiration = _systemClock.CurrentMilliseconds + ttl;
             var newEntries = new List<TableLocationEntry>();
 
             if (tablets.Count == 0)
