@@ -18,23 +18,23 @@ namespace Knet.Kudu.Client
         /// <summary>
         /// Map of column name to predicate.
         /// </summary>
-        protected readonly Dictionary<string, KuduPredicate> Predicates;
+        protected internal readonly Dictionary<string, KuduPredicate> Predicates;
 
-        protected ReadMode ReadMode = ReadMode.ReadLatest;
-        protected bool IsFaultTolerant = false;
-        protected int? BatchSizeBytes;
-        protected long Limit = long.MaxValue;
-        protected bool CacheBlocks = true;
-        protected long StartTimestamp = KuduClient.NoTimestamp;
-        protected long HtTimestamp = KuduClient.NoTimestamp;
-        protected byte[] LowerBoundPrimaryKey = Array.Empty<byte>();
-        protected byte[] UpperBoundPrimaryKey = Array.Empty<byte>();
-        protected byte[] LowerBoundPartitionKey = Array.Empty<byte>();
-        protected byte[] UpperBoundPartitionKey = Array.Empty<byte>();
-        protected List<string> ProjectedColumnNames;
-        protected List<int> ProjectedColumnIndexes;
-        protected long ScanRequestTimeout; // TODO: Expose this, and expose as TimeSpan?
-        protected ReplicaSelection ReplicaSelection = ReplicaSelection.LeaderOnly;
+        protected internal ReadMode ReadMode = ReadMode.ReadLatest;
+        protected internal bool IsFaultTolerant = false;
+        protected internal int? BatchSizeBytes;
+        protected internal long Limit = long.MaxValue;
+        protected internal bool CacheBlocks = true;
+        protected internal long StartTimestamp = KuduClient.NoTimestamp;
+        protected internal long HtTimestamp = KuduClient.NoTimestamp;
+        protected internal byte[] LowerBoundPrimaryKey = Array.Empty<byte>();
+        protected internal byte[] UpperBoundPrimaryKey = Array.Empty<byte>();
+        protected internal byte[] LowerBoundPartitionKey = Array.Empty<byte>();
+        protected internal byte[] UpperBoundPartitionKey = Array.Empty<byte>();
+        protected internal List<string> ProjectedColumnNames;
+        protected internal List<int> ProjectedColumnIndexes;
+        protected internal long ScanRequestTimeout; // TODO: Expose this, and expose as TimeSpan?
+        protected internal ReplicaSelection ReplicaSelection = ReplicaSelection.LeaderOnly;
 
         public AbstractKuduScannerBuilder(KuduClient client, KuduTable table)
         {

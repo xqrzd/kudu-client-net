@@ -7,7 +7,6 @@ using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Scanner
 {
-    // TODO: This class needs tests.
     public class PartitionPruner
     {
         private readonly Stack<PartitionKeyRange> _rangePartitions;
@@ -22,6 +21,20 @@ namespace Knet.Kudu.Client.Scanner
         /// </summary>
         private static PartitionPruner Empty =>
             new PartitionPruner(new Stack<PartitionKeyRange>());
+
+        public static PartitionPruner Create<TBuilder>(
+            AbstractKuduScannerBuilder<TBuilder> scanBuilder)
+            where TBuilder : AbstractKuduScannerBuilder<TBuilder>
+        {
+            return Create(
+                scanBuilder.Table.Schema,
+                scanBuilder.Table.PartitionSchema,
+                scanBuilder.Predicates,
+                scanBuilder.LowerBoundPrimaryKey,
+                scanBuilder.UpperBoundPrimaryKey,
+                scanBuilder.LowerBoundPartitionKey,
+                scanBuilder.UpperBoundPartitionKey);
+        }
 
         public static PartitionPruner Create(
             KuduSchema schema,
@@ -253,6 +266,11 @@ namespace Knet.Kudu.Client.Scanner
         public bool HasMorePartitionKeyRanges => _rangePartitions.Count > 0;
 
         /// <summary>
+        /// The number of remaining partition ranges for the scan.
+        /// </summary>
+        public int NumRangesRemaining => _rangePartitions.Count;
+
+        /// <summary>
         /// The inclusive lower bound partition key of the next tablet to scan.
         /// </summary>
         public byte[] NextPartitionKey => _rangePartitions.Peek().Lower;
@@ -290,6 +308,31 @@ namespace Knet.Kudu.Client.Scanner
                     break;
                 }
             }
+        }
+
+        internal bool ShouldPruneForTests(Partition partition)
+        {
+            // The C++ version uses binary search to do this with fewer key comparisons,
+            // but the algorithm isn't easily translatable, so this just uses a linear
+            // search.
+            foreach (var range in _rangePartitions)
+            {
+                // Continue searching the list of ranges if the partition is greater than
+                // the current range.
+                if (range.Upper.Length > 0 &&
+                    range.Upper.SequenceCompareTo(partition.PartitionKeyStart) <= 0)
+                {
+                    continue;
+                }
+
+                // If the current range is greater than the partitions,
+                // then the partition should be pruned.
+                return partition.PartitionKeyEnd.Length > 0 &&
+                       partition.PartitionKeyEnd.SequenceCompareTo(range.Lower) <= 0;
+            }
+
+            // The partition is greater than all ranges.
+            return true;
         }
 
         private static List<int> IdsToIndexes(KuduSchema schema, List<int> ids)
@@ -331,7 +374,6 @@ namespace Knet.Kudu.Client.Scanner
             // Copy predicates into the row in range partition key column order,
             // stopping after the first missing predicate.
 
-            // TODO: Verify this logic
             foreach (int idx in rangePartitionColumnIdxs)
             {
                 ColumnSchema column = schema.GetColumn(idx);
@@ -341,11 +383,14 @@ namespace Knet.Kudu.Client.Scanner
 
                 PredicateType predicateType = predicate.Type;
 
-                if (predicateType == PredicateType.Range && predicate.Lower == null ||
+                if ((predicateType == PredicateType.Range && predicate.Lower == null) ||
                     predicateType == PredicateType.IsNotNull)
+                {
                     break;
+                }
 
-                if (predicateType == PredicateType.Equality)
+                if (predicateType == PredicateType.Range ||
+                    predicateType == PredicateType.Equality)
                 {
                     row.SetRaw(idx, predicate.Lower);
                     pushedPredicates++;
@@ -354,6 +399,11 @@ namespace Knet.Kudu.Client.Scanner
                 {
                     row.SetRaw(idx, predicate.InListValues.Min);
                     pushedPredicates++;
+                }
+                else
+                {
+                    throw new ArgumentException(
+                        $"Unexpected predicate type can not be pushed into key: {predicate}");
                 }
             }
 
@@ -422,6 +472,11 @@ namespace Knet.Kudu.Client.Scanner
                     row.SetRaw(idx, predicate.InListValues.Max);
                     pushedPredicates++;
                     finalPredicate = predicate;
+                }
+                else
+                {
+                    throw new ArgumentException(
+                        $"Unexpected predicate type can not be pushed into key: {predicate}");
                 }
             }
 

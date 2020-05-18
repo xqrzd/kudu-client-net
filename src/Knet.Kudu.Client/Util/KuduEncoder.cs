@@ -81,6 +81,9 @@ namespace Knet.Kudu.Client.Util
         public static byte[] EncodeInt8(sbyte value) =>
             new byte[] { (byte)value };
 
+        public static byte[] EncodeUInt8(byte value) =>
+            new byte[] { value };
+
         public static byte[] EncodeInt16(short value)
         {
             var buffer = new byte[2];
