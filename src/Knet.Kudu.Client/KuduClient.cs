@@ -12,7 +12,6 @@ using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Protocol.Consensus;
 using Knet.Kudu.Client.Protocol.Master;
 using Knet.Kudu.Client.Protocol.Rpc;
-using Knet.Kudu.Client.Protocol.Security;
 using Knet.Kudu.Client.Protocol.Tserver;
 using Knet.Kudu.Client.Requests;
 using Knet.Kudu.Client.Tablet;
@@ -41,7 +40,7 @@ namespace Knet.Kudu.Client
         private readonly IKuduConnectionFactory _connectionFactory;
         private readonly SecurityContext _securityContext;
         private readonly ConnectionCache _connectionCache;
-        private readonly ConcurrentDictionary<string, TableLocationsCache> _tableLocations;
+        private readonly ConcurrentDictionary<string, TableLocationsCache2> _tableLocations;
         private readonly RequestTracker _requestTracker;
         private readonly AuthzTokenCache _authzTokenCache;
         private readonly int _defaultOperationTimeoutMs;
@@ -69,7 +68,7 @@ namespace Knet.Kudu.Client
             _securityContext = new SecurityContext();
             _connectionFactory = new KuduConnectionFactory(options, _securityContext, loggerFactory);
             _connectionCache = new ConnectionCache(_connectionFactory, loggerFactory);
-            _tableLocations = new ConcurrentDictionary<string, TableLocationsCache>();
+            _tableLocations = new ConcurrentDictionary<string, TableLocationsCache2>();
             _requestTracker = new RequestTracker(SecurityUtil.NewGuid().ToString("N"));
             _authzTokenCache = new AuthzTokenCache();
             _defaultOperationTimeoutMs = (int)options.DefaultOperationTimeout.TotalMilliseconds;
@@ -323,6 +322,13 @@ namespace Knet.Kudu.Client
             var tableLocations = await _connectionFactory.GetTabletsAsync(tableId, result)
                 .ConfigureAwait(false);
 
+            CacheTablets(
+                tableId,
+                tableLocations,
+                partitionKeyStart,
+                fetchBatchSize,
+                result.TtlMillis);
+
             return tableLocations;
         }
 
@@ -545,15 +551,20 @@ namespace Knet.Kudu.Client
         /// <returns>The requested tablet, or null if the tablet doesn't exist.</returns>
         private RemoteTablet GetTabletFromCache(string tableId, ReadOnlySpan<byte> partitionKey)
         {
-            TableLocationsCache cache = GetTableLocationsCache(tableId);
-            return cache.FindTablet(partitionKey);
-        }
+            TableLocationsCache2 cache = GetTableLocationsCache(tableId);
+            TabletLocationEntry entry = cache.GetEntry(partitionKey);
 
-        private bool FindTabletInCache(string tableId, ReadOnlySpan<byte> partitionKey,
-            out RemoteTablet left, out RemoteTablet right)
-        {
-            TableLocationsCache cache = GetTableLocationsCache(tableId);
-            return cache.SearchLeftRight(partitionKey, out left, out right);
+            if (entry is null)
+                return null;
+
+            if (entry.IsNonCoveredRange)
+            {
+                throw new NonCoveredRangeException(
+                    entry.LowerBoundPartitionKey,
+                    entry.UpperBoundPartitionKey);
+            }
+
+            return entry.Tablet;
         }
 
         /// <summary>
@@ -571,8 +582,6 @@ namespace Knet.Kudu.Client
                 FetchTabletsPerPointLookup,
                 cancellationToken).ConfigureAwait(false);
 
-            CacheTablets(tableId, tablets, partitionKey);
-
             var tablet = tablets.FindTablet(partitionKey);
 
             if (tablet == null)
@@ -589,11 +598,22 @@ namespace Knet.Kudu.Client
         /// </summary>
         /// <param name="tableId">The table identifier.</param>
         /// <param name="tablets">The tablets to cache.</param>
-        /// <param name="partitionKey">The partition key used to locate the given tablets.</param>
-        private void CacheTablets(string tableId, List<RemoteTablet> tablets, ReadOnlySpan<byte> partitionKey)
+        /// <param name="requestPartitionKey">
+        /// The partition key used to locate the given tablets.
+        /// </param>
+        /// <param name="requestedBatchSize">TODO</param>
+        /// <param name="ttl">TODO</param>
+        private void CacheTablets(
+            string tableId,
+            List<RemoteTablet> tablets,
+            ReadOnlySpan<byte> requestPartitionKey,
+            int requestedBatchSize,
+            long ttl)
         {
-            TableLocationsCache cache = GetTableLocationsCache(tableId);
-            cache.CacheTabletLocations(tablets, partitionKey);
+            TableLocationsCache2 cache = GetTableLocationsCache(tableId);
+
+            cache.CacheTabletLocations(
+                tablets, requestPartitionKey, requestedBatchSize, ttl);
         }
 
         private void RemoveTabletFromCache<T>(KuduTabletRpc<T> rpc)
@@ -601,13 +621,13 @@ namespace Knet.Kudu.Client
             RemoteTablet tablet = rpc.Tablet;
             rpc.Tablet = null;
 
-            TableLocationsCache cache = GetTableLocationsCache(tablet.TableId);
+            TableLocationsCache2 cache = GetTableLocationsCache(tablet.TableId);
             cache.RemoveTablet(tablet.Partition.PartitionKeyStart);
         }
 
-        private TableLocationsCache GetTableLocationsCache(string tableId)
+        private TableLocationsCache2 GetTableLocationsCache(string tableId)
         {
-            return _tableLocations.GetOrAdd(tableId, key => new TableLocationsCache());
+            return _tableLocations.GetOrAdd(tableId, key => new TableLocationsCache2());
         }
 
         public async Task<List<RemoteTablet>> LoopLocateTableAsync(
@@ -631,6 +651,13 @@ namespace Knet.Kudu.Client
 
                 if (startPartitionKey.SequenceCompareTo(tablet.Partition.PartitionKeyStart) > 0)
                     return new List<RemoteTablet>();
+            }
+
+            if (tablets.Count > 1 && endPartitionKey != null)
+            {
+                var tablet = tablets[tablets.Count - 1];
+                if (tablet.Partition.PartitionKeyStart.SequenceCompareTo(endPartitionKey) >= 0)
+                    tablets.RemoveAt(tablets.Count - 1);
             }
 
             return tablets;

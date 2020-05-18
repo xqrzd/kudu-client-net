@@ -15,5 +15,16 @@ namespace Knet.Kudu.Client.Internal
 
             return left;
         }
+
+        public static TabletLocationEntry FloorEntry(
+            this AvlTree2 avlTree, ReadOnlySpan<byte> partitionKey)
+        {
+            avlTree.SearchLeftRight(
+                    partitionKey,
+                    out TabletLocationEntry left,
+                    out _);
+
+            return left;
+        }
     }
 }
