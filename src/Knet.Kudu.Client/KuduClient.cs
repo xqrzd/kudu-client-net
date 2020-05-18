@@ -651,7 +651,7 @@ namespace Knet.Kudu.Client
             byte[] startPartitionKey,
             byte[] endPartitionKey,
             int fetchBatchSize,
-            List<RemoteTablet> ret,
+            List<RemoteTablet> results,
             CancellationToken cancellationToken = default)
         {
             // We rely on the keys initially not being empty.
@@ -677,14 +677,12 @@ namespace Knet.Kudu.Client
 
                 if (entry != null)
                 {
-                    if (entry.IsNonCoveredRange)
-                        ret.Add(entry.Tablet);
+                    if (entry.IsCoveredRange)
+                        results.Add(entry.Tablet);
 
                     partitionKey = entry.UpperBoundPartitionKey;
                     continue;
                 }
-
-                //timeout tracker; not needed here
 
                 // If the partition key location isn't cached, and the request hasn't timed out,
                 // then kick off a new tablet location lookup and try again when it completes.
@@ -700,7 +698,7 @@ namespace Knet.Kudu.Client
                     lookupKey,
                     endPartitionKey,
                     fetchBatchSize,
-                    ret,
+                    results,
                     cancellationToken).ConfigureAwait(false);
 
                 break;
