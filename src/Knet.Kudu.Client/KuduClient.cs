@@ -40,7 +40,7 @@ namespace Knet.Kudu.Client
         private readonly IKuduConnectionFactory _connectionFactory;
         private readonly SecurityContext _securityContext;
         private readonly ConnectionCache _connectionCache;
-        private readonly ConcurrentDictionary<string, TableLocationsCache2> _tableLocations;
+        private readonly ConcurrentDictionary<string, TableLocationsCache> _tableLocations;
         private readonly RequestTracker _requestTracker;
         private readonly AuthzTokenCache _authzTokenCache;
         private readonly int _defaultOperationTimeoutMs;
@@ -68,7 +68,7 @@ namespace Knet.Kudu.Client
             _securityContext = new SecurityContext();
             _connectionFactory = new KuduConnectionFactory(options, _securityContext, loggerFactory);
             _connectionCache = new ConnectionCache(_connectionFactory, loggerFactory);
-            _tableLocations = new ConcurrentDictionary<string, TableLocationsCache2>();
+            _tableLocations = new ConcurrentDictionary<string, TableLocationsCache>();
             _requestTracker = new RequestTracker(SecurityUtil.NewGuid().ToString("N"));
             _authzTokenCache = new AuthzTokenCache();
             _defaultOperationTimeoutMs = (int)options.DefaultOperationTimeout.TotalMilliseconds;
@@ -551,7 +551,7 @@ namespace Knet.Kudu.Client
         /// <returns>The requested tablet, or null if the tablet doesn't exist.</returns>
         private RemoteTablet GetTabletFromCache(string tableId, ReadOnlySpan<byte> partitionKey)
         {
-            TableLocationsCache2 cache = GetTableLocationsCache(tableId);
+            TableLocationsCache cache = GetTableLocationsCache(tableId);
             TabletLocationEntry entry = cache.GetEntry(partitionKey);
 
             if (entry is null)
@@ -610,7 +610,7 @@ namespace Knet.Kudu.Client
             int requestedBatchSize,
             long ttl)
         {
-            TableLocationsCache2 cache = GetTableLocationsCache(tableId);
+            TableLocationsCache cache = GetTableLocationsCache(tableId);
 
             cache.CacheTabletLocations(
                 tablets, requestPartitionKey, requestedBatchSize, ttl);
@@ -621,13 +621,13 @@ namespace Knet.Kudu.Client
             RemoteTablet tablet = rpc.Tablet;
             rpc.Tablet = null;
 
-            TableLocationsCache2 cache = GetTableLocationsCache(tablet.TableId);
+            TableLocationsCache cache = GetTableLocationsCache(tablet.TableId);
             cache.RemoveTablet(tablet.Partition.PartitionKeyStart);
         }
 
-        private TableLocationsCache2 GetTableLocationsCache(string tableId)
+        private TableLocationsCache GetTableLocationsCache(string tableId)
         {
-            return _tableLocations.GetOrAdd(tableId, key => new TableLocationsCache2());
+            return _tableLocations.GetOrAdd(tableId, key => new TableLocationsCache());
         }
 
         public async Task<List<RemoteTablet>> LoopLocateTableAsync(

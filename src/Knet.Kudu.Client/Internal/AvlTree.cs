@@ -25,14 +25,15 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Knet.Kudu.Client.Tablet;
+using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Internal
 {
-    public class AvlTree : IEnumerable<RemoteTablet>
+    public class AvlTree : IEnumerable<TabletLocationEntry>
     {
         private AvlNode _root;
 
-        public bool Search(ReadOnlySpan<byte> partitionKey, out RemoteTablet value)
+        public bool Search(ReadOnlySpan<byte> partitionKey, out TabletLocationEntry value)
         {
             AvlNode node = _root;
 
@@ -50,7 +51,7 @@ namespace Knet.Kudu.Client.Internal
                 }
                 else
                 {
-                    value = node.Tablet;
+                    value = node.Entry;
 
                     return true;
                 }
@@ -63,8 +64,8 @@ namespace Knet.Kudu.Client.Internal
 
         public bool SearchLeftRight(
             ReadOnlySpan<byte> partitionKey,
-            out RemoteTablet left,
-            out RemoteTablet right)
+            out TabletLocationEntry left,
+            out TabletLocationEntry right)
         {
             AvlNode node = _root;
             AvlNode leftnode = null;
@@ -86,28 +87,28 @@ namespace Knet.Kudu.Client.Internal
                 }
                 else
                 {
-                    left = node.Tablet;
-                    right = node.Tablet;
+                    left = node.Entry;
+                    right = node.Entry;
                     return true;
                 }
             }
 
-            left = leftnode?.Tablet;
-            right = rightnode?.Tablet;
+            left = leftnode?.Entry;
+            right = rightnode?.Entry;
 
             return false;
         }
 
-        public RemoteTablet First
+        public TabletLocationEntry First
         {
             get
             {
                 AvlNode node = _root;
-                RemoteTablet value = null;
+                TabletLocationEntry value = null;
 
                 while (node != null)
                 {
-                    value = node.Tablet;
+                    value = node.Entry;
                     node = node.Left;
                 }
 
@@ -115,16 +116,16 @@ namespace Knet.Kudu.Client.Internal
             }
         }
 
-        public RemoteTablet Last
+        public TabletLocationEntry Last
         {
             get
             {
                 AvlNode node = _root;
-                RemoteTablet value = null;
+                TabletLocationEntry value = null;
 
                 while (node != null)
                 {
-                    value = node.Tablet;
+                    value = node.Entry;
                     node = node.Right;
                 }
 
@@ -132,13 +133,14 @@ namespace Knet.Kudu.Client.Internal
             }
         }
 
-        public bool Insert(RemoteTablet tablet)
+        public bool Insert(TabletLocationEntry entry)
         {
             AvlNode node = _root;
 
             while (node != null)
             {
-                int compare = tablet.Partition.CompareTo(node.Tablet.Partition);
+                int compare = entry.LowerBoundPartitionKey.SequenceCompareTo(
+                    node.PartitionKeyStart);
 
                 if (compare < 0)
                 {
@@ -146,7 +148,7 @@ namespace Knet.Kudu.Client.Internal
 
                     if (left == null)
                     {
-                        node.Left = new AvlNode { Tablet = tablet, Parent = node };
+                        node.Left = new AvlNode { Entry = entry, Parent = node };
 
                         InsertBalance(node, 1);
 
@@ -163,7 +165,7 @@ namespace Knet.Kudu.Client.Internal
 
                     if (right == null)
                     {
-                        node.Right = new AvlNode { Tablet = tablet, Parent = node };
+                        node.Right = new AvlNode { Entry = entry, Parent = node };
 
                         InsertBalance(node, -1);
 
@@ -176,13 +178,13 @@ namespace Knet.Kudu.Client.Internal
                 }
                 else
                 {
-                    node.Tablet = tablet;
+                    node.Entry = entry;
 
                     return false;
                 }
             }
 
-            _root = new AvlNode { Tablet = tablet };
+            _root = new AvlNode { Entry = entry };
 
             return true;
         }
@@ -671,14 +673,13 @@ namespace Knet.Kudu.Client.Internal
             }
         }
 
-
         private static void Replace(AvlNode target, AvlNode source)
         {
             AvlNode left = source.Left;
             AvlNode right = source.Right;
 
             target.Balance = source.Balance;
-            target.Tablet = source.Tablet;
+            target.Entry = source.Entry;
             target.Left = left;
             target.Right = right;
 
@@ -693,7 +694,7 @@ namespace Knet.Kudu.Client.Internal
             }
         }
 
-        public IEnumerator<RemoteTablet> GetEnumerator()
+        public IEnumerator<TabletLocationEntry> GetEnumerator()
         {
             return new AvlNodeEnumerator(_root);
         }
@@ -710,12 +711,12 @@ namespace Knet.Kudu.Client.Internal
             public AvlNode Right;
             public int Balance;
 
-            public RemoteTablet Tablet;
+            public TabletLocationEntry Entry;
 
-            public byte[] PartitionKeyStart => Tablet.Partition.PartitionKeyStart;
+            public byte[] PartitionKeyStart => Entry.LowerBoundPartitionKey;
         }
 
-        private sealed class AvlNodeEnumerator : IEnumerator<RemoteTablet>
+        private sealed class AvlNodeEnumerator : IEnumerator<TabletLocationEntry>
         {
             private readonly AvlNode _root;
             private Action _action;
@@ -776,7 +777,7 @@ namespace Knet.Kudu.Client.Internal
                 _action = _root == null ? Action.End : Action.Right;
             }
 
-            public RemoteTablet Current => _current.Tablet;
+            public TabletLocationEntry Current => _current.Entry;
 
             object IEnumerator.Current => Current;
 

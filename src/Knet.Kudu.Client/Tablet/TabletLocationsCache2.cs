@@ -10,17 +10,17 @@ namespace Knet.Kudu.Client.Tablet
     /// A cache of the tablet locations in a table, keyed by partition key.
     /// Entries in the cache are either tablets or non-covered ranges.
     /// </summary>
-    public class TableLocationsCache2 : IDisposable
+    public class TableLocationsCache : IDisposable
     {
         private readonly ISystemClock _systemClock;
-        private readonly AvlTree2 _cache;
+        private readonly AvlTree _cache;
         private readonly ReaderWriterLockSlim _lock;
 
-        public TableLocationsCache2()
+        public TableLocationsCache()
         {
             // TODO: Pass this in.
             _systemClock = new SystemClock();
-            _cache = new AvlTree2();
+            _cache = new AvlTree();
             _lock = new ReaderWriterLockSlim();
         }
 
