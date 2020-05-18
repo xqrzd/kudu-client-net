@@ -16,10 +16,9 @@ namespace Knet.Kudu.Client.Tablet
         private readonly AvlTree _cache;
         private readonly ReaderWriterLockSlim _lock;
 
-        public TableLocationsCache()
+        public TableLocationsCache(ISystemClock systemClock)
         {
-            // TODO: Pass this in.
-            _systemClock = new SystemClock();
+            _systemClock = systemClock;
             _cache = new AvlTree();
             _lock = new ReaderWriterLockSlim();
         }

@@ -38,6 +38,7 @@ namespace Knet.Kudu.Client
         private readonly ILogger _logger;
         private readonly ILogger _scanLogger;
         private readonly IKuduConnectionFactory _connectionFactory;
+        private readonly ISystemClock _systemClock;
         private readonly SecurityContext _securityContext;
         private readonly ConnectionCache _connectionCache;
         private readonly ConcurrentDictionary<string, TableLocationsCache> _tableLocations;
@@ -66,7 +67,9 @@ namespace Knet.Kudu.Client
             _logger = loggerFactory.CreateLogger<KuduClient>();
             _scanLogger = loggerFactory.CreateLogger("Knet.Kudu.Client.Scanner");
             _securityContext = new SecurityContext();
+            // TODO: Pass these through constructor.
             _connectionFactory = new KuduConnectionFactory(options, _securityContext, loggerFactory);
+            _systemClock = new SystemClock();
             _connectionCache = new ConnectionCache(_connectionFactory, loggerFactory);
             _tableLocations = new ConcurrentDictionary<string, TableLocationsCache>();
             _requestTracker = new RequestTracker(SecurityUtil.NewGuid().ToString("N"));
@@ -643,7 +646,16 @@ namespace Knet.Kudu.Client
 
         private TableLocationsCache GetTableLocationsCache(string tableId)
         {
-            return _tableLocations.GetOrAdd(tableId, key => new TableLocationsCache());
+#if NETSTANDARD2_0
+            return _tableLocations.GetOrAdd(
+                tableId,
+                key => new TableLocationsCache(_systemClock));
+#else
+            return _tableLocations.GetOrAdd(
+                tableId,
+                (key, clock) => new TableLocationsCache(clock),
+                _systemClock);
+#endif
         }
 
         public async Task LoopLocateTableAsync(
