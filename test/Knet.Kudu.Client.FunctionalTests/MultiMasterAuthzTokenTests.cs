@@ -90,7 +90,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             var table = await client.CreateTableAsync(builder);
 
-            cts.CancelAfter(TimeSpan.FromSeconds(20));
+            cts.CancelAfter(TimeSpan.FromSeconds(10));
 
             int rowStart = 0;
 
