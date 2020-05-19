@@ -13,7 +13,6 @@ namespace Knet.Kudu.Client.FunctionalTests
     {
         private readonly string _tableName = "TestMultiMasterAuthzToken-table";
         private KuduTestHarness _harness;
-        private KuduClient _client;
 
         public async Task InitializeAsync()
         {
@@ -24,20 +23,18 @@ namespace Knet.Kudu.Client.FunctionalTests
                 // back to the master for an authz token.
                 .AddTabletServerFlag("--tserver_inject_invalid_authz_token_ratio=0.5")
                 .BuildHarnessAsync();
-
-            _client = _harness.CreateClient();
         }
 
         public async Task DisposeAsync()
         {
-            await _client.DisposeAsync();
             await _harness.DisposeAsync();
         }
 
         [SkippableFact]
         public async Task TestAuthzTokensDuringElection()
         {
-            await using var session = _client.NewSession();
+            await using var client = _harness.CreateClient();
+            await using var session = client.NewSession();
 
             // Test sending various requests that require authorization.
             var builder = ClientTestUtil.GetBasicSchema()
@@ -45,7 +42,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 .CreateBasicRangePartition()
                 .SetNumReplicas(1);
 
-            var table = await _client.CreateTableAsync(builder);
+            var table = await client.CreateTableAsync(builder);
 
             // Restart the masters to trigger an election.
             await _harness.KillAllMasterServersAsync();
@@ -66,7 +63,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _harness.StartAllMasterServersAsync();
             for (int i = 0; i < numReqs; i++)
             {
-                var numRows = await ClientTestUtil.CountRowsAsync(_client, table);
+                var numRows = await ClientTestUtil.CountRowsAsync(client, table);
                 Assert.Equal(2 * numReqs, numRows);
             }
         }
@@ -79,38 +76,41 @@ namespace Knet.Kudu.Client.FunctionalTests
             // token expiration time. The threads should reacquire tokens as needed
             // without surfacing token errors to the client.
 
-            var testRuntime = TimeSpan.FromSeconds(10);
+            await using var client = _harness.CreateClientBuilder()
+                .SetDefaultOperationTimeout(TimeSpan.FromMinutes(1))
+                .Build();
+
+            using var cts = new CancellationTokenSource();
+            var stopToken = cts.Token;
 
             var builder = ClientTestUtil.GetBasicSchema()
                 .SetTableName(_tableName)
                 .CreateBasicRangePartition()
                 .SetNumReplicas(1);
 
-            var table = await _client.CreateTableAsync(builder);
+            var table = await client.CreateTableAsync(builder);
 
-            long keepRunning = 1;
+            cts.CancelAfter(TimeSpan.FromSeconds(10));
+
             int rowStart = 0;
 
             var loop1 = WriteRowsAsync(flush: true);
             var loop2 = WriteRowsAsync(flush: false);
             var scanTask = ScanTableAsync();
 
-            await Task.Delay(testRuntime);
-            Interlocked.Decrement(ref keepRunning);
-
             await loop1;
             await loop2;
             await scanTask;
 
             var expected = Interlocked.Add(ref rowStart, 0) * 10;
-            var rows = await ClientTestUtil.CountRowsAsync(_client, table);
+            var rows = await ClientTestUtil.CountRowsAsync(client, table);
             Assert.Equal(expected, rows);
 
             async Task WriteRowsAsync(bool flush)
             {
-                await using var session = _client.NewSession();
+                await using var session = client.NewSession();
 
-                while (Interlocked.Read(ref keepRunning) == 1)
+                while (!stopToken.IsCancellationRequested)
                 {
                     var start = Interlocked.Increment(ref rowStart) * 10;
                     await InsertRowsAsync(session, table, start, 10);
@@ -122,11 +122,11 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             async Task ScanTableAsync()
             {
-                while (Interlocked.Read(ref keepRunning) == 1)
+                while (!stopToken.IsCancellationRequested)
                 {
                     // We can't validate the row count until the end, but this
                     // still ensures the scanner doesn't throw any exceptions.
-                    await ClientTestUtil.CountRowsAsync(_client, table);
+                    await ClientTestUtil.CountRowsAsync(client, table);
                 }
             }
         }
