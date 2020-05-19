@@ -5,12 +5,12 @@ namespace Knet.Kudu.Client.Internal
 {
     public static class AvlTreeExtensions
     {
-        public static RemoteTablet GetFloor(
+        public static TableLocationEntry FloorEntry(
             this AvlTree avlTree, ReadOnlySpan<byte> partitionKey)
         {
             avlTree.SearchLeftRight(
                 partitionKey,
-                out RemoteTablet left,
+                out TableLocationEntry left,
                 out _);
 
             return left;

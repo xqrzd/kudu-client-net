@@ -86,5 +86,38 @@ namespace Knet.Kudu.Client.Util
 
             return pb;
         }
+
+        public static PartitionSchema CreatePartitionSchema(
+            PartitionSchemaPB partitionSchemaPb, KuduSchema schema)
+        {
+            var rangeSchema = new RangeSchema(ToColumnIds(
+                partitionSchemaPb.RangeSchema.Columns));
+
+            var hashBucketSchemas = new List<HashBucketSchema>(
+                partitionSchemaPb.HashBucketSchemas.Count);
+
+            foreach (var hashSchema in partitionSchemaPb.HashBucketSchemas)
+            {
+                var newSchema = new HashBucketSchema(
+                    ToColumnIds(hashSchema.Columns),
+                    hashSchema.NumBuckets,
+                    hashSchema.Seed);
+
+                hashBucketSchemas.Add(newSchema);
+            }
+
+            return new PartitionSchema(rangeSchema, hashBucketSchemas, schema);
+        }
+
+        private static List<int> ToColumnIds(
+            List<PartitionSchemaPB.ColumnIdentifierPB> columns)
+        {
+            var columnIds = new List<int>(columns.Count);
+
+            foreach (var column in columns)
+                columnIds.Add(column.Id);
+
+            return columnIds;
+        }
     }
 }

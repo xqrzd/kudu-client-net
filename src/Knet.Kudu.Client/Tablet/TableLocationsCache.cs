@@ -2,24 +2,30 @@
 using System.Collections.Generic;
 using System.Threading;
 using Knet.Kudu.Client.Internal;
+using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Tablet
 {
     /// <summary>
-    /// A cache of the tablet locations in a table, keyed by partition key. Unlike the
-    /// Java client, we don't store non-covered ranges. If FindTablet returns null, it
-    /// could mean the tablet doesn't exist, or hasn't been cached yet. A master must
-    /// be contacted to make a determination.
+    /// A cache of the tablet locations in a table, keyed by partition key.
+    /// Entries in the cache are either tablets or non-covered ranges.
     /// </summary>
     public class TableLocationsCache : IDisposable
     {
+        private readonly ISystemClock _systemClock;
         private readonly AvlTree _cache;
         private readonly ReaderWriterLockSlim _lock;
 
-        public TableLocationsCache()
+        public TableLocationsCache(ISystemClock systemClock)
         {
+            _systemClock = systemClock;
             _cache = new AvlTree();
             _lock = new ReaderWriterLockSlim();
+        }
+
+        public void Dispose()
+        {
+            _lock.Dispose();
         }
 
         /// <summary>
@@ -27,47 +33,52 @@ namespace Knet.Kudu.Client.Tablet
         /// a tablet couldn't be found.
         /// </summary>
         /// <param name="partitionKey">The partition key to look up.</param>
-        public RemoteTablet FindTablet(ReadOnlySpan<byte> partitionKey)
+        public TableLocationEntry GetEntry(ReadOnlySpan<byte> partitionKey)
         {
-            RemoteTablet tablet;
-            _lock.EnterReadLock();
-            try
+            TableLocationEntry entry = GetFloorEntry(partitionKey);
+
+            if (entry != null)
             {
-                tablet = _cache.GetFloor(partitionKey);
-            }
-            finally
-            {
-                _lock.ExitReadLock();
+                byte[] upperBoundPartitionKey = entry.UpperBoundPartitionKey;
+
+                if (upperBoundPartitionKey.Length > 0 &&
+                    partitionKey.SequenceCompareTo(upperBoundPartitionKey) >= 0)
+                {
+                    // The requested partition key is outside the bounds of this tablet.
+                    return null;
+                }
+
+                long now = _systemClock.CurrentMilliseconds;
+
+                if (now > entry.Expiration)
+                    return null;
             }
 
-            if (tablet != null && (!tablet.Partition.IsEndPartition &&
-                partitionKey.SequenceCompareTo(tablet.Partition.PartitionKeyEnd) >= 0))
-            {
-                // The requested partition key is outside the bounds of this tablet.
-                tablet = null;
-            }
-
-            return tablet;
+            return entry;
         }
 
-        public bool SearchLeftRight(ReadOnlySpan<byte> partitionKey,
-            out RemoteTablet left, out RemoteTablet right)
-        {
-            _lock.EnterReadLock();
-            try
-            {
-                return _cache.SearchLeftRight(partitionKey, out left, out right);
-            }
-            finally
-            {
-                _lock.ExitReadLock();
-            }
-        }
-
+        /// <summary>
+        /// Add tablet locations to the cache. Already known tablet locations will
+        /// have their entry updated and expiration extended.
+        /// </summary>
+        /// <param name="tablets">The discovered tablets to cache.</param>
+        /// <param name="requestPartitionKey">The lookup partition key.</param>
+        /// <param name="requestedBatchSize">
+        /// The number of tablet locations requested from the master in the
+        /// original request.
+        /// </param>
+        /// <param name="ttl">
+        /// The time in milliseconds that the tablets may be cached for.
+        /// </param>
         public void CacheTabletLocations(
             List<RemoteTablet> tablets,
-            ReadOnlySpan<byte> requestPartitionKey)
+            ReadOnlySpan<byte> requestPartitionKey,
+            int requestedBatchSize,
+            long ttl)
         {
+            long expiration = _systemClock.CurrentMilliseconds + ttl;
+            var newEntries = new List<TableLocationEntry>();
+
             if (tablets.Count == 0)
             {
                 // If there are no tablets in the response, then the table is empty. If
@@ -75,36 +86,95 @@ namespace Knet.Kudu.Client.Tablet
                 // the master guarantees that if the partition key falls in a non-covered
                 // range, the previous tablet will be returned, and we did not set an upper
                 // bound partition key on the request.
-                ClearCache();
+
+                newEntries.Add(TableLocationEntry.NewNonCoveredRange(
+                    Array.Empty<byte>(),
+                    Array.Empty<byte>(),
+                    expiration));
             }
             else
             {
-                byte[] discoveredlowerBound = tablets[0].Partition.PartitionKeyStart;
-                byte[] discoveredUpperBound = tablets[tablets.Count - 1].Partition.PartitionKeyEnd;
+                // The comments below will reference the following diagram:
+                //
+                //   +---+   +---+---+
+                //   |   |   |   |   |
+                // A | B | C | D | E | F
+                //   |   |   |   |   |
+                //   +---+   +---+---+
+                //
+                // It depicts a tablet locations response from the master containing three
+                // tablets: B, D and E. Three non-covered ranges are present: A, C, and F.
+                // An RPC response containing B, D and E could occur if the lookup partition
+                // key falls in A, B, or C, although the existence of A as an initial
+                // non-covered range can only be inferred if the lookup partition key falls
+                // in A.
 
-                _lock.EnterWriteLock();
-                try
+                byte[] firstLowerBound = tablets[0].Partition.PartitionKeyStart;
+
+                if (requestPartitionKey.SequenceCompareTo(firstLowerBound) < 0)
                 {
-                    // Remove all existing overlapping entries, and add the new entries.
-                    RemoteTablet floorEntry = _cache.GetFloor(discoveredlowerBound);
+                    // If the first tablet is past the requested partition key, then the
+                    // partition key falls in an initial non-covered range, such as A.
+                    newEntries.Add(TableLocationEntry.NewNonCoveredRange(
+                        Array.Empty<byte>(), firstLowerBound, expiration));
+                }
 
-                    if (floorEntry != null && requestPartitionKey.SequenceCompareTo(
-                        floorEntry.Partition.PartitionKeyEnd) < 0)
+                // lastUpperBound tracks the upper bound of the previously processed
+                // entry, so that we can determine when we have found a non-covered range.
+                byte[] lastUpperBound = firstLowerBound;
+
+                foreach (var tablet in tablets)
+                {
+                    byte[] tabletLowerBound = tablet.Partition.PartitionKeyStart;
+                    byte[] tabletUpperBound = tablet.Partition.PartitionKeyEnd;
+
+                    if (lastUpperBound.SequenceCompareTo(tabletLowerBound) < 0)
                     {
-                        // A new partition now covers part of an old partition.
-                        discoveredlowerBound = floorEntry.Partition.PartitionKeyStart;
+                        // There is a non-covered range between the previous tablet and this tablet.
+                        // This will discover C while processing the tablet location for D.
+                        newEntries.Add(TableLocationEntry.NewNonCoveredRange(
+                            lastUpperBound, tabletLowerBound, expiration));
                     }
 
-                    bool upperBoundActive = discoveredUpperBound.Length > 0;
-                    _cache.ClearRange(discoveredlowerBound, discoveredUpperBound, upperBoundActive);
+                    lastUpperBound = tabletUpperBound;
 
-                    foreach (var entry in tablets)
-                        _cache.Insert(entry);
+                    // Now add the tablet itself (such as B, D, or E).
+                    newEntries.Add(TableLocationEntry.NewTablet(tablet, expiration));
                 }
-                finally
+
+                if (lastUpperBound.Length > 0 &&
+                    tablets.Count < requestedBatchSize)
                 {
-                    _lock.ExitWriteLock();
+                    // There is a non-covered range between the last tablet and the end
+                    // of the partition key space, such as F.
+                    newEntries.Add(TableLocationEntry.NewNonCoveredRange(
+                        lastUpperBound, Array.Empty<byte>(), expiration));
                 }
+            }
+
+            byte[] discoveredlowerBound = newEntries[0].LowerBoundPartitionKey;
+            byte[] discoveredUpperBound = newEntries[newEntries.Count - 1].UpperBoundPartitionKey;
+
+            _lock.EnterWriteLock();
+            try
+            {
+                // Remove all existing overlapping entries, and add the new entries.
+                TableLocationEntry floorEntry = _cache.FloorEntry(discoveredlowerBound);
+                if (floorEntry != null &&
+                    requestPartitionKey.SequenceCompareTo(floorEntry.UpperBoundPartitionKey) < 0)
+                {
+                    discoveredlowerBound = floorEntry.LowerBoundPartitionKey;
+                }
+
+                bool upperBoundActive = discoveredUpperBound.Length > 0;
+                _cache.ClearRange(discoveredlowerBound, discoveredUpperBound, upperBoundActive);
+
+                foreach (var entry in newEntries)
+                    _cache.Insert(entry);
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
             }
         }
 
@@ -134,9 +204,89 @@ namespace Knet.Kudu.Client.Tablet
             }
         }
 
-        public void Dispose()
+        private TableLocationEntry GetFloorEntry(ReadOnlySpan<byte> partitionKey)
         {
-            _lock.Dispose();
+            _lock.EnterReadLock();
+            try
+            {
+                return _cache.FloorEntry(partitionKey);
+            }
+            finally
+            {
+                _lock.ExitReadLock();
+            }
+        }
+    }
+
+    public class TableLocationEntry
+    {
+        /// <summary>
+        /// The lower bound partition key, only set if this is a non-covered range.
+        /// </summary>
+        private readonly byte[] _lowerBoundPartitionKey;
+
+        /// <summary>
+        /// The upper bound partition key, only set if this is a non-covered range.
+        /// </summary>
+        /// 
+        private readonly byte[] _upperBoundPartitionKey;
+
+        /// <summary>
+        /// The remote tablet, only set if this entry represents a tablet.
+        /// </summary>
+        public RemoteTablet Tablet { get; }
+
+        /// <summary>
+        /// When this entry will expire, based on <see cref="ISystemClock"/>.
+        /// </summary>
+        public long Expiration { get; }
+
+        public TableLocationEntry(
+            RemoteTablet tablet,
+            byte[] lowerBoundPartitionKey,
+            byte[] upperBoundPartitionKey,
+            long expiration)
+        {
+            Tablet = tablet;
+            _lowerBoundPartitionKey = lowerBoundPartitionKey;
+            _upperBoundPartitionKey = upperBoundPartitionKey;
+            Expiration = expiration;
+        }
+
+        /// <summary>
+        /// If this entry is a non-covered range.
+        /// </summary>
+        public bool IsNonCoveredRange => Tablet is null;
+
+        /// <summary>
+        /// If this entry is a covered range.
+        /// </summary>
+        public bool IsCoveredRange => Tablet != null;
+
+        public byte[] LowerBoundPartitionKey => Tablet is null
+            ? _lowerBoundPartitionKey
+            : Tablet.Partition.PartitionKeyStart;
+
+        public byte[] UpperBoundPartitionKey => Tablet is null
+            ? _upperBoundPartitionKey
+            : Tablet.Partition.PartitionKeyEnd;
+
+        public static TableLocationEntry NewNonCoveredRange(
+            byte[] lowerBoundPartitionKey,
+            byte[] upperBoundPartitionKey,
+            long expiration)
+        {
+            return new TableLocationEntry(
+                null,
+                lowerBoundPartitionKey,
+                upperBoundPartitionKey,
+                expiration);
+        }
+
+        public static TableLocationEntry NewTablet(
+            RemoteTablet tablet, long expiration)
+        {
+            return new TableLocationEntry(tablet, null, null, expiration);
         }
     }
 }

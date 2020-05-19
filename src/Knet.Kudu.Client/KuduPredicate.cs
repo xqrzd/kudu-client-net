@@ -803,9 +803,9 @@ namespace Knet.Kudu.Client
         {
             var encoded = values switch
             {
-                // TODO: byte
                 IEnumerable<bool> x => GetZ(x, KuduEncoder.EncodeBool),
                 IEnumerable<sbyte> x => GetZ(x, KuduEncoder.EncodeInt8),
+                IEnumerable<byte> x => GetZ(x, KuduEncoder.EncodeUInt8),
                 IEnumerable<short> x => GetZ(x, KuduEncoder.EncodeInt16),
                 IEnumerable<int> x => GetZ(x, KuduEncoder.EncodeInt32),
                 IEnumerable<long> x => GetZ(x, KuduEncoder.EncodeInt64),
