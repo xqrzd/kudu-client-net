@@ -168,6 +168,7 @@ namespace Knet.Kudu.Client.Util
                 KuduType.Int32 => EncodeInt32((int)value),
                 KuduType.Int64 => EncodeInt64((long)value),
                 KuduType.String => EncodeString((string)value),
+                KuduType.Varchar => EncodeString((string)value),
                 KuduType.Bool => EncodeBool((bool)value),
                 KuduType.Float => EncodeFloat((float)value),
                 KuduType.Double => EncodeDouble((double)value),
