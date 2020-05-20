@@ -155,6 +155,9 @@ namespace Knet.Kudu.Client
                     "use RemoveDefault to clear a default value");
             }
 
+            var column = _table.Schema.GetColumn(name);
+            var defaultValue = KuduEncoder.EncodeDefaultValue(column.Type, newDefault);
+
             _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
             {
                 Type = AlterTableRequestPB.StepType.AlterColumn,
@@ -163,7 +166,7 @@ namespace Knet.Kudu.Client
                     Delta = new ColumnSchemaDeltaPB
                     {
                         Name = name,
-                        DefaultValue = KuduEncoder.EncodeDefaultValue(newDefault)
+                        DefaultValue = defaultValue
                     }
                 }
             });
