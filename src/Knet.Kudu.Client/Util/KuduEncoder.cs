@@ -182,6 +182,33 @@ namespace Knet.Kudu.Client.Util
             };
         }
 
+        public static object DecodeDefaultValue(
+            KuduType type, ColumnTypeAttributes typeAttributes, byte[] value)
+        {
+            return type switch
+            {
+                KuduType.Int8 => DecodeInt8(value),
+                KuduType.Int16 => DecodeInt16(value),
+                KuduType.Int32 => DecodeInt32(value),
+                KuduType.Int64 => DecodeInt64(value),
+                KuduType.String => DecodeString(value),
+                KuduType.Varchar => DecodeString(value),
+                KuduType.Bool => DecodeBool(value),
+                KuduType.Float => DecodeFloat(value),
+                KuduType.Double => DecodeDouble(value),
+                KuduType.Binary => value,
+                KuduType.UnixtimeMicros => DecodeDateTime(value),
+                KuduType.Date => DecodeDate(value),
+                KuduType.Decimal32 => DecodeDecimal(
+                    value, type, typeAttributes.Scale.GetValueOrDefault()),
+                KuduType.Decimal64 => DecodeDecimal(
+                    value, type, typeAttributes.Scale.GetValueOrDefault()),
+                KuduType.Decimal128 => DecodeDecimal(
+                    value, type, typeAttributes.Scale.GetValueOrDefault()),
+                _ => throw new Exception($"Unknown data type {type}"),
+            };
+        }
+
         public static bool DecodeBool(ReadOnlySpan<byte> source) => source[0] > 0;
 
         public static sbyte DecodeInt8(ReadOnlySpan<byte> source) => (sbyte)source[0];

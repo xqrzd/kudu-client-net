@@ -1152,8 +1152,11 @@ namespace Knet.Kudu.Client.Tests
                 dataType,
                 false,
                 dataType == KuduType.String || dataType == KuduType.Varchar,
+                null,
+                0,
                 EncodingType.AutoEncoding,
                 CompressionType.DefaultCompression,
-                attributes);
+                attributes,
+                null);
     }
 }
