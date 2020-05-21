@@ -88,7 +88,7 @@ namespace Knet.Kudu.Client.Negotiate
 
         private int ReadHandshake(Memory<byte> buffer)
         {
-            var length = buffer.Length;
+            int length = Math.Min(buffer.Length, _result.TlsHandshake.Length);
             _result.TlsHandshake.AsSpan(_readPosition, length).CopyTo(buffer.Span);
             _readPosition += length;
             return length;
