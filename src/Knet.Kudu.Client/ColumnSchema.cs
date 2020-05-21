@@ -14,6 +14,10 @@ namespace Knet.Kudu.Client
 
         public bool IsNullable { get; }
 
+        public object DefaultValue { get; }
+
+        public int DesiredBlockSize { get; }
+
         public EncodingType Encoding { get; }
 
         public CompressionType Compression { get; }
@@ -26,21 +30,29 @@ namespace Knet.Kudu.Client
 
         public bool IsFixedSize { get; }
 
+        public string Comment { get; }
+
         public ColumnSchema(
             string name, KuduType type,
             bool isKey = false,
             bool isNullable = false,
+            object defaultValue = null,
+            int desiredBlockSize = 0,
             EncodingType encoding = EncodingType.AutoEncoding,
             CompressionType compression = CompressionType.DefaultCompression,
-            ColumnTypeAttributes typeAttributes = null)
+            ColumnTypeAttributes typeAttributes = null,
+            string comment = null)
         {
             Name = name;
             Type = type;
             IsKey = isKey;
             IsNullable = isNullable;
+            DefaultValue = defaultValue;
+            DesiredBlockSize = desiredBlockSize;
             Encoding = encoding;
             Compression = compression;
             TypeAttributes = typeAttributes;
+            Comment = comment;
 
             Size = KuduSchema.GetTypeSize(type);
             IsSigned = KuduSchema.IsSigned(type);
@@ -85,14 +97,24 @@ namespace Knet.Kudu.Client
 
         public static ColumnSchema FromProtobuf(ColumnSchemaPB columnSchemaPb)
         {
+            var type = (KuduType)columnSchemaPb.Type;
+            var typeAttributes = columnSchemaPb.TypeAttributes.ToTypeAttributes();
+            var defaultValue = columnSchemaPb.ShouldSerializeWriteDefaultValue()
+                ? KuduEncoder.DecodeDefaultValue(
+                    type, typeAttributes, columnSchemaPb.WriteDefaultValue)
+                : null;
+
             return new ColumnSchema(
                 columnSchemaPb.Name,
-                (KuduType)columnSchemaPb.Type,
+                type,
                 columnSchemaPb.IsKey,
                 columnSchemaPb.IsNullable,
+                defaultValue,
+                columnSchemaPb.CfileBlockSize,
                 (EncodingType)columnSchemaPb.Encoding,
                 (CompressionType)columnSchemaPb.Compression,
-                columnSchemaPb.TypeAttributes.ToTypeAttributes());
+                typeAttributes,
+                columnSchemaPb.Comment);
         }
     }
 
