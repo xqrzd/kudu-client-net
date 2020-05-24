@@ -59,9 +59,9 @@ namespace Knet.Kudu.Client
             var columnBuilder = new ColumnBuilder(name, type);
             configure?.Invoke(columnBuilder);
 
-            ColumnSchemaPB schema = columnBuilder;
+            var schema = columnBuilder.Build();
 
-            if (!schema.IsNullable && schema.ReadDefaultValue == null)
+            if (!schema.IsNullable && schema.DefaultValue == null)
                 throw new ArgumentException("A new non-null column must have a default value");
 
             if (schema.IsKey)
@@ -72,7 +72,7 @@ namespace Knet.Kudu.Client
                 Type = AlterTableRequestPB.StepType.AddColumn,
                 AddColumn = new AlterTableRequestPB.AddColumn
                 {
-                    Schema = schema
+                    Schema = schema.ToColumnSchemaPb()
                 }
             });
 

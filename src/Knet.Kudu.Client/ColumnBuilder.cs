@@ -1,20 +1,23 @@
-﻿using Knet.Kudu.Client.Protocol;
-using Knet.Kudu.Client.Util;
-
-namespace Knet.Kudu.Client
+﻿namespace Knet.Kudu.Client
 {
-    public readonly struct ColumnBuilder
+    public class ColumnBuilder
     {
-        private readonly ColumnSchemaPB _column;
+        private readonly string _name;
+        private readonly KuduType _type;
+        private bool _isKey;
+        private bool _isNullable;
+        private object _defaultValue;
+        private int _desiredBlockSize;
+        private EncodingType _encoding;
+        private CompressionType _compression;
+        private ColumnTypeAttributes _typeAttributes;
+        private string _comment;
 
         public ColumnBuilder(string name, KuduType type)
         {
-            _column = new ColumnSchemaPB
-            {
-                Name = name,
-                Type = (DataTypePB)type,
-                IsNullable = true
-            };
+            _name = name;
+            _type = type;
+            _isNullable = true;
         }
 
         /// <summary>
@@ -26,10 +29,10 @@ namespace Knet.Kudu.Client
         /// </param>
         public ColumnBuilder Key(bool isKey)
         {
-            _column.IsKey = isKey;
+            _isKey = isKey;
 
             if (isKey)
-                _column.IsNullable = false;
+                _isNullable = false;
 
             return this;
         }
@@ -43,7 +46,7 @@ namespace Knet.Kudu.Client
         /// </param>
         public ColumnBuilder Nullable(bool isNullable)
         {
-            _column.IsNullable = isNullable;
+            _isNullable = isNullable;
             return this;
         }
 
@@ -53,7 +56,7 @@ namespace Knet.Kudu.Client
         /// <param name="encodingType">The encoding to use on the column.</param>
         public ColumnBuilder Encoding(EncodingType encodingType)
         {
-            _column.Encoding = (EncodingTypePB)encodingType;
+            _encoding = encodingType;
             return this;
         }
 
@@ -63,7 +66,7 @@ namespace Knet.Kudu.Client
         /// <param name="compressionType">The compression to use on the column.</param>
         public ColumnBuilder Compression(CompressionType compressionType)
         {
-            _column.Compression = (CompressionTypePB)compressionType;
+            _compression = compressionType;
             return this;
         }
 
@@ -86,7 +89,7 @@ namespace Knet.Kudu.Client
         /// <param name="desiredBlockSize">The desired block size, in bytes.</param>
         public ColumnBuilder DesiredBlockSize(int desiredBlockSize)
         {
-            _column.CfileBlockSize = desiredBlockSize;
+            _desiredBlockSize = desiredBlockSize;
             return this;
         }
 
@@ -97,11 +100,8 @@ namespace Knet.Kudu.Client
         /// <param name="scale">The decimal scale.</param>
         public ColumnBuilder DecimalAttributes(int precision, int scale)
         {
-            _column.TypeAttributes = new ColumnTypeAttributesPB
-            {
-                Precision = precision,
-                Scale = scale
-            };
+            _typeAttributes = ColumnTypeAttributes.NewDecimalAttributes(
+                precision, scale);
 
             return this;
         }
@@ -114,11 +114,7 @@ namespace Knet.Kudu.Client
         /// </param>
         public ColumnBuilder VarcharAttributes(int length)
         {
-            _column.TypeAttributes = new ColumnTypeAttributesPB
-            {
-                Length = length
-            };
-
+            _typeAttributes = ColumnTypeAttributes.NewVarcharAttributes(length);
             return this;
         }
 
@@ -128,7 +124,7 @@ namespace Knet.Kudu.Client
         /// <param name="comment">The comment to set on the column.</param>
         public ColumnBuilder Comment(string comment)
         {
-            _column.Comment = comment;
+            _comment = comment;
             return this;
         }
 
@@ -140,13 +136,23 @@ namespace Knet.Kudu.Client
         /// </param>
         public ColumnBuilder DefaultValue(object value)
         {
-            _column.ReadDefaultValue = KuduEncoder.EncodeDefaultValue(
-                (KuduType)_column.Type,
-                value);
-
+            _defaultValue = value;
             return this;
         }
 
-        public static implicit operator ColumnSchemaPB(ColumnBuilder builder) => builder._column;
+        public ColumnSchema Build()
+        {
+            return new ColumnSchema(
+                _name,
+                _type,
+                _isKey,
+                _isNullable,
+                _defaultValue,
+                _desiredBlockSize,
+                _encoding,
+                _compression,
+                _typeAttributes,
+                _comment);
+        }
     }
 }

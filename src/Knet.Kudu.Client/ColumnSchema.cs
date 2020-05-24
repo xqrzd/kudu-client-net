@@ -153,5 +153,16 @@ namespace Knet.Kudu.Client
                     return "";
             }
         }
+
+        public static ColumnTypeAttributes NewDecimalAttributes(
+            int precision, int scale)
+        {
+            return new ColumnTypeAttributes(precision, scale, null);
+        }
+
+        public static ColumnTypeAttributes NewVarcharAttributes(int length)
+        {
+            return new ColumnTypeAttributes(null, null, length);
+        }
     }
 }

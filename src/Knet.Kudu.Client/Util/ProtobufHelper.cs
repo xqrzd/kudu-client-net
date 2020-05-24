@@ -87,6 +87,28 @@ namespace Knet.Kudu.Client.Util
             return pb;
         }
 
+        public static ColumnSchemaPB ToColumnSchemaPb(this ColumnSchema columnSchema)
+        {
+            var defaultValue = columnSchema.DefaultValue;
+            var encodedDefaultValue = defaultValue != null
+                ? KuduEncoder.EncodeDefaultValue(columnSchema.Type, columnSchema.DefaultValue)
+                : null;
+
+            return new ColumnSchemaPB
+            {
+                Name = columnSchema.Name,
+                Type = (DataTypePB)columnSchema.Type,
+                IsKey = columnSchema.IsKey,
+                IsNullable = columnSchema.IsNullable,
+                ReadDefaultValue = encodedDefaultValue,
+                CfileBlockSize = columnSchema.DesiredBlockSize,
+                Encoding = (EncodingTypePB)columnSchema.Encoding,
+                Compression = (CompressionTypePB)columnSchema.Compression,
+                TypeAttributes = columnSchema.TypeAttributes.ToTypeAttributesPb(),
+                Comment = columnSchema.Comment
+            };
+        }
+
         public static PartitionSchema CreatePartitionSchema(
             PartitionSchemaPB partitionSchemaPb, KuduSchema schema)
         {
