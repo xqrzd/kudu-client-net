@@ -1018,7 +1018,7 @@ namespace Knet.Kudu.Client
             return true;
         }
 
-        public async Task<T> SendRpcAsync<T>(
+        internal async Task<T> SendRpcAsync<T>(
             KuduRpc<T> rpc, CancellationToken cancellationToken = default)
         {
             using var cts = new CancellationTokenSource(_defaultOperationTimeoutMs);
