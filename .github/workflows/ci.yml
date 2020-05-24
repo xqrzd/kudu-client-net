@@ -41,3 +41,10 @@ jobs:
     needs: linux_build
     name: Publish nuget package
     runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 3.1.202
