@@ -51,5 +51,5 @@ jobs:
     - name: Publish on version change
       uses: rohith/publish-nuget@v2
       with:
-        PROJECT_FILE_PATH: src\Knet.Kudu.Client\Knet.Kudu.Client.csproj
+        PROJECT_FILE_PATH: src/Knet.Kudu.Client/Knet.Kudu.Client.csproj
         NUGET_KEY: ${{secrets.KUDU_NUGET_API_KEY}}
