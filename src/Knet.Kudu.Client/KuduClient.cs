@@ -327,7 +327,7 @@ namespace Knet.Kudu.Client
             return new KuduTableStatistics(response.OnDiskSize, response.LiveRowCount);
         }
 
-        public Task<List<RemoteTablet>> GetTableLocationsAsync(
+        internal Task<List<RemoteTablet>> GetTableLocationsAsync(
             string tableId, byte[] partitionKeyStart, int fetchBatchSize,
             CancellationToken cancellationToken = default)
         {
@@ -335,7 +335,7 @@ namespace Knet.Kudu.Client
                 tableId, partitionKeyStart, null, fetchBatchSize, cancellationToken);
         }
 
-        public async Task<List<RemoteTablet>> GetTableLocationsAsync(
+        internal async Task<List<RemoteTablet>> GetTableLocationsAsync(
             string tableId, byte[] partitionKeyStart, byte[] partitionKeyEnd,
             int fetchBatchSize, CancellationToken cancellationToken = default)
         {
@@ -664,7 +664,7 @@ namespace Knet.Kudu.Client
 #endif
         }
 
-        public async Task LoopLocateTableAsync(
+        private async Task LoopLocateTableAsync(
             KuduTable table,
             byte[] startPartitionKey,
             byte[] endPartitionKey,
@@ -760,7 +760,7 @@ namespace Knet.Kudu.Client
             return SendRpcAsync(rpc, cancellationToken);
         }
 
-        public async ValueTask<List<KeyRange>> GetTableKeyRangesAsync(
+        internal async ValueTask<List<KeyRange>> GetTableKeyRangesAsync(
             KuduTable table,
             byte[] startPrimaryKey,
             byte[] endPrimaryKey,
