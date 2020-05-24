@@ -287,13 +287,24 @@ namespace Knet.Kudu.Client
             await SendRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
         }
 
-        public async Task<List<ListTablesResponsePB.TableInfo>> GetTablesAsync(
+        public async Task<List<TableInfo>> GetTablesAsync(
             string nameFilter = null, CancellationToken cancellationToken = default)
         {
             var rpc = new ListTablesRequest(nameFilter);
-            var response = await SendRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
+            var response = await SendRpcAsync(rpc, cancellationToken)
+                .ConfigureAwait(false);
 
-            return response.Tables;
+            var tables = response.Tables;
+            var results = new List<TableInfo>(tables.Count);
+
+            foreach (var tablePb in tables)
+            {
+                var tableId = tablePb.Id.ToStringUtf8();
+                var table = new TableInfo(tablePb.Name, tableId);
+                results.Add(table);
+            }
+
+            return results;
         }
 
         /// <summary>
