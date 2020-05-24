@@ -34,3 +34,10 @@ jobs:
       run: dotnet build --configuration Release
     - name: Test
       run: dotnet test --no-restore --no-build --configuration Release
+
+  publish:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
+
+    needs: linux_build
+    name: Publish nuget package
+    runs-on: ubuntu-latest
