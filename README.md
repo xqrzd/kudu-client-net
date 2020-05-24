@@ -7,16 +7,15 @@ Kudu provides a combination of fast inserts/updates and efficient columnar scans
 [https://kudu.apache.org](https://kudu.apache.org)
 
 ## Project Status
-This client is still under development and isn't ready for production use.
-Issue [#17](/../../issues/17) tracks the remaining work for the first release.
-A pre-release package will be released soon, until then you can checkout the repo and build the solution.
-To build the solution you need the [.NET Core 3.1 SDK](https://dotnet.microsoft.com/download/dotnet-core/3.1).
+This client is in preview and isn't quite ready for production use.
+Issue [#17](/../../issues/17) tracks the remaining work for the first stable release.
+
+You can get the preview package on Nuget.
 
 ## Supported Versions
 This library supports Apache Kudu 1.3 and newer. The newest version of this library
 should always be used, regardless of the Apache Kudu version.
-This client aims for feature parity between the official C++ and Java clients.
-There should be no unsupported functionality, once this client is complete.
+This client tries to maintain feature parity with the official C++ and Java clients.
 
 ## Quickstart
 
