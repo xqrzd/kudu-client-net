@@ -311,15 +311,22 @@ namespace Knet.Kudu.Client
         /// Get the list of running tablet servers.
         /// </summary>
         /// <param name="cancellationToken">The cancellation token.</param>
-        public async Task<List<ListTabletServersResponsePB.Entry>> GetTabletServersAsync(
+        public async Task<List<TabletServerInfo>> GetTabletServersAsync(
             CancellationToken cancellationToken = default)
         {
             var rpc = new ListTabletServersRequest();
             var response = await SendRpcAsync(rpc, cancellationToken)
                 .ConfigureAwait(false);
 
-            // TODO: Create managed wrapper for this response.
-            return response.Servers;
+            var servers = response.Servers;
+            var results = new List<TabletServerInfo>(servers.Count);
+            foreach (var serverPb in servers)
+            {
+                var serverInfo = serverPb.ToTabletServerInfo();
+                results.Add(serverInfo);
+            }
+
+            return results;
         }
 
         /// <summary>
