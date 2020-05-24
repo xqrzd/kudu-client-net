@@ -9,7 +9,7 @@ env:
 jobs:
   linux_build:
 
-    name: Linux CI
+    name: Linux Build
     runs-on: ubuntu-latest
 
     env:
