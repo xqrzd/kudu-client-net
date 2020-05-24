@@ -1,4 +1,4 @@
-name: Linux CI
+name: CI
 
 on: [push]
 
@@ -7,8 +7,9 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: 1
 
 jobs:
-  build:
+  linux_build:
 
+    name: Linux build
     runs-on: ubuntu-latest
 
     env:
@@ -33,3 +34,22 @@ jobs:
       run: dotnet build --configuration Release
     - name: Test
       run: dotnet test --no-restore --no-build --configuration Release
+
+  publish:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
+
+    needs: linux_build
+    name: Publish nuget package
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 3.1.202
+    - name: Publish on version change
+      uses: rohith/publish-nuget@v2
+      with:
+        PROJECT_FILE_PATH: src\Knet.Kudu.Client\Knet.Kudu.Client.csproj
+        NUGET_KEY: ${{secrets.KUDU_NUGET_API_KEY}}
