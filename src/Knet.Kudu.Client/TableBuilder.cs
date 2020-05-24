@@ -12,6 +12,8 @@ namespace Knet.Kudu.Client
         private readonly CreateTableRequestPB _createTableRequest;
         private readonly List<PartialRowOperation> _splitRowsRangeBounds;
 
+        internal bool Wait { get; private set; } = true;
+
         /// <summary>
         /// Creates a new table builder with the given table name.
         /// </summary>
@@ -327,6 +329,26 @@ namespace Knet.Kudu.Client
 
             _splitRowsRangeBounds.Add(splitRow);
 
+            return this;
+        }
+
+        /// <summary>
+        /// Whether to wait for the table to be fully created before this create
+        /// operation is considered to be finished.
+        /// 
+        /// If false, the create will finish quickly, but subsequent row operations
+        /// may take longer as they may need to wait for portions of the table to be
+        /// fully created.
+        /// 
+        /// If true, the create will take longer, but the speed of subsequent row
+        /// operations will not be impacted.
+        /// 
+        /// If not provided, defaults to true.
+        /// </summary>
+        /// <param name="wait">Whether to wait for the table to be fully created.</param>
+        public TableBuilder SetWait(bool wait)
+        {
+            Wait = wait;
             return this;
         }
 

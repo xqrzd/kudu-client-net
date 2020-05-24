@@ -10,9 +10,9 @@ namespace Knet.Kudu.Client.Requests
 
         public override string MethodName => "IsCreateTableDone";
 
-        public IsCreateTableDoneRequest(IsCreateTableDoneRequestPB request)
+        public IsCreateTableDoneRequest(TableIdentifierPB tableId)
         {
-            _request = request;
+            _request = new IsCreateTableDoneRequestPB { Table = tableId };
         }
 
         public override void Serialize(Stream stream)
@@ -22,8 +22,12 @@ namespace Knet.Kudu.Client.Requests
 
         public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
         {
-            Output = Deserialize(buffer);
-            Error = Output.Error;
+            var responsePb = Deserialize(buffer);
+
+            if (responsePb.Error == null)
+                Output = responsePb;
+            else
+                Error = responsePb.Error;
         }
     }
 }
