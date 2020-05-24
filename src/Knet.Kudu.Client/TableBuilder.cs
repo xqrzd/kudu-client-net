@@ -111,7 +111,8 @@ namespace Knet.Kudu.Client
         {
             var builder = new ColumnBuilder(name, type);
             configure?.Invoke(builder);
-            CreateTableRequest.Schema.Columns.Add(builder);
+            var columnSchemaPb = builder.Build().ToColumnSchemaPb();
+            CreateTableRequest.Schema.Columns.Add(columnSchemaPb);
             return this;
         }
 

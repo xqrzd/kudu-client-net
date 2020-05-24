@@ -159,8 +159,10 @@ namespace Knet.Kudu.Client.Util
         public static byte[] EncodeString(string source) =>
             Encoding.UTF8.GetBytes(source);
 
-        public static byte[] EncodeDefaultValue(KuduType type, object value)
+        public static byte[] EncodeDefaultValue(ColumnSchema columnSchema, object value)
         {
+            var type = columnSchema.Type;
+
             return type switch
             {
                 KuduType.Int8 => EncodeInt8((sbyte)value),
@@ -175,9 +177,18 @@ namespace Knet.Kudu.Client.Util
                 KuduType.Binary => (byte[])value,
                 KuduType.UnixtimeMicros => EncodeDateTime((DateTime)value),
                 KuduType.Date => EncodeDate((DateTime)value),
-                KuduType.Decimal32 => EncodeDefaultDecimal((decimal)value),
-                KuduType.Decimal64 => EncodeDefaultDecimal((decimal)value),
-                KuduType.Decimal128 => EncodeDefaultDecimal((decimal)value),
+                KuduType.Decimal32 => EncodeDecimal32(
+                    (decimal)value,
+                    columnSchema.TypeAttributes.Precision.GetValueOrDefault(),
+                    columnSchema.TypeAttributes.Scale.GetValueOrDefault()),
+                KuduType.Decimal64 => EncodeDecimal64(
+                    (decimal)value,
+                    columnSchema.TypeAttributes.Precision.GetValueOrDefault(),
+                    columnSchema.TypeAttributes.Scale.GetValueOrDefault()),
+                KuduType.Decimal128 => EncodeDecimal128(
+                    (decimal)value,
+                    columnSchema.TypeAttributes.Precision.GetValueOrDefault(),
+                    columnSchema.TypeAttributes.Scale.GetValueOrDefault()),
                 _ => throw new Exception($"Unknown data type {type}"),
             };
         }
@@ -286,13 +297,5 @@ namespace Knet.Kudu.Client.Util
         /// </summary>
         /// <param name="buffer">Buffer whose left most bit will be xor'd.</param>
         public static byte XorLeftMostBit(Span<byte> buffer) => buffer[0] ^= 1 << 7;
-
-        private static byte[] EncodeDefaultDecimal(decimal value)
-        {
-            var scale = DecimalUtil.GetScale(value);
-
-            return EncodeDecimal128(
-                value, DecimalUtil.MaxDecimal128Precision, scale);
-        }
     }
 }
