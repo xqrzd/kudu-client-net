@@ -294,7 +294,7 @@ namespace Knet.Kudu.Client.Tests
 
         private static KuduSchema GetSchema(TableBuilder builder)
         {
-            CreateTableRequestPB request = builder;
+            var request = builder.Build();
             // The builder doesn't support setting column ids, so for testing
             // set them here, and use the column index as the id.
             for (var i = 0; i < request.Schema.Columns.Count; i++)

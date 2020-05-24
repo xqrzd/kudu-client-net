@@ -170,15 +170,25 @@ namespace Knet.Kudu.Client
         }
 
         public async Task<KuduTable> CreateTableAsync(
-            TableBuilder table, CancellationToken cancellationToken = default)
+            TableBuilder tableBuilder, CancellationToken cancellationToken = default)
         {
-            var rpc = new CreateTableRequest(table.Build());
-            var response = await SendRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
+            var rpc = new CreateTableRequest(tableBuilder.Build());
 
-            await WaitForTableDoneAsync(response.TableId, cancellationToken).ConfigureAwait(false);
+            var response = await SendRpcAsync(rpc, cancellationToken)
+                .ConfigureAwait(false);
 
-            var tableIdentifier = new TableIdentifierPB { TableId = response.TableId };
-            return await OpenTableAsync(tableIdentifier, cancellationToken).ConfigureAwait(false);
+            var tableId = new TableIdentifierPB { TableId = response.TableId };
+
+            if (tableBuilder.Wait)
+            {
+                await WaitForCreateTableDoneAsync(
+                    tableId, cancellationToken).ConfigureAwait(false);
+
+                return await OpenTableAsync(
+                    tableId, cancellationToken).ConfigureAwait(false);
+            }
+
+            return null;
         }
 
         public async Task<AlterTableResponse> AlterTableAsync(
@@ -206,7 +216,7 @@ namespace Knet.Kudu.Client
 
             if (alterTable.Wait)
             {
-                var isDoneResponse = await WaitForIsAlterTableDoneAsync(
+                var isDoneResponse = await WaitForAlterTableDoneAsync(
                     alterTable.TableIdPb, cancellationToken).ConfigureAwait(false);
 
                 response = new AlterTableResponse(
@@ -217,7 +227,25 @@ namespace Knet.Kudu.Client
             return response;
         }
 
-        private async Task<IsAlterTableDoneResponsePB> WaitForIsAlterTableDoneAsync(
+        private async Task<IsCreateTableDoneResponsePB> WaitForCreateTableDoneAsync(
+            TableIdentifierPB tableId, CancellationToken cancellationToken)
+        {
+            var rpc = new IsCreateTableDoneRequest(tableId);
+
+            while (true)
+            {
+                var response = await SendRpcAsync(rpc, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (response.Done)
+                    return response;
+
+                rpc.Attempt++;
+                await DelayRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        private async Task<IsAlterTableDoneResponsePB> WaitForAlterTableDoneAsync(
             TableIdentifierPB tableId, CancellationToken cancellationToken)
         {
             var rpc = new IsAlterTableDoneRequest(tableId);
@@ -229,8 +257,9 @@ namespace Knet.Kudu.Client
 
                 if (response.Done)
                     return response;
-                else
-                    await Task.Delay(100).ConfigureAwait(false);
+
+                rpc.Attempt++;
+                await DelayRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -481,29 +510,6 @@ namespace Knet.Kudu.Client
             }
 
             return schema;
-        }
-
-        private async Task WaitForTableDoneAsync(
-            byte[] tableId, CancellationToken cancellationToken = default)
-        {
-            var request = new IsCreateTableDoneRequestPB
-            {
-                Table = new TableIdentifierPB { TableId = tableId }
-            };
-
-            var rpc = new IsCreateTableDoneRequest(request);
-
-            while (true)
-            {
-                var result = await SendRpcAsync(rpc, cancellationToken)
-                    .ConfigureAwait(false);
-
-                if (result.Done)
-                    break;
-
-                await Task.Delay(50, cancellationToken).ConfigureAwait(false);
-                // TODO: Increment rpc attempts.
-            }
         }
 
         internal ValueTask<RemoteTablet> GetRowTabletAsync(

@@ -13,7 +13,7 @@ namespace Knet.Kudu.Client.Tests
                 .SetTableName("table_name")
                 .SetNumReplicas(3);
 
-            CreateTableRequestPB request = builder;
+            var request = builder.Build();
 
             Assert.Equal("table_name", request.Name);
             Assert.Equal(3, request.NumReplicas);
@@ -29,7 +29,7 @@ namespace Knet.Kudu.Client.Tests
                     .Encoding(EncodingType.DictEncoding)
                     .Compression(CompressionType.Snappy));
 
-            CreateTableRequestPB request = builder;
+            var request = builder.Build();
 
             Assert.Collection(request.Schema.Columns, c => {
                 Assert.Equal("c1", c.Name);
@@ -54,7 +54,7 @@ namespace Knet.Kudu.Client.Tests
                 .AddColumn("dec32", KuduType.Decimal32, opt => opt
                     .DecimalAttributes(4, 3));
 
-            CreateTableRequestPB request = builder;
+            var request = builder.Build();
 
             Assert.Collection(request.Schema.Columns, c =>
             {
@@ -69,7 +69,7 @@ namespace Knet.Kudu.Client.Tests
             var builder = new TableBuilder()
                 .AddHashPartitions(5, "a", "b", "c");
 
-            CreateTableRequestPB request = builder;
+            var request = builder.Build();
 
             Assert.Collection(request.PartitionSchema.HashBucketSchemas, h =>
             {
