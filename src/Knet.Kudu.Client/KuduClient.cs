@@ -287,28 +287,46 @@ namespace Knet.Kudu.Client
             await SendRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
         }
 
-        public async Task<List<ListTablesResponsePB.TableInfo>> GetTablesAsync(
+        public async Task<List<TableInfo>> GetTablesAsync(
             string nameFilter = null, CancellationToken cancellationToken = default)
         {
             var rpc = new ListTablesRequest(nameFilter);
-            var response = await SendRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
+            var response = await SendRpcAsync(rpc, cancellationToken)
+                .ConfigureAwait(false);
 
-            return response.Tables;
+            var tables = response.Tables;
+            var results = new List<TableInfo>(tables.Count);
+
+            foreach (var tablePb in tables)
+            {
+                var tableId = tablePb.Id.ToStringUtf8();
+                var table = new TableInfo(tablePb.Name, tableId);
+                results.Add(table);
+            }
+
+            return results;
         }
 
         /// <summary>
         /// Get the list of running tablet servers.
         /// </summary>
         /// <param name="cancellationToken">The cancellation token.</param>
-        public async Task<List<ListTabletServersResponsePB.Entry>> GetTabletServersAsync(
+        public async Task<List<TabletServerInfo>> GetTabletServersAsync(
             CancellationToken cancellationToken = default)
         {
             var rpc = new ListTabletServersRequest();
             var response = await SendRpcAsync(rpc, cancellationToken)
                 .ConfigureAwait(false);
 
-            // TODO: Create managed wrapper for this response.
-            return response.Servers;
+            var servers = response.Servers;
+            var results = new List<TabletServerInfo>(servers.Count);
+            foreach (var serverPb in servers)
+            {
+                var serverInfo = serverPb.ToTabletServerInfo();
+                results.Add(serverInfo);
+            }
+
+            return results;
         }
 
         /// <summary>
@@ -327,7 +345,7 @@ namespace Knet.Kudu.Client
             return new KuduTableStatistics(response.OnDiskSize, response.LiveRowCount);
         }
 
-        public Task<List<RemoteTablet>> GetTableLocationsAsync(
+        internal Task<List<RemoteTablet>> GetTableLocationsAsync(
             string tableId, byte[] partitionKeyStart, int fetchBatchSize,
             CancellationToken cancellationToken = default)
         {
@@ -335,7 +353,7 @@ namespace Knet.Kudu.Client
                 tableId, partitionKeyStart, null, fetchBatchSize, cancellationToken);
         }
 
-        public async Task<List<RemoteTablet>> GetTableLocationsAsync(
+        internal async Task<List<RemoteTablet>> GetTableLocationsAsync(
             string tableId, byte[] partitionKeyStart, byte[] partitionKeyEnd,
             int fetchBatchSize, CancellationToken cancellationToken = default)
         {
@@ -664,7 +682,7 @@ namespace Knet.Kudu.Client
 #endif
         }
 
-        public async Task LoopLocateTableAsync(
+        private async Task LoopLocateTableAsync(
             KuduTable table,
             byte[] startPartitionKey,
             byte[] endPartitionKey,
@@ -760,7 +778,7 @@ namespace Knet.Kudu.Client
             return SendRpcAsync(rpc, cancellationToken);
         }
 
-        public async ValueTask<List<KeyRange>> GetTableKeyRangesAsync(
+        internal async ValueTask<List<KeyRange>> GetTableKeyRangesAsync(
             KuduTable table,
             byte[] startPrimaryKey,
             byte[] endPrimaryKey,
@@ -1000,7 +1018,7 @@ namespace Knet.Kudu.Client
             return true;
         }
 
-        public async Task<T> SendRpcAsync<T>(
+        internal async Task<T> SendRpcAsync<T>(
             KuduRpc<T> rpc, CancellationToken cancellationToken = default)
         {
             using var cts = new CancellationTokenSource(_defaultOperationTimeoutMs);

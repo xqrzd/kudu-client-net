@@ -1,7 +1,10 @@
-﻿using System.Buffers;
+﻿using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
+using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Protocol;
+using Knet.Kudu.Client.Protocol.Master;
 using Knet.Kudu.Client.Protocol.Rpc;
 using ProtoBuf;
 
@@ -107,6 +110,40 @@ namespace Knet.Kudu.Client.Util
                 TypeAttributes = columnSchema.TypeAttributes.ToTypeAttributesPb(),
                 Comment = columnSchema.Comment
             };
+        }
+
+        public static TabletServerInfo ToTabletServerInfo(
+            this ListTabletServersResponsePB.Entry entry)
+        {
+            var tsUuid = entry.InstanceId.PermanentUuid.ToStringUtf8();
+            var registration = entry.Registration;
+
+            var rpcAddresses = new List<HostAndPort>(registration.RpcAddresses.Count);
+            foreach (var rpcAddress in registration.RpcAddresses)
+            {
+                var hostPort = rpcAddress.ToHostAndPort();
+                rpcAddresses.Add(hostPort);
+            }
+
+            var httpAddresses = new List<HostAndPort>(registration.HttpAddresses.Count);
+            foreach (var rpcAddress in registration.HttpAddresses)
+            {
+                var hostPort = rpcAddress.ToHostAndPort();
+                httpAddresses.Add(hostPort);
+            }
+
+            var startTime = DateTimeOffset.FromUnixTimeSeconds(registration.StartTime);
+
+            return new TabletServerInfo(
+                tsUuid,
+                entry.MillisSinceHeartbeat,
+                entry.Location,
+                (TabletServerState)entry.State,
+                rpcAddresses,
+                httpAddresses,
+                registration.SoftwareVersion,
+                registration.HttpsEnabled,
+                startTime.ToLocalTime());
         }
 
         public static PartitionSchema CreatePartitionSchema(
