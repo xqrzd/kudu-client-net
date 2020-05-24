@@ -36,12 +36,12 @@ jobs:
       run: dotnet test --no-restore --no-build --configuration Release
 
   publish:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
 
-    needs: linux_build
     name: Publish nuget package
+    needs: linux_build
     runs-on: ubuntu-latest
 
+    if: github.ref == 'refs/heads/master'
     steps:
     - uses: actions/checkout@v2
     - name: Setup .NET Core
