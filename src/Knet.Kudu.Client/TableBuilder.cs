@@ -9,9 +9,8 @@ namespace Knet.Kudu.Client
 {
     public class TableBuilder
     {
+        private readonly CreateTableRequestPB _createTableRequest;
         private readonly List<PartialRowOperation> _splitRowsRangeBounds;
-
-        internal CreateTableRequestPB CreateTableRequest;
 
         /// <summary>
         /// Creates a new table builder with the given table name.
@@ -19,7 +18,7 @@ namespace Knet.Kudu.Client
         /// <param name="tableName">The table's name.</param>
         public TableBuilder(string tableName = null)
         {
-            CreateTableRequest = new CreateTableRequestPB
+            _createTableRequest = new CreateTableRequestPB
             {
                 Name = tableName,
                 Schema = new SchemaPB(),
@@ -39,7 +38,7 @@ namespace Knet.Kudu.Client
         /// <param name="name">The table's name.</param>
         public TableBuilder SetTableName(string name)
         {
-            CreateTableRequest.Name = name;
+            _createTableRequest.Name = name;
             return this;
         }
 
@@ -51,7 +50,7 @@ namespace Knet.Kudu.Client
         /// <param name="numReplicas">The number of replicas to use.</param>
         public TableBuilder SetNumReplicas(int numReplicas)
         {
-            CreateTableRequest.NumReplicas = numReplicas;
+            _createTableRequest.NumReplicas = numReplicas;
             return this;
         }
 
@@ -65,7 +64,7 @@ namespace Knet.Kudu.Client
         /// </param>
         public TableBuilder SetOwner(string owner)
         {
-            CreateTableRequest.Owner = owner;
+            _createTableRequest.Owner = owner;
             return this;
         }
 
@@ -82,7 +81,7 @@ namespace Knet.Kudu.Client
         /// <param name="dimensionLabel">The dimension label for the tablet to be created.</param>
         public TableBuilder SetDimensionLabel(string dimensionLabel)
         {
-            CreateTableRequest.DimensionLabel = dimensionLabel;
+            _createTableRequest.DimensionLabel = dimensionLabel;
             return this;
         }
 
@@ -94,7 +93,7 @@ namespace Knet.Kudu.Client
             IEnumerable<KeyValuePair<string, string>> extraConfig)
         {
             foreach (var kvp in extraConfig)
-                CreateTableRequest.ExtraConfigs.Add(kvp.Key, kvp.Value);
+                _createTableRequest.ExtraConfigs.Add(kvp.Key, kvp.Value);
 
             return this;
         }
@@ -112,7 +111,7 @@ namespace Knet.Kudu.Client
             var builder = new ColumnBuilder(name, type);
             configure?.Invoke(builder);
             var columnSchemaPb = builder.Build().ToColumnSchemaPb();
-            CreateTableRequest.Schema.Columns.Add(columnSchemaPb);
+            _createTableRequest.Schema.Columns.Add(columnSchemaPb);
             return this;
         }
 
@@ -169,7 +168,7 @@ namespace Knet.Kudu.Client
                     new PartitionSchemaPB.ColumnIdentifierPB { Name = column });
             }
 
-            CreateTableRequest.PartitionSchema.HashBucketSchemas.Add(partition);
+            _createTableRequest.PartitionSchema.HashBucketSchemas.Add(partition);
 
             return this;
         }
@@ -185,7 +184,7 @@ namespace Knet.Kudu.Client
         /// <param name="columns">The range partitioned columns.</param>
         public TableBuilder SetRangePartitionColumns(params string[] columns)
         {
-            var schemaColumns = CreateTableRequest.PartitionSchema.RangeSchema.Columns;
+            var schemaColumns = _createTableRequest.PartitionSchema.RangeSchema.Columns;
 
             foreach (var column in columns)
             {
@@ -248,7 +247,7 @@ namespace Knet.Kudu.Client
             RangePartitionBound upperBoundType)
         {
             // TODO: Rework this
-            var columns = CreateTableRequest.Schema.Columns
+            var columns = _createTableRequest.Schema.Columns
                 .Select(c => ColumnSchema.FromProtobuf(c))
                 .ToList();
 
@@ -291,7 +290,7 @@ namespace Knet.Kudu.Client
             Action<PartialRowOperation> configure)
         {
             // TODO: Rework this
-            var columns = CreateTableRequest.Schema.Columns
+            var columns = _createTableRequest.Schema.Columns
                 .Select(c => ColumnSchema.FromProtobuf(c))
                 .ToList();
 
@@ -317,7 +316,7 @@ namespace Knet.Kudu.Client
         public TableBuilder AddSplitRow(Action<PartialRowOperation> configure)
         {
             // TODO: Rework this
-            var columns = CreateTableRequest.Schema.Columns
+            var columns = _createTableRequest.Schema.Columns
                 .Select(c => ColumnSchema.FromProtobuf(c))
                 .ToList();
 
@@ -335,13 +334,11 @@ namespace Knet.Kudu.Client
         {
             if (_splitRowsRangeBounds.Count > 0)
             {
-                CreateTableRequest.SplitRowsRangeBounds =
+                _createTableRequest.SplitRowsRangeBounds =
                     ProtobufHelper.EncodeRowOperations(_splitRowsRangeBounds);
             }
 
-            return CreateTableRequest;
+            return _createTableRequest;
         }
-
-        public static implicit operator CreateTableRequestPB(TableBuilder builder) => builder.CreateTableRequest;
     }
 }
