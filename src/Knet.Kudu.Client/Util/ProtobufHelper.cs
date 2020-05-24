@@ -91,7 +91,7 @@ namespace Knet.Kudu.Client.Util
         {
             var defaultValue = columnSchema.DefaultValue;
             var encodedDefaultValue = defaultValue != null
-                ? KuduEncoder.EncodeDefaultValue(columnSchema.Type, columnSchema.DefaultValue)
+                ? KuduEncoder.EncodeDefaultValue(columnSchema, columnSchema.DefaultValue)
                 : null;
 
             return new ColumnSchemaPB

@@ -156,7 +156,7 @@ namespace Knet.Kudu.Client
             }
 
             var column = _table.Schema.GetColumn(name);
-            var defaultValue = KuduEncoder.EncodeDefaultValue(column.Type, newDefault);
+            var defaultValue = KuduEncoder.EncodeDefaultValue(column, newDefault);
 
             _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
             {
