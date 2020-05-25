@@ -90,8 +90,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             ColumnSchema col = table.Schema.GetColumn(1);
             Assert.Equal(CompressionType.DefaultCompression, col.Compression);
             Assert.Equal(EncodingType.AutoEncoding, col.Encoding);
-            // TODO: Need DefaultValue on ColumnSchema.
-            //Assert.Null(col.DefaultValue);
+            Assert.Null(col.DefaultValue);
             Assert.Null(table.SchemaPb.Schema.Columns[1].WriteDefaultValue);
 
             // Alter the table.
@@ -105,8 +104,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             col = table.Schema.GetColumn(1);
             Assert.Equal(CompressionType.Snappy, col.Compression);
             Assert.Equal(EncodingType.Rle, col.Encoding);
-            // TODO: Need DefaultValue on ColumnSchema.
-            //Assert.Equal(0, col.DefaultValue);
+            Assert.Equal(0, col.DefaultValue);
             Assert.Equal(new byte[4], table.SchemaPb.Schema.Columns[1].WriteDefaultValue);
         }
 

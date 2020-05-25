@@ -62,12 +62,11 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
                     continue;
                 }
 
-                // TODO: Uncomment when DefaultValue exists.
-                //if (col.DefaultValue != null && !col.IsKey && _random.NextDouble() <= _defaultRate)
-                //{
-                //    // Sometimes use the column default value.
-                //    continue;
-                //}
+                if (col.DefaultValue != null && !col.IsKey && _random.NextDouble() <= _defaultRate)
+                {
+                    // Sometimes use the column default value.
+                    continue;
+                }
 
                 switch (type)
                 {
