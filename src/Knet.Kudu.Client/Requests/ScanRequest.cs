@@ -72,6 +72,9 @@ namespace Knet.Kudu.Client.Requests
             {
                 var newRequest = _scanRequestPb.NewScanRequest;
 
+                // Set tabletId here, as we don't know what tablet the request is
+                // going to until GetTabletAsync() is called and that tablet is
+                // set on this RPC.
                 newRequest.TabletId = Tablet.TabletId.ToUtf8ByteArray();
 
                 if (AuthzToken != null)
@@ -137,7 +140,8 @@ namespace Knet.Kudu.Client.Requests
                     _responsePB.HasMoreResults,
                     _responsePB.ShouldSerializeSnapTimestamp() ? (long)_responsePB.SnapTimestamp : KuduClient.NoTimestamp,
                     _responsePB.ShouldSerializePropagatedTimestamp() ? (long)_responsePB.PropagatedTimestamp : KuduClient.NoTimestamp,
-                    _responsePB.LastPrimaryKey);
+                    _responsePB.LastPrimaryKey,
+                    _responsePB.ResourceMetrics);
             }
         }
 

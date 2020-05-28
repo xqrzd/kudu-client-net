@@ -57,6 +57,8 @@ namespace Knet.Kudu.Client
 
         public T Current { get; private set; }
 
+        public ResourceMetrics ResourceMetrics { get; }
+
         public KuduScanEnumerator(
             ILogger logger,
             KuduClient client,
@@ -125,6 +127,7 @@ namespace Knet.Kudu.Client
             SnapshotTimestamp = htTimestamp;
             _lastPrimaryKey = Array.Empty<byte>();
             _cancellationToken = cancellationToken;
+            ResourceMetrics = new ResourceMetrics();
             // TODO: Register cancellation callback and cancel the scan.
 
             // Map the column names to actual columns in the table schema.
@@ -317,6 +320,9 @@ namespace Knet.Kudu.Client
             _numRowsReturned += response.NumRows;
             Current = response.Data;
 
+            if (response.ResourceMetricsPb != null)
+                ResourceMetrics.Update(response.ResourceMetricsPb);
+
             if (!response.HasMoreResults || response.ScannerId == null)
             {
                 ScanFinished();
@@ -370,6 +376,9 @@ namespace Knet.Kudu.Client
 
             _numRowsReturned += response.NumRows;
             Current = response.Data;
+
+            if (response.ResourceMetricsPb != null)
+                ResourceMetrics.Update(response.ResourceMetricsPb);
 
             if (!response.HasMoreResults)
             {
