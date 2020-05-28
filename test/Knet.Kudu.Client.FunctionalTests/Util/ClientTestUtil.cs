@@ -95,5 +95,15 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
 
             return rows;
         }
+
+        public static async Task<int> CountRowsInScanAsync(KuduScanEnumerator<ResultSet> scanner)
+        {
+            var rows = 0;
+
+            while (await scanner.MoveNextAsync())
+                rows += scanner.Current.Count;
+
+            return rows;
+        }
     }
 }

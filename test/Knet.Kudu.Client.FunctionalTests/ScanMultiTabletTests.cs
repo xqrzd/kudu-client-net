@@ -90,7 +90,32 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _harness.DisposeAsync();
         }
 
-        // TODO: Test scan metrics when they're available
+        /// <summary>
+        /// Test scanner resource metrics.
+        /// </summary>
+        [SkippableFact]
+        public async Task TestResourceMetrics()
+        {
+            // Scan one tablet and the whole table.
+            var oneTabletScanner = GetScanner("1", "1", "1", "4"); // Whole second tablet.
+            await using var oneTabletScanEnumerator = oneTabletScanner.GetAsyncEnumerator();
+            Assert.Equal(3, await ClientTestUtil.CountRowsInScanAsync(oneTabletScanEnumerator));
+
+            var fullTableScanner = GetScanner(null, null, null, null);
+            await using var fullTableScanEnumerator = fullTableScanner.GetAsyncEnumerator();
+            Assert.Equal(9, await ClientTestUtil.CountRowsInScanAsync(fullTableScanEnumerator));
+
+            // Both scans should take a positive amount of wait duration, total duration,
+            // cpu user and cpu system time.
+            ValidateResourceMetrics(oneTabletScanEnumerator.ResourceMetrics);
+            ValidateResourceMetrics(fullTableScanEnumerator.ResourceMetrics);
+
+            static void ValidateResourceMetrics(ResourceMetrics resourceMetrics)
+            {
+                Assert.True(resourceMetrics.QueueDurationNanos > 0);
+                Assert.True(resourceMetrics.TotalDurationNanos > 0);
+            }
+        }
 
         /// <summary>
         /// Test various combinations of start/end row keys.

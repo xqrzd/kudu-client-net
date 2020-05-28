@@ -1,4 +1,6 @@
-﻿namespace Knet.Kudu.Client.Scanner
+﻿using Knet.Kudu.Client.Protocol.Tserver;
+
+namespace Knet.Kudu.Client.Scanner
 {
     /// <summary>
     /// Helper object that contains all the info sent by a TS after a Scan request.
@@ -51,6 +53,8 @@
         /// </summary>
         public byte[] LastPrimaryKey { get; }
 
+        public ResourceMetricsPB ResourceMetricsPb { get; }
+
         public ScanResponse(
             byte[] scannerId,
             T data,
@@ -58,7 +62,8 @@
             bool hasMoreResults,
             long scanTimestamp,
             long propagatedTimestamp,
-            byte[] lastPrimaryKey)
+            byte[] lastPrimaryKey,
+            ResourceMetricsPB resourceMetricsPb)
         {
             ScannerId = scannerId;
             Data = data;
@@ -67,6 +72,7 @@
             ScanTimestamp = scanTimestamp;
             PropagatedTimestamp = propagatedTimestamp;
             LastPrimaryKey = lastPrimaryKey;
+            ResourceMetricsPb = resourceMetricsPb;
         }
     }
 }
