@@ -13,6 +13,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Knet.Kudu.Client.Tests", "t
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Knet.Kudu.Client.FunctionalTests", "test\Knet.Kudu.Client.FunctionalTests\Knet.Kudu.Client.FunctionalTests.csproj", "{A6B3FC57-24DF-49E4-B054-CCAA9F4D80F8}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{565302BB-7150-43AD-8C4B-C02A9C0A0CC9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InsertLoadgen", "examples\InsertLoadgen\InsertLoadgen.csproj", "{9AE56A76-D470-41D0-A723-76EF5FF29DCD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -31,6 +35,10 @@ Global
 		{A6B3FC57-24DF-49E4-B054-CCAA9F4D80F8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A6B3FC57-24DF-49E4-B054-CCAA9F4D80F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A6B3FC57-24DF-49E4-B054-CCAA9F4D80F8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9AE56A76-D470-41D0-A723-76EF5FF29DCD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9AE56A76-D470-41D0-A723-76EF5FF29DCD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9AE56A76-D470-41D0-A723-76EF5FF29DCD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9AE56A76-D470-41D0-A723-76EF5FF29DCD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -39,6 +47,7 @@ Global
 		{12053CAC-611C-4AC6-AACE-65B4D7CFF871} = {6F55103C-C078-4010-AA40-5706AF573975}
 		{4F8E3787-0E77-432A-B285-E220264A50B9} = {4D3A1F26-C778-411F-BEF9-57FE1965DEC5}
 		{A6B3FC57-24DF-49E4-B054-CCAA9F4D80F8} = {4D3A1F26-C778-411F-BEF9-57FE1965DEC5}
+		{9AE56A76-D470-41D0-A723-76EF5FF29DCD} = {565302BB-7150-43AD-8C4B-C02A9C0A0CC9}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {297C14B6-E993-4050-938A-53091BF81912}
