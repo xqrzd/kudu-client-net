@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using Knet.Kudu.Binary;
 using McMaster.Extensions.Xunit;
 
 namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
@@ -20,7 +21,7 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
                 try
                 {
                     // This method throws an exception if Kudu can't be found.
-                    var location = KuduBinaryLocator.BinaryLocation;
+                    KuduBinaryLocator.FindBinary("kudu");
                     return true;
                 }
                 catch { }

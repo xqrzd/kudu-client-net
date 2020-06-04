@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Knet.Kudu.Binary;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Protocol.Tools;
 using Knet.Kudu.Client.Util;
@@ -49,11 +50,11 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
             Directory.CreateDirectory(_createClusterRequestPB.ClusterRoot);
 
             var kuduExe = KuduBinaryLocator.FindBinary("kudu");
-            var workingDirectory = Path.GetDirectoryName(kuduExe);
+            var workingDirectory = Path.GetDirectoryName(kuduExe.ExePath);
 
             var startInfo = new ProcessStartInfo
             {
-                FileName = kuduExe,
+                FileName = kuduExe.ExePath,
                 WorkingDirectory = workingDirectory,
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
@@ -65,6 +66,11 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
             startInfo.ArgumentList.Add("test");
             startInfo.ArgumentList.Add("mini_cluster");
             startInfo.ArgumentList.Add("--serialization=pb");
+
+            foreach (var env in kuduExe.EnvironmentVariables)
+            {
+                startInfo.EnvironmentVariables.Add(env.Key, env.Value);
+            }
 
             _nativeProcess = new ProcessEx(startInfo);
             _nativeProcess.Start();
