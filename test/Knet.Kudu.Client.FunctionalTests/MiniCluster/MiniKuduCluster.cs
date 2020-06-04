@@ -69,7 +69,6 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
 
             foreach (var env in kuduExe.EnvironmentVariables)
             {
-                Console.WriteLine($"Key: {env.Key}, Value: {env.Value}");
                 startInfo.EnvironmentVariables.Add(env.Key, env.Value);
             }
 
