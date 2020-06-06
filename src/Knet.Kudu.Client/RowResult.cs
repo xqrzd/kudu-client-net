@@ -512,6 +512,12 @@ namespace Knet.Kudu.Client
             return KuduEncoder.DecodeString(data);
         }
 
+        public ReadOnlySpan<byte> GetBinary(string columnName)
+        {
+            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            return GetBinary(columnIndex);
+        }
+
         public ReadOnlySpan<byte> GetBinary(int columnIndex)
         {
             CheckType(columnIndex, KuduType.Binary);
