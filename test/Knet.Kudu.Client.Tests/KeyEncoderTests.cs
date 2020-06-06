@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Knet.Kudu.Client.Protocol.Master;
 using Knet.Kudu.Client.Tablet;
 using Knet.Kudu.Client.Util;
 using Xunit;
