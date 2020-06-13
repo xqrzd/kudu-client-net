@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Util;
 
@@ -147,7 +148,7 @@ namespace Knet.Kudu.Client
                         }
                         else
                         {
-                            //Preconditions.checkState(other.type == PredicateType.IN_LIST);
+                            CheckPredicateType(other.Type, PredicateType.InList);
                             return other.Merge(this);
                         }
                     }
@@ -159,7 +160,7 @@ namespace Knet.Kudu.Client
                         }
                         else
                         {
-                            //Preconditions.checkState(other.type == PredicateType.RANGE);
+                            CheckPredicateType(other.Type, PredicateType.Range);
                             byte[] newLower = other.Lower == null ||
                                 (Lower != null && Compare(Column, Lower, other.Lower) >= 0) ? Lower : other.Lower;
                             byte[] newUpper = other.Upper == null ||
@@ -209,7 +210,7 @@ namespace Knet.Kudu.Client
                         }
                         else
                         {
-                            //Preconditions.checkState(other.type == PredicateType.IN_LIST);
+                            CheckPredicateType(other.Type, PredicateType.InList);
                             var comparer = new PredicateComparer(Column);
                             var values = new SortedSet<byte[]>(comparer);
                             foreach (var value in InListValues)
@@ -348,7 +349,7 @@ namespace Knet.Kudu.Client
         public static KuduPredicate NewComparisonPredicate(
             ColumnSchema column, ComparisonOp op, bool value)
         {
-            CheckColumn(column, KuduType.Bool);
+            KuduTypeValidation.ValidateColumnType(column, KuduType.Bool);
 
             // Create the comparison predicate. Range predicates on boolean values can
             // always be converted to either an equality, an IS NOT NULL (filtering only
@@ -391,12 +392,21 @@ namespace Knet.Kudu.Client
         public static KuduPredicate NewComparisonPredicate(
             ColumnSchema column, ComparisonOp op, long value)
         {
-            //checkColumn(column, Type.INT8, Type.INT16, Type.INT32, Type.INT64, Type.UNIXTIME_MICROS);
+            KuduTypeValidation.ValidateColumnType(column,
+                KuduTypeFlags.Int8 |
+                KuduTypeFlags.Int16 |
+                KuduTypeFlags.Int32 |
+                KuduTypeFlags.Int64 |
+                KuduTypeFlags.Date |
+                KuduTypeFlags.UnixtimeMicros);
+
             long minValue = MinIntValue(column.Type);
             long maxValue = MaxIntValue(column.Type);
-            //Preconditions.checkArgument(value <= maxValue && value >= minValue,
-            //                            "integer value out of range for %s column: %s",
-            //                            column.getType(), value);
+
+            if (value < minValue || value > maxValue)
+            {
+                throw new ArgumentException($"Integer value out of range for {column}");
+            }
 
             return NewComparisonPredicate(column, op, value, minValue, maxValue);
         }
@@ -475,9 +485,10 @@ namespace Knet.Kudu.Client
             }
             else
             {
-                throw new ArgumentException(
-                    $"Expected either {KuduType.UnixtimeMicros} or {KuduType.Date} " +
-                    $"but received {type}");
+                KuduTypeValidation.ThrowException(column,
+                    KuduTypeFlags.UnixtimeMicros | KuduTypeFlags.Date);
+
+                rawValue = 0;
             }
 
             return NewComparisonPredicate(column, op, rawValue);
@@ -492,7 +503,7 @@ namespace Knet.Kudu.Client
         public static KuduPredicate NewComparisonPredicate(
             ColumnSchema column, ComparisonOp op, float value)
         {
-            CheckColumn(column, KuduType.Float);
+            KuduTypeValidation.ValidateColumnType(column, KuduType.Float);
 
             if (op == ComparisonOp.LessEqual)
             {
@@ -548,7 +559,8 @@ namespace Knet.Kudu.Client
         public static KuduPredicate NewComparisonPredicate(
             ColumnSchema column, ComparisonOp op, double value)
         {
-            CheckColumn(column, KuduType.Double);
+            KuduTypeValidation.ValidateColumnType(column, KuduType.Double);
+
             if (op == ComparisonOp.LessEqual)
             {
                 if (value == double.PositiveInfinity)
@@ -603,7 +615,11 @@ namespace Knet.Kudu.Client
         public static KuduPredicate NewComparisonPredicate(
             ColumnSchema column, ComparisonOp op, decimal value)
         {
-            //checkColumn(column, Type.DECIMAL);
+            KuduTypeValidation.ValidateColumnType(column,
+                KuduTypeFlags.Decimal32 |
+                KuduTypeFlags.Decimal64 |
+                KuduTypeFlags.Decimal128);
+
             var typeAttributes = column.TypeAttributes;
             int precision = typeAttributes.Precision.GetValueOrDefault();
             int scale = typeAttributes.Scale.GetValueOrDefault();
@@ -633,24 +649,16 @@ namespace Knet.Kudu.Client
                     throw new Exception($"Unknown column type {column.Type}");
             }
 
-            //Preconditions.checkArgument(value.compareTo(maxValue) <= 0 && value.compareTo(minValue) >= 0,
-            //    "Decimal value out of range for %s column: %s",
-            //    column.getType(), value);
-            //BigDecimal smallestValue = DecimalUtil.smallestValue(scale);
-
             long minValue = maxValue * -1;
+
+            if (value < minValue || value > maxValue)
+            {
+                throw new ArgumentException($"Decimal value out of range for {column}");
+            }
 
             return NewComparisonPredicate(column, op, longValue, minValue, maxValue);
         }
 
-        /// <summary>
-        /// Creates a new comparison predicate on an integer or timestamp column.
-        /// </summary>
-        /// <param name="column">The column schema.</param>
-        /// <param name="op">The comparison operation.</param>
-        /// <param name="value">The value to compare against.</param>
-        /// <param name="minValue">TODO</param>
-        /// <param name="maxValue">TODO</param>
         private static KuduPredicate NewComparisonPredicate(
             ColumnSchema column, ComparisonOp op, KuduInt128 value, KuduInt128 minValue, KuduInt128 maxValue)
         {
@@ -704,17 +712,15 @@ namespace Knet.Kudu.Client
         public static KuduPredicate NewComparisonPredicate(
             ColumnSchema column, ComparisonOp op, string value)
         {
-            var type = column.Type;
-            if (type != KuduType.String && type != KuduType.Varchar)
-                throw new ArgumentException($"Expected either {KuduType.String}" +
-                    $" or {KuduType.Varchar}, but received {type}");
+            KuduTypeValidation.ValidateColumnType(column,
+                KuduTypeFlags.String | KuduTypeFlags.Varchar);
 
             var bytes = KuduEncoder.EncodeString(value);
             return NewComparisonPredicateNoCheck(column, op, bytes);
         }
 
         /// <summary>
-        /// Creates a new comparison predicate on a binary or string column.
+        /// Creates a new comparison predicate on a binary column.
         /// </summary>
         /// <param name="column">The column schema.</param>
         /// <param name="op">The comparison operation.</param>
@@ -722,17 +728,11 @@ namespace Knet.Kudu.Client
         public static KuduPredicate NewComparisonPredicate(
             ColumnSchema column, ComparisonOp op, byte[] value)
         {
-            CheckColumn(column, KuduType.Binary);
+            KuduTypeValidation.ValidateColumnType(column, KuduType.Binary);
 
             return NewComparisonPredicateNoCheck(column, op, value);
         }
 
-        /// <summary>
-        /// Creates a new comparison predicate on a binary or string column.
-        /// </summary>
-        /// <param name="column">The column schema.</param>
-        /// <param name="op">The comparison operation.</param>
-        /// <param name="value">The value to compare against.</param>
         private static KuduPredicate NewComparisonPredicateNoCheck(
             ColumnSchema column, ComparisonOp op, byte[] value)
         {
@@ -801,53 +801,155 @@ namespace Knet.Kudu.Client
         public static KuduPredicate NewInListPredicate<T>(
             ColumnSchema column, IEnumerable<T> values)
         {
-            var encoded = values switch
+            var comparer = new PredicateComparer(column);
+            var encoded = new SortedSet<byte[]>(comparer);
+
+            if (typeof(T) == typeof(string) || typeof(T) == typeof(byte[]))
             {
-                IEnumerable<bool> x => GetZ(x, KuduEncoder.EncodeBool),
-                IEnumerable<sbyte> x => GetZ(x, KuduEncoder.EncodeInt8),
-                IEnumerable<byte> x => GetZ(x, KuduEncoder.EncodeUInt8),
-                IEnumerable<short> x => GetZ(x, KuduEncoder.EncodeInt16),
-                IEnumerable<int> x => GetZ(x, KuduEncoder.EncodeInt32),
-                IEnumerable<long> x => GetZ(x, KuduEncoder.EncodeInt64),
-                IEnumerable<float> x => GetZ(x, KuduEncoder.EncodeFloat),
-                IEnumerable<double> x => GetZ(x, KuduEncoder.EncodeDouble),
-                IEnumerable<string> x => GetZ(x, KuduEncoder.EncodeString),
-                IEnumerable<byte[]> x => GetZ(x, y => y),
-                IEnumerable<DateTime> x when column.Type == KuduType.UnixtimeMicros =>
-                    GetZ(x, KuduEncoder.EncodeDateTime),
-                IEnumerable<DateTime> x when column.Type == KuduType.Date =>
-                    GetZ(x, KuduEncoder.EncodeDate),
-                IEnumerable<decimal> x when column.Type == KuduType.Decimal32 =>
-                    GetZ(x, i => KuduEncoder.EncodeDecimal32(i,
-                        column.TypeAttributes.Precision.GetValueOrDefault(),
-                        column.TypeAttributes.Scale.GetValueOrDefault())),
-                IEnumerable<decimal> x when column.Type == KuduType.Decimal64 =>
-                    GetZ(x, i => KuduEncoder.EncodeDecimal64(i,
-                        column.TypeAttributes.Precision.GetValueOrDefault(),
-                        column.TypeAttributes.Scale.GetValueOrDefault())),
-                IEnumerable<decimal> x when column.Type == KuduType.Decimal128 =>
-                    GetZ(x, i => KuduEncoder.EncodeDecimal128(i,
-                        column.TypeAttributes.Precision.GetValueOrDefault(),
-                        column.TypeAttributes.Scale.GetValueOrDefault())),
-                _ => throw new Exception()
-            };
+                switch (values)
+                {
+                    case IEnumerable<string> vals:
+                        {
+                            KuduTypeValidation.ValidateColumnType(column,
+                                KuduTypeFlags.String | KuduTypeFlags.Varchar);
+                            foreach (var value in vals)
+                            {
+                                encoded.Add(KuduEncoder.EncodeString(value));
+                            }
+                            break;
+                        }
+                    case IEnumerable<byte[]> vals:
+                        {
+                            KuduTypeValidation.ValidateColumnType(column, KuduType.Binary);
+                            foreach (var value in vals)
+                            {
+                                encoded.Add(value);
+                            }
+                            break;
+                        }
+                    default:
+                        break;
+                }
+            }
+            else if (typeof(T) == typeof(DateTime))
+            {
+                var type = column.Type;
+                if (type == KuduType.UnixtimeMicros)
+                {
+                    foreach (var value in values)
+                    {
+                        encoded.Add(KuduEncoder.EncodeDateTime((DateTime)(object)value));
+                    }
+                }
+                else if (type == KuduType.Date)
+                {
+                    foreach (var value in values)
+                    {
+                        encoded.Add(KuduEncoder.EncodeDate((DateTime)(object)value));
+                    }
+                }
+                else
+                {
+                    KuduTypeValidation.ThrowException(column,
+                        KuduTypeFlags.UnixtimeMicros | KuduTypeFlags.Date);
+                }
+            }
+            else if (typeof(T) == typeof(decimal))
+            {
+                var type = column.Type;
+                var precision = column.TypeAttributes.Precision.GetValueOrDefault();
+                var scale = column.TypeAttributes.Scale.GetValueOrDefault();
+
+                if (type == KuduType.Decimal32)
+                {
+                    foreach (var value in values)
+                    {
+                        encoded.Add(KuduEncoder.EncodeDecimal32(
+                            (decimal)(object)value, precision, scale));
+                    }
+                }
+                else if (type == KuduType.Decimal64)
+                {
+                    foreach (var value in values)
+                    {
+                        encoded.Add(KuduEncoder.EncodeDecimal64(
+                            (decimal)(object)value, precision, scale));
+                    }
+                }
+                else if (type == KuduType.Decimal128)
+                {
+                    foreach (var value in values)
+                    {
+                        encoded.Add(KuduEncoder.EncodeDecimal128(
+                            (decimal)(object)value, precision, scale));
+                    }
+                }
+                else
+                {
+                    KuduTypeValidation.ThrowException(column,
+                        KuduTypeFlags.Decimal32 |
+                        KuduTypeFlags.Decimal64 |
+                        KuduTypeFlags.Decimal128);
+                }
+            }
+            else
+            {
+                foreach (var value in values)
+                {
+                    if (typeof(T) == typeof(bool))
+                    {
+                        KuduTypeValidation.ValidateColumnType(column, KuduType.Bool);
+                        encoded.Add(KuduEncoder.EncodeBool((bool)(object)value));
+                    }
+                    else if (typeof(T) == typeof(sbyte))
+                    {
+                        KuduTypeValidation.ValidateColumnType(column, KuduType.Int8);
+                        encoded.Add(KuduEncoder.EncodeInt8((sbyte)(object)value));
+                    }
+                    else if (typeof(T) == typeof(byte))
+                    {
+                        KuduTypeValidation.ValidateColumnType(column, KuduType.Int8);
+                        encoded.Add(KuduEncoder.EncodeUInt8((byte)(object)value));
+                    }
+                    else if (typeof(T) == typeof(short))
+                    {
+                        KuduTypeValidation.ValidateColumnType(column, KuduType.Int16);
+                        encoded.Add(KuduEncoder.EncodeInt16((short)(object)value));
+                    }
+                    else if (typeof(T) == typeof(int))
+                    {
+                        KuduTypeValidation.ValidateColumnType(column,
+                            KuduTypeFlags.Int32 | KuduTypeFlags.Date);
+                        encoded.Add(KuduEncoder.EncodeInt32((int)(object)value));
+                    }
+                    else if (typeof(T) == typeof(long))
+                    {
+                        KuduTypeValidation.ValidateColumnType(column,
+                            KuduTypeFlags.Int64 | KuduTypeFlags.UnixtimeMicros);
+                        encoded.Add(KuduEncoder.EncodeInt64((long)(object)value));
+                    }
+                    else if (typeof(T) == typeof(float))
+                    {
+                        KuduTypeValidation.ValidateColumnType(column, KuduType.Float);
+                        encoded.Add(KuduEncoder.EncodeFloat((float)(object)value));
+                    }
+                    else if (typeof(T) == typeof(double))
+                    {
+                        KuduTypeValidation.ValidateColumnType(column, KuduType.Double);
+                        encoded.Add(KuduEncoder.EncodeDouble((double)(object)value));
+                    }
+                    else
+                    {
+                        throw new ArgumentException(
+                            $"Type {typeof(T).Name} isn't supported for IN list values");
+                    }
+                }
+            }
+
+            if (encoded.Count == 0)
+                return None(column);
 
             return BuildInList(column, encoded);
-
-            SortedSet<byte[]> GetZ<K>(IEnumerable<K> setx, Func<K, byte[]> conv)
-            {
-                // TODO: Avoid closure
-                var comparer = new PredicateComparer(column);
-                var values = new SortedSet<byte[]>(comparer);
-                var result = new SortedSet<byte[]>(comparer);
-                foreach (var i in setx)
-                {
-                    var bytes = conv(i);
-                    result.Add(bytes);
-                }
-
-                return result;
-            }
         }
 
         internal static long MinIntValue(KuduType type)
@@ -1030,6 +1132,12 @@ namespace Knet.Kudu.Client
             };
         }
 
+        private static void CheckPredicateType(PredicateType actual, PredicateType expected)
+        {
+            if (actual != expected)
+                throw new Exception($"Expected {expected}, received {actual}");
+        }
+
         /// <summary>
         /// Check if this RANGE predicate contains the value.
         /// </summary>
@@ -1038,19 +1146,6 @@ namespace Knet.Kudu.Client
         {
             return (Lower == null || Compare(Column, value, Lower) >= 0) &&
                    (Upper == null || Compare(Column, value, Upper) < 0);
-        }
-
-        /// <summary>
-        /// Checks that the column is one of the expected types.
-        /// </summary>
-        /// <param name="column">The column being checked.</param>
-        /// <param name="type">The expected type.</param>
-        private static void CheckColumn(ColumnSchema column, KuduType type)
-        {
-            if (column.Type != type)
-            {
-                throw new ArgumentException($"Expected type {type} but received {column.Type}");
-            }
         }
 
         public static KuduPredicate FromPb(KuduSchema schema, ColumnPredicatePB pb)
