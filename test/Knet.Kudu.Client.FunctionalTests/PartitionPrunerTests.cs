@@ -377,7 +377,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             // c = MAX
             await CheckPartitionsAsync(1, 1, table, partitions,
-                KuduPredicate.NewComparisonPredicate(c, ComparisonOp.Equal, byte.MaxValue));
+                KuduPredicate.NewComparisonPredicate(c, ComparisonOp.Equal, sbyte.MaxValue));
 
             // c IN (1, 2)
             await CheckPartitionsAsync(1, 1, table, partitions,
