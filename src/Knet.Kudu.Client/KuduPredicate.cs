@@ -946,9 +946,6 @@ namespace Knet.Kudu.Client
                 }
             }
 
-            if (encoded.Count == 0)
-                return None(column);
-
             return BuildInList(column, encoded);
         }
 
