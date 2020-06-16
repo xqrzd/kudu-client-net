@@ -392,7 +392,7 @@ namespace Knet.Kudu.Client
             return new KuduTable(response);
         }
 
-        public async Task<WriteResponsePB[]> WriteAsync(
+        public async Task WriteAsync(
             IEnumerable<KuduOperation> operations,
             ExternalConsistencyMode externalConsistencyMode = ExternalConsistencyMode.ClientPropagated,
             CancellationToken cancellationToken = default)
@@ -427,7 +427,29 @@ namespace Knet.Kudu.Client
                 tasks[i++] = task;
             }
 
-            return await Task.WhenAll(tasks).ConfigureAwait(false);
+            List<KuduStatus> errors = null;
+
+            foreach (var task in tasks)
+            {
+                var result = await task.ConfigureAwait(false);
+                var perRowErrors = result.PerRowErrors;
+
+                if (perRowErrors.Count > 0)
+                {
+                    errors = errors ?? new List<KuduStatus>();
+
+                    foreach (var rowError in perRowErrors)
+                    {
+                        var status = KuduStatus.FromPB(rowError.Error);
+                        errors.Add(status);
+                    }
+                }
+            }
+
+            if (errors != null)
+            {
+                throw new KuduWriteException(errors);
+            }
         }
 
         private async Task<WriteResponsePB> WriteAsync(
