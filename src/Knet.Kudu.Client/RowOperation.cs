@@ -9,6 +9,7 @@ namespace Knet.Kudu.Client
         Delete = RowOperationsPB.Type.Delete,
         Upsert = RowOperationsPB.Type.Upsert,
         SplitRow = RowOperationsPB.Type.SplitRow,
+        InsertIgnore = RowOperationsPB.Type.InsertIgnore,
         RangeLowerBound = RowOperationsPB.Type.RangeLowerBound,
         RangeUpperBound = RowOperationsPB.Type.RangeUpperBound,
         ExclusiveRangeLowerBound = RowOperationsPB.Type.ExclusiveRangeLowerBound,

@@ -37,6 +37,8 @@ namespace Knet.Kudu.Client
 
         public KuduOperation NewInsert() => NewOperation(RowOperation.Insert);
 
+        public KuduOperation NewInsertIgnore() => NewOperation(RowOperation.InsertIgnore);
+
         public KuduOperation NewUpdate() => NewOperation(RowOperation.Update);
 
         public KuduOperation NewUpsert() => NewOperation(RowOperation.Upsert);

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Util;
 
@@ -551,7 +552,78 @@ namespace Knet.Kudu.Client
             return isNull;
         }
 
-        public ColumnSchema CheckType(int columnIndex, KuduType type)
+        public override string ToString()
+        {
+            var stringBuilder = new StringBuilder();
+            var columns = _resultSet.Schema.Columns;
+            var numColumns = columns.Count;
+
+            for (int i = 0; i < numColumns; i++)
+            {
+                var column = columns[i];
+                var type = column.Type;
+
+                if (i != 0)
+                    stringBuilder.Append(", ");
+
+                stringBuilder.Append($"{type.ToString().ToUpper()} {column.Name}");
+
+                if (column.TypeAttributes != null)
+                    stringBuilder.Append(column.TypeAttributes.ToStringForType(type));
+
+                stringBuilder.Append("=");
+
+                if (IsNull(i))
+                {
+                    stringBuilder.Append("NULL");
+                }
+                else
+                {
+                    switch (type)
+                    {
+                        case KuduType.Int8:
+                            stringBuilder.Append(GetSByte(i));
+                            break;
+                        case KuduType.Int16:
+                            stringBuilder.Append(GetInt16(i));
+                            break;
+                        case KuduType.Int32:
+                            stringBuilder.Append(GetInt32(i));
+                            break;
+                        case KuduType.Int64:
+                            stringBuilder.Append(GetInt64(i));
+                            break;
+                        case KuduType.Date:
+                        case KuduType.UnixtimeMicros:
+                            stringBuilder.Append(GetDateTime(i));
+                            break;
+                        case KuduType.String:
+                        case KuduType.Varchar:
+                            stringBuilder.Append(GetString(i));
+                            break;
+                        case KuduType.Binary:
+                            stringBuilder.Append(BitConverter.ToString(GetBinary(i).ToArray()));
+                            break;
+                        case KuduType.Float:
+                            stringBuilder.Append(GetFloat(i));
+                            break;
+                        case KuduType.Double:
+                            stringBuilder.Append(GetDouble(i));
+                            break;
+                        case KuduType.Bool:
+                            stringBuilder.Append(GetBool(i));
+                            break;
+                        default:
+                            stringBuilder.Append("<unknown type!>");
+                            break;
+                    }
+                }
+            }
+
+            return stringBuilder.ToString();
+        }
+
+        private ColumnSchema CheckType(int columnIndex, KuduType type)
         {
             var columnSchema = _resultSet.GetColumnSchema(columnIndex);
             KuduTypeValidation.ValidateColumnType(columnSchema, type);
