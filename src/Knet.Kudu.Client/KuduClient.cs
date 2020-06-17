@@ -427,28 +427,28 @@ namespace Knet.Kudu.Client
                 tasks[i++] = task;
             }
 
-            List<KuduStatus> errors = null;
+            var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+            List<KuduStatus> rowErrors = null;
 
-            foreach (var task in tasks)
+            foreach (var result in results)
             {
-                var result = await task.ConfigureAwait(false);
                 var perRowErrors = result.PerRowErrors;
 
                 if (perRowErrors.Count > 0)
                 {
-                    errors = errors ?? new List<KuduStatus>();
+                    rowErrors = rowErrors ?? new List<KuduStatus>();
 
                     foreach (var rowError in perRowErrors)
                     {
                         var status = KuduStatus.FromPB(rowError.Error);
-                        errors.Add(status);
+                        rowErrors.Add(status);
                     }
                 }
             }
 
-            if (errors != null)
+            if (rowErrors != null)
             {
-                throw new KuduWriteException(errors);
+                throw new KuduWriteException(rowErrors);
             }
         }
 
