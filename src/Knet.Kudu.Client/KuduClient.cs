@@ -428,7 +428,7 @@ namespace Knet.Kudu.Client
             }
 
             var results = await Task.WhenAll(tasks).ConfigureAwait(false);
-            List<KuduStatus> errors = null;
+            List<KuduStatus> rowErrors = null;
 
             foreach (var result in results)
             {
@@ -436,19 +436,19 @@ namespace Knet.Kudu.Client
 
                 if (perRowErrors.Count > 0)
                 {
-                    errors = errors ?? new List<KuduStatus>();
+                    rowErrors = rowErrors ?? new List<KuduStatus>();
 
                     foreach (var rowError in perRowErrors)
                     {
                         var status = KuduStatus.FromPB(rowError.Error);
-                        errors.Add(status);
+                        rowErrors.Add(status);
                     }
                 }
             }
 
-            if (errors != null)
+            if (rowErrors != null)
             {
-                throw new KuduWriteException(errors);
+                throw new KuduWriteException(rowErrors);
             }
         }
 
