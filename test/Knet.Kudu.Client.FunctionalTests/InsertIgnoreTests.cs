@@ -66,6 +66,9 @@ namespace Knet.Kudu.Client.FunctionalTests
             var exception = await Assert.ThrowsAsync<KuduWriteException>(
                 () => _client.WriteAsync(rows));
 
+            var rowError = Assert.Single(exception.PerRowErrors);
+            Assert.True(rowError.IsAlreadyPresent);
+
             var rowStrings = await ClientTestUtil.ScanTableToStringsAsync(_client, table);
             var rowString = Assert.Single(rowStrings);
             Assert.Equal(
