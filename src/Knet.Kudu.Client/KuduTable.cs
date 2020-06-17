@@ -35,12 +35,31 @@ namespace Knet.Kudu.Client
 
         public override string ToString() => TableName;
 
+        /// <summary>
+        /// Get a new insert configured with this table's schema.
+        /// </summary>
         public KuduOperation NewInsert() => NewOperation(RowOperation.Insert);
 
+        /// <summary>
+        /// Get a new insert ignore configured with this table's schema.
+        /// An insert ignore will ignore duplicate row errors. This is useful
+        /// when the same insert may be sent multiple times.
+        /// </summary>
+        public KuduOperation NewInsertIgnore() => NewOperation(RowOperation.InsertIgnore);
+
+        /// <summary>
+        /// Get a new update configured with this table's schema.
+        /// </summary>
         public KuduOperation NewUpdate() => NewOperation(RowOperation.Update);
 
+        /// <summary>
+        /// Get a new upsert configured with this table's schema.
+        /// </summary>
         public KuduOperation NewUpsert() => NewOperation(RowOperation.Upsert);
 
+        /// <summary>
+        /// Get a new delete configured with this table's schema.
+        /// </summary>
         public KuduOperation NewDelete() => NewOperation(RowOperation.Delete);
 
         private KuduOperation NewOperation(RowOperation rowOperation)

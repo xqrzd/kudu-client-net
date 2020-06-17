@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Knet.Kudu.Client.FunctionalTests.Util
@@ -80,6 +81,32 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
             return row;
         }
 
+        public static KuduOperation CreateBasicSchemaInsertIgnore(KuduTable table, int key)
+        {
+            var row = table.NewInsertIgnore();
+            row.SetInt32(0, key);
+            row.SetInt32(1, 2);
+            row.SetInt32(2, 3);
+            row.SetString(3, "a string");
+            row.SetBool(4, true);
+            return row;
+        }
+
+        public static KuduOperation CreateBasicSchemaUpsert(
+            KuduTable table, int key, int secondVal, bool hasNull)
+        {
+            var row = table.NewUpsert();
+            row.SetInt32(0, key);
+            row.SetInt32(1, secondVal);
+            row.SetInt32(2, 3);
+            if (hasNull)
+                row.SetNull(3);
+            else
+                row.SetString(3, "a string");
+            row.SetBool(4, true);
+            return row;
+        }
+
         public static Task<int> CountRowsAsync(KuduClient client, KuduTable table)
         {
             var scanner = client.NewScanBuilder(table).Build();
@@ -104,6 +131,35 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
                 rows += scanner.Current.Count;
 
             return rows;
+        }
+
+        public static async Task<List<string>> ScanTableToStringsAsync(
+            KuduClient client, KuduTable table, params KuduPredicate[] predicates)
+        {
+            var rowStrings = new List<string>();
+            var scanBuilder = client.NewScanBuilder(table);
+
+            foreach (var predicate in predicates)
+                scanBuilder.AddPredicate(predicate);
+
+            var scanner = scanBuilder.Build();
+
+            await foreach (var resultSet in scanner)
+            {
+                ParseResults(resultSet);
+            }
+
+            void ParseResults(ResultSet resultSet)
+            {
+                foreach (var row in resultSet)
+                {
+                    rowStrings.Add(row.ToString());
+                }
+            }
+
+            rowStrings.Sort();
+
+            return rowStrings;
         }
     }
 }
