@@ -427,11 +427,11 @@ namespace Knet.Kudu.Client
                 tasks[i++] = task;
             }
 
+            var results = await Task.WhenAll(tasks).ConfigureAwait(false);
             List<KuduStatus> errors = null;
 
-            foreach (var task in tasks)
+            foreach (var result in results)
             {
-                var result = await task.ConfigureAwait(false);
                 var perRowErrors = result.PerRowErrors;
 
                 if (perRowErrors.Count > 0)
