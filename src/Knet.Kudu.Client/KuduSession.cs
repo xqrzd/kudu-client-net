@@ -230,6 +230,19 @@ namespace Knet.Kudu.Client
             catch (Exception ex)
             {
                 _logger.ExceptionSendingSessionData(ex);
+
+                var exceptionHandler = _options.ExceptionHandler;
+                if (exceptionHandler != null)
+                {
+                    var queueCopy = new List<KuduOperation>(queue);
+                    var exceptionContext = new SessionExceptionContext(ex, queueCopy);
+
+                    try
+                    {
+                        await exceptionHandler(exceptionContext).ConfigureAwait(false);
+                    }
+                    catch { }
+                }
             }
         }
     }
