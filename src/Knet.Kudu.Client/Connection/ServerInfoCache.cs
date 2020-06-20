@@ -69,15 +69,15 @@ namespace Knet.Kudu.Client.Connection
             byte sameLocationIndex = 0;
             bool missingLocation = string.IsNullOrEmpty(location);
 
-            foreach (ServerInfo e in servers)
+            foreach (var serverInfo in servers)
             {
-                bool serverInSameLocation = e.InSameLocation(location);
+                bool serverInSameLocation = serverInfo.InSameLocation(location);
 
                 // Only consider a server "local" if we're in the same location, or if
                 // there is missing location info.
-                if (missingLocation || !e.HasLocation || serverInSameLocation)
+                if (missingLocation || !serverInfo.HasLocation || serverInSameLocation)
                 {
-                    if (e.IsLocal)
+                    if (serverInfo.IsLocal)
                         localServers[localIndex++] = index;
                 }
 
@@ -85,7 +85,7 @@ namespace Knet.Kudu.Client.Connection
                     serversInSameLocation[sameLocationIndex++] = index;
 
                 if (index == randomIndex)
-                    result = e;
+                    result = serverInfo;
 
                 index++;
             }
