@@ -139,10 +139,11 @@ namespace Knet.Kudu.Client.Tests
             int sameLocationReplicaIndex)
         {
             var servers = new List<ServerInfo>();
+            var uuids = _uuids;
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < uuids.Length; i++)
             {
-                var uuid = _uuids[i];
+                var uuid = uuids[i];
                 var port = 1000 + i;
                 var hostPort = new HostAndPort("host", port);
                 var location = i == sameLocationReplicaIndex ? _clientLocation : _location;
