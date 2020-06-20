@@ -31,6 +31,8 @@ namespace Knet.Kudu.Client.Connection
             IsLocal = isLocal;
         }
 
+        public bool HasLocation => !string.IsNullOrEmpty(Location);
+
         /// <summary>
         /// Returns true if the server is in the same location as the given location.
         /// </summary>
