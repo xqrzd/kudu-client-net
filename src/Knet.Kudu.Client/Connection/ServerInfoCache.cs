@@ -52,9 +52,10 @@ namespace Knet.Kudu.Client.Connection
         public ServerInfo GetClosestServerInfo(string location = null)
         {
             // This method returns
-            // 1. a randomly picked server among local servers, if there is a local server, or
-            // 2. a randomly picked server in the same location, if there is a server in the
-            //    same location, or, finally,
+            // 1. a randomly picked server among local servers, if there is one based
+            //    on IP and assigned location, or
+            // 2. a randomly picked server in the same assigned location, if there is a
+            //    server in the same location, or, finally,
             // 3. a randomly picked server among all tablet servers.
 
             var servers = _servers;
@@ -66,17 +67,25 @@ namespace Knet.Kudu.Client.Connection
             byte index = 0;
             byte localIndex = 0;
             byte sameLocationIndex = 0;
+            bool missingLocation = string.IsNullOrEmpty(location);
 
-            foreach (ServerInfo e in servers)
+            foreach (var serverInfo in servers)
             {
-                if (e.IsLocal)
-                    localServers[localIndex++] = index;
+                bool serverInSameLocation = serverInfo.InSameLocation(location);
 
-                if (e.InSameLocation(location))
+                // Only consider a server "local" if we're in the same location, or if
+                // there is missing location info.
+                if (missingLocation || !serverInfo.HasLocation || serverInSameLocation)
+                {
+                    if (serverInfo.IsLocal)
+                        localServers[localIndex++] = index;
+                }
+
+                if (serverInSameLocation)
                     serversInSameLocation[sameLocationIndex++] = index;
 
                 if (index == randomIndex)
-                    result = e;
+                    result = serverInfo;
 
                 index++;
             }
