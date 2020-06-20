@@ -31,9 +31,8 @@ namespace Knet.Kudu.Client.Exceptions
             if (msg.Length > MaxMessageLength)
             {
                 // Truncate the message and indicate that it was abbreviated.
-                Message = string.Concat(
-                    msg.Substring(0, MaxMessageLength - Abbreviation.Length),
-                    Abbreviation);
+                int messageLength = MaxMessageLength - Abbreviation.Length;
+                Message = msg.Substring(0, messageLength) + Abbreviation;
             }
             else
             {
