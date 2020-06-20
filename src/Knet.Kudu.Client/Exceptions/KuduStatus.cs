@@ -10,16 +10,11 @@ namespace Knet.Kudu.Client.Exceptions
     public class KuduStatus
     {
         // Limit the message size we get from the servers as it can be quite large.
-        private const int MaxMessageLength = 32 * 1024;
+        internal const int MaxMessageLength = 32 * 1024;
+        internal const string Abbreviation = "...";
 
-        /// <summary>
-        /// 
-        /// </summary>
         public AppStatusPB.ErrorCode Code { get; }
 
-        /// <summary>
-        /// 
-        /// </summary>
         public string Message { get; }
 
         /// <summary>
@@ -36,7 +31,9 @@ namespace Knet.Kudu.Client.Exceptions
             if (msg.Length > MaxMessageLength)
             {
                 // Truncate the message and indicate that it was abbreviated.
-                Message = msg.Substring(0, MaxMessageLength) + "...";
+                Message = string.Concat(
+                    msg.Substring(0, MaxMessageLength - Abbreviation.Length),
+                    Abbreviation);
             }
             else
             {
@@ -72,16 +69,15 @@ namespace Knet.Kudu.Client.Exceptions
         /// Create a status object from a tablet server error.
         /// </summary>
         /// <param name="tserverErrorPB">PB object received via RPC from the TS.</param>
-        /// <returns></returns>
         internal static KuduStatus FromTabletServerErrorPB(TabletServerErrorPB tserverErrorPB)
         {
             return new KuduStatus(tserverErrorPB.Status);
         }
 
         /// <summary>
-        /// Create a Status object from a {@link WireProtocol.AppStatusPB} protobuf object.
+        /// Create a Status object from a <see cref="AppStatusPB"/> protobuf object.
         /// </summary>
-        /// <param name="pb"></param>
+        /// <param name="pb">PB object received via RPC from the server.</param>
         internal static KuduStatus FromPB(AppStatusPB pb)
         {
             return new KuduStatus(pb);
