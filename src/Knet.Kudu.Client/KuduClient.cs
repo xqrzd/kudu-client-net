@@ -59,18 +59,6 @@ namespace Knet.Kudu.Client
         public KuduClient(
             KuduClientOptions options,
             ISecurityContext securityContext,
-            ILoggerFactory loggerFactory)
-            : this(
-                options,
-                securityContext,
-                new KuduConnectionFactory(options, securityContext, loggerFactory),
-                new SystemClock(),
-                loggerFactory)
-        { }
-
-        public KuduClient(
-            KuduClientOptions options,
-            ISecurityContext securityContext,
             IKuduConnectionFactory connectionFactory,
             ISystemClock systemClock,
             ILoggerFactory loggerFactory)
