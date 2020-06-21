@@ -11,7 +11,7 @@ using ProtoBuf;
 
 namespace Knet.Kudu.Client.Connection
 {
-    public class SecurityContext
+    public class SecurityContext : ISecurityContext
     {
         private readonly object _lockObj = new object();
 
@@ -54,6 +54,11 @@ namespace Knet.Kudu.Client.Connection
             }
         }
 
+        /// <summary>
+        /// Export serialized authentication data that may be passed to a different
+        /// client instance and imported to provide that client the ability to connect
+        /// to the cluster.
+        /// </summary>
         public ReadOnlyMemory<byte> ExportAuthenticationCredentials()
         {
             var tokenPb = new AuthenticationCredentialsPB();
@@ -75,6 +80,10 @@ namespace Knet.Kudu.Client.Connection
             return writer.WrittenMemory;
         }
 
+        /// <summary>
+        /// Import data allowing this client to authenticate to the cluster.
+        /// </summary>
+        /// <param name="token">The authentication token.</param>
         public void ImportAuthenticationCredentials(ReadOnlyMemory<byte> token)
         {
             var tokenPb = Serializer.Deserialize<AuthenticationCredentialsPB>(token);
@@ -112,9 +121,18 @@ namespace Knet.Kudu.Client.Connection
             }
         }
 
+        /// <summary>
+        /// Creates a <see cref="SslStream"/> that trusts the certificates provided
+        /// by <see cref="TrustCertificates(List{byte[]})"/>.
+        /// </summary>
+        /// <param name="innerStream">The stream to wrap.</param>
         public SslStream CreateTlsStream(Stream innerStream) =>
             new SslStream(innerStream, leaveInnerStreamOpen: true, ValidateCertificate);
 
+        /// <summary>
+        /// Creates a <see cref="SslStream"/> that trusts all certificates.
+        /// </summary>
+        /// <param name="innerStream">The stream to wrap.</param>
         public SslStream CreateTlsStreamTrustAll(Stream innerStream) =>
             new SslStream(innerStream, leaveInnerStreamOpen: true, AllowAnyCertificate);
 

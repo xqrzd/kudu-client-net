@@ -81,7 +81,8 @@ namespace Knet.Kudu.Client
         public KuduClient Build()
         {
             var options = BuildOptions();
-            return new KuduClient(options, _loggerFactory);
+            var securityContext = new SecurityContext();
+            return new KuduClient(options, securityContext, _loggerFactory);
         }
     }
 }

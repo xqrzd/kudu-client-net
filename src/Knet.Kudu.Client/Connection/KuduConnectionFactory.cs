@@ -15,12 +15,12 @@ namespace Knet.Kudu.Client.Connection
     {
         private readonly ILoggerFactory _loggerFactory;
         private readonly KuduClientOptions _options;
-        private readonly SecurityContext _securityContext;
+        private readonly ISecurityContext _securityContext;
         private readonly HashSet<IPAddress> _localIPs;
 
         public KuduConnectionFactory(
             KuduClientOptions options,
-            SecurityContext securityContext,
+            ISecurityContext securityContext,
             ILoggerFactory loggerFactory)
         {
             _loggerFactory = loggerFactory;
