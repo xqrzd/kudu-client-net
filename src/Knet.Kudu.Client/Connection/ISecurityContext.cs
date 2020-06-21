@@ -14,8 +14,7 @@ namespace Knet.Kudu.Client.Connection
         public bool IsAuthenticationTokenImported { get; }
 
         /// <summary>
-        /// Set the token that we will use to authenticate to servers. Replaces any
-        /// prior token.
+        /// Set the token received from connecting to the leader master.
         /// </summary>
         /// <param name="token">The token to set.</param>
         public void SetAuthenticationToken(SignedTokenPB token);
