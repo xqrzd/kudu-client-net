@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO.Pipelines;
 using Knet.Kudu.Client.Connection;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Util;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -81,7 +82,17 @@ namespace Knet.Kudu.Client
         public KuduClient Build()
         {
             var options = BuildOptions();
-            return new KuduClient(options, _loggerFactory);
+            var securityContext = new SecurityContext();
+            var systemClock = new SystemClock();
+            var connectionFactory = new KuduConnectionFactory(
+                options, securityContext, _loggerFactory);
+
+            return new KuduClient(
+                options,
+                securityContext,
+                connectionFactory,
+                systemClock,
+                _loggerFactory);
         }
     }
 }

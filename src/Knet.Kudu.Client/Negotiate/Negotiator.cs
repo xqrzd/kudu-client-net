@@ -46,14 +46,14 @@ namespace Knet.Kudu.Client.Negotiate
         private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger _logger;
         private readonly KuduClientOptions _options;
-        private readonly SecurityContext _securityContext;
+        private readonly ISecurityContext _securityContext;
         private readonly ServerInfo _serverInfo;
         private readonly Socket _socket;
         private readonly NegotiateLoggerMessage _logMessage;
 
         /// <summary>
         /// The authentication token we'll try to connect with, maybe null.
-        /// This is fetched from <see cref="SecurityContext"/> in the constructor to
+        /// This is fetched from <see cref="ISecurityContext"/> in the constructor to
         /// ensure that it doesn't change over the course of a negotiation attempt.
         /// </summary>
         private readonly SignedTokenPB _authnToken;
@@ -63,7 +63,7 @@ namespace Knet.Kudu.Client.Negotiate
 
         public Negotiator(
             KuduClientOptions options,
-            SecurityContext securityContext,
+            ISecurityContext securityContext,
             ILoggerFactory loggerFactory,
             ServerInfo serverInfo,
             Socket socket)

@@ -17,7 +17,6 @@ using Knet.Kudu.Client.Requests;
 using Knet.Kudu.Client.Tablet;
 using Knet.Kudu.Client.Util;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Knet.Kudu.Client
 {
@@ -39,7 +38,7 @@ namespace Knet.Kudu.Client
         private readonly ILogger _scanLogger;
         private readonly IKuduConnectionFactory _connectionFactory;
         private readonly ISystemClock _systemClock;
-        private readonly SecurityContext _securityContext;
+        private readonly ISecurityContext _securityContext;
         private readonly ConnectionCache _connectionCache;
         private readonly ConcurrentDictionary<string, TableLocationsCache> _tableLocations;
         private readonly RequestTracker _requestTracker;
@@ -57,19 +56,20 @@ namespace Knet.Kudu.Client
         private long _lastPropagatedTimestamp = NoTimestamp;
         private readonly object _lastPropagatedTimestampLock = new object();
 
-        public KuduClient(KuduClientOptions options)
-            : this(options, NullLoggerFactory.Instance) { }
-
-        public KuduClient(KuduClientOptions options, ILoggerFactory loggerFactory)
+        public KuduClient(
+            KuduClientOptions options,
+            ISecurityContext securityContext,
+            IKuduConnectionFactory connectionFactory,
+            ISystemClock systemClock,
+            ILoggerFactory loggerFactory)
         {
             _options = options;
+            _securityContext = securityContext;
+            _connectionFactory = connectionFactory;
+            _systemClock = systemClock;
             _loggerFactory = loggerFactory;
             _logger = loggerFactory.CreateLogger<KuduClient>();
             _scanLogger = loggerFactory.CreateLogger("Knet.Kudu.Client.Scanner");
-            _securityContext = new SecurityContext();
-            // TODO: Pass these through constructor.
-            _connectionFactory = new KuduConnectionFactory(options, _securityContext, loggerFactory);
-            _systemClock = new SystemClock();
             _connectionCache = new ConnectionCache(_connectionFactory, loggerFactory);
             _tableLocations = new ConcurrentDictionary<string, TableLocationsCache>();
             _requestTracker = new RequestTracker(SecurityUtil.NewGuid().ToString("N"));
