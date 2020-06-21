@@ -8,6 +8,9 @@ namespace Knet.Kudu.Client.Connection
 {
     public interface ISecurityContext
     {
+        /// <summary>
+        /// True if the user imported an authentication token to use.
+        /// </summary>
         public bool IsAuthenticationTokenImported { get; }
 
         /// <summary>

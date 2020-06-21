@@ -19,6 +19,9 @@ namespace Knet.Kudu.Client.Connection
         private List<X509Certificate2> _trustedCertificates;
         private bool _isAuthenticationTokenImported;
 
+        /// <summary>
+        /// True if the user imported an authentication token to use.
+        /// </summary>
         public bool IsAuthenticationTokenImported
         {
             get
