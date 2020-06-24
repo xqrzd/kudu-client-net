@@ -238,7 +238,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                     scanner.ReplicaSelection);
 
                     var connection = await GetConnectionAsync(serverInfo);
-                    await connection.StopAsync();
+                    await connection.CloseAsync();
 
                     shouldClose = false;
                 }
