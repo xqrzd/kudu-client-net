@@ -10,7 +10,7 @@ Kudu provides a combination of fast inserts/updates and efficient columnar scans
 This client is in preview and isn't quite ready for production use.
 Issue [#17](/../../issues/17) tracks the remaining work for the first stable release.
 
-You can get the preview package on Nuget.
+You can get the preview package on [Nuget](https://www.nuget.org/packages/Knet.Kudu.Client).
 
 ## Supported Versions
 This library supports Apache Kudu 1.3 and newer. The newest version of this library
