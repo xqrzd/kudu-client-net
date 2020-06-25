@@ -392,7 +392,7 @@ namespace Knet.Kudu.Client
             return new KuduTable(response);
         }
 
-        public async Task WriteAsync(
+        public async Task<WriteResponse> WriteAsync(
             IEnumerable<KuduOperation> operations,
             ExternalConsistencyMode externalConsistencyMode = ExternalConsistencyMode.ClientPropagated,
             CancellationToken cancellationToken = default)
@@ -428,15 +428,28 @@ namespace Knet.Kudu.Client
             }
 
             var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+
+            return CreateWriteResponse(results);
+        }
+
+        private WriteResponse CreateWriteResponse(WriteResponsePB[] results)
+        {
+            long writeTimestamp = NoTimestamp;
             List<KuduStatus> rowErrors = null;
 
             foreach (var result in results)
             {
+                var timestamp = (long)result.Timestamp;
                 var perRowErrors = result.PerRowErrors;
+
+                if (writeTimestamp == NoTimestamp || writeTimestamp < timestamp)
+                {
+                    writeTimestamp = timestamp;
+                }
 
                 if (perRowErrors.Count > 0)
                 {
-                    rowErrors = rowErrors ?? new List<KuduStatus>();
+                    rowErrors ??= new List<KuduStatus>();
 
                     foreach (var rowError in perRowErrors)
                     {
@@ -450,6 +463,8 @@ namespace Knet.Kudu.Client
             {
                 throw new KuduWriteException(rowErrors);
             }
+
+            return new WriteResponse(writeTimestamp);
         }
 
         private async Task<WriteResponsePB> WriteAsync(

@@ -22,7 +22,6 @@ namespace Knet.Kudu.Client.FunctionalTests
         private KuduClient _client;
         private TestConnectionFactory _testConnectionFactory;
         private KuduTable _table;
-        private long _sharedWriteTimestamp;
 
         public async Task InitializeAsync()
         {
@@ -154,8 +153,6 @@ namespace Knet.Kudu.Client.FunctionalTests
                     flush = ThreadSafeRandom.Instance.NextBool();
 
                 currentRowKey++;
-
-                Volatile.Write(ref _sharedWriteTimestamp, _client.LastPropagatedTimestamp);
             }
 
             await session.FlushAsync();
@@ -171,9 +168,9 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             while (!cancellationToken.IsCancellationRequested)
             {
-                var sharedWriteTimestamp = Volatile.Read(ref _sharedWriteTimestamp);
+                var timestamp = _client.LastPropagatedTimestamp;
 
-                if (sharedWriteTimestamp == 0)
+                if (timestamp == 0)
                 {
                     // Nothing has been written yet.
                 }
@@ -235,11 +232,11 @@ namespace Knet.Kudu.Client.FunctionalTests
 
         private KuduScannerBuilder GetScannerBuilder()
         {
-            var sharedWriteTimestamp = Volatile.Read(ref _sharedWriteTimestamp);
+            var timestamp = _client.LastPropagatedTimestamp;
 
             return _client.NewScanBuilder(_table)
                 .SetReadMode(ReadMode.ReadAtSnapshot)
-                .SnapshotTimestampRaw(sharedWriteTimestamp)
+                .SnapshotTimestampRaw(timestamp)
                 .SetFaultTolerant(true);
         }
 
