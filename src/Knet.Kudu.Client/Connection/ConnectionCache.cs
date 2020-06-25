@@ -123,7 +123,7 @@ namespace Knet.Kudu.Client.Connection
                     // TODO: Cancellation token support so we can cancel
                     // any connections still in the negotiation phase?
                     KuduConnection connection = await connectionTask.ConfigureAwait(false);
-                    await connection.StopAsync().ConfigureAwait(false);
+                    await connection.CloseAsync().ConfigureAwait(false);
                 }
                 catch { }
             }

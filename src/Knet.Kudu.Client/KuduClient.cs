@@ -1328,7 +1328,7 @@ namespace Knet.Kudu.Client
                 // side open to allow pending RPCs to finish, instead of forcing
                 // them to retry on a new connection).
                 if (connection != null)
-                    await connection.StopAsync().ConfigureAwait(false);
+                    await connection.CloseAsync().ConfigureAwait(false);
 
                 throw;
             }

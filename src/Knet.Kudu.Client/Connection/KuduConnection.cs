@@ -153,13 +153,11 @@ namespace Knet.Kudu.Client.Connection
                     input.AdvanceTo(consumed, buffer.End);
                 }
 
-                input.Complete();
-                Shutdown();
+                await ShutdownAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                input.Complete(ex);
-                Shutdown(ex);
+                await ShutdownAsync(ex).ConfigureAwait(false);
             }
         }
 
@@ -433,9 +431,19 @@ namespace Knet.Kudu.Client.Connection
         /// Stops accepting any new RPCs, and completes any outstanding
         /// RPCs with exceptions.
         /// </summary>
-        /// <param name="exception"></param>
-        private void Shutdown(Exception exception = null)
+        private async Task ShutdownAsync(Exception exception = null)
         {
+            await _singleWriter.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                await _ioPipe.Output.CompleteAsync(exception).ConfigureAwait(false);
+                await _ioPipe.Input.CompleteAsync(exception).ConfigureAwait(false);
+            }
+            finally
+            {
+                _singleWriter.Release();
+            }
+
             if (exception != null)
                 _logger.ConnectionDisconnected(_ioPipe.ToString(), exception);
 
@@ -447,10 +455,10 @@ namespace Knet.Kudu.Client.Connection
                 _closed = true;
                 _closedException = closedException;
 
+                InvokeDisconnectedCallback();
+
                 foreach (var inflightMessage in _inflightRpcs.Values)
                     inflightMessage.TrySetException(closedException);
-
-                InvokeDisconnectedCallback();
 
                 _inflightRpcs.Clear();
             }
@@ -466,15 +474,16 @@ namespace Knet.Kudu.Client.Connection
         /// <summary>
         /// Stops accepting RPCs and completes any outstanding RPCs with exceptions.
         /// </summary>
-        public Task StopAsync()
+        public async Task CloseAsync()
         {
-            _ioPipe.Input.CancelPendingRead();
-            _ioPipe.Input.Complete();
             _ioPipe.Output.CancelPendingFlush();
-            _ioPipe.Output.Complete();
+            await _ioPipe.Output.CompleteAsync().ConfigureAwait(false);
+
+            _ioPipe.Input.CancelPendingRead();
+            await _ioPipe.Input.CompleteAsync().ConfigureAwait(false);
 
             // Wait for the reader loop to finish.
-            return _receiveTask;
+            await _receiveTask.ConfigureAwait(false);
         }
 
         /// <summary>
