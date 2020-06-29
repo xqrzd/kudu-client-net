@@ -31,7 +31,8 @@ namespace Knet.Kudu.Client.Tests
 
             var request = builder.Build();
 
-            Assert.Collection(request.Schema.Columns, c => {
+            Assert.Collection(request.Schema.Columns, c =>
+            {
                 Assert.Equal("c1", c.Name);
                 Assert.Equal(DataTypePB.Int32, c.Type);
                 Assert.True(c.IsKey);
@@ -39,7 +40,8 @@ namespace Knet.Kudu.Client.Tests
                 Assert.Equal(EncodingTypePB.AutoEncoding, c.Encoding);
                 Assert.Equal(CompressionTypePB.DefaultCompression, c.Compression);
                 Assert.Null(c.TypeAttributes);
-            }, c => {
+            }, c =>
+            {
                 Assert.Equal("c2", c.Name);
                 Assert.Equal(DataTypePB.String, c.Type);
                 Assert.Equal(EncodingTypePB.DictEncoding, c.Encoding);
