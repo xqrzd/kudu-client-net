@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Connection;
@@ -992,22 +991,7 @@ namespace Knet.Kudu.Client
             }
             else
             {
-                var sb = new StringBuilder("Unable to find master leader:");
-
-                foreach (var address in masterAddresses)
-                {
-                    sb.AppendLine();
-                    sb.Append($"\t{address} => ");
-
-                    if (results.TryGetValue(address, out var exception))
-                        sb.Append(exception.Message);
-                    else
-                        sb.Append("Not the leader");
-                }
-
-                throw new NoLeaderFoundException(
-                    KuduStatus.NetworkError(sb.ToString()),
-                    new AggregateException(results.Values));
+                throw new NoLeaderFoundException(masterAddresses, results);
             }
         }
 
