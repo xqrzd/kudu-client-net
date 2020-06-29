@@ -28,7 +28,7 @@ namespace Knet.Kudu.Client.Requests
         public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
         {
             var responsePb = Serializer.Deserialize<AlterTableResponsePB>(buffer);
-            
+
             if (responsePb.Error == null)
             {
                 Output = new AlterTableResponse(
