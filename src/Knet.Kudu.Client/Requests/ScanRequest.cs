@@ -1,5 +1,4 @@
-﻿using System;
-using System.Buffers;
+﻿using System.Buffers;
 using System.IO;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Exceptions;
@@ -12,7 +11,7 @@ using ProtoBuf;
 
 namespace Knet.Kudu.Client.Requests
 {
-    public class ScanRequest<T> : KuduTabletRpc<ScanResponse<T>>, IDisposable
+    public class ScanRequest<T> : KuduTabletRpc<ScanResponse<T>>
     {
         private static readonly uint[] _columnPredicateRequiredFeature = new uint[]
         {
@@ -61,11 +60,6 @@ namespace Knet.Kudu.Client.Requests
 
         public override ReplicaSelection ReplicaSelection { get; }
 
-        public void Dispose()
-        {
-            _parser.Dispose();
-        }
-
         public override void Serialize(Stream stream)
         {
             if (_state == ScanRequestState.Opening)
@@ -100,7 +94,10 @@ namespace Knet.Kudu.Client.Requests
             _responsePB = response;
 
             if (error == null)
+            {
+                _parser.ProcessScanResponse(_schema, response);
                 return;
+            }
 
             switch (error.code)
             {
@@ -145,14 +142,14 @@ namespace Knet.Kudu.Client.Requests
             }
         }
 
-        public override void BeginProcessingSidecars(KuduSidecarOffsets sidecars)
+        public override void ParseSidecar(KuduSidecar sidecar)
         {
-            _parser.BeginProcessingSidecars(_schema, _responsePB, sidecars);
+            _parser.ProcessSidecar(sidecar);
         }
 
-        public override void ParseSidecarSegment(ref SequenceReader<byte> reader)
+        public override void ParseSidecars(KuduSidecars sidecars)
         {
-            _parser.ParseSidecarSegment(ref reader);
+            _parser.ParseSidecars(sidecars);
         }
     }
 

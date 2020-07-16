@@ -205,7 +205,7 @@ namespace Knet.Kudu.Client
                 // means we were in between tablets.
                 if (Tablet != null)
                 {
-                    using var rpc = GetCloseRequest();
+                    var rpc = GetCloseRequest();
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
                     try
@@ -246,7 +246,7 @@ namespace Knet.Kudu.Client
 
         private async ValueTask<bool> OpenScannerAsync()
         {
-            using var rpc = GetOpenRequest();
+            var rpc = GetOpenRequest();
             ScanResponse<T> response;
 
             try
@@ -343,7 +343,7 @@ namespace Knet.Kudu.Client
 
         private async ValueTask<bool> ScanNextRowsAsync()
         {
-            using var rpc = GetNextRowsRequest();
+            var rpc = GetNextRowsRequest();
             ScanResponse<T> response;
 
             try

@@ -185,7 +185,7 @@ namespace Knet.Kudu.Client.Connection
 
                     parserContext.Reset();
                 }
-            } while (parserContext.Step == ParseStep.NotStarted && reader.Remaining >= 4);
+            } while (parserContext.Step == ParseStep.ReadTotalMessageLength && reader.Remaining >= 4);
 
             consumed = reader.Position;
         }
@@ -195,7 +195,7 @@ namespace Knet.Kudu.Client.Connection
         {
             switch (parserContext.Step)
             {
-                case ParseStep.NotStarted:
+                case ParseStep.ReadTotalMessageLength:
                     {
                         if (reader.TryReadBigEndian(out parserContext.TotalMessageLength))
                         {
@@ -297,43 +297,37 @@ namespace Knet.Kudu.Client.Connection
 
                         if (parserContext.HasSidecars)
                         {
-                            parserContext.RemainingSidecarLength = parserContext.SidecarLength;
-                            goto case ParseStep.BeginSidecars;
+                            var sidecarLength = parserContext.SidecarLength;
+
+                            if (sidecarLength == 0)
+                                return true;
+
+                            goto case ParseStep.ReadSidecars;
                         }
                         else
                         {
                             return true;
                         }
                     }
-                case ParseStep.BeginSidecars:
-                    {
-                        AdjustSidecarOffsets(parserContext.Header);
-
-                        var sidecars = new KuduSidecarOffsets(
-                            parserContext.Header.SidecarOffsets,
-                            parserContext.RemainingSidecarLength);
-
-                        parserContext.Rpc.BeginProcessingSidecars(sidecars);
-                        parserContext.Step = ParseStep.ReadSidecars;
-
-                        if (parserContext.RemainingSidecarLength == 0)
-                            return true;
-
-                        goto case ParseStep.ReadSidecars;
-                    }
                 case ParseStep.ReadSidecars:
                     {
-                        var remaining = reader.Remaining;
+                        if (parserContext.ProcessSidecars(ref reader))
+                        {
+                            var sidecar = new KuduSidecars(
+                                parserContext.SidecarMemory,
+                                parserContext.SidecarOffsets,
+                                parserContext.SidecarLength);
 
-                        if (remaining == 0)
-                            break;
+                            parserContext.Rpc.ParseSidecars(sidecar);
+                            parserContext.SidecarMemory = null;
 
-                        parserContext.Rpc.ParseSidecarSegment(ref reader);
-                        remaining -= reader.Remaining;
-                        parserContext.RemainingSidecarLength -= (int)remaining;
-
-                        if (parserContext.RemainingSidecarLength == 0)
                             return true;
+                        }
+                        else
+                        {
+                            // We need more data to finish reading the sidecars.
+                            parserContext.Step = ParseStep.ReadSidecars;
+                        }
 
                         break;
                     }
@@ -384,21 +378,6 @@ namespace Knet.Kudu.Client.Connection
             }
 
             return exception;
-        }
-
-        /// <summary>
-        /// Make sidecar offsets zero-based.
-        /// </summary>
-        /// <param name="header">The header to adjust.</param>
-        private void AdjustSidecarOffsets(ResponseHeader header)
-        {
-            uint[] sidecars = header.SidecarOffsets;
-            uint offset = sidecars[0];
-
-            for (int i = 0; i < sidecars.Length; i++)
-            {
-                sidecars[i] -= offset;
-            }
         }
 
         private bool TryGetRpc(ResponseHeader header, out InflightRpc rpc)
@@ -463,10 +442,8 @@ namespace Knet.Kudu.Client.Connection
                 _inflightRpcs.Clear();
             }
 
-            (_ioPipe as IDisposable)?.Dispose();
-            // TODO: There may still be pending tasks waiting to
-            // acquire this semaphore.
-            //_singleWriter.Dispose();
+            // Don't dispose _singleWriter; there may still be
+            // pending writes.
         }
 
         public override string ToString() => _ioPipe.ToString();
@@ -478,9 +455,6 @@ namespace Knet.Kudu.Client.Connection
         {
             _ioPipe.Output.CancelPendingFlush();
             await _ioPipe.Output.CompleteAsync().ConfigureAwait(false);
-
-            _ioPipe.Input.CancelPendingRead();
-            await _ioPipe.Input.CompleteAsync().ConfigureAwait(false);
 
             // Wait for the reader loop to finish.
             await _receiveTask.ConfigureAwait(false);
@@ -552,6 +526,20 @@ namespace Knet.Kudu.Client.Connection
 
             public Exception Exception;
 
+            public int NextSidecarIndex;
+
+            public IMemoryOwner<byte> SidecarMemory;
+
+            public Memory<byte> CurrentSidecarMemory;
+
+            public KuduSidecar CurrentSidecar;
+
+            public KuduSidecarOffset[] SidecarOffsets;
+
+            public bool Skip;
+
+            public int RemainingSkipBytes;
+
             /// <summary>
             /// Gets the size of the main message protobuf.
             /// </summary>
@@ -564,37 +552,162 @@ namespace Knet.Kudu.Client.Connection
 
             public KuduRpc Rpc => InflightRpc.Rpc;
 
-            public int RemainingSidecarLength;
+            public bool ProcessSidecars(ref SequenceReader<byte> reader)
+            {
+                while (true)
+                {
+                    if (NextSidecarIndex == Header.SidecarOffsets.Length &&
+                        CurrentSidecarMemory.Length == 0)
+                    {
+                        // We've processed all the sidecars for this RPC.
+                        return true;
+                    }
 
-            public bool Skip;
+                    var remaining = (int)reader.Remaining;
+                    if (remaining == 0)
+                    {
+                        // We need more data to process this RPC's sidecars.
+                        return false;
+                    }
 
-            public int RemainingSkipBytes;
+                    var sidecar = GetSidecar();
+
+                    // How much data should we be processing?
+                    var read = Math.Min(sidecar.Length, remaining);
+                    var slice = sidecar.Span.Slice(0, read);
+
+                    reader.TryCopyTo(slice);
+                    reader.Advance(read);
+
+                    AdvanceSidecar(read);
+
+                    if (read == sidecar.Length)
+                    {
+                        // We're done reading this sidecar.
+                        Rpc.ParseSidecar(CurrentSidecar);
+                    }
+                }
+            }
+
+            public Memory<byte> GetSidecar()
+            {
+                if (SidecarMemory == null)
+                {
+                    // Setup for processing sidecars.
+                    // TODO: Allow MemoryPool to be passed in.
+                    SidecarMemory = MemoryPool<byte>.Shared.Rent(SidecarLength);
+                    SetSidecarOffsets();
+                }
+
+                if (CurrentSidecarMemory.Length > 0)
+                {
+                    // There's still data to process on the current sidecar.
+                    return CurrentSidecarMemory;
+                }
+
+                return GetNextSidecar();
+            }
+
+            public Memory<byte> GetNextSidecar()
+            {
+                var sidecarOffsets = Header.SidecarOffsets;
+                int currentIndex = NextSidecarIndex;
+
+                var offset = SidecarOffsets[currentIndex];
+                var memory = SidecarMemory.Memory;
+                var segment = memory.Slice(offset.Start, offset.Length);
+
+                CurrentSidecar = new KuduSidecar(segment, currentIndex);
+                CurrentSidecarMemory = segment;
+                NextSidecarIndex = currentIndex + 1;
+
+                return segment;
+            }
+
+            public void SetSidecarOffsets()
+            {
+                var rawSidecarOffsets = Header.SidecarOffsets;
+                int numSidecars = rawSidecarOffsets.Length;
+                int totalSize = 0;
+
+                var sidecarOffsets = new KuduSidecarOffset[numSidecars];
+
+                for (int i = 0; i < numSidecars - 1; i++)
+                {
+                    var currentOffset = rawSidecarOffsets[i];
+                    var nextOffset = rawSidecarOffsets[i + 1];
+                    int size = (int)(nextOffset - currentOffset);
+
+                    var offset = new KuduSidecarOffset(totalSize, size);
+                    sidecarOffsets[i] = offset;
+
+                    totalSize += size;
+                }
+
+                // Handle the last sidecar.
+                var remainingSize = SidecarLength - totalSize;
+                var lastOffset = new KuduSidecarOffset(totalSize, remainingSize);
+                sidecarOffsets[numSidecars - 1] = lastOffset;
+
+                SidecarOffsets = sidecarOffsets;
+            }
+
+            public void AdvanceSidecar(int read)
+            {
+                CurrentSidecarMemory = CurrentSidecarMemory.Slice(read);
+            }
 
             public void Reset()
             {
-                Step = ParseStep.NotStarted;
+                Step = ParseStep.ReadTotalMessageLength;
                 TotalMessageLength = default;
                 HeaderLength = default;
                 MainMessageLength = default;
                 Header = default;
                 InflightRpc = default;
                 Exception = default;
-                RemainingSidecarLength = default;
+                NextSidecarIndex = default;
+                SidecarMemory?.Dispose();
+                SidecarMemory = default;
+                CurrentSidecarMemory = default;
+                CurrentSidecar = default;
+                SidecarOffsets = default;
                 Skip = default;
                 RemainingSkipBytes = default;
             }
         }
 
-        private enum ParseStep : byte
+        private enum ParseStep
         {
-            NotStarted,
+            /// <summary>
+            /// Total message length (4 bytes).
+            /// </summary>
             ReadTotalMessageLength,
+            /// <summary>
+            /// RPC Header protobuf length (variable encoding).
+            /// </summary>
             ReadHeaderLength,
+            /// <summary>
+            /// RPC Header protobuf.
+            /// </summary>
             ReadHeader,
+            /// <summary>
+            /// Main message length (variable encoding).
+            /// </summary>
             ReadMainMessageLength,
+            /// <summary>
+            /// Main message protobuf.
+            /// </summary>
             ReadProtobufMessage,
-            BeginSidecars,
+            /// <summary>
+            /// Variable number of sidecars, defined in the RPC header.
+            /// </summary>
             ReadSidecars,
+            /// <summary>
+            /// We couldn't match the incoming CallId to an inflight RPC,
+            /// probably because the RPC timed out (on our side) and was
+            /// removed. Skip the remaining data for the message.
+            /// </summary>
             Skip
         }
     }

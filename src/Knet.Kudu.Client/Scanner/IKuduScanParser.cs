@@ -1,19 +1,16 @@
-﻿using System;
-using System.Buffers;
-using Knet.Kudu.Client.Connection;
+﻿using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Protocol.Tserver;
 
 namespace Knet.Kudu.Client.Scanner
 {
-    public interface IKuduScanParser<T> : IDisposable
+    public interface IKuduScanParser<T>
     {
         T Output { get; }
 
-        void BeginProcessingSidecars(
-            KuduSchema scanSchema,
-            ScanResponsePB scanResponse,
-            KuduSidecarOffsets sidecars);
+        void ProcessScanResponse(KuduSchema scanSchema, ScanResponsePB scanResponse);
 
-        void ParseSidecarSegment(ref SequenceReader<byte> reader);
+        void ProcessSidecar(KuduSidecar sidecar);
+
+        void ParseSidecars(KuduSidecars sidecars); // TODO: Abstract class
     }
 }

@@ -56,15 +56,18 @@ namespace Knet.Kudu.Client.Requests
 
         public abstract void ParseProtobuf(ReadOnlySequence<byte> buffer);
 
-        // TODO: Use separate class/struct for this.
-        // This method would allocate several sidecars.
-        // If at any point parsing fails, we need to cleanup these.
-        public virtual void BeginProcessingSidecars(KuduSidecarOffsets sidecars)
+        /// <summary>
+        /// Override to enable incremental parsing of sidecars. The memory
+        /// from the sidecar is safe to hold, until ParseSidecars() is called.
+        /// </summary>
+        /// <param name="sidecar"></param>
+        public virtual void ParseSidecar(KuduSidecar sidecar)
         {
         }
 
-        public virtual void ParseSidecarSegment(ref SequenceReader<byte> reader)
+        public virtual void ParseSidecars(KuduSidecars sidecars)
         {
+            sidecars.Dispose();
         }
     }
 

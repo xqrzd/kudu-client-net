@@ -1,13 +1,12 @@
 ﻿using System;
-using System.Buffers;
 using System.Runtime.CompilerServices;
 
 namespace Knet.Kudu.Client
 {
-    public class ResultSet : IDisposable
+    public class ResultSet
     {
-        private readonly IMemoryOwner<byte> _rowAlloc;
-        private readonly IMemoryOwner<byte> _indirectData;
+        private readonly ReadOnlyMemory<byte> _rowAlloc;
+        private readonly ReadOnlyMemory<byte> _indirectData;
         private readonly int[] _columnOffsets;
         private readonly int _rowSize;
 
@@ -22,8 +21,8 @@ namespace Knet.Kudu.Client
         public ResultSet(
             KuduSchema schema,
             int numRows,
-            IMemoryOwner<byte> rowAlloc,
-            IMemoryOwner<byte> indirectData)
+            ReadOnlyMemory<byte> rowAlloc,
+            ReadOnlyMemory<byte> indirectData)
         {
             Schema = schema;
             _rowAlloc = rowAlloc;
@@ -61,12 +60,6 @@ namespace Knet.Kudu.Client
             NullBitSetOffset = columnOffsets[columnOffsets.Length - 1];
         }
 
-        public void Dispose()
-        {
-            _rowAlloc?.Dispose();
-            _indirectData?.Dispose();
-        }
-
         internal int GetOffset(int columnIndex)
         {
             return _columnOffsets[columnIndex];
@@ -97,10 +90,8 @@ namespace Knet.Kudu.Client
             internal Enumerator(ResultSet resultSet)
             {
                 _resultSet = resultSet;
-                _rowData = resultSet._rowAlloc != null ?
-                    resultSet._rowAlloc.Memory.Span : default;
-                _indirectData = resultSet._indirectData != null ?
-                    resultSet._indirectData.Memory.Span : default;
+                _rowData = resultSet._rowAlloc.Span;
+                _indirectData = _resultSet._indirectData.Span;
                 _rowSize = resultSet._rowSize;
                 _index = -1;
             }
@@ -127,6 +118,27 @@ namespace Knet.Kudu.Client
                     return new RowResult(_resultSet, rowData, _indirectData);
                 }
             }
+        }
+    }
+
+    public class ResultSetWrapper : ResultSet, IDisposable
+    {
+        private readonly IDisposable _memory;
+
+        public ResultSetWrapper(
+            IDisposable memory,
+            KuduSchema schema,
+            int numRows,
+            ReadOnlyMemory<byte> rowAlloc,
+            ReadOnlyMemory<byte> indirectData)
+            : base(schema, numRows, rowAlloc, indirectData)
+        {
+            _memory = memory;
+        }
+
+        public void Dispose()
+        {
+            _memory.Dispose();
         }
     }
 }
