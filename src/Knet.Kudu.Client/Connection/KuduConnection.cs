@@ -244,8 +244,7 @@ namespace Knet.Kudu.Client.Connection
                         {
                             // We don't have this RPC. It probably timed out
                             // and was removed from _inflightRpcs.
-                            parserContext.Skip = true;
-                            parserContext.RemainingSkipBytes = parserContext.MainMessageLength;
+                            parserContext.RemainingBytesToSkip = parserContext.MainMessageLength;
                             goto case ParseStep.Skip;
                         }
 
@@ -291,14 +290,9 @@ namespace Knet.Kudu.Client.Connection
                     }
                 case ParseStep.ReadSidecars:
                     {
-                        if (parserContext.ProcessSidecars(ref reader))
+                        if (parserContext.TryReadSidecars(ref reader, out var sidecars))
                         {
-                            var sidecar = new KuduSidecars(
-                                parserContext.SidecarMemory,
-                                parserContext.SidecarOffsets,
-                                parserContext.SidecarLength);
-
-                            parserContext.Rpc.ParseSidecars(sidecar);
+                            parserContext.Rpc.ParseSidecars(sidecars);
                             parserContext.SidecarMemory = null;
 
                             return true;
@@ -509,9 +503,7 @@ namespace Knet.Kudu.Client.Connection
 
             public KuduSidecarOffset[] SidecarOffsets;
 
-            public bool Skip;
-
-            public int RemainingSkipBytes;
+            public int RemainingBytesToSkip;
 
             /// <summary>
             /// Gets the size of the main message protobuf.
@@ -520,6 +512,8 @@ namespace Knet.Kudu.Client.Connection
                 MainMessageLength : (int)Header.SidecarOffsets[0];
 
             public bool HasSidecars => Header.SidecarOffsets != null;
+
+            public int NumSidecars => Header.SidecarOffsets.Length;
 
             public int SidecarLength => MainMessageLength - (int)Header.SidecarOffsets[0];
 
@@ -578,24 +572,31 @@ namespace Knet.Kudu.Client.Connection
 
             public bool TrySkip(ref SequenceReader<byte> reader)
             {
-                var remainingSkipBytes = RemainingSkipBytes;
-                var skipBytes = Math.Min(reader.Remaining, remainingSkipBytes);
+                var remainingBytesToSkip = RemainingBytesToSkip;
+                var bytesToSkip = Math.Min((int)reader.Remaining, remainingBytesToSkip);
 
-                reader.Advance(skipBytes);
-                remainingSkipBytes -= (int)skipBytes;
-                RemainingSkipBytes = remainingSkipBytes;
+                reader.Advance(bytesToSkip);
+                remainingBytesToSkip -= bytesToSkip;
+                RemainingBytesToSkip = remainingBytesToSkip;
 
-                return remainingSkipBytes == 0;
+                return remainingBytesToSkip == 0;
             }
 
-            public bool ProcessSidecars(ref SequenceReader<byte> reader)
+            public bool TryReadSidecars(
+                ref SequenceReader<byte> reader,
+                out KuduSidecars sidecars)
             {
                 while (true)
                 {
-                    if (NextSidecarIndex == Header.SidecarOffsets.Length &&
+                    if (NextSidecarIndex == NumSidecars &&
                         CurrentSidecarMemory.Length == 0)
                     {
                         // We've processed all the sidecars for this RPC.
+                        sidecars = new KuduSidecars(
+                            SidecarMemory,
+                            SidecarOffsets,
+                            SidecarLength);
+
                         return true;
                     }
 
@@ -603,6 +604,7 @@ namespace Knet.Kudu.Client.Connection
                     if (remaining == 0)
                     {
                         // We need more data to process this RPC's sidecars.
+                        sidecars = default;
                         return false;
                     }
 
@@ -708,8 +710,7 @@ namespace Knet.Kudu.Client.Connection
                 CurrentSidecarMemory = default;
                 CurrentSidecar = default;
                 SidecarOffsets = default;
-                Skip = default;
-                RemainingSkipBytes = default;
+                RemainingBytesToSkip = default;
             }
         }
 
