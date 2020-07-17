@@ -219,15 +219,6 @@ namespace Knet.Kudu.Client.Connection
                 case ParseStep.ReadHeader:
                     if (parserContext.TryReadResponseHeader(ref reader))
                     {
-                        if (!TryGetRpc(parserContext.Header, out parserContext.InflightRpc))
-                        {
-                            // We don't have this RPC. It probably timed out
-                            // and was removed from _inflightRpcs.
-
-                            // TODO: Refactor skipping logic.
-                            parserContext.Skip = true;
-                        }
-
                         goto case ParseStep.ReadMainMessageLength;
                     }
                     else
@@ -237,42 +228,38 @@ namespace Knet.Kudu.Client.Connection
                         break;
                     }
                 case ParseStep.ReadMainMessageLength:
+                    if (parserContext.TryReadMessageLength(ref reader))
                     {
-                        if (parserContext.TryReadMessageLength(ref reader))
-                        {
-                            if (parserContext.Skip)
-                            {
-                                parserContext.RemainingSkipBytes = parserContext.MainMessageLength;
-                                goto case ParseStep.Skip;
-                            }
-                            else
-                            {
-                                goto case ParseStep.ReadProtobufMessage;
-                            }
-                        }
-                        else
-                        {
-                            // Not enough data to read main message length.
-                            parserContext.Step = ParseStep.ReadMainMessageLength;
-                            break;
-                        }
+                        goto case ParseStep.ReadProtobufMessage;
+                    }
+                    else
+                    {
+                        // Not enough data to read the main message length.
+                        parserContext.Step = ParseStep.ReadMainMessageLength;
+                        break;
                     }
                 case ParseStep.ReadProtobufMessage:
                     {
-                        var messageLength = parserContext.ProtobufMessageLength;
-                        if (reader.Remaining < messageLength)
+                        if (!TryGetRpc(parserContext.Header, out parserContext.InflightRpc))
                         {
-                            // Not enough data to parse main protobuf message.
+                            // We don't have this RPC. It probably timed out
+                            // and was removed from _inflightRpcs.
+                            parserContext.Skip = true;
+                            parserContext.RemainingSkipBytes = parserContext.MainMessageLength;
+                            goto case ParseStep.Skip;
+                        }
+
+                        if (!parserContext.TryReadMainMessageProtobuf(
+                            ref reader, out var protobufMessage))
+                        {
+                            // Not enough data to read the main protobuf message.
                             parserContext.Step = ParseStep.ReadProtobufMessage;
                             break;
                         }
 
-                        var mainProtobufMessage = reader.Sequence.Slice(
-                            reader.Position, messageLength);
-
                         if (parserContext.Header.IsError)
                         {
-                            var error = ProtobufHelper.GetErrorStatus(mainProtobufMessage);
+                            var error = ProtobufHelper.GetErrorStatus(protobufMessage);
                             var exception = GetException(error);
                             parserContext.Exception = exception;
                         }
@@ -280,15 +267,13 @@ namespace Knet.Kudu.Client.Connection
                         {
                             try
                             {
-                                parserContext.Rpc.ParseProtobuf(mainProtobufMessage);
+                                parserContext.Rpc.ParseProtobuf(protobufMessage);
                             }
                             catch (Exception ex)
                             {
                                 parserContext.Exception = ex;
                             }
                         }
-
-                        reader.Advance(messageLength);
 
                         if (parserContext.HasSidecars)
                         {
@@ -327,19 +312,12 @@ namespace Knet.Kudu.Client.Connection
                         break;
                     }
                 case ParseStep.Skip:
+                    if (!parserContext.TrySkip(ref reader))
                     {
-                        var skipBytes = Math.Min(
-                            reader.Remaining,
-                            parserContext.RemainingSkipBytes);
-
-                        reader.Advance(skipBytes);
-                        parserContext.RemainingSkipBytes -= (int)skipBytes;
-
-                        if (parserContext.RemainingSkipBytes == 0)
-                            parserContext.Reset();
-
-                        break;
+                        // We need more data to skip.
+                        parserContext.Step = ParseStep.Skip;
                     }
+                    break;
             }
 
             return false;
@@ -577,6 +555,37 @@ namespace Knet.Kudu.Client.Connection
                 reader.Advance(length);
 
                 return true;
+            }
+
+            public bool TryReadMainMessageProtobuf(
+                ref SequenceReader<byte> reader,
+                out ReadOnlySequence<byte> message)
+            {
+                var messageLength = ProtobufMessageLength;
+
+                if (reader.Remaining < messageLength)
+                {
+                    // Not enough data to parse the main protobuf message.
+                    message = default;
+                    return false;
+                }
+
+                message = reader.Sequence.Slice(reader.Position, messageLength);
+                reader.Advance(messageLength);
+
+                return true;
+            }
+
+            public bool TrySkip(ref SequenceReader<byte> reader)
+            {
+                var remainingSkipBytes = RemainingSkipBytes;
+                var skipBytes = Math.Min(reader.Remaining, remainingSkipBytes);
+
+                reader.Advance(skipBytes);
+                remainingSkipBytes -= (int)skipBytes;
+                RemainingSkipBytes = remainingSkipBytes;
+
+                return remainingSkipBytes == 0;
             }
 
             public bool ProcessSidecars(ref SequenceReader<byte> reader)
