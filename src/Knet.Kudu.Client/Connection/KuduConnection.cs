@@ -196,54 +196,49 @@ namespace Knet.Kudu.Client.Connection
             switch (parserContext.Step)
             {
                 case ParseStep.ReadTotalMessageLength:
+                    if (parserContext.TryReadTotalMessageLength(ref reader))
                     {
-                        if (reader.TryReadBigEndian(out parserContext.TotalMessageLength))
-                        {
-                            goto case ParseStep.ReadHeaderLength;
-                        }
-                        else
-                        {
-                            // Not enough data to read message size.
-                            break;
-                        }
+                        goto case ParseStep.ReadHeaderLength;
+                    }
+                    else
+                    {
+                        // Not enough data to read the message size.
+                        break;
                     }
                 case ParseStep.ReadHeaderLength:
+                    if (parserContext.TryReadHeaderLength(ref reader))
                     {
-                        if (reader.TryReadVarint(out parserContext.HeaderLength))
-                        {
-                            goto case ParseStep.ReadHeader;
-                        }
-                        else
-                        {
-                            // Not enough data to read header length.
-                            parserContext.Step = ParseStep.ReadHeaderLength;
-                            break;
-                        }
+                        goto case ParseStep.ReadHeader;
+                    }
+                    else
+                    {
+                        // Not enough data to read the header length.
+                        parserContext.Step = ParseStep.ReadHeaderLength;
+                        break;
                     }
                 case ParseStep.ReadHeader:
+                    if (parserContext.TryReadResponseHeader(ref reader))
                     {
-                        if (ProtobufHelper.TryParseResponseHeader(ref reader,
-                            parserContext.HeaderLength, out parserContext.Header))
+                        if (!TryGetRpc(parserContext.Header, out parserContext.InflightRpc))
                         {
-                            if (!TryGetRpc(parserContext.Header, out parserContext.InflightRpc))
-                            {
-                                // We don't have this RPC. It probably timed out
-                                // and was removed from _inflightRpcs.
-                                parserContext.Skip = true;
-                            }
+                            // We don't have this RPC. It probably timed out
+                            // and was removed from _inflightRpcs.
 
-                            goto case ParseStep.ReadMainMessageLength;
+                            // TODO: Refactor skipping logic.
+                            parserContext.Skip = true;
                         }
-                        else
-                        {
-                            // Not enough data to read header.
-                            parserContext.Step = ParseStep.ReadHeader;
-                            break;
-                        }
+
+                        goto case ParseStep.ReadMainMessageLength;
+                    }
+                    else
+                    {
+                        // Not enough data to read the header.
+                        parserContext.Step = ParseStep.ReadHeader;
+                        break;
                     }
                 case ParseStep.ReadMainMessageLength:
                     {
-                        if (reader.TryReadVarint(out parserContext.MainMessageLength))
+                        if (parserContext.TryReadMessageLength(ref reader))
                         {
                             if (parserContext.Skip)
                             {
@@ -551,6 +546,38 @@ namespace Knet.Kudu.Client.Connection
             public int SidecarLength => MainMessageLength - (int)Header.SidecarOffsets[0];
 
             public KuduRpc Rpc => InflightRpc.Rpc;
+
+            public bool TryReadTotalMessageLength(ref SequenceReader<byte> reader)
+            {
+                return reader.TryReadBigEndian(out TotalMessageLength);
+            }
+
+            public bool TryReadHeaderLength(ref SequenceReader<byte> reader)
+            {
+                return reader.TryReadVarint(out HeaderLength);
+            }
+
+            public bool TryReadMessageLength(ref SequenceReader<byte> reader)
+            {
+                return reader.TryReadVarint(out MainMessageLength);
+            }
+
+            public bool TryReadResponseHeader(ref SequenceReader<byte> reader)
+            {
+                var length = HeaderLength;
+
+                if (reader.Remaining < length)
+                {
+                    return false;
+                }
+
+                var slice = reader.Sequence.Slice(reader.Position, length);
+                Header = Serializer.Deserialize<ResponseHeader>(slice);
+
+                reader.Advance(length);
+
+                return true;
+            }
 
             public bool ProcessSidecars(ref SequenceReader<byte> reader)
             {
