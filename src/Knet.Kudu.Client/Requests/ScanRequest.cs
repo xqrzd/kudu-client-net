@@ -21,7 +21,7 @@ namespace Knet.Kudu.Client.Requests
         private readonly ScanRequestState _state;
         private readonly ScanRequestPB _scanRequestPb;
         private readonly KuduSchema _schema;
-        private readonly IKuduScanParser<T> _parser;
+        private readonly KuduScanParser<T> _parser;
         private readonly bool _isFaultTolerant;
 
         private ScanResponsePB _responsePB;
@@ -30,7 +30,7 @@ namespace Knet.Kudu.Client.Requests
             ScanRequestState state,
             ScanRequestPB scanRequestPb,
             KuduSchema schema,
-            IKuduScanParser<T> parser,
+            KuduScanParser<T> parser,
             ReplicaSelection replicaSelection,
             string tableId,
             RemoteTablet tablet,
@@ -144,7 +144,7 @@ namespace Knet.Kudu.Client.Requests
 
         public override void ParseSidecar(KuduSidecar sidecar)
         {
-            _parser.ProcessSidecar(sidecar);
+            _parser.ParseSidecar(sidecar);
         }
 
         public override void ParseSidecars(KuduSidecars sidecars)

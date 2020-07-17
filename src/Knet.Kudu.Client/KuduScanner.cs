@@ -10,7 +10,7 @@ namespace Knet.Kudu.Client
         private readonly ILogger _logger;
         private readonly KuduClient _client;
         private readonly KuduTable _table;
-        private readonly IKuduScanParser<T> _parser; // TODO: This should be a factory.
+        private readonly KuduScanParser<T> _parser; // TODO: This should be a factory.
         private readonly List<string> _projectedColumnNames;
         private readonly List<int> _projectedColumnIndexes;
         private readonly Dictionary<string, KuduPredicate> _predicates;
@@ -35,7 +35,7 @@ namespace Knet.Kudu.Client
             ILogger logger,
             KuduClient client,
             KuduTable table,
-            IKuduScanParser<T> parser,
+            KuduScanParser<T> parser,
             List<string> projectedColumnNames,
             List<int> projectedColumnIndexes,
             Dictionary<string, KuduPredicate> predicates,

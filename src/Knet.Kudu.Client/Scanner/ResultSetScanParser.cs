@@ -4,25 +4,21 @@ using Knet.Kudu.Client.Protocol.Tserver;
 
 namespace Knet.Kudu.Client.Scanner
 {
-    public class ResultSetScanParser : IKuduScanParser<ResultSet>
+    public class ResultSetScanParser : KuduScanParser<ResultSet>
     {
         private KuduSchema _scanSchema;
         private ScanResponsePB _responsePB;
         private ResultSetWrapper _result;
 
-        public ResultSet Output => _result ?? GetEmptyResultSet();
+        public override ResultSet Output => _result ?? GetEmptyResultSet();
 
-        public void ProcessScanResponse(KuduSchema scanSchema, ScanResponsePB scanResponse)
+        public override void ProcessScanResponse(KuduSchema scanSchema, ScanResponsePB scanResponse)
         {
             _scanSchema = scanSchema;
             _responsePB = scanResponse;
         }
 
-        public void ProcessSidecar(KuduSidecar sidecar)
-        {
-        }
-
-        public void ParseSidecars(KuduSidecars sidecars)
+        public override void ParseSidecars(KuduSidecars sidecars)
         {
             var numRows = _responsePB.Data.NumRows;
             var rowData = GetRowData(sidecars);
