@@ -627,7 +627,7 @@ namespace Knet.Kudu.Client.Connection
                 }
             }
 
-            public Memory<byte> GetSidecar()
+            private Memory<byte> GetSidecar()
             {
                 if (SidecarMemory == null)
                 {
@@ -646,7 +646,7 @@ namespace Knet.Kudu.Client.Connection
                 return GetNextSidecar();
             }
 
-            public Memory<byte> GetNextSidecar()
+            private Memory<byte> GetNextSidecar()
             {
                 var sidecarOffsets = Header.SidecarOffsets;
                 int currentIndex = NextSidecarIndex;
@@ -662,7 +662,7 @@ namespace Knet.Kudu.Client.Connection
                 return segment;
             }
 
-            public void SetSidecarOffsets()
+            private void SetSidecarOffsets()
             {
                 var rawSidecarOffsets = Header.SidecarOffsets;
                 int numSidecars = rawSidecarOffsets.Length;
@@ -690,7 +690,7 @@ namespace Knet.Kudu.Client.Connection
                 SidecarOffsets = sidecarOffsets;
             }
 
-            public void AdvanceSidecar(int read)
+            private void AdvanceSidecar(int read)
             {
                 CurrentSidecarMemory = CurrentSidecarMemory.Slice(read);
             }

@@ -19,7 +19,7 @@ namespace Knet.Kudu.Client
                 Logger,
                 Client,
                 Table,
-                new ResultSetScanParser(),
+                new ResultSetScanParserFactory(),
                 ProjectedColumnNames,
                 ProjectedColumnIndexes,
                 Predicates,
