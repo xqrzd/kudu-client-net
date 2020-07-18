@@ -1,170 +1,64 @@
 ﻿using System;
-using System.Buffers;
-using System.Collections.Generic;
 using Knet.Kudu.Client.Connection;
-using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Protocol.Tserver;
 
 namespace Knet.Kudu.Client.Scanner
 {
-    public class ResultSetScanParser : IKuduScanParser<ResultSet>
+    public class ResultSetScanParser : KuduScanParser<ResultSet>
     {
-        private int length;
-        int nextSidecarIndex;
-        Memory<byte> currentSidecar;
-        long remaining;
-        long remainingSidecarLength;
-        private List<ArrayMemoryPoolBuffer<byte>> _sidecars;
         private KuduSchema _scanSchema;
         private ScanResponsePB _responsePB;
+        private ResultSetWrapper _result;
 
-        public ResultSet Output { get; private set; }
+        public override ResultSet Output => _result ?? GetEmptyResultSet();
 
-        public void Dispose()
-        {
-            var sidecars = _sidecars;
-            if (sidecars != null)
-            {
-                _sidecars = null;
-
-                foreach (var sidecar in sidecars)
-                    sidecar.Dispose();
-            }
-        }
-
-        public void BeginProcessingSidecars(
-            KuduSchema scanSchema,
-            ScanResponsePB scanResponse,
-            KuduSidecarOffsets sidecars)
+        public override void ProcessScanResponse(KuduSchema scanSchema, ScanResponsePB scanResponse)
         {
             _scanSchema = scanSchema;
             _responsePB = scanResponse;
-            _sidecars = new List<ArrayMemoryPoolBuffer<byte>>(sidecars.SidecarCount);
-
-            int total = 0;
-            length = sidecars.TotalSize;
-            for (int i = 0; i < sidecars.SidecarCount; i++)
-            {
-                var offset = sidecars.GetOffset(i);
-                int size;
-                if (i + 1 >= sidecars.SidecarCount)
-                {
-                    size = length - total;
-                }
-                else
-                {
-                    var next = sidecars.GetOffset(i + 1);
-                    size = next - offset;
-                }
-
-                var sidecar = new ArrayMemoryPoolBuffer<byte>(size);
-                _sidecars.Add(sidecar);
-
-                total += size;
-            }
-
-            if (total != length)
-            {
-                throw new NonRecoverableException(KuduStatus.IllegalState(
-                    $"Expected {length} sidecar bytes, computed {total}"));
-            }
-
-            nextSidecarIndex = 0;
-            currentSidecar = _sidecars[nextSidecarIndex++].Memory;
-
-            remaining = length;
-            remainingSidecarLength = currentSidecar.Length;
-
-            if (length == 0)
-            {
-                // Empty projection.
-                Output = new ResultSet(scanSchema, scanResponse.Data.NumRows, null, null);
-            }
         }
 
-        public void ParseSidecarSegment(ref SequenceReader<byte> reader)
+        public override void ParseSidecars(KuduSidecars sidecars)
         {
-            var buffer = reader.Sequence.Slice(reader.Position);
+            var numRows = _responsePB.Data.NumRows;
+            var rowData = GetRowData(sidecars);
+            var indirectData = GetIndirectData(sidecars);
 
-            do
-            {
-                if (currentSidecar.Length == 0)
-                {
-                    currentSidecar = _sidecars[nextSidecarIndex++].Memory;
-                    remainingSidecarLength = currentSidecar.Length;
-                }
-
-                // How much data can we copy from the buffer?
-                var bytesToRead = Math.Min(buffer.Length, remainingSidecarLength);
-                buffer.Slice(0, bytesToRead).CopyTo(currentSidecar.Span);
-
-                remaining -= bytesToRead;
-                remainingSidecarLength -= bytesToRead;
-                currentSidecar = currentSidecar.Slice((int)bytesToRead);
-
-                buffer = buffer.Slice(bytesToRead);
-                reader.Advance(bytesToRead);
-            }
-            while (remaining > 0 && buffer.Length > 0);
-
-            if (remaining == 0)
-            {
-                var response = _responsePB;
-
-                var rowData = _sidecars[response.Data.RowsSidecar];
-                IMemoryOwner<byte> indirectData = null;
-
-                if (response.Data.ShouldSerializeIndirectDataSidecar())
-                {
-                    indirectData = _sidecars[response.Data.IndirectDataSidecar];
-                }
-
-                var resultSet = new ResultSet(
-                    _scanSchema,
-                    response.Data.NumRows,
-                    rowData,
-                    indirectData);
-
-                _sidecars.Clear();
-
-                Output = resultSet;
-            }
+            _result = new ResultSetWrapper(
+                sidecars,
+                _scanSchema,
+                numRows,
+                rowData,
+                indirectData);
         }
 
-        private sealed class ArrayMemoryPoolBuffer<T> : IMemoryOwner<T>
+        private ReadOnlyMemory<byte> GetRowData(KuduSidecars sidecars)
         {
-            private readonly int _length;
-            private T[] _array;
-
-            public ArrayMemoryPoolBuffer(int size)
+            if (_responsePB.Data.ShouldSerializeRowsSidecar())
             {
-                _length = size;
-                _array = ArrayPool<T>.Shared.Rent(size);
+                return sidecars.GetSidecarMemory(_responsePB.Data.RowsSidecar);
             }
 
-            public Memory<T> Memory
-            {
-                get
-                {
-                    T[] array = _array;
-                    if (array == null)
-                    {
-                        throw new ObjectDisposedException(nameof(ArrayMemoryPoolBuffer<T>));
-                    }
+            return default;
+        }
 
-                    return new Memory<T>(array, 0, _length);
-                }
+        private ReadOnlyMemory<byte> GetIndirectData(KuduSidecars sidecars)
+        {
+            if (_responsePB.Data.ShouldSerializeIndirectDataSidecar())
+            {
+                return sidecars.GetSidecarMemory(_responsePB.Data.IndirectDataSidecar);
             }
 
-            public void Dispose()
-            {
-                T[] array = _array;
-                if (array != null)
-                {
-                    _array = null;
-                    ArrayPool<T>.Shared.Return(array);
-                }
-            }
+            return default;
+        }
+
+        private ResultSet GetEmptyResultSet()
+        {
+            return new ResultSet(
+                _scanSchema,
+                _responsePB.Data.NumRows,
+                default,
+                default);
         }
     }
 }

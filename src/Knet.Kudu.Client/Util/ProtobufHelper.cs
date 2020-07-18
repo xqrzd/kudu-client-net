@@ -41,23 +41,6 @@ namespace Knet.Kudu.Client.Util
             return Serializer.Deserialize<ErrorStatusPB>(buffer);
         }
 
-        public static bool TryParseResponseHeader(
-            ref SequenceReader<byte> reader, long length, out ResponseHeader header)
-        {
-            if (reader.Remaining < length)
-            {
-                header = null;
-                return false;
-            }
-
-            var slice = reader.Sequence.Slice(reader.Position, length);
-            header = Serializer.Deserialize<ResponseHeader>(slice);
-
-            reader.Advance(length);
-
-            return true;
-        }
-
         public static ColumnTypeAttributes ToTypeAttributes(
             this ColumnTypeAttributesPB pb)
         {

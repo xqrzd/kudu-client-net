@@ -19,7 +19,7 @@ namespace Knet.Kudu.Client
         private readonly ILogger _logger;
         private readonly KuduClient _client;
         private readonly KuduTable _table;
-        private readonly IKuduScanParser<T> _parser;
+        private readonly KuduScanParser<T> _parser;
         private readonly List<ColumnSchemaPB> _columns;
         private readonly KuduSchema _schema;
         private readonly PartitionPruner _partitionPruner;
@@ -63,7 +63,7 @@ namespace Knet.Kudu.Client
             ILogger logger,
             KuduClient client,
             KuduTable table,
-            IKuduScanParser<T> parser,
+            KuduScanParser<T> parser,
             List<string> projectedColumnNames,
             List<int> projectedColumnIndexes,
             ReadMode readMode,
@@ -205,7 +205,7 @@ namespace Knet.Kudu.Client
                 // means we were in between tablets.
                 if (Tablet != null)
                 {
-                    using var rpc = GetCloseRequest();
+                    var rpc = GetCloseRequest();
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
                     try
@@ -246,7 +246,7 @@ namespace Knet.Kudu.Client
 
         private async ValueTask<bool> OpenScannerAsync()
         {
-            using var rpc = GetOpenRequest();
+            var rpc = GetOpenRequest();
             ScanResponse<T> response;
 
             try
@@ -343,7 +343,7 @@ namespace Knet.Kudu.Client
 
         private async ValueTask<bool> ScanNextRowsAsync()
         {
-            using var rpc = GetNextRowsRequest();
+            var rpc = GetNextRowsRequest();
             ScanResponse<T> response;
 
             try
