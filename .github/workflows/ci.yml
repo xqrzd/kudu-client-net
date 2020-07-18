@@ -8,7 +8,6 @@ env:
 
 jobs:
   linux_build:
-
     name: Linux build
     runs-on: ubuntu-latest
 
@@ -17,14 +16,13 @@ jobs:
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v1
       with:
-        dotnet-version: 3.1.301
+        dotnet-version: 3.1.302
     - name: Build
       run: dotnet build --configuration Release
     - name: Test
       run: dotnet test --no-restore --no-build --configuration Release
 
   publish:
-
     name: Publish nuget package
     needs: linux_build
     runs-on: ubuntu-latest
@@ -35,7 +33,7 @@ jobs:
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v1
       with:
-        dotnet-version: 3.1.301
+        dotnet-version: 3.1.302
     - name: Publish on version change
       uses: rohith/publish-nuget@v2
       with:
