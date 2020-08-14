@@ -22,6 +22,14 @@ namespace Knet.Kudu.Client.Connection
 
         public int NumSidecars => _sidecarOffsets.Length;
 
+        public ReadOnlySpan<KuduSidecarOffset> Offsets => _sidecarOffsets;
+
+        public ReadOnlyMemory<byte> Memory => _data.Memory.Slice(0, TotalSize);
+
+        public ReadOnlySpan<byte> Span => _data.Memory.Span.Slice(0, TotalSize);
+
+        public int GetOffset(int sidecar) => _sidecarOffsets[sidecar].Start;
+
         public ReadOnlyMemory<byte> GetSidecarMemory(int sidecar)
         {
             var offset = _sidecarOffsets[sidecar];
