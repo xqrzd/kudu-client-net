@@ -25,6 +25,12 @@ namespace Knet.Kudu.Client
             Schema = schema;
             Count = rowBlockPb.NumRows;
 
+            if (sidecars is null)
+            {
+                // Empty projection.
+                return;
+            }
+
             var columns = rowBlockPb.Columns;
             var numColumns = columns.Count;
 
@@ -66,7 +72,7 @@ namespace Knet.Kudu.Client
 
         public void Dispose()
         {
-            _sidecars.Dispose();
+            _sidecars?.Dispose();
         }
 
         internal int GetDataOffset(int columnIndex) =>
@@ -92,9 +98,19 @@ namespace Knet.Kudu.Client
             internal Enumerator(ColumnarResultSet resultSet)
             {
                 _resultSet = resultSet;
-                _data = resultSet._sidecars.Span;
-                _numRows = (int)resultSet.Count;
                 _index = -1;
+
+                if (resultSet._sidecars is null)
+                {
+                    // Empty projection.
+                    _data = default;
+                    _numRows = 0;
+                }
+                else
+                {
+                    _data = resultSet._sidecars.Span;
+                    _numRows = (int)resultSet.Count;
+                }
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]

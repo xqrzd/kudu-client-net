@@ -531,7 +531,7 @@ namespace Knet.Kudu.Client.FunctionalTests
         }
 
         private async Task BuildScannerAndCheckColumnsCountAsync(
-            KuduScannerBuilder builder, params string[] expectedColumnNames)
+            KuduScannerBuilder<ResultSet> builder, params string[] expectedColumnNames)
         {
             var scanner = builder.Build();
             KuduSchema schema = null;
