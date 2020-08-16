@@ -20,6 +20,7 @@ namespace Knet.Kudu.Client.Scanner
 
             _scanSchema = scanSchema;
             _responsePB = scanResponse;
+            NumRows = (int)scanResponse.ColumnarData.NumRows;
         }
 
         public override void ParseSidecars(KuduSidecars sidecars)
