@@ -5,7 +5,7 @@ namespace Knet.Kudu.Client.Scanner
 {
     public abstract class KuduScanParser<T>
     {
-        public int NumRows { get; protected set; }
+        public long NumRows { get; protected set; }
 
         public abstract T Output { get; }
 
