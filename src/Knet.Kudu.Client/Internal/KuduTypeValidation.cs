@@ -25,6 +25,12 @@ namespace Knet.Kudu.Client.Internal
                 ThrowException(column, type);
         }
 
+        public static void ValidateColumnIsFixedLengthType(this ColumnSchema column)
+        {
+            if (!column.IsFixedSize)
+                ThrowNotFixedLengthException(column);
+        }
+
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static void ThrowException(ColumnSchema column, KuduTypeFlags types)
         {
@@ -56,6 +62,12 @@ namespace Knet.Kudu.Client.Internal
         public static void ThrowNotNullableException(ColumnSchema column)
         {
             throw new Exception($"Column {column} is not nullable");
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void ThrowNotFixedLengthException(ColumnSchema column)
+        {
+            throw new Exception($"Column {column} is not a fixed length type");
         }
     }
 }
