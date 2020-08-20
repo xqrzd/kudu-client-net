@@ -436,8 +436,11 @@ namespace Knet.Kudu.Client
         /// <param name="columnIndex">The column index.</param>
         public ReadOnlySpan<byte> GetRawFixed(int columnIndex)
         {
-            ColumnSchema column = GetColumnSchema(columnIndex);
-            // TODO: Check nulls
+            ColumnSchema column = CheckFixedLengthType(columnIndex);
+
+            if (IsNull(columnIndex))
+                return default;
+
             return ReadDataSlice(columnIndex, column.Size);
         }
 
@@ -494,7 +497,18 @@ namespace Knet.Kudu.Client
 
         public ReadOnlySpan<byte> GetBinary(int columnIndex)
         {
-            throw new NotImplementedException();
+            CheckType(columnIndex, KuduType.Binary);
+
+            if (IsNull(columnIndex))
+                return default;
+
+            int offset = GetOffsetForCurrentRow(columnIndex);
+            int length = GetOffsetForNextRow(columnIndex) - offset;
+
+            int sidecarOffset = _resultSet.GetVarLenOffset(columnIndex);
+            int realOffset = sidecarOffset + offset;
+
+            return _data.Slice(realOffset, length);
         }
 
         public bool IsNull(string columnName)
@@ -619,6 +633,13 @@ namespace Knet.Kudu.Client
         {
             var columnSchema = GetColumnSchema(columnIndex);
             KuduTypeValidation.ValidateColumnType(columnSchema, typeFlags);
+            return columnSchema;
+        }
+
+        private ColumnSchema CheckFixedLengthType(int columnIndex)
+        {
+            var columnSchema = GetColumnSchema(columnIndex);
+            KuduTypeValidation.ValidateColumnIsFixedLengthType(columnSchema);
             return columnSchema;
         }
 
