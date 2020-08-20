@@ -5,6 +5,8 @@ namespace Knet.Kudu.Client.Scanner
 {
     public abstract class KuduScanParser<T>
     {
+        public long NumRows { get; protected set; }
+
         public abstract T Output { get; }
 
         public abstract void ProcessScanResponse(KuduSchema scanSchema, ScanResponsePB scanResponse);

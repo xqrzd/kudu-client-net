@@ -15,6 +15,7 @@ namespace Knet.Kudu.Client
         private readonly List<int> _projectedColumnIndexes;
         private readonly Dictionary<string, KuduPredicate> _predicates;
 
+        private readonly RowDataFormat _rowDataFormat;
         private readonly bool _isFaultTolerant;
         private readonly int? _batchSizeBytes;
         private readonly long _limit;
@@ -41,6 +42,7 @@ namespace Knet.Kudu.Client
             Dictionary<string, KuduPredicate> predicates,
             ReadMode readMode,
             ReplicaSelection replicaSelection,
+            RowDataFormat rowDataFormat,
             bool isFaultTolerant,
             int? batchSizeBytes,
             long limit,
@@ -61,6 +63,7 @@ namespace Knet.Kudu.Client
             _predicates = predicates;
             ReadMode = readMode;
             ReplicaSelection = replicaSelection;
+            _rowDataFormat = rowDataFormat;
             _isFaultTolerant = isFaultTolerant;
             _batchSizeBytes = batchSizeBytes;
             _limit = limit;
@@ -94,6 +97,7 @@ namespace Knet.Kudu.Client
                 _projectedColumnNames,
                 _projectedColumnIndexes,
                 ReadMode,
+                _rowDataFormat,
                 _isFaultTolerant,
                 _predicates,
                 _limit,

@@ -510,9 +510,14 @@ namespace Knet.Kudu.Client
             return response;
         }
 
-        public KuduScannerBuilder NewScanBuilder(KuduTable table)
+        public KuduScannerBuilder<ResultSet> NewScanBuilder(KuduTable table)
         {
-            return new KuduScannerBuilder(this, table, _scanLogger);
+            return new KuduScannerBuilder<ResultSet>(this, table, _scanLogger);
+        }
+
+        public KuduScannerBuilder<T> NewScanBuilder<T>(KuduTable table)
+        {
+            return new KuduScannerBuilder<T>(this, table, _scanLogger);
         }
 
         public KuduScanTokenBuilder NewScanTokenBuilder(KuduTable table)

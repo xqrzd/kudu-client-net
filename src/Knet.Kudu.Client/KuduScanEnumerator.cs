@@ -29,6 +29,7 @@ namespace Knet.Kudu.Client
         private readonly OrderModePB _orderMode;
         private readonly ReadMode _readMode;
         private readonly ReplicaSelection _replicaSelection;
+        private readonly RowDataFormat _rowDataFormat;
         private readonly bool _isFaultTolerant;
         private readonly int _batchSizeBytes;
         private readonly long _limit;
@@ -67,6 +68,7 @@ namespace Knet.Kudu.Client
             List<string> projectedColumnNames,
             List<int> projectedColumnIndexes,
             ReadMode readMode,
+            RowDataFormat rowDataFormat,
             bool isFaultTolerant,
             Dictionary<string, KuduPredicate> predicates,
             long limit,
@@ -119,6 +121,7 @@ namespace Knet.Kudu.Client
             _partitionPruner = partitionPruner;
             _readMode = readMode;
             _predicates = predicates;
+            _rowDataFormat = rowDataFormat;
             _limit = limit;
             _cacheBlocks = cacheBlocks;
             _startPrimaryKey = startPrimaryKey ?? Array.Empty<byte>();
@@ -405,6 +408,9 @@ namespace Knet.Kudu.Client
             };
 
             newRequest.ProjectedColumns.AddRange(_columns);
+
+            if (_rowDataFormat == RowDataFormat.Columnar)
+                newRequest.RowFormatFlags |= (ulong)RowFormatFlags.ColumnarLayout;
 
             // For READ_YOUR_WRITES scan, use the propagated timestamp from
             // the scanner.

@@ -20,7 +20,7 @@ namespace Knet.Kudu.Client.Scanner
         /// <summary>
         /// Number of rows returned by the scanner.
         /// </summary>
-        public int NumRows { get; }
+        public long NumRows { get; }
 
         /// <summary>
         /// If false, the filter we use decided there was no more data to scan.
@@ -58,7 +58,7 @@ namespace Knet.Kudu.Client.Scanner
         public ScanResponse(
             byte[] scannerId,
             T data,
-            int numRows,
+            long numRows,
             bool hasMoreResults,
             long scanTimestamp,
             long propagatedTimestamp,

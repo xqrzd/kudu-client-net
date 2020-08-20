@@ -133,7 +133,7 @@ namespace Knet.Kudu.Client.Requests
                 return new ScanResponse<T>(
                     _responsePB.ScannerId,
                     _parser.Output,
-                    _responsePB.Data.NumRows,
+                    _parser.NumRows,
                     _responsePB.HasMoreResults,
                     _responsePB.ShouldSerializeSnapTimestamp() ? (long)_responsePB.SnapTimestamp : KuduClient.NoTimestamp,
                     _responsePB.ShouldSerializePropagatedTimestamp() ? (long)_responsePB.PropagatedTimestamp : KuduClient.NoTimestamp,

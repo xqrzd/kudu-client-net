@@ -230,7 +230,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(key, result);
         }
 
-        private KuduScannerBuilder GetScannerBuilder()
+        private KuduScannerBuilder<ResultSet> GetScannerBuilder()
         {
             var timestamp = _client.LastPropagatedTimestamp;
 
