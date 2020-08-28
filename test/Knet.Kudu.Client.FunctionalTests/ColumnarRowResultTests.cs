@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
 using Knet.Kudu.Client.FunctionalTests.Util;
+using Knet.Kudu.Client.Util;
 using McMaster.Extensions.Xunit;
 using Xunit;
 
@@ -48,6 +49,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 {
                     Assert.Equal(currentRow, row.GetInt32("key"));
                     Assert.Equal(currentRow, row.GetNullableInt32("key"));
+                    Assert.Equal(KuduEncoder.EncodeInt32(currentRow), row.GetRawFixed("key").ToArray());
                     Assert.Equal(42, row.GetByte("int8"));
                     Assert.Equal((byte?)42, row.GetNullableByte("int8"));
                     Assert.Equal(42, row.GetSByte("int8"));
@@ -155,6 +157,19 @@ namespace Knet.Kudu.Client.FunctionalTests
                     Assert.Null(row.GetNullableDecimal("decimal32"));
                     Assert.Null(row.GetNullableDecimal("decimal64"));
                     Assert.Null(row.GetNullableDecimal("decimal128"));
+
+                    Assert.Equal(0, row.GetRawFixed("int8").Length);
+                    Assert.Equal(0, row.GetRawFixed("int16").Length);
+                    Assert.Equal(0, row.GetRawFixed("int32").Length);
+                    Assert.Equal(0, row.GetRawFixed("int64").Length);
+                    Assert.Equal(0, row.GetRawFixed("bool").Length);
+                    Assert.Equal(0, row.GetRawFixed("float").Length);
+                    Assert.Equal(0, row.GetRawFixed("double").Length);
+                    Assert.Equal(0, row.GetRawFixed("timestamp").Length);
+                    Assert.Equal(0, row.GetRawFixed("date").Length);
+                    Assert.Equal(0, row.GetRawFixed("decimal32").Length);
+                    Assert.Equal(0, row.GetRawFixed("decimal64").Length);
+                    Assert.Equal(0, row.GetRawFixed("decimal128").Length);
                     currentRow++;
                 }
             }
