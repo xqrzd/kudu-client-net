@@ -161,5 +161,49 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             Assert.Equal(numRows, currentRow);
         }
+
+        [SkippableFact]
+        public async Task TestEmptyProjection()
+        {
+            await using var miniCluster = await new MiniKuduClusterBuilder().BuildAsync();
+            await using var client = miniCluster.CreateClient();
+            await using var session = client.NewSession();
+
+            var builder = ClientTestUtil.CreateAllTypesSchema()
+                .SetTableName(nameof(TestEmptyProjection))
+                .CreateBasicRangePartition();
+
+            var table = await client.CreateTableAsync(builder);
+
+            int numRows = 5;
+            int currentRow = 0;
+            for (int i = 0; i < numRows; i++)
+            {
+                var insert = ClientTestUtil.CreateAllTypesInsert(table, i);
+                await session.EnqueueAsync(insert);
+            }
+
+            await session.FlushAsync();
+
+            var scanner = client.NewScanBuilder<ColumnarResultSet>(table)
+                .SetEmptyProjection()
+                .Build();
+
+            await foreach (var resultSet in scanner)
+            {
+                Assert.Empty(resultSet.Schema.Columns);
+                CheckResults(resultSet);
+            }
+
+            void CheckResults(ColumnarResultSet resultSet)
+            {
+                foreach (var row in resultSet)
+                {
+                    currentRow++;
+                }
+            }
+
+            Assert.Equal(numRows, currentRow);
+        }
     }
 }

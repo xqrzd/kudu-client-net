@@ -84,6 +84,21 @@ namespace Knet.Kudu.Client
         internal int GetNonNullBitmapOffset(int columnIndex) =>
             _nonNullBitmapSidecarOffsets[columnIndex];
 
+        private ReadOnlySpan<byte> GetData()
+        {
+            var sidecars = _sidecars;
+
+            if (sidecars is null)
+            {
+                // Empty projection.
+                return default;
+            }
+            else
+            {
+                return sidecars.Span;
+            }
+        }
+
         public override string ToString() => $"{Count} rows";
 
         public Enumerator GetEnumerator() => new Enumerator(this);
@@ -99,18 +114,8 @@ namespace Knet.Kudu.Client
             {
                 _resultSet = resultSet;
                 _index = -1;
-
-                if (resultSet._sidecars is null)
-                {
-                    // Empty projection.
-                    _data = default;
-                    _numRows = 0;
-                }
-                else
-                {
-                    _data = resultSet._sidecars.Span;
-                    _numRows = (int)resultSet.Count;
-                }
+                _numRows = (int)resultSet.Count;
+                _data = resultSet.GetData();
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
