@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Util;
@@ -33,7 +34,7 @@ namespace Knet.Kudu.Client
 
         public bool GetBool(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetBool(columnIndex);
         }
 
@@ -45,7 +46,7 @@ namespace Knet.Kudu.Client
 
         public bool? GetNullableBool(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetNullableBool(columnIndex);
         }
 
@@ -61,15 +62,13 @@ namespace Knet.Kudu.Client
 
         private bool ReadBool(int columnIndex)
         {
-            int position = _resultSet.GetOffset(columnIndex);
-            ReadOnlySpan<byte> data = _rowData.Slice(position, 1);
-
+            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 1);
             return KuduEncoder.DecodeBool(data);
         }
 
         public byte GetByte(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetByte(columnIndex);
         }
 
@@ -81,7 +80,7 @@ namespace Knet.Kudu.Client
 
         public byte? GetNullableByte(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetNullableByte(columnIndex);
         }
 
@@ -97,15 +96,13 @@ namespace Knet.Kudu.Client
 
         private byte ReadByte(int columnIndex)
         {
-            int position = _resultSet.GetOffset(columnIndex);
-            ReadOnlySpan<byte> data = _rowData.Slice(position, 1);
-
+            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 1);
             return KuduEncoder.DecodeUInt8(data);
         }
 
         public sbyte GetSByte(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetSByte(columnIndex);
         }
 
@@ -117,7 +114,7 @@ namespace Knet.Kudu.Client
 
         public sbyte? GetNullableSByte(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetNullableSByte(columnIndex);
         }
 
@@ -133,15 +130,13 @@ namespace Knet.Kudu.Client
 
         private sbyte ReadSByte(int columnIndex)
         {
-            int position = _resultSet.GetOffset(columnIndex);
-            ReadOnlySpan<byte> data = _rowData.Slice(position, 1);
-
+            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 1);
             return KuduEncoder.DecodeInt8(data);
         }
 
         public short GetInt16(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetInt16(columnIndex);
         }
 
@@ -153,7 +148,7 @@ namespace Knet.Kudu.Client
 
         public short? GetNullableInt16(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetNullableInt16(columnIndex);
         }
 
@@ -169,15 +164,13 @@ namespace Knet.Kudu.Client
 
         private short ReadInt16(int columnIndex)
         {
-            int position = _resultSet.GetOffset(columnIndex);
-            ReadOnlySpan<byte> data = _rowData.Slice(position, 2);
-
+            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 2);
             return KuduEncoder.DecodeInt16(data);
         }
 
         public int GetInt32(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetInt32(columnIndex);
         }
 
@@ -189,7 +182,7 @@ namespace Knet.Kudu.Client
 
         public int? GetNullableInt32(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetNullableInt32(columnIndex);
         }
 
@@ -205,15 +198,13 @@ namespace Knet.Kudu.Client
 
         private int ReadInt32(int columnIndex)
         {
-            int position = _resultSet.GetOffset(columnIndex);
-            ReadOnlySpan<byte> data = _rowData.Slice(position, 4);
-
+            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 4);
             return KuduEncoder.DecodeInt32(data);
         }
 
         public long GetInt64(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetInt64(columnIndex);
         }
 
@@ -228,7 +219,7 @@ namespace Knet.Kudu.Client
 
         public long? GetNullableInt64(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetNullableInt64(columnIndex);
         }
 
@@ -246,21 +237,19 @@ namespace Knet.Kudu.Client
 
         private long ReadInt64(int columnIndex)
         {
-            int position = _resultSet.GetOffset(columnIndex);
-            ReadOnlySpan<byte> data = _rowData.Slice(position, 8);
-
+            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 8);
             return KuduEncoder.DecodeInt64(data);
         }
 
         public DateTime GetDateTime(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetDateTime(columnIndex);
         }
 
         public DateTime GetDateTime(int columnIndex)
         {
-            var columnSchema = _resultSet.GetColumnSchema(columnIndex);
+            var columnSchema = GetColumnSchema(columnIndex);
             var type = columnSchema.Type;
 
             CheckNotNull(columnSchema, columnIndex);
@@ -281,13 +270,13 @@ namespace Knet.Kudu.Client
 
         public DateTime? GetNullableDateTime(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetNullableDateTime(columnIndex);
         }
 
         public DateTime? GetNullableDateTime(int columnIndex)
         {
-            var columnSchema = _resultSet.GetColumnSchema(columnIndex);
+            var columnSchema = GetColumnSchema(columnIndex);
             var type = columnSchema.Type;
 
             if (IsNull(columnIndex))
@@ -309,23 +298,19 @@ namespace Knet.Kudu.Client
 
         private DateTime ReadDateTime(int columnIndex)
         {
-            int position = _resultSet.GetOffset(columnIndex);
-            ReadOnlySpan<byte> data = _rowData.Slice(position, 8);
-
+            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 8);
             return KuduEncoder.DecodeDateTime(data);
         }
 
         private DateTime ReadDate(int columnIndex)
         {
-            int position = _resultSet.GetOffset(columnIndex);
-            ReadOnlySpan<byte> data = _rowData.Slice(position, 4);
-
+            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 4);
             return KuduEncoder.DecodeDate(data);
         }
 
         public float GetFloat(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetFloat(columnIndex);
         }
 
@@ -337,7 +322,7 @@ namespace Knet.Kudu.Client
 
         public float? GetNullableFloat(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetNullableFloat(columnIndex);
         }
 
@@ -353,15 +338,13 @@ namespace Knet.Kudu.Client
 
         private float ReadFloat(int columnIndex)
         {
-            int position = _resultSet.GetOffset(columnIndex);
-            ReadOnlySpan<byte> data = _rowData.Slice(position, 4);
-
+            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 4);
             return KuduEncoder.DecodeFloat(data);
         }
 
         public double GetDouble(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetDouble(columnIndex);
         }
 
@@ -373,7 +356,7 @@ namespace Knet.Kudu.Client
 
         public double? GetNullableDouble(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetNullableDouble(columnIndex);
         }
 
@@ -389,15 +372,13 @@ namespace Knet.Kudu.Client
 
         private double ReadDouble(int columnIndex)
         {
-            int position = _resultSet.GetOffset(columnIndex);
-            ReadOnlySpan<byte> data = _rowData.Slice(position, 8);
-
+            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 8);
             return KuduEncoder.DecodeDouble(data);
         }
 
         public decimal GetDecimal(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetDecimal(columnIndex);
         }
 
@@ -413,7 +394,7 @@ namespace Knet.Kudu.Client
 
         public decimal? GetNullableDecimal(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetNullableDecimal(columnIndex);
         }
 
@@ -432,15 +413,12 @@ namespace Knet.Kudu.Client
 
         private decimal ReadDecimal(int columnIndex)
         {
-            ColumnSchema column = _resultSet.GetColumnSchema(columnIndex);
+            ColumnSchema column = GetColumnSchema(columnIndex);
             int scale = column.TypeAttributes.Scale.GetValueOrDefault();
 
-            int position = _resultSet.GetOffset(columnIndex);
-            ReadOnlySpan<byte> data = _rowData.Slice(position, column.Size);
-
+            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, column.Size);
             return KuduEncoder.DecodeDecimal(data, column.Type, scale);
         }
-
 
         /// <summary>
         /// Get the raw value of a fixed length data column.
@@ -448,7 +426,7 @@ namespace Knet.Kudu.Client
         /// <param name="columnName">The column name.</param>
         public ReadOnlySpan<byte> GetRawFixed(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetRawFixed(columnIndex);
         }
 
@@ -458,17 +436,17 @@ namespace Knet.Kudu.Client
         /// <param name="columnIndex">The column index.</param>
         public ReadOnlySpan<byte> GetRawFixed(int columnIndex)
         {
-            ColumnSchema column = _resultSet.GetColumnSchema(columnIndex);
+            ColumnSchema column = CheckFixedLengthType(columnIndex);
 
-            int position = _resultSet.GetOffset(columnIndex);
-            ReadOnlySpan<byte> data = _rowData.Slice(position, column.Size);
+            if (IsNull(columnIndex))
+                return default;
 
-            return data;
+            return ReadDataSlice(columnIndex, column.Size);
         }
 
         public string GetString(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetString(columnIndex);
         }
 
@@ -483,7 +461,7 @@ namespace Knet.Kudu.Client
 
         public string GetNullableString(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetNullableString(columnIndex);
         }
 
@@ -507,7 +485,7 @@ namespace Knet.Kudu.Client
 
         public ReadOnlySpan<byte> GetBinary(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return GetBinary(columnIndex);
         }
 
@@ -535,7 +513,7 @@ namespace Knet.Kudu.Client
 
         public bool IsNull(string columnName)
         {
-            int columnIndex = _resultSet.GetColumnIndex(columnName);
+            int columnIndex = GetColumnIndex(columnName);
             return IsNull(columnIndex);
         }
 
@@ -620,17 +598,31 @@ namespace Knet.Kudu.Client
             return stringBuilder.ToString();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private ReadOnlySpan<byte> ReadDataSlice(int columnIndex, int dataSize)
+        {
+            int position = _resultSet.GetOffset(columnIndex);
+            return _rowData.Slice(position, dataSize);
+        }
+
         private ColumnSchema CheckType(int columnIndex, KuduType type)
         {
-            var columnSchema = _resultSet.GetColumnSchema(columnIndex);
+            var columnSchema = GetColumnSchema(columnIndex);
             KuduTypeValidation.ValidateColumnType(columnSchema, type);
             return columnSchema;
         }
 
         private ColumnSchema CheckType(int columnIndex, KuduTypeFlags typeFlags)
         {
-            var columnSchema = _resultSet.GetColumnSchema(columnIndex);
+            var columnSchema = GetColumnSchema(columnIndex);
             KuduTypeValidation.ValidateColumnType(columnSchema, typeFlags);
+            return columnSchema;
+        }
+
+        private ColumnSchema CheckFixedLengthType(int columnIndex)
+        {
+            var columnSchema = GetColumnSchema(columnIndex);
+            KuduTypeValidation.ValidateColumnIsFixedLengthType(columnSchema);
             return columnSchema;
         }
 
@@ -654,6 +646,16 @@ namespace Knet.Kudu.Client
             {
                 KuduTypeValidation.ThrowNullException(columnSchema);
             }
+        }
+
+        private ColumnSchema GetColumnSchema(int columnIndex)
+        {
+            return _resultSet.Schema.GetColumn(columnIndex);
+        }
+
+        private int GetColumnIndex(string columnName)
+        {
+            return _resultSet.Schema.GetColumnIndex(columnName);
         }
     }
 }
