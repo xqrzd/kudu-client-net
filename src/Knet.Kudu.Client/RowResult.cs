@@ -501,15 +501,7 @@ namespace Knet.Kudu.Client
 
         private string ReadString(int columnIndex)
         {
-            int position = _resultSet.GetOffset(columnIndex);
-            ReadOnlySpan<byte> offsetData = _rowData.Slice(position, 8);
-            ReadOnlySpan<byte> lengthData = _rowData.Slice(position + 8, 8);
-
-            int offset = (int)KuduEncoder.DecodeInt64(offsetData);
-            int length = (int)KuduEncoder.DecodeInt64(lengthData);
-
-            ReadOnlySpan<byte> data = _indirectData.Slice(offset, length);
-
+            ReadOnlySpan<byte> data = ReadBinary(columnIndex);
             return KuduEncoder.DecodeString(data);
         }
 
@@ -526,6 +518,11 @@ namespace Knet.Kudu.Client
             if (IsNull(columnIndex))
                 return default;
 
+            return ReadBinary(columnIndex);
+        }
+
+        private ReadOnlySpan<byte> ReadBinary(int columnIndex)
+        {
             int position = _resultSet.GetOffset(columnIndex);
             ReadOnlySpan<byte> offsetData = _rowData.Slice(position, 8);
             ReadOnlySpan<byte> lengthData = _rowData.Slice(position + 8, 8);
