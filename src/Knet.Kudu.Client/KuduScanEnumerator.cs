@@ -247,6 +247,46 @@ namespace Knet.Kudu.Client
             }
         }
 
+        /// <summary>
+        /// <para>
+        /// Keep the current remote scanner alive on the Tablet server for an
+        /// additional time-to-live. This is useful if the interval in between
+        /// <see cref="MoveNextAsync"/> calls is big enough that the remote
+        /// scanner might be garbage collected. The scanner time-to-live can
+        /// be configured on the tablet server via the --scanner_ttl_ms
+        /// configuration flag and has a default of 60 seconds.
+        /// </para>
+        /// <para>
+        /// This does not invalidate any previously fetched results.
+        /// </para>
+        /// <para>
+        /// Note that an exception thrown by this method should not be taken as
+        /// indication that the scan has failed. Subsequent calls to
+        /// <see cref="MoveNextAsync"/> might still be successful, particularly
+        /// if the scanner is configured to be fault tolerant.
+        /// </para>
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public Task KeepAliveAsync(CancellationToken cancellationToken = default)
+        {
+            if (_closed)
+            {
+                throw new Exception("Scanner has already been closed");
+            }
+
+            if (Tablet is null)
+            {
+                // Getting a null tablet here without being in a closed state
+                // means we were in between tablets. If there is no scanner to
+                // keep alive, we still return success.
+
+                return Task.CompletedTask;
+            }
+
+            var rpc = GetKeepAliveRequest();
+            return _client.SendRpcAsync(rpc, cancellationToken);
+        }
+
         private async ValueTask<bool> OpenScannerAsync()
         {
             var rpc = GetOpenRequest();
@@ -498,6 +538,16 @@ namespace Knet.Kudu.Client
                 Tablet,
                 _partitionPruner.NextPartitionKey,
                 _isFaultTolerant);
+        }
+
+        private KeepAliveRequest GetKeepAliveRequest()
+        {
+            return new KeepAliveRequest(
+                _scannerId,
+                _replicaSelection,
+                _table.TableId,
+                Tablet,
+                _partitionPruner.NextPartitionKey);
         }
 
         private void ScanFinished()

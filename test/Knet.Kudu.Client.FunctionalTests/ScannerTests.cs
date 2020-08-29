@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
 using Knet.Kudu.Client.FunctionalTests.Util;
 using McMaster.Extensions.Xunit;
@@ -11,6 +13,9 @@ namespace Knet.Kudu.Client.FunctionalTests
     [MiniKuduClusterTest]
     public class ScannerTests
     {
+        private const int ShortScannerTtlMs = 5000;
+        private const int ShortScannerGcUs = ShortScannerTtlMs * 100; // 10% of the TTL.
+
         private readonly Random _random;
         private readonly DataGenerator _generator;
 
@@ -78,7 +83,149 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Empty(inserts);
         }
 
-        // TODO: Test keep alive
+        /// <summary>
+        /// Test the scanner behavior when a scanner is used beyond
+        /// the scanner ttl without keeping the scanner alive.
+        /// </summary>
+        [SkippableFact]
+        public async Task TestScannerExpiration()
+        {
+            await using var miniCluster = await new MiniKuduClusterBuilder()
+                .AddTabletServerFlag($"--scanner_ttl_ms={ShortScannerTtlMs}")
+                .AddTabletServerFlag($"--scanner_gc_check_interval_us={ShortScannerGcUs}")
+                .BuildAsync();
+            await using var client = miniCluster.CreateClient();
+
+            var builder = ClientTestUtil.GetBasicSchema()
+                .SetTableName("TestScannerExpiration")
+                .AddHashPartitions(2, "key");
+
+            var table = await client.CreateTableAsync(builder);
+
+            int numRows = 1000;
+            var rows = Enumerable.Range(0, numRows).Select(i =>
+            {
+                return ClientTestUtil.CreateBasicSchemaInsert(table, i);
+            });
+
+            await client.WriteAsync(rows);
+
+            var scanner = client.NewScanBuilder(table)
+                .SetReplicaSelection(ReplicaSelection.ClosestReplica)
+                .SetBatchSizeBytes(100) // Use a small batch size so we get many batches.
+                .Build();
+
+            var scanEnumerator = scanner.GetAsyncEnumerator();
+
+            // Initialize the scanner and verify we can read rows.
+            Assert.True(await scanEnumerator.MoveNextAsync());
+            Assert.True(scanEnumerator.Current.Count > 0);
+
+            // Wait for the scanner to time out.
+            await Task.Delay(ShortScannerTtlMs * 2);
+
+            try
+            {
+                await scanEnumerator.MoveNextAsync();
+                Assert.False(true, "Exception was not thrown when accessing an expired scanner");
+            }
+            catch (NonRecoverableException ex)
+            {
+                Assert.Matches(".*Scanner .* not found.*", ex.Message);
+            }
+
+            // Closing an expired scanner shouldn't throw an exception.
+            await scanEnumerator.DisposeAsync();
+        }
+
+        /// <summary>
+        /// Test keeping a scanner alive beyond scanner ttl.
+        /// </summary>
+        [SkippableFact]
+        public async Task TestKeepAlive()
+        {
+            await using var miniCluster = await new MiniKuduClusterBuilder()
+                .AddTabletServerFlag($"--scanner_ttl_ms={ShortScannerTtlMs}")
+                .AddTabletServerFlag($"--scanner_gc_check_interval_us={ShortScannerGcUs}")
+                .BuildAsync();
+            await using var client = miniCluster.CreateClient();
+
+            var builder = ClientTestUtil.GetBasicSchema()
+                .SetTableName("TestKeepAlive")
+                .AddHashPartitions(2, "key");
+
+            var table = await client.CreateTableAsync(builder);
+
+            int numRows = 1000;
+            var rows = Enumerable.Range(0, numRows).Select(i =>
+            {
+                return ClientTestUtil.CreateBasicSchemaInsert(table, i);
+            });
+
+            await client.WriteAsync(rows);
+
+            var scanner = client.NewScanBuilder(table)
+                .SetReplicaSelection(ReplicaSelection.ClosestReplica)
+                .SetBatchSizeBytes(100) // Use a small batch size so we get many batches.
+                .Build();
+
+            var scanEnumerator = scanner.GetAsyncEnumerator();
+
+            // KeepAlive on uninitialized scanner should be ok.
+            await scanEnumerator.KeepAliveAsync();
+
+            // Get the first batch and initialize the scanner.
+            Assert.True(await scanEnumerator.MoveNextAsync());
+            int accum = scanEnumerator.Current.Count;
+
+            while (await scanEnumerator.MoveNextAsync())
+            {
+                accum += scanEnumerator.Current.Count;
+
+                // Break when we are between tablets.
+                if (scanEnumerator.Tablet is null)
+                    break;
+
+                // Ensure we actually end up between tablets.
+                if (accum == numRows)
+                    Assert.False(true, "All rows were in a single tablet.");
+            }
+
+            // In between scanners now and should be ok.
+            await scanEnumerator.KeepAliveAsync();
+
+            // Initialize the next scanner or keepAlive will have no effect.
+            Assert.True(await scanEnumerator.MoveNextAsync());
+            accum += scanEnumerator.Current.Count;
+
+            // Wait for longer than the scanner ttl calling keepAlive throughout.
+            // Each loop sleeps 25% of the scanner ttl and we loop 10 times to ensure
+            // we extend over 2x the scanner ttl.
+            for (int i = 0; i < 10; i++)
+            {
+                await Task.Delay(ShortScannerTtlMs / 4);
+                await scanEnumerator.KeepAliveAsync();
+            }
+
+            // Finish out the rows.
+            while (await scanEnumerator.MoveNextAsync())
+            {
+                accum += scanEnumerator.Current.Count;
+            }
+
+            Assert.Equal(numRows, accum);
+
+            // At this point the scanner is closed and there is nothing to keep alive.
+            try
+            {
+                await scanEnumerator.KeepAliveAsync();
+                Assert.False(true);
+            }
+            catch (Exception ex)
+            {
+                Assert.Contains("Scanner has already been closed", ex.Message);
+            }
+        }
 
         [SkippableFact]
         public async Task TestOpenScanWithDroppedPartition()
