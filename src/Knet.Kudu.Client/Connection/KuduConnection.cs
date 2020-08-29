@@ -119,7 +119,11 @@ namespace Knet.Kudu.Client.Connection
             await _singleWriter.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                await output.WriteAsync(source, cancellationToken).ConfigureAwait(false);
+                var result = await output.WriteAsync(source, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (result.IsCanceled)
+                    await output.CompleteAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -411,6 +415,8 @@ namespace Knet.Kudu.Client.Connection
 
             // Don't dispose _singleWriter; there may still be
             // pending writes.
+
+            (_ioPipe as IDisposable)?.Dispose();
         }
 
         public override string ToString() => _ioPipe.ToString();
@@ -421,7 +427,7 @@ namespace Knet.Kudu.Client.Connection
         public async Task CloseAsync()
         {
             _ioPipe.Output.CancelPendingFlush();
-            await _ioPipe.Output.CompleteAsync().ConfigureAwait(false);
+            _ioPipe.Input.CancelPendingRead();
 
             // Wait for the reader loop to finish.
             await _receiveTask.ConfigureAwait(false);
@@ -648,7 +654,6 @@ namespace Knet.Kudu.Client.Connection
 
             private Memory<byte> GetNextSidecar()
             {
-                var sidecarOffsets = Header.SidecarOffsets;
                 int currentIndex = NextSidecarIndex;
 
                 var offset = SidecarOffsets[currentIndex];

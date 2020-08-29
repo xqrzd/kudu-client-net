@@ -132,7 +132,7 @@ namespace Knet.Kudu.Client.Negotiate
                 var input = StreamConnection.GetReader(_stream,
                     _options.ReceivePipeOptions);
 
-                pipe = new DuplexPipe(output, input, _serverInfo.ToString());
+                pipe = new DuplexPipe(_socket, output, input, _serverInfo.ToString());
             }
             else
             {
@@ -149,8 +149,7 @@ namespace Knet.Kudu.Client.Negotiate
                 _logMessage.NegotiateInfo,
                 _serverInfo.IsLocal);
 
-            var socketConnection = new KuduSocketConnection(_socket, pipe);
-            return new KuduConnection(socketConnection, _loggerFactory);
+            return new KuduConnection(pipe, _loggerFactory);
         }
 
         private Task<NegotiatePB> NegotiateFeaturesAsync(CancellationToken cancellationToken)
@@ -530,22 +529,32 @@ namespace Knet.Kudu.Client.Negotiate
             public string NegotiateInfo { get; set; } = "SASL_PLAIN";
         }
 
-        private sealed class DuplexPipe : IDuplexPipe
+        private sealed class DuplexPipe : IDuplexPipe, IDisposable
         {
+            private readonly Socket _socket;
+
             public PipeWriter Output { get; }
 
             public PipeReader Input { get; }
 
             public string Name { get; }
 
-            public DuplexPipe(PipeWriter output, PipeReader input, string name)
+            public DuplexPipe(Socket socket, PipeWriter output, PipeReader input, string name)
             {
+                _socket = socket;
                 Output = output;
                 Input = input;
                 Name = name;
             }
 
             public override string ToString() => Name;
+
+            public void Dispose()
+            {
+                _socket.Shutdown(SocketShutdown.Both);
+                _socket.Close();
+                _socket.Dispose();
+            }
         }
     }
 }
