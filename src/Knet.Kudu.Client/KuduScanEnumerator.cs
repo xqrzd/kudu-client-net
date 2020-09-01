@@ -131,7 +131,6 @@ namespace Knet.Kudu.Client
             _lastPrimaryKey = Array.Empty<byte>();
             _cancellationToken = cancellationToken;
             ResourceMetrics = new ResourceMetrics();
-            // TODO: Register cancellation callback and cancel the scan.
 
             // Map the column names to actual columns in the table schema.
             // If the user set this to 'null', we scan all columns.
@@ -436,7 +435,6 @@ namespace Knet.Kudu.Client
 
         private ScanRequest<T> GetOpenRequest()
         {
-            //checkScanningNotStarted();
             var request = new ScanRequestPB();
 
             var newRequest = request.NewScanRequest = new NewScanRequestPB
@@ -499,7 +497,6 @@ namespace Knet.Kudu.Client
 
         private ScanRequest<T> GetNextRowsRequest()
         {
-            //checkScanningNotStarted();
             var request = new ScanRequestPB
             {
                 ScannerId = _scannerId,

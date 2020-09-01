@@ -23,10 +23,6 @@ namespace Knet.Kudu.Client
         /// timestamp is propagated through back-channels to other
         /// KuduClient's.
         ///
-        /// WARNING: Failure to propagate timestamp information through
-        /// back-channels will negate any external consistency guarantee under this
-        /// mode.
-        ///
         /// Example:
         /// 1 - Client A executes operation X in Tablet A
         /// 2 - Afterwards, Client A executes operation Y in Tablet B
