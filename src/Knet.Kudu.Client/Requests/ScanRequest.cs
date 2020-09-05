@@ -142,11 +142,6 @@ namespace Knet.Kudu.Client.Requests
             }
         }
 
-        public override void ParseSidecar(KuduSidecar sidecar)
-        {
-            _parser.ParseSidecar(sidecar);
-        }
-
         public override void ParseSidecars(KuduSidecars sidecars)
         {
             _parser.ParseSidecars(sidecars);

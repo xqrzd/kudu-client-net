@@ -56,15 +56,6 @@ namespace Knet.Kudu.Client.Requests
 
         public abstract void ParseProtobuf(ReadOnlySequence<byte> buffer);
 
-        /// <summary>
-        /// Override to enable incremental parsing of sidecars. The memory
-        /// from the sidecar is safe to hold, until ParseSidecars() is called.
-        /// </summary>
-        /// <param name="sidecar"></param>
-        public virtual void ParseSidecar(KuduSidecar sidecar)
-        {
-        }
-
         public virtual void ParseSidecars(KuduSidecars sidecars)
         {
             sidecars.Dispose();
