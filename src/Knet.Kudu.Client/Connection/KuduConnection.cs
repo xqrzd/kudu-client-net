@@ -293,9 +293,7 @@ namespace Knet.Kudu.Client.Connection
                     {
                         if (parserContext.TryReadSidecars(ref reader, out var sidecars))
                         {
-                            parserContext.Rpc.ParseSidecars(sidecars);
-                            parserContext.SidecarMemory = null;
-
+                            ProcessSidecars(parserContext, sidecars);
                             return true;
                         }
                         else
@@ -362,6 +360,21 @@ namespace Knet.Kudu.Client.Connection
                 rpc.TrySetResult(null);
             else
                 rpc.TrySetException(exception);
+        }
+
+        private void ProcessSidecars(ParserContext parserContext, KuduSidecars sidecars)
+        {
+            try
+            {
+                parserContext.Rpc.ParseSidecars(sidecars);
+            }
+            catch (Exception ex)
+            {
+                parserContext.Exception = ex;
+                parserContext.SidecarMemory.Dispose();
+            }
+
+            parserContext.SidecarMemory = null;
         }
 
         private void RemoveInflightRpc(int callId)
