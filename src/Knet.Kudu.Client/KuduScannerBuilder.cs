@@ -1,4 +1,5 @@
-﻿using Knet.Kudu.Client.Scanner;
+﻿using System;
+using Knet.Kudu.Client.Scanner;
 using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client
@@ -31,6 +32,8 @@ namespace Knet.Kudu.Client
                     ScanParser = (IKuduScanParser<T>)_resultSetParser;
                 else if (typeof(T) == typeof(ColumnarResultSet))
                     ScanParser = (IKuduScanParser<T>)_columnarResultSetParser;
+                else
+                    throw new Exception($"A scan parser was not supplied for type {typeof(T).Name}");
             }
 
             return new KuduScanner<T>(
