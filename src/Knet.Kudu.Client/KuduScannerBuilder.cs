@@ -33,7 +33,7 @@ namespace Knet.Kudu.Client
                 else if (typeof(T) == typeof(ColumnarResultSet))
                     ScanParser = (IKuduScanParser<T>)_columnarResultSetParser;
                 else
-                    throw new Exception($"A scan parser was not supplied for type {typeof(T).Name}");
+                    throw new ArgumentException($"A scan parser was not supplied for type {typeof(T).Name}");
             }
 
             return new KuduScanner<T>(
