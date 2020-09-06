@@ -21,16 +21,17 @@ namespace Knet.Kudu.Client.Requests
         private readonly ScanRequestState _state;
         private readonly ScanRequestPB _scanRequestPb;
         private readonly KuduSchema _schema;
-        private readonly KuduScanParser<T> _parser;
+        private readonly IKuduScanParser<T> _parser;
         private readonly bool _isFaultTolerant;
 
-        private ScanResponsePB _responsePB;
+        private ScanResponsePB _responsePb;
+        private KuduSidecars _sidecars;
 
         public ScanRequest(
             ScanRequestState state,
             ScanRequestPB scanRequestPb,
             KuduSchema schema,
-            KuduScanParser<T> parser,
+            IKuduScanParser<T> parser,
             ReplicaSelection replicaSelection,
             string tableId,
             RemoteTablet tablet,
@@ -91,11 +92,10 @@ namespace Knet.Kudu.Client.Requests
             var error = response.Error;
 
             Error = error;
-            _responsePB = response;
+            _responsePb = response;
 
-            if (error == null)
+            if (error is null)
             {
-                _parser.ProcessScanResponse(_schema, response);
                 return;
             }
 
@@ -130,21 +130,29 @@ namespace Knet.Kudu.Client.Requests
         {
             get
             {
+                var result = _parser.ParseSidecars(_schema, _responsePb, _sidecars);
+
+                var scanTimestamp = _responsePb.ShouldSerializeSnapTimestamp()
+                    ? (long)_responsePb.SnapTimestamp : KuduClient.NoTimestamp;
+
+                var propagatedTimestamp = _responsePb.ShouldSerializePropagatedTimestamp()
+                    ? (long)_responsePb.PropagatedTimestamp : KuduClient.NoTimestamp;
+
                 return new ScanResponse<T>(
-                    _responsePB.ScannerId,
-                    _parser.Output,
-                    _parser.NumRows,
-                    _responsePB.HasMoreResults,
-                    _responsePB.ShouldSerializeSnapTimestamp() ? (long)_responsePB.SnapTimestamp : KuduClient.NoTimestamp,
-                    _responsePB.ShouldSerializePropagatedTimestamp() ? (long)_responsePB.PropagatedTimestamp : KuduClient.NoTimestamp,
-                    _responsePB.LastPrimaryKey,
-                    _responsePB.ResourceMetrics);
+                    _responsePb.ScannerId,
+                    result.Result,
+                    result.NumRows,
+                    _responsePb.HasMoreResults,
+                    scanTimestamp,
+                    propagatedTimestamp,
+                    _responsePb.LastPrimaryKey,
+                    _responsePb.ResourceMetrics);
             }
         }
 
         public override void ParseSidecars(KuduSidecars sidecars)
         {
-            _parser.ParseSidecars(sidecars);
+            _sidecars = sidecars;
         }
     }
 

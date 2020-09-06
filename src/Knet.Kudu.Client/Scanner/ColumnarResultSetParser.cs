@@ -4,36 +4,26 @@ using Knet.Kudu.Client.Protocol.Tserver;
 
 namespace Knet.Kudu.Client.Scanner
 {
-    public class ColumnarResultSetParser : KuduScanParser<ColumnarResultSet>
+    public sealed class ColumnarResultSetParser : IKuduScanParser<ColumnarResultSet>
     {
-        private KuduSchema _scanSchema;
-        private ScanResponsePB _responsePB;
-        private ColumnarResultSet _result;
+        public RowDataFormat RowFormat => RowDataFormat.Columnar;
 
-        public override ColumnarResultSet Output => _result ?? GetEmptyResultSet();
-
-        public override void ProcessScanResponse(KuduSchema scanSchema, ScanResponsePB scanResponse)
+        public KuduScanParserResult<ColumnarResultSet> ParseSidecars(
+            KuduSchema scanSchema,
+            ScanResponsePB scanResponse,
+            KuduSidecars sidecars)
         {
-            if (scanResponse.ColumnarData == null)
+            if (scanResponse.ColumnarData is null)
                 throw new NonRecoverableException(
                     KuduStatus.NotSupported("Columnar scan format requires Kudu server 1.12 or newer."));
 
-            _scanSchema = scanSchema;
-            _responsePB = scanResponse;
-            NumRows = scanResponse.ColumnarData.NumRows;
-        }
+            var columnarData = scanResponse.ColumnarData;
 
-        public override void ParseSidecars(KuduSidecars sidecars)
-        {
-            _result = new ColumnarResultSet(
-                sidecars,
-                _scanSchema,
-                _responsePB.ColumnarData);
-        }
+            var resultSet = new ColumnarResultSet(
+                sidecars, scanSchema, columnarData);
 
-        private ColumnarResultSet GetEmptyResultSet()
-        {
-            return new ColumnarResultSet(null, _scanSchema, _responsePB.ColumnarData);
+            return new KuduScanParserResult<ColumnarResultSet>(
+                resultSet, columnarData.NumRows);
         }
     }
 }

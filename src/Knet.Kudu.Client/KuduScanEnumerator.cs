@@ -19,7 +19,7 @@ namespace Knet.Kudu.Client
         private readonly ILogger _logger;
         private readonly KuduClient _client;
         private readonly KuduTable _table;
-        private readonly KuduScanParser<T> _parser;
+        private readonly IKuduScanParser<T> _parser;
         private readonly List<ColumnSchemaPB> _columns;
         private readonly KuduSchema _schema;
         private readonly PartitionPruner _partitionPruner;
@@ -64,7 +64,7 @@ namespace Knet.Kudu.Client
             ILogger logger,
             KuduClient client,
             KuduTable table,
-            KuduScanParser<T> parser,
+            IKuduScanParser<T> parser,
             List<string> projectedColumnNames,
             List<int> projectedColumnIndexes,
             ReadMode readMode,
