@@ -140,6 +140,7 @@ namespace Knet.Kudu.Client.Connection
         {
             var input = _ioPipe.Input;
             var parserContext = new ParserContext();
+            Exception exception = null;
 
             try
             {
@@ -156,12 +157,14 @@ namespace Knet.Kudu.Client.Connection
 
                     input.AdvanceTo(consumed, buffer.End);
                 }
-
-                await ShutdownAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                await ShutdownAsync(ex).ConfigureAwait(false);
+                exception = ex;
+            }
+            finally
+            {
+                await ShutdownAsync(exception).ConfigureAwait(false);
             }
         }
 
@@ -177,15 +180,9 @@ namespace Knet.Kudu.Client.Connection
                 if (TryParseMessage(ref reader, parserContext))
                 {
                     var rpc = parserContext.InflightRpc;
+                    var exception = parserContext.Exception;
 
-                    if (parserContext.Exception != null)
-                    {
-                        CompleteRpc(rpc, parserContext.Exception);
-                    }
-                    else
-                    {
-                        CompleteRpc(rpc);
-                    }
+                    CompleteRpc(rpc, exception);
 
                     parserContext.Reset();
                 }
@@ -359,14 +356,12 @@ namespace Knet.Kudu.Client.Connection
             }
         }
 
-        private void CompleteRpc(InflightRpc rpc)
-        {
-            rpc.TrySetResult(null);
-        }
-
         private void CompleteRpc(InflightRpc rpc, Exception exception)
         {
-            rpc.TrySetException(exception);
+            if (exception is null)
+                rpc.TrySetResult(null);
+            else
+                rpc.TrySetException(exception);
         }
 
         private void RemoveInflightRpc(int callId)
