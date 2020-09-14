@@ -532,6 +532,19 @@ namespace Knet.Kudu.Client
             return new KuduSession(this, options, _loggerFactory);
         }
 
+        public async ValueTask<KuduPartitioner> CreatePartitionerAsync(
+            KuduTable table, CancellationToken cancellationToken = default)
+        {
+            var tablets = await LoopLocateTableAsync(
+                table.TableId,
+                null,
+                null,
+                1000,
+                cancellationToken).ConfigureAwait(false);
+
+            return new KuduPartitioner(table, tablets);
+        }
+
         private async Task<KuduTable> OpenTableAsync(
             TableIdentifierPB tableIdentifier, CancellationToken cancellationToken = default)
         {
