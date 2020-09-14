@@ -723,7 +723,7 @@ namespace Knet.Kudu.Client
 #endif
         }
 
-        private async Task<List<RemoteTablet>> LoopLocateTableAsync(
+        public async ValueTask<List<RemoteTablet>> LoopLocateTableAsync(
             string tableId,
             byte[] startPartitionKey,
             byte[] endPartitionKey,
@@ -743,7 +743,7 @@ namespace Knet.Kudu.Client
             return tablets;
         }
 
-        private async Task LoopLocateTableAsync(
+        private async ValueTask LoopLocateTableAsync(
             string tableId,
             byte[] startPartitionKey,
             byte[] endPartitionKey,
