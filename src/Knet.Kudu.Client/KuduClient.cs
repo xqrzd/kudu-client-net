@@ -168,17 +168,23 @@ namespace Knet.Kudu.Client
             _securityContext.ImportAuthenticationCredentials(token);
         }
 
+        /// <summary>
+        /// Create a table on the cluster with the specified name, schema, and
+        /// table configurations.
+        /// </summary>
+        /// <param name="builder">The create table options.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         public async Task<KuduTable> CreateTableAsync(
-            TableBuilder tableBuilder, CancellationToken cancellationToken = default)
+            TableBuilder builder, CancellationToken cancellationToken = default)
         {
-            var rpc = new CreateTableRequest(tableBuilder.Build());
+            var rpc = new CreateTableRequest(builder.Build());
 
             var response = await SendRpcAsync(rpc, cancellationToken)
                 .ConfigureAwait(false);
 
             var tableId = new TableIdentifierPB { TableId = response.TableId };
 
-            if (tableBuilder.Wait)
+            if (builder.Wait)
             {
                 await WaitForCreateTableDoneAsync(
                     tableId, cancellationToken).ConfigureAwait(false);
@@ -190,11 +196,16 @@ namespace Knet.Kudu.Client
             return null;
         }
 
+        /// <summary>
+        /// Alter a table on the cluster as specified by the builder.
+        /// </summary>
+        /// <param name="builder">The alter table options.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         public async Task<AlterTableResponse> AlterTableAsync(
-            AlterTableBuilder alterTable,
+            AlterTableBuilder builder,
             CancellationToken cancellationToken = default)
         {
-            var rpc = new AlterTableRequest(alterTable);
+            var rpc = new AlterTableRequest(builder);
             AlterTableResponse response;
 
             try
@@ -204,19 +215,19 @@ namespace Knet.Kudu.Client
             }
             finally
             {
-                if (alterTable.HasAddDropRangePartitions)
+                if (builder.HasAddDropRangePartitions)
                 {
                     // Clear the table locations cache so the new partition is
                     // immediately visible. We clear the cache even on failure,
                     // just in case the alter table operation actually succeeded.
-                    _tableLocations.TryRemove(alterTable.TableId, out _);
+                    _tableLocations.TryRemove(builder.TableId, out _);
                 }
             }
 
-            if (alterTable.Wait)
+            if (builder.Wait)
             {
                 var isDoneResponse = await WaitForAlterTableDoneAsync(
-                    alterTable.TableIdPb, cancellationToken).ConfigureAwait(false);
+                    builder.TableIdPb, cancellationToken).ConfigureAwait(false);
 
                 response = new AlterTableResponse(
                     response.TableId,
@@ -286,6 +297,13 @@ namespace Knet.Kudu.Client
             await SendRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Get a list of table names. Passing a null filter returns all the tables.
+        /// When a filter is specified, it only returns tables that satisfy a substring
+        /// match.
+        /// </summary>
+        /// <param name="nameFilter">An optional table name filter.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         public async Task<List<TableInfo>> GetTablesAsync(
             string nameFilter = null, CancellationToken cancellationToken = default)
         {
@@ -381,6 +399,11 @@ namespace Knet.Kudu.Client
             return tableLocations;
         }
 
+        /// <summary>
+        /// Open the table with the given name.
+        /// </summary>
+        /// <param name="tableName">The table to open.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         public async Task<KuduTable> OpenTableAsync(
             string tableName, CancellationToken cancellationToken = default)
         {
@@ -532,6 +555,23 @@ namespace Knet.Kudu.Client
             return new KuduSession(this, options, _loggerFactory);
         }
 
+        /// <summary>
+        /// <para>
+        /// Create a <see cref="KuduPartitioner"/> that allows clients to determine
+        /// the target partition of a row without actually performing a write. The
+        /// set of partitions is eagerly fetched when the KuduPartitioner is constructed
+        /// so that the actual partitioning step can be performed synchronously
+        /// without any network trips.
+        /// </para>
+        /// 
+        /// <para>
+        /// NOTE: Because this operates on a metadata snapshot retrieved at
+        /// construction time, it will not reflect any metadata changes to the
+        /// table that have occurred since its creation.
+        /// </para>
+        /// </summary>
+        /// <param name="table">The table to operate on.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         public async ValueTask<KuduPartitioner> CreatePartitionerAsync(
             KuduTable table, CancellationToken cancellationToken = default)
         {
@@ -736,7 +776,7 @@ namespace Knet.Kudu.Client
 #endif
         }
 
-        public async ValueTask<List<RemoteTablet>> LoopLocateTableAsync(
+        private async ValueTask<List<RemoteTablet>> LoopLocateTableAsync(
             string tableId,
             byte[] startPartitionKey,
             byte[] endPartitionKey,
