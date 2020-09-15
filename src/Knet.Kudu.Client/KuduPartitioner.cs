@@ -72,8 +72,7 @@ namespace Knet.Kudu.Client
 
                 if (firstLowerBound.Length > 0)
                 {
-                    // If the first tablet is past the requested partition key, then the
-                    // partition key falls in an initial non-covered range, such as A.
+                    // There is an initial non-covered range, such as A.
                     newEntries.Add(PartitionerLocationEntry.NewNonCoveredRange2(
                         Array.Empty<byte>(), firstLowerBound));
                 }
