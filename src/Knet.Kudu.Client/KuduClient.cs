@@ -304,7 +304,6 @@ namespace Knet.Kudu.Client
         /// </summary>
         /// <param name="nameFilter">An optional table name filter.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
-        /// <returns></returns>
         public async Task<List<TableInfo>> GetTablesAsync(
             string nameFilter = null, CancellationToken cancellationToken = default)
         {
