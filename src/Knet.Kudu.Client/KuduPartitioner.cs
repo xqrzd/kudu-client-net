@@ -35,7 +35,52 @@ namespace Knet.Kudu.Client
             _cache = new AvlTree();
 
             NumPartitions = tablets.Count;
+            InitializeCache(tablets);
+        }
 
+        /// <summary>
+        /// Determine if the given row falls into a valid partition.
+        /// </summary>
+        /// <param name="row">The row to check.</param>
+        public bool IsCovered(PartialRow row)
+        {
+            var entry = GetCacheEntry(row);
+            return entry.IsCoveredRange;
+        }
+
+        public PartitionResult GetRowTablet(PartialRow row)
+        {
+            var entry = GetCacheEntry(row);
+
+            if (entry.IsNonCoveredRange)
+            {
+                throw new NonCoveredRangeException(
+                    entry.LowerBoundPartitionKey,
+                    entry.UpperBoundPartitionKey);
+            }
+
+            return new PartitionResult(entry.Tablet, entry.PartitionIndex);
+        }
+
+        private PartitionerLocationEntry GetCacheEntry(PartialRow row)
+        {
+            var partitionSchema = _partitionSchema;
+            int maxSize = KeyEncoder.CalculateMaxPartitionKeySize(row, partitionSchema);
+            Span<byte> buffer = stackalloc byte[maxSize];
+
+            KeyEncoder.EncodePartitionKey(
+                row,
+                partitionSchema,
+                buffer,
+                out int bytesWritten);
+
+            var partitionKey = buffer.Slice(0, bytesWritten);
+
+            return (PartitionerLocationEntry)_cache.FloorEntry(partitionKey);
+        }
+
+        private void InitializeCache(List<RemoteTablet> tablets)
+        {
             var newEntries = new List<PartitionerLocationEntry>();
             int partitionIndex = 0;
 
@@ -111,47 +156,6 @@ namespace Knet.Kudu.Client
 
             foreach (var entry in newEntries)
                 _cache.Insert(entry);
-        }
-
-        /// <summary>
-        /// Determine if the given row falls into a valid partition.
-        /// </summary>
-        /// <param name="row">The row to check.</param>
-        public bool IsCovered(PartialRow row)
-        {
-            var entry = GetCacheEntry(row);
-            return entry.IsCoveredRange;
-        }
-
-        public PartitionResult GetRowTablet(PartialRow row)
-        {
-            var entry = GetCacheEntry(row);
-
-            if (entry.IsNonCoveredRange)
-            {
-                throw new NonCoveredRangeException(
-                    entry.LowerBoundPartitionKey,
-                    entry.UpperBoundPartitionKey);
-            }
-
-            return new PartitionResult(entry.Tablet, entry.PartitionIndex);
-        }
-
-        private PartitionerLocationEntry GetCacheEntry(PartialRow row)
-        {
-            var partitionSchema = _partitionSchema;
-            int maxSize = KeyEncoder.CalculateMaxPartitionKeySize(row, partitionSchema);
-            Span<byte> buffer = stackalloc byte[maxSize];
-
-            KeyEncoder.EncodePartitionKey(
-                row,
-                partitionSchema,
-                buffer,
-                out int bytesWritten);
-
-            var partitionKey = buffer.Slice(0, bytesWritten);
-
-            return (PartitionerLocationEntry)_cache.FloorEntry(partitionKey);
         }
 
         private class PartitionerLocationEntry : TableLocationEntry
