@@ -6,20 +6,26 @@ using Knet.Kudu.Client.Connection;
 namespace Knet.Kudu.Client.Tablet
 {
     /// <summary>
+    /// <para>
     /// This class encapsulates the information regarding a tablet and its locations.
-    ///
+    /// </para>
+    /// 
+    /// <para>
     /// RemoteTablet's main function is to keep track of where the leader for this
     /// tablet is. For example, an RPC might call GetServerInfo, contact that TS, find
-    /// it's not the leader anymore, and then re-fetch the tablet locations.
-    ///
+    /// it's not the leader anymore, and then re-fetch the tablet locations. This
+    /// class is immutable.
+    /// </para>
+    /// 
+    /// <para>
     /// A RemoteTablet's life is expected to be long in a cluster where roles aren't
     /// changing often, and short when they do since the Kudu client will replace the
     /// RemoteTablet it caches with new ones after getting tablet locations from the master.
+    /// </para>
     /// </summary>
     public class RemoteTablet : IEquatable<RemoteTablet>
     {
         private readonly ServerInfoCache _cache;
-        private readonly List<Replica> _replicas;
 
         public string TableId { get; }
 
@@ -27,21 +33,21 @@ namespace Knet.Kudu.Client.Tablet
 
         public Partition Partition { get; }
 
+        public IReadOnlyList<Replica> Replicas { get; }
+
         public RemoteTablet(
             string tableId,
             string tabletId,
             Partition partition,
             ServerInfoCache cache,
-            List<Replica> replicas)
+            IReadOnlyList<Replica> replicas)
         {
             TableId = tableId;
             TabletId = tabletId;
             Partition = partition;
+            Replicas = replicas;
             _cache = cache;
-            _replicas = replicas;
         }
-
-        public IReadOnlyList<Replica> Replicas => _replicas;
 
         public ServerInfo GetServerInfo(
             ReplicaSelection replicaSelection, string location = null)
