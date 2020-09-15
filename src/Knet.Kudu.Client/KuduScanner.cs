@@ -10,7 +10,7 @@ namespace Knet.Kudu.Client
         private readonly ILogger _logger;
         private readonly KuduClient _client;
         private readonly KuduTable _table;
-        private readonly IKuduScanParserFactory<T> _scanParserFactory;
+        private readonly IKuduScanParser<T> _parser;
         private readonly List<string> _projectedColumnNames;
         private readonly List<int> _projectedColumnIndexes;
         private readonly Dictionary<string, KuduPredicate> _predicates;
@@ -36,7 +36,7 @@ namespace Knet.Kudu.Client
             ILogger logger,
             KuduClient client,
             KuduTable table,
-            IKuduScanParserFactory<T> scanParserFactory,
+            IKuduScanParser<T> parser,
             List<string> projectedColumnNames,
             List<int> projectedColumnIndexes,
             Dictionary<string, KuduPredicate> predicates,
@@ -57,7 +57,7 @@ namespace Knet.Kudu.Client
             _logger = logger;
             _client = client;
             _table = table;
-            _scanParserFactory = scanParserFactory;
+            _parser = parser;
             _projectedColumnNames = projectedColumnNames;
             _projectedColumnIndexes = projectedColumnIndexes;
             _predicates = predicates;
@@ -87,13 +87,11 @@ namespace Knet.Kudu.Client
                 _lowerBoundPartitionKey,
                 _upperBoundPartitionKey);
 
-            var scanParser = _scanParserFactory.CreateParser();
-
             return new KuduScanEnumerator<T>(
                 _logger,
                 _client,
                 _table,
-                scanParser,
+                _parser,
                 _projectedColumnNames,
                 _projectedColumnIndexes,
                 ReadMode,

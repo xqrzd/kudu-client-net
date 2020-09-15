@@ -161,7 +161,7 @@ namespace Knet.Kudu.Client
                 var partitionRange = pruner.NextPartitionKeyRange;
 
                 var newKeyRanges = await Client.GetTableKeyRangesAsync(
-                    Table,
+                    Table.TableId,
                     LowerBoundPrimaryKey,
                     UpperBoundPrimaryKey,
                     partitionRange.Lower.Length == 0 ? null : partitionRange.Lower,

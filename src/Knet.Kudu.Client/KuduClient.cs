@@ -532,6 +532,19 @@ namespace Knet.Kudu.Client
             return new KuduSession(this, options, _loggerFactory);
         }
 
+        public async ValueTask<KuduPartitioner> CreatePartitionerAsync(
+            KuduTable table, CancellationToken cancellationToken = default)
+        {
+            var tablets = await LoopLocateTableAsync(
+                table.TableId,
+                null,
+                null,
+                1000,
+                cancellationToken).ConfigureAwait(false);
+
+            return new KuduPartitioner(table, tablets);
+        }
+
         private async Task<KuduTable> OpenTableAsync(
             TableIdentifierPB tableIdentifier, CancellationToken cancellationToken = default)
         {
@@ -723,8 +736,28 @@ namespace Knet.Kudu.Client
 #endif
         }
 
-        private async Task LoopLocateTableAsync(
-            KuduTable table,
+        public async ValueTask<List<RemoteTablet>> LoopLocateTableAsync(
+            string tableId,
+            byte[] startPartitionKey,
+            byte[] endPartitionKey,
+            int fetchBatchSize,
+            CancellationToken cancellationToken = default)
+        {
+            var tablets = new List<RemoteTablet>();
+
+            await LoopLocateTableAsync(
+                tableId,
+                startPartitionKey,
+                endPartitionKey,
+                fetchBatchSize,
+                tablets,
+                cancellationToken).ConfigureAwait(false);
+
+            return tablets;
+        }
+
+        private async ValueTask LoopLocateTableAsync(
+            string tableId,
             byte[] startPartitionKey,
             byte[] endPartitionKey,
             int fetchBatchSize,
@@ -741,7 +774,6 @@ namespace Knet.Kudu.Client
             // The next partition key to look up. If null, then it represents
             // the minimum partition key, If empty, it represents the maximum key.
             byte[] partitionKey = startPartitionKey;
-            string tableId = table.TableId;
 
             // Continue while the partition key is the minimum, or it is not the maximum
             // and it is less than the end partition key.
@@ -771,7 +803,7 @@ namespace Knet.Kudu.Client
                     .ConfigureAwait(false);
 
                 await LoopLocateTableAsync(
-                    table,
+                    tableId,
                     lookupKey,
                     endPartitionKey,
                     fetchBatchSize,
@@ -820,7 +852,7 @@ namespace Knet.Kudu.Client
         }
 
         internal async ValueTask<List<KeyRange>> GetTableKeyRangesAsync(
-            KuduTable table,
+            string tableId,
             byte[] startPrimaryKey,
             byte[] endPrimaryKey,
             byte[] startPartitionKey,
@@ -829,14 +861,11 @@ namespace Knet.Kudu.Client
             long splitSizeBytes,
             CancellationToken cancellationToken = default)
         {
-            var tablets = new List<RemoteTablet>();
-
-            await LoopLocateTableAsync(
-                table,
+            var tablets = await LoopLocateTableAsync(
+                tableId,
                 startPartitionKey,
                 endPartitionKey,
                 fetchBatchSize,
-                tablets,
                 cancellationToken).ConfigureAwait(false);
 
             var keyRanges = new List<KeyRange>(tablets.Count);
