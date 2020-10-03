@@ -781,6 +781,15 @@ namespace Knet.Kudu.Client.Protocol
         ClosestReplica = 2,
     }
 
+    [global::ProtoBuf.ProtoContract()]
+    public enum TableTypePB
+    {
+        [global::ProtoBuf.ProtoEnum(Name = @"DEFAULT_TABLE")]
+        DefaultTable = 0,
+        [global::ProtoBuf.ProtoEnum(Name = @"TXN_STATUS_TABLE")]
+        TxnStatusTable = 1,
+    }
+
 }
 
 #pragma warning restore CS1591, CS0612, CS3021, IDE1006

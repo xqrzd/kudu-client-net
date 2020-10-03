@@ -262,6 +262,28 @@ namespace Knet.Kudu.Client.Protocol.Master
         [global::ProtoBuf.ProtoMember(12, Name = @"extra_config")]
         public global::Knet.Kudu.Client.Protocol.TableExtraConfigPB ExtraConfig { get; set; }
 
+        [global::ProtoBuf.ProtoMember(13, Name = @"owner")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string Owner
+        {
+            get { return __pbn__Owner ?? ""; }
+            set { __pbn__Owner = value; }
+        }
+        public bool ShouldSerializeOwner() => __pbn__Owner != null;
+        public void ResetOwner() => __pbn__Owner = null;
+        private string __pbn__Owner;
+
+        [global::ProtoBuf.ProtoMember(14, Name = @"table_type")]
+        [global::System.ComponentModel.DefaultValue(global::Knet.Kudu.Client.Protocol.TableTypePB.DefaultTable)]
+        public global::Knet.Kudu.Client.Protocol.TableTypePB TableType
+        {
+            get { return __pbn__TableType ?? global::Knet.Kudu.Client.Protocol.TableTypePB.DefaultTable; }
+            set { __pbn__TableType = value; }
+        }
+        public bool ShouldSerializeTableType() => __pbn__TableType != null;
+        public void ResetTableType() => __pbn__TableType = null;
+        private global::Knet.Kudu.Client.Protocol.TableTypePB? __pbn__TableType;
+
         [global::ProtoBuf.ProtoContract()]
         public enum State
         {
@@ -730,6 +752,17 @@ namespace Knet.Kudu.Client.Protocol.Master
         public void ResetLocation() => __pbn__Location = null;
         private string __pbn__Location;
 
+        [global::ProtoBuf.ProtoMember(4, Name = @"unix_domain_socket_path")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string UnixDomainSocketPath
+        {
+            get { return __pbn__UnixDomainSocketPath ?? ""; }
+            set { __pbn__UnixDomainSocketPath = value; }
+        }
+        public bool ShouldSerializeUnixDomainSocketPath() => __pbn__UnixDomainSocketPath != null;
+        public void ResetUnixDomainSocketPath() => __pbn__UnixDomainSocketPath = null;
+        private string __pbn__UnixDomainSocketPath;
+
     }
 
     [global::ProtoBuf.ProtoContract()]
@@ -856,6 +889,17 @@ namespace Knet.Kudu.Client.Protocol.Master
         public bool ShouldSerializeDimensionLabel() => __pbn__DimensionLabel != null;
         public void ResetDimensionLabel() => __pbn__DimensionLabel = null;
         private string __pbn__DimensionLabel;
+
+        [global::ProtoBuf.ProtoMember(11, Name = @"table_type")]
+        [global::System.ComponentModel.DefaultValue(global::Knet.Kudu.Client.Protocol.TableTypePB.DefaultTable)]
+        public global::Knet.Kudu.Client.Protocol.TableTypePB TableType
+        {
+            get { return __pbn__TableType ?? global::Knet.Kudu.Client.Protocol.TableTypePB.DefaultTable; }
+            set { __pbn__TableType = value; }
+        }
+        public bool ShouldSerializeTableType() => __pbn__TableType != null;
+        public void ResetTableType() => __pbn__TableType = null;
+        private global::Knet.Kudu.Client.Protocol.TableTypePB? __pbn__TableType;
 
     }
 
@@ -1180,6 +1224,17 @@ namespace Knet.Kudu.Client.Protocol.Master
         [global::ProtoBuf.ProtoMap]
         public global::System.Collections.Generic.Dictionary<string, string> NewExtraConfigs { get; } = new global::System.Collections.Generic.Dictionary<string, string>();
 
+        [global::ProtoBuf.ProtoMember(7, Name = @"new_table_owner")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string NewTableOwner
+        {
+            get { return __pbn__NewTableOwner ?? ""; }
+            set { __pbn__NewTableOwner = value; }
+        }
+        public bool ShouldSerializeNewTableOwner() => __pbn__NewTableOwner != null;
+        public void ResetNewTableOwner() => __pbn__NewTableOwner = null;
+        private string __pbn__NewTableOwner;
+
         [global::ProtoBuf.ProtoContract()]
         public partial class AddColumn : global::ProtoBuf.IExtensible
         {
@@ -1466,6 +1521,17 @@ namespace Knet.Kudu.Client.Protocol.Master
         [global::ProtoBuf.ProtoMember(9, Name = @"extra_configs")]
         [global::ProtoBuf.ProtoMap]
         public global::System.Collections.Generic.Dictionary<string, string> ExtraConfigs { get; } = new global::System.Collections.Generic.Dictionary<string, string>();
+
+        [global::ProtoBuf.ProtoMember(10, Name = @"owner")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string Owner
+        {
+            get { return __pbn__Owner ?? ""; }
+            set { __pbn__Owner = value; }
+        }
+        public bool ShouldSerializeOwner() => __pbn__Owner != null;
+        public void ResetOwner() => __pbn__Owner = null;
+        private string __pbn__Owner;
 
     }
 
@@ -1841,7 +1907,7 @@ namespace Knet.Kudu.Client.Protocol.Master
     }
 
     [global::ProtoBuf.ProtoContract()]
-    public partial class ResetAuthzCacheRequestPB : global::ProtoBuf.IExtensible
+    public partial class RefreshAuthzCacheRequestPB : global::ProtoBuf.IExtensible
     {
         private global::ProtoBuf.IExtension __pbn__extensionData;
         global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
@@ -1850,7 +1916,7 @@ namespace Knet.Kudu.Client.Protocol.Master
     }
 
     [global::ProtoBuf.ProtoContract()]
-    public partial class ResetAuthzCacheResponsePB : global::ProtoBuf.IExtensible
+    public partial class RefreshAuthzCacheResponsePB : global::ProtoBuf.IExtensible
     {
         private global::ProtoBuf.IExtension __pbn__extensionData;
         global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)

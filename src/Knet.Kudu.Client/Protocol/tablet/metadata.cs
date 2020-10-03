@@ -113,6 +113,17 @@ namespace Knet.Kudu.Client.Protocol.Tablet
         [global::ProtoBuf.ProtoMember(2, Name = @"tablet_id", IsRequired = true)]
         public byte[] TabletId { get; set; }
 
+        [global::ProtoBuf.ProtoMember(19, Name = @"table_type")]
+        [global::System.ComponentModel.DefaultValue(global::Knet.Kudu.Client.Protocol.TableTypePB.DefaultTable)]
+        public global::Knet.Kudu.Client.Protocol.TableTypePB TableType
+        {
+            get { return __pbn__TableType ?? global::Knet.Kudu.Client.Protocol.TableTypePB.DefaultTable; }
+            set { __pbn__TableType = value; }
+        }
+        public bool ShouldSerializeTableType() => __pbn__TableType != null;
+        public void ResetTableType() => __pbn__TableType = null;
+        private global::Knet.Kudu.Client.Protocol.TableTypePB? __pbn__TableType;
+
         [global::ProtoBuf.ProtoMember(3, Name = @"last_durable_mrs_id", IsRequired = true)]
         public long LastDurableMrsId { get; set; }
 
