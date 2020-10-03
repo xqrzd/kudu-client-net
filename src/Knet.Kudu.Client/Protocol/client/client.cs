@@ -7,6 +7,166 @@ namespace Knet.Kudu.Client.Protocol.Client
 {
 
     [global::ProtoBuf.ProtoContract()]
+    public partial class TableMetadataPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"table_id")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string TableId
+        {
+            get { return __pbn__TableId ?? ""; }
+            set { __pbn__TableId = value; }
+        }
+        public bool ShouldSerializeTableId() => __pbn__TableId != null;
+        public void ResetTableId() => __pbn__TableId = null;
+        private string __pbn__TableId;
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"table_name")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string TableName
+        {
+            get { return __pbn__TableName ?? ""; }
+            set { __pbn__TableName = value; }
+        }
+        public bool ShouldSerializeTableName() => __pbn__TableName != null;
+        public void ResetTableName() => __pbn__TableName = null;
+        private string __pbn__TableName;
+
+        [global::ProtoBuf.ProtoMember(3, Name = @"num_replicas")]
+        public int NumReplicas
+        {
+            get { return __pbn__NumReplicas.GetValueOrDefault(); }
+            set { __pbn__NumReplicas = value; }
+        }
+        public bool ShouldSerializeNumReplicas() => __pbn__NumReplicas != null;
+        public void ResetNumReplicas() => __pbn__NumReplicas = null;
+        private int? __pbn__NumReplicas;
+
+        [global::ProtoBuf.ProtoMember(4, Name = @"schema")]
+        public global::Knet.Kudu.Client.Protocol.SchemaPB Schema { get; set; }
+
+        [global::ProtoBuf.ProtoMember(5, Name = @"partition_schema")]
+        public global::Knet.Kudu.Client.Protocol.PartitionSchemaPB PartitionSchema { get; set; }
+
+        [global::ProtoBuf.ProtoMember(6, Name = @"extra_configs")]
+        [global::ProtoBuf.ProtoMap]
+        public global::System.Collections.Generic.Dictionary<string, string> ExtraConfigs { get; } = new global::System.Collections.Generic.Dictionary<string, string>();
+
+        [global::ProtoBuf.ProtoMember(7, Name = @"owner")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string Owner
+        {
+            get { return __pbn__Owner ?? ""; }
+            set { __pbn__Owner = value; }
+        }
+        public bool ShouldSerializeOwner() => __pbn__Owner != null;
+        public void ResetOwner() => __pbn__Owner = null;
+        private string __pbn__Owner;
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class ServerMetadataPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"uuid")]
+        public byte[] Uuid
+        {
+            get { return __pbn__Uuid; }
+            set { __pbn__Uuid = value; }
+        }
+        public bool ShouldSerializeUuid() => __pbn__Uuid != null;
+        public void ResetUuid() => __pbn__Uuid = null;
+        private byte[] __pbn__Uuid;
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"rpc_addresses")]
+        public global::System.Collections.Generic.List<global::Knet.Kudu.Client.Protocol.HostPortPB> RpcAddresses { get; } = new global::System.Collections.Generic.List<global::Knet.Kudu.Client.Protocol.HostPortPB>();
+
+        [global::ProtoBuf.ProtoMember(3, Name = @"location")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string Location
+        {
+            get { return __pbn__Location ?? ""; }
+            set { __pbn__Location = value; }
+        }
+        public bool ShouldSerializeLocation() => __pbn__Location != null;
+        public void ResetLocation() => __pbn__Location = null;
+        private string __pbn__Location;
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class TabletMetadataPB : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"tablet_id")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string TabletId
+        {
+            get { return __pbn__TabletId ?? ""; }
+            set { __pbn__TabletId = value; }
+        }
+        public bool ShouldSerializeTabletId() => __pbn__TabletId != null;
+        public void ResetTabletId() => __pbn__TabletId = null;
+        private string __pbn__TabletId;
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"partition")]
+        public global::Knet.Kudu.Client.Protocol.PartitionPB Partition { get; set; }
+
+        [global::ProtoBuf.ProtoMember(3, Name = @"tablet_servers")]
+        public global::System.Collections.Generic.List<ServerMetadataPB> TabletServers { get; } = new global::System.Collections.Generic.List<ServerMetadataPB>();
+
+        [global::ProtoBuf.ProtoMember(4, Name = @"replicas")]
+        public global::System.Collections.Generic.List<ReplicaMetadataPB> Replicas { get; } = new global::System.Collections.Generic.List<ReplicaMetadataPB>();
+
+        [global::ProtoBuf.ProtoMember(5, Name = @"ttl_millis")]
+        public ulong TtlMillis
+        {
+            get { return __pbn__TtlMillis.GetValueOrDefault(); }
+            set { __pbn__TtlMillis = value; }
+        }
+        public bool ShouldSerializeTtlMillis() => __pbn__TtlMillis != null;
+        public void ResetTtlMillis() => __pbn__TtlMillis = null;
+        private ulong? __pbn__TtlMillis;
+
+        [global::ProtoBuf.ProtoContract()]
+        public partial class ReplicaMetadataPB : global::ProtoBuf.IExtensible
+        {
+            private global::ProtoBuf.IExtension __pbn__extensionData;
+            global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+                => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+            [global::ProtoBuf.ProtoMember(1, Name = @"ts_idx", IsRequired = true)]
+            public uint TsIdx { get; set; }
+
+            [global::ProtoBuf.ProtoMember(2, Name = @"role", IsRequired = true)]
+            public global::Knet.Kudu.Client.Protocol.Consensus.RaftPeerPB.Role Role { get; set; } = global::Knet.Kudu.Client.Protocol.Consensus.RaftPeerPB.Role.UnknownRole;
+
+            [global::ProtoBuf.ProtoMember(3, Name = @"dimension_label")]
+            [global::System.ComponentModel.DefaultValue("")]
+            public string DimensionLabel
+            {
+                get { return __pbn__DimensionLabel ?? ""; }
+                set { __pbn__DimensionLabel = value; }
+            }
+            public bool ShouldSerializeDimensionLabel() => __pbn__DimensionLabel != null;
+            public void ResetDimensionLabel() => __pbn__DimensionLabel = null;
+            private string __pbn__DimensionLabel;
+
+        }
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
     public partial class ScanTokenPB : global::ProtoBuf.IExtensible
     {
         private global::ProtoBuf.IExtension __pbn__extensionData;
@@ -37,6 +197,15 @@ namespace Knet.Kudu.Client.Protocol.Client
         public bool ShouldSerializeTableName() => __pbn__TableName != null;
         public void ResetTableName() => __pbn__TableName = null;
         private string __pbn__TableName;
+
+        [global::ProtoBuf.ProtoMember(21, Name = @"table_metadata")]
+        public TableMetadataPB TableMetadata { get; set; }
+
+        [global::ProtoBuf.ProtoMember(22, Name = @"tablet_metadata")]
+        public TabletMetadataPB TabletMetadata { get; set; }
+
+        [global::ProtoBuf.ProtoMember(23, Name = @"projected_column_idx")]
+        public int[] ProjectedColumnIdxs { get; set; }
 
         [global::ProtoBuf.ProtoMember(3, Name = @"projected_columns")]
         public global::System.Collections.Generic.List<global::Knet.Kudu.Client.Protocol.ColumnSchemaPB> ProjectedColumns { get; } = new global::System.Collections.Generic.List<global::Knet.Kudu.Client.Protocol.ColumnSchemaPB>();
@@ -197,6 +366,9 @@ namespace Knet.Kudu.Client.Protocol.Client
         public bool ShouldSerializeKeepAlivePeriodMs() => __pbn__KeepAlivePeriodMs != null;
         public void ResetKeepAlivePeriodMs() => __pbn__KeepAlivePeriodMs = null;
         private long? __pbn__KeepAlivePeriodMs;
+
+        [global::ProtoBuf.ProtoMember(24, Name = @"authz_token")]
+        public global::Knet.Kudu.Client.Protocol.Security.SignedTokenPB AuthzToken { get; set; }
 
         [global::ProtoBuf.ProtoContract()]
         public enum Feature

@@ -145,6 +145,17 @@ namespace Knet.Kudu.Client.Protocol
         public void ResetStartTime() => __pbn__StartTime = null;
         private long? __pbn__StartTime;
 
+        [global::ProtoBuf.ProtoMember(6, Name = @"unix_domain_socket_path")]
+        [global::System.ComponentModel.DefaultValue("")]
+        public string UnixDomainSocketPath
+        {
+            get { return __pbn__UnixDomainSocketPath ?? ""; }
+            set { __pbn__UnixDomainSocketPath = value; }
+        }
+        public bool ShouldSerializeUnixDomainSocketPath() => __pbn__UnixDomainSocketPath != null;
+        public void ResetUnixDomainSocketPath() => __pbn__UnixDomainSocketPath = null;
+        private string __pbn__UnixDomainSocketPath;
+
     }
 
     [global::ProtoBuf.ProtoContract()]
