@@ -540,6 +540,25 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Empty(table.ExtraConfig);
         }
 
+        [SkippableFact]
+        public async Task TestAlterChangeOwner()
+        {
+            var originalOwner = "alice";
+            var builder = ClientTestUtil.GetBasicSchema()
+                .SetTableName(nameof(TestAlterChangeOwner))
+                .SetRangePartitionColumns("key")
+                .SetOwner(originalOwner);
+
+            var table = await _client.CreateTableAsync(builder);
+            Assert.Equal(originalOwner, table.Owner);
+
+            var newOwner = "bob";
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .SetOwner(newOwner));
+            table = await _client.OpenTableAsync(table.TableName);
+            Assert.Equal(newOwner, table.Owner);
+        }
+
         /// <summary>
         /// Creates a new table with two int columns, c0 and c1. c0 is the primary key.
         /// The table is hash partitioned on c0 into two buckets, and range partitioned
