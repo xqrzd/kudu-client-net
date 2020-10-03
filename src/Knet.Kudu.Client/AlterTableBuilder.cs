@@ -27,6 +27,16 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// True if the alter table operation includes an add or drop
+        /// partition operation.
+        /// </summary>
+        internal bool HasAddDropRangePartitions => _request.Schema != null;
+
+        internal string TableId => _table.TableId;
+
+        internal TableIdentifierPB TableIdPb => _request.Table;
+
+        /// <summary>
         /// Change a table's name.
         /// </summary>
         /// <param name="newName">New table's name, must be used to check progress.</param>
@@ -37,14 +47,14 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
-        /// True if the alter table operation includes an add or drop
-        /// partition operation.
+        /// Change a table's owner.
         /// </summary>
-        internal bool HasAddDropRangePartitions => _request.Schema != null;
-
-        internal string TableId => _table.TableId;
-
-        internal TableIdentifierPB TableIdPb => _request.Table;
+        /// <param name="owner">The new table owner.</param>
+        public AlterTableBuilder SetOwner(string owner)
+        {
+            _request.NewTableOwner = owner;
+            return this;
+        }
 
         /// <summary>
         /// Add a new column to the table. The column defaults to a
