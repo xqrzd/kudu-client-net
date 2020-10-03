@@ -33,6 +33,13 @@ namespace Knet.Kudu.Client
 
         public string TableName => SchemaPb.TableName;
 
+        /// <summary>
+        /// This table's owner or an empty string if the table was created
+        /// without owner on a version of Kudu that didn't automatically
+        /// assign an owner.
+        /// </summary>
+        public string Owner => SchemaPb.Owner;
+
         public override string ToString() => TableName;
 
         /// <summary>

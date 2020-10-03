@@ -57,13 +57,10 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
-        /// Set the table owner as the provided username in configured external
-        /// catalogs such as the Hive Metastore. Overrides the default of the
-        /// currently logged-in username or Kerberos principal.
+        /// Set the table owner as the provided username. Overrides the
+        /// default of the currently logged-in username or Kerberos principal.
         /// </summary>
-        /// <param name="owner">
-        /// The username to set as the table owner in external catalogs.
-        /// </param>
+        /// <param name="owner">The username to set as the table owner.</param>
         public TableBuilder SetOwner(string owner)
         {
             _createTableRequest.Owner = owner;
