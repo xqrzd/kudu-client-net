@@ -121,7 +121,7 @@ namespace Knet.Kudu.Client
         }
     }
 
-    public class ResultSetWrapper : ResultSet, IDisposable
+    public sealed class ResultSetWrapper : ResultSet, IDisposable
     {
         private readonly IDisposable _memory;
 

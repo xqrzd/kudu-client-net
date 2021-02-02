@@ -119,9 +119,8 @@ namespace Knet.Kudu.Client
 
         private void Set(int columnIndex) => _rowAlloc.SetBit(0, columnIndex);
 
-        private bool IsSetToNull(int columnIndex) => Schema.HasNullableColumns
-            ? _rowAlloc.GetBit(_nullOffset, columnIndex)
-            : false;
+        private bool IsSetToNull(int columnIndex) =>
+            Schema.HasNullableColumns && _rowAlloc.GetBit(_nullOffset, columnIndex);
 
         private void SetToNull(int columnIndex) =>
             _rowAlloc.SetBit(_nullOffset, columnIndex);

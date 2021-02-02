@@ -205,7 +205,7 @@ namespace Knet.Kudu.Client.Negotiate
             return tlsStream;
         }
 
-        private AuthenticationType ChooseAuthenticationType(NegotiatePB features)
+        private static AuthenticationType ChooseAuthenticationType(NegotiatePB features)
         {
             if (features.AuthnTypes.Count != 1)
             {
@@ -499,7 +499,7 @@ namespace Knet.Kudu.Client.Negotiate
 
         private static string GetTlsInfoLogString(SslStream tlsStream)
         {
-#if NETCOREAPP3_0
+#if NETCOREAPP3_1 || NET5_0
             return $"{tlsStream.SslProtocol.ToString().ToUpper()} [{tlsStream.NegotiatedCipherSuite}]";
 #else
             return $"{tlsStream.SslProtocol.ToString().ToUpper()}";

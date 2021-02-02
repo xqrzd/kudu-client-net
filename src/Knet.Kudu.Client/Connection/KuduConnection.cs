@@ -354,7 +354,7 @@ namespace Knet.Kudu.Client.Connection
             }
         }
 
-        private void CompleteRpc(InflightRpc rpc, Exception exception)
+        private static void CompleteRpc(InflightRpc rpc, Exception exception)
         {
             if (exception is null)
                 rpc.TrySetResult(null);
@@ -362,7 +362,7 @@ namespace Knet.Kudu.Client.Connection
                 rpc.TrySetException(exception);
         }
 
-        private void ProcessSidecars(ParserContext parserContext, KuduSidecars sidecars)
+        private static void ProcessSidecars(ParserContext parserContext, KuduSidecars sidecars)
         {
             try
             {

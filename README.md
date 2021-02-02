@@ -61,7 +61,7 @@ var rows = Enumerable.Range(0, 100).Select(i =>
     var row = table.NewInsert();
     row.SetInt64("tweet_id", i);
     row.SetString("user_name", $"user_{i}");
-    row.SetDateTime("created_at", DateTime.Now);
+    row.SetDateTime("created_at", DateTime.UtcNow);
     row.SetString("text", $"sample tweet {i}");
     return row;
 });
@@ -88,9 +88,9 @@ static void PrintRows(ResultSet resultSet)
     {
         var tweetId = row.GetInt64("tweet_id");
         var userName = row.GetString("user_name");
-        var createdAt = row.GetDateTime("created_at").ToLocalTime();
+        var createdAtUtc = row.GetDateTime("created_at");
 
-        Console.WriteLine($"tweet_id: {tweetId}, user_name: {userName}, created_at: {createdAt}");
+        Console.WriteLine($"tweet_id: {tweetId}, user_name: {userName}, created_at: {createdAtUtc}");
     }
 }
 ```
