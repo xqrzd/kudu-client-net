@@ -38,26 +38,38 @@ namespace Knet.Kudu.Client.Util
 #endif
         }
 
-        public static async Task WithCancellation(
-            this Task task, CancellationToken cancellationToken)
+        // https://github.com/dotnet/runtime/blob/master/src/libraries/Common/src/System/Threading/Tasks/TaskTimeoutExtensions.cs
+        public static Task WithCancellation(this Task task, CancellationToken cancellationToken)
         {
-            if (cancellationToken.CanBeCanceled)
+            if (task.IsCompleted || !cancellationToken.CanBeCanceled)
             {
-                var tcs = new TaskCompletionSource<object>(
-                    TaskCreationOptions.RunContinuationsAsynchronously);
-
-                using var registration = cancellationToken.Register(
-                    s => ((TaskCompletionSource<object>)s).TrySetCanceled(),
-                    state: tcs,
-                    useSynchronizationContext: false);
-
-                var eitherTask = await Task.WhenAny(task, tcs.Task)
-                    .ConfigureAwait(false);
-                await eitherTask.ConfigureAwait(false);
+                return task;
             }
-            else
+
+            if (cancellationToken.IsCancellationRequested)
             {
-                await task.ConfigureAwait(false);
+                return Task.FromCanceled(cancellationToken);
+            }
+
+            return WithCancellationCore(task, cancellationToken);
+
+            static async Task WithCancellationCore(Task task, CancellationToken cancellationToken)
+            {
+#if NET5_0
+                var tcs = new TaskCompletionSource();
+                using var _ = cancellationToken.UnsafeRegister(
+                    static s => ((TaskCompletionSource)s).TrySetResult(), tcs);
+#else
+                var tcs = new TaskCompletionSource<object>();
+                using var _ = cancellationToken.Register(
+                    static s => ((TaskCompletionSource<object>)s).TrySetResult(null), tcs);
+#endif
+                if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
+                {
+                    throw new TaskCanceledException(Task.FromCanceled(cancellationToken));
+                }
+
+                task.GetAwaiter().GetResult(); // Already completed; propagate any exception.
             }
         }
 
