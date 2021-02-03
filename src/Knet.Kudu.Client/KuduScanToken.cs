@@ -9,23 +9,31 @@ using ProtoBuf;
 namespace Knet.Kudu.Client
 {
     /// <summary>
+    /// <para>
     /// A scan token describes a partial scan of a Kudu table limited to a single
     /// contiguous physical location. Using the <see cref="KuduScanTokenBuilder"/>,
     /// clients can describe the desired scan, including predicates, bounds,
     /// timestamps, and caching, and receive back a collection of scan tokens.
+    /// </para>
     /// 
+    /// <para>
     /// Each scan token may be separately turned into a scanner using
     /// <see cref="IntoScanner{TBuilder}(TBuilder)"/> with each scanner responsible
     /// for a disjoint section of the table.
+    /// </para>
     /// 
+    /// <para>
     /// Scan tokens may be serialized using the <see cref="Serialize"/> method and
     /// deserialized back into a scanner using the
     /// <see cref="DeserializeIntoScanner{TBuilder}(TBuilder, ReadOnlyMemory{byte})"/>
     /// method. This allows use cases such as generating scan tokens in the planner
     /// component of a query engine, then sending the tokens to execution nodes based
     /// on locality, and then instantiating the scanners on those nodes.
+    /// </para>
     /// 
+    /// <para>
     /// Scan token locality information can be inspected using <see cref="Tablet"/>.
+    /// </para>
     /// </summary>
     public class KuduScanToken
     {
@@ -72,17 +80,26 @@ namespace Knet.Kudu.Client
             var table = builder.Table;
 
             if (scanTokenPb.FeatureFlags.Contains(ScanTokenPB.Feature.Unknown))
-                throw new Exception("Scan token requires an unsupported feature. This Kudu client must be updated.");
+            {
+                throw new Exception("Scan token requires an unsupported feature. " +
+                    "This Kudu client must be updated.");
+            }
 
             if (scanTokenPb.ShouldSerializeTableId())
             {
                 if (scanTokenPb.TableId != table.TableId)
-                    throw new Exception($"Scan token table id {scanTokenPb.TableId} does not match the builder table id {table.TableId}");
+                {
+                    throw new Exception($"Scan token table id {scanTokenPb.TableId} " +
+                        $"does not match the builder table id {table.TableId}");
+                }
             }
             else
             {
                 if (scanTokenPb.TableName != table.TableName)
-                    throw new Exception($"Scan token table name {scanTokenPb.TableName} does not match the builder table name {table.TableName}");
+                {
+                    throw new Exception($"Scan token table name {scanTokenPb.TableName} " +
+                        $"does not match the builder table name {table.TableName}");
+                }
             }
 
             builder.SetProjectedColumns(
@@ -202,16 +219,15 @@ namespace Knet.Kudu.Client
 
                 if (colSchemaFromPb.Type != (DataTypePB)colSchema.Type)
                 {
-                    throw new Exception(string.Format(
-                        "invalid type %s for column '%s' in scan token, expected: %s",
-                        colSchemaFromPb.Type, colSchemaFromPb.Name, colSchema.Type));
+                    throw new Exception($"Invalid type {colSchemaFromPb.Type} " +
+                        $"for column '{colSchemaFromPb.Name}' in scan token, " +
+                        $"expected: {colSchema.Type}");
                 }
 
                 if (colSchemaFromPb.IsNullable != colSchema.IsNullable)
                 {
-                    throw new Exception(string.Format(
-                        "Invalid nullability for column '%s' in scan token, expected: %s",
-                        colSchemaFromPb.Name, colSchema.IsNullable ? "NULLABLE" : "NOT NULL"));
+                    throw new Exception($"Invalid nullability for column '{colSchemaFromPb.Name}' " +
+                        $"in scan token, expected: {(colSchema.IsNullable ? "NULLABLE" : "NOT NULL")}");
                 }
 
                 columns.Add(colIdx);
