@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Knet.Kudu.Client.Util;
 using Xunit;
 

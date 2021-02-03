@@ -1,4 +1,4 @@
-﻿using Knet.Kudu.Client.Protocol;
+using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Protocol.Master;
 using Knet.Kudu.Client.Protocol.Tserver;
 

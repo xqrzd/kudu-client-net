@@ -3,7 +3,24 @@
 # top-most EditorConfig file
 root = true
 
+[*]
+indent_style = space
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
 # Dotnet code style settings:
 [*.{cs,vb}]
+indent_size = 4
 # Sort using and Import directives with System.* appearing first
 dotnet_sort_system_directives_first = true
+
+[*.{xml,config,*proj,nuspec,props,resx,targets,yml}]
+indent_size = 2
+
+[*.json]
+indent_size = 2
+
+[*.cs]
+# Use range operator
+dotnet_diagnostic.IDE0057.severity = none

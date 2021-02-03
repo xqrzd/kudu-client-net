@@ -1,4 +1,4 @@
-﻿using Knet.Kudu.Client.Connection;
+using Knet.Kudu.Client.Connection;
 using static Knet.Kudu.Client.Protocol.Consensus.RaftPeerPB;
 
 namespace Knet.Kudu.Client.Tablet

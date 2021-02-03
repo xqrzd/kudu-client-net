@@ -1,4 +1,4 @@
-﻿namespace Knet.Kudu.Client
+namespace Knet.Kudu.Client
 {
     public class ColumnBuilder
     {

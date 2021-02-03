@@ -1,4 +1,4 @@
-﻿namespace Knet.Kudu.Client
+namespace Knet.Kudu.Client
 {
     /// <summary>
     /// Specifies whether a range partition bound is inclusive or exclusive.

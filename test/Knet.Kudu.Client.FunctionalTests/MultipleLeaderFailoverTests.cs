@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
 using Knet.Kudu.Client.FunctionalTests.Util;

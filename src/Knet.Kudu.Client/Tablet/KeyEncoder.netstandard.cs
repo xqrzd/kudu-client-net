@@ -1,4 +1,4 @@
-﻿#if !NETCOREAPP3_1 && !NET5_0
+#if !NETCOREAPP3_1 && !NET5_0
 using System;
 
 namespace Knet.Kudu.Client.Tablet

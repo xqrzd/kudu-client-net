@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using Knet.Kudu.Binary;
 using McMaster.Extensions.Xunit;

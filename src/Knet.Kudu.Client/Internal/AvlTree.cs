@@ -1,4 +1,4 @@
-﻿//https://github.com/bitlush/avl-tree-c-sharp
+//https://github.com/bitlush/avl-tree-c-sharp
 //MIT License
 
 //Copyright(c) 2012 Keith Wood

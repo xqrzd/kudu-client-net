@@ -1,4 +1,4 @@
-﻿using Knet.Kudu.Client.Tablet;
+using Knet.Kudu.Client.Tablet;
 using Xunit;
 
 namespace Knet.Kudu.Client.Tests

@@ -1,4 +1,4 @@
-﻿namespace Knet.Kudu.Client.Util
+namespace Knet.Kudu.Client.Util
 {
     public static class CharUtil
     {
