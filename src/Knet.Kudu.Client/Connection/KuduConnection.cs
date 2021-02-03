@@ -357,7 +357,7 @@ namespace Knet.Kudu.Client.Connection
         private static void CompleteRpc(InflightRpc rpc, Exception exception)
         {
             if (exception is null)
-                rpc.TrySetResult(null);
+                rpc.TrySetResult();
             else
                 rpc.TrySetException(exception);
         }
@@ -453,7 +453,7 @@ namespace Knet.Kudu.Client.Connection
             catch { }
         }
 
-        private sealed class InflightRpc : TaskCompletionSource<object>
+        private sealed class InflightRpc : TaskCompletionSource
         {
             public KuduRpc Rpc { get; }
 

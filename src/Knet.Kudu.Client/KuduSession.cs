@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Logging;
 using Knet.Kudu.Client.Util;
 using Microsoft.Extensions.Logging;
@@ -20,7 +21,7 @@ namespace Knet.Kudu.Client
         private readonly Task _consumeTask;
 
         private volatile CancellationTokenSource _flushCts;
-        private volatile TaskCompletionSource<object> _flushTcs;
+        private volatile TaskCompletionSource _flushTcs;
 
         public KuduSession(
             KuduClient client,
@@ -45,7 +46,7 @@ namespace Knet.Kudu.Client
 
             _singleFlush = new SemaphoreSlim(1, 1);
             _flushCts = new CancellationTokenSource();
-            _flushTcs = new TaskCompletionSource<object>(
+            _flushTcs = new TaskCompletionSource(
                 TaskCreationOptions.RunContinuationsAsynchronously);
 
             _consumeTask = ConsumeAsync();
@@ -93,7 +94,7 @@ namespace Knet.Kudu.Client
                 }
                 finally
                 {
-                    _flushTcs = new TaskCompletionSource<object>(
+                    _flushTcs = new TaskCompletionSource(
                         TaskCreationOptions.RunContinuationsAsynchronously);
                 }
             }
@@ -217,7 +218,7 @@ namespace Knet.Kudu.Client
             _flushCts = new CancellationTokenSource();
 
             // Complete the flush.
-            _flushTcs.TrySetResult(null);
+            _flushTcs.TrySetResult();
         }
 
         private async Task SendAsync(List<KuduOperation> queue)
