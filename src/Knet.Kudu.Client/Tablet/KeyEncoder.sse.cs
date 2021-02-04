@@ -9,7 +9,7 @@ namespace Knet.Kudu.Client.Tablet
     public static partial class KeyEncoder
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int EncodeBinary(
+        private static int EncodeBinary(
             ReadOnlySpan<byte> source, Span<byte> destination)
         {
             if (Sse41.IsSupported)
@@ -17,7 +17,7 @@ namespace Knet.Kudu.Client.Tablet
                 return EncodeBinarySse(source, destination);
             }
 
-            return EncodeBinarySlow(source, destination);
+            return EncodeBinaryStandard(source, destination);
         }
 
         private static unsafe int EncodeBinarySse(
