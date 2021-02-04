@@ -23,7 +23,9 @@ namespace Knet.Kudu.Client.Tablet
         private static unsafe int EncodeBinarySse(
             ReadOnlySpan<byte> source, Span<byte> destination)
         {
-            if (destination.Length < source.Length * 2)
+            var length = (uint)source.Length;
+
+            if ((uint)destination.Length < length * 2)
                 ThrowException();
 
             fixed (byte* src = source)
@@ -32,10 +34,10 @@ namespace Knet.Kudu.Client.Tablet
                 var srcCurrent = src;
                 var destCurrent = dest;
 
-                var remainder = source.Length % 16;
-                var lastBlockIndex = source.Length - remainder;
+                var remainder = length % 16;
+                var lastBlockIndex = length - remainder;
                 var blockEnd = src + lastBlockIndex;
-                var end = blockEnd + remainder;
+                var end = src + length;
 
                 while (srcCurrent < blockEnd)
                 {
