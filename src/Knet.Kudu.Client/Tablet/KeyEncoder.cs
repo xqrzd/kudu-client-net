@@ -165,6 +165,25 @@ namespace Knet.Kudu.Client.Tablet
             }
         }
 
+        private static int EncodeBinaryStandard(
+            ReadOnlySpan<byte> source, Span<byte> destination)
+        {
+            // In the common case where there are no zeros, this is
+            // faster than copying byte by byte.
+            int index = source.IndexOf((byte)0);
+
+            if (index == -1)
+            {
+                // Data contains no zeros, do the fast path copy.
+                source.CopyTo(destination);
+                return source.Length;
+            }
+            else
+            {
+                return EncodeBinarySlow(source, destination);
+            }
+        }
+
         private static int EncodeBinarySlow(
             ReadOnlySpan<byte> source, Span<byte> destination)
         {
