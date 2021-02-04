@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Connection;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Protocol.Rpc;
 
@@ -55,14 +56,13 @@ namespace Knet.Kudu.Client.Util
 
             static async Task WithCancellationCore(Task task, CancellationToken cancellationToken)
             {
-#if NET5_0
                 var tcs = new TaskCompletionSource();
+#if NET5_0
                 using var _ = cancellationToken.UnsafeRegister(
                     static s => ((TaskCompletionSource)s).TrySetResult(), tcs);
 #else
-                var tcs = new TaskCompletionSource<object>();
                 using var _ = cancellationToken.Register(
-                    static s => ((TaskCompletionSource<object>)s).TrySetResult(null), tcs);
+                    static s => ((TaskCompletionSource)s).TrySetResult(), tcs);
 #endif
                 if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
                 {

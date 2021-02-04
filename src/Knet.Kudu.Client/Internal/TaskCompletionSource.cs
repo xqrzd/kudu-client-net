@@ -6,6 +6,8 @@ namespace Knet.Kudu.Client.Internal
 {
     internal class TaskCompletionSource : TaskCompletionSource<object>
     {
+        public TaskCompletionSource() : base() { }
+
         public TaskCompletionSource(object state) : base(state) { }
 
         public TaskCompletionSource(TaskCreationOptions creationOptions) : base(creationOptions) { }
