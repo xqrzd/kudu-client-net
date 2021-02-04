@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 
 namespace Knet.Kudu.Client.Internal
 {
     public sealed class SystemClock : ISystemClock
     {
-#if NETCOREAPP3_0
+#if NETCOREAPP3_1 || NET5_0
         /// <inheritdoc/>
         public long CurrentMilliseconds => Environment.TickCount64;
 #else

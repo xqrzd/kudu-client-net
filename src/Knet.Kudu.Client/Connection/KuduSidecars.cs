@@ -3,7 +3,7 @@ using System.Buffers;
 
 namespace Knet.Kudu.Client.Connection
 {
-    public class KuduSidecars : IDisposable
+    public sealed class KuduSidecars : IDisposable
     {
         private readonly IMemoryOwner<byte> _data;
         private readonly KuduSidecarOffset[] _sidecarOffsets;

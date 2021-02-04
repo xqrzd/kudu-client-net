@@ -1,14 +1,13 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-#if NETSTANDARD2_0 || NETCOREAPP2_1
+#if NETSTANDARD2_0
 
 using System;
 using System.Buffers;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Threading;
 
 namespace Knet.Kudu.Client
 {
@@ -106,7 +105,7 @@ namespace Knet.Kudu.Client
                 if (_length < 0)
                 {
                     // Cast-away readonly to initialize lazy field
-                    Volatile.Write(ref Unsafe.AsRef(_length), Sequence.Length);
+                    Unsafe.AsRef(_length) = Sequence.Length;
                 }
                 return _length;
             }
@@ -166,7 +165,7 @@ namespace Knet.Kudu.Client
             {
                 long remainingOffset = offset - (CurrentSpan.Length - CurrentSpanIndex);
                 SequencePosition nextPosition = _nextPosition;
-                ReadOnlyMemory<T> currentMemory = default;
+                ReadOnlyMemory<T> currentMemory;
 
                 while (Sequence.TryGet(ref nextPosition, out currentMemory, advance: true))
                 {

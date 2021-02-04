@@ -1,4 +1,4 @@
-﻿namespace Knet.Kudu.Client
+namespace Knet.Kudu.Client
 {
     /// <summary>
     /// Represent statistics belongs to a specific kudu table.

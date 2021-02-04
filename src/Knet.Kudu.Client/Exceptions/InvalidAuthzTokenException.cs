@@ -1,4 +1,4 @@
-﻿namespace Knet.Kudu.Client.Exceptions
+namespace Knet.Kudu.Client.Exceptions
 {
     /// <summary>
     /// Receiving this exception means the authorization token used to make a

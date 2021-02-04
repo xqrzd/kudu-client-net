@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Runtime.CompilerServices;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client
 {
-    public class ColumnarResultSet : IDisposable
+    public sealed class ColumnarResultSet : IDisposable
     {
         private readonly KuduSidecars _sidecars;
         private readonly int[] _dataSidecarOffsets;

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Exceptions;
@@ -311,7 +311,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             await InsertRowsAsync(table, 0, 100);
             Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
 
-            // ADD [0, 100) <- illegal (duplicate)
+            // ADD [0, 100) <- already present (duplicate)
             try
             {
                 await _client.AlterTableAsync(new AlterTableBuilder(table)
@@ -325,10 +325,8 @@ namespace Knet.Kudu.Client.FunctionalTests
             }
             catch (KuduException e)
             {
-                Assert.True(e.Status.IsInvalidArgument);
-                Assert.Contains(
-                    "New range partition conflicts with existing range partition",
-                    e.Status.Message);
+                Assert.True(e.Status.IsAlreadyPresent);
+                Assert.Contains("range partition already exists", e.Status.Message);
             }
 
             Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
@@ -348,9 +346,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             catch (KuduException e)
             {
                 Assert.True(e.Status.IsInvalidArgument);
-                Assert.Contains(
-                    "New range partition conflicts with existing range partition",
-                    e.Status.Message);
+                Assert.Contains("new range partition conflicts with existing one", e.Status.Message);
             }
 
             Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
@@ -370,9 +366,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             catch (KuduException e)
             {
                 Assert.True(e.Status.IsInvalidArgument);
-                Assert.Contains(
-                    "New range partition conflicts with existing range partition",
-                    e.Status.Message);
+                Assert.Contains("new range partition conflicts with existing one", e.Status.Message);
             }
 
             Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
@@ -398,9 +392,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             catch (KuduException e)
             {
                 Assert.True(e.Status.IsInvalidArgument);
-                Assert.Contains(
-                    "New range partition conflicts with existing range partition",
-                    e.Status.Message);
+                Assert.Contains("new range partition conflicts with existing one", e.Status.Message);
             }
 
             Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
@@ -416,9 +408,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             catch (KuduException e)
             {
                 Assert.True(e.Status.IsInvalidArgument);
-                Assert.Contains(
-                    "No range partition found for drop range partition step",
-                    e.Status.Message);
+                Assert.Contains("no range partition to drop", e.Status.Message);
             }
 
             Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
@@ -440,9 +430,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             catch (KuduException e)
             {
                 Assert.True(e.Status.IsInvalidArgument);
-                Assert.Contains(
-                    "No range partition found for drop range partition step",
-                    e.Status.Message);
+                Assert.Contains("no range partition to drop", e.Status.Message);
             }
 
             Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
@@ -487,9 +475,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             catch (KuduException e)
             {
                 Assert.True(e.Status.IsInvalidArgument);
-                Assert.Contains(
-                    "No range partition found for drop range partition step",
-                    e.Status.Message);
+                Assert.Contains("no range partition to drop", e.Status.Message);
             }
 
             Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));

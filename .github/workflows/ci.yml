@@ -9,14 +9,18 @@ env:
 jobs:
   linux_build:
     name: Linux build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
     - uses: actions/checkout@v2
-    - name: Setup .NET Core
+    - name: Setup dotnet
       uses: actions/setup-dotnet@v1
       with:
-        dotnet-version: 3.1.402
+        dotnet-version: '3.1.x'
+    - name: Setup dotnet
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.0.x'
     - name: Build
       run: dotnet build --configuration Release
     - name: Test
@@ -25,15 +29,15 @@ jobs:
   publish:
     name: Publish nuget package
     needs: linux_build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     if: github.ref == 'refs/heads/master'
     steps:
     - uses: actions/checkout@v2
-    - name: Setup .NET Core
+    - name: Setup dotnet
       uses: actions/setup-dotnet@v1
       with:
-        dotnet-version: 3.1.402
+        dotnet-version: '5.0.x'
     - name: Publish on version change
       uses: rohith/publish-nuget@v2
       with:

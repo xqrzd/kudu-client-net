@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -354,15 +354,15 @@ namespace Knet.Kudu.Client.Connection
             }
         }
 
-        private void CompleteRpc(InflightRpc rpc, Exception exception)
+        private static void CompleteRpc(InflightRpc rpc, Exception exception)
         {
             if (exception is null)
-                rpc.TrySetResult(null);
+                rpc.TrySetResult();
             else
                 rpc.TrySetException(exception);
         }
 
-        private void ProcessSidecars(ParserContext parserContext, KuduSidecars sidecars)
+        private static void ProcessSidecars(ParserContext parserContext, KuduSidecars sidecars)
         {
             try
             {
@@ -453,7 +453,7 @@ namespace Knet.Kudu.Client.Connection
             catch { }
         }
 
-        private sealed class InflightRpc : TaskCompletionSource<object>
+        private sealed class InflightRpc : TaskCompletionSource
         {
             public KuduRpc Rpc { get; }
 

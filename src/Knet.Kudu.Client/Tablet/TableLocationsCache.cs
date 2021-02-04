@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using Knet.Kudu.Client.Internal;
@@ -10,7 +10,7 @@ namespace Knet.Kudu.Client.Tablet
     /// A cache of the tablet locations in a table, keyed by partition key.
     /// Entries in the cache are either tablets or non-covered ranges.
     /// </summary>
-    public class TableLocationsCache : IDisposable
+    public sealed class TableLocationsCache : IDisposable
     {
         private readonly ISystemClock _systemClock;
         private readonly AvlTree _cache;

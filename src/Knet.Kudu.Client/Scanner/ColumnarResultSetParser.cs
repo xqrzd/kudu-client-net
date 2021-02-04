@@ -1,4 +1,4 @@
-﻿using Knet.Kudu.Client.Connection;
+using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Protocol.Tserver;
 

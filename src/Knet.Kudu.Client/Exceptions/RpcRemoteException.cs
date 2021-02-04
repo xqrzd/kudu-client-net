@@ -1,4 +1,4 @@
-﻿using Knet.Kudu.Client.Protocol.Rpc;
+using Knet.Kudu.Client.Protocol.Rpc;
 
 namespace Knet.Kudu.Client.Exceptions
 {

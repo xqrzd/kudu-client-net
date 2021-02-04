@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.IO;
 using Knet.Kudu.Client.Protocol.Master;
 using ProtoBuf;

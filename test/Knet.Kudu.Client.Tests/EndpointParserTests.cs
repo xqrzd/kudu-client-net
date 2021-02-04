@@ -1,4 +1,4 @@
-﻿using Knet.Kudu.Client.Connection;
+using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Util;
 using Xunit;
 

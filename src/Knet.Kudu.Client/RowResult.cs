@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Knet.Kudu.Client.Internal;
@@ -546,7 +546,7 @@ namespace Knet.Kudu.Client
                 if (column.TypeAttributes != null)
                     stringBuilder.Append(column.TypeAttributes.ToStringForType(type));
 
-                stringBuilder.Append("=");
+                stringBuilder.Append('=');
 
                 if (IsNull(i))
                 {

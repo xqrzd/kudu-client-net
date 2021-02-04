@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Knet.Kudu.Client
@@ -121,7 +121,7 @@ namespace Knet.Kudu.Client
         }
     }
 
-    public class ResultSetWrapper : ResultSet, IDisposable
+    public sealed class ResultSetWrapper : ResultSet, IDisposable
     {
         private readonly IDisposable _memory;
 

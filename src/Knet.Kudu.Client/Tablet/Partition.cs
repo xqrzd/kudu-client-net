@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Tablet

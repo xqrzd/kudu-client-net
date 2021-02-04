@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Util;

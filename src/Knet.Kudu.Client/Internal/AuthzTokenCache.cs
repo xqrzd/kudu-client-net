@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using Knet.Kudu.Client.Protocol.Security;
 
 namespace Knet.Kudu.Client.Internal

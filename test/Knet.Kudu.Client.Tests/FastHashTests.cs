@@ -1,4 +1,4 @@
-﻿using Knet.Kudu.Client.Util;
+using Knet.Kudu.Client.Util;
 using Xunit;
 
 namespace Knet.Kudu.Client.Tests

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
@@ -454,7 +454,7 @@ namespace Knet.Kudu.Client
             return CreateWriteResponse(results);
         }
 
-        private WriteResponse CreateWriteResponse(WriteResponsePB[] results)
+        private static WriteResponse CreateWriteResponse(WriteResponsePB[] results)
         {
             long writeTimestamp = NoTimestamp;
             List<KuduStatus> rowErrors = null;
@@ -1082,7 +1082,7 @@ namespace Knet.Kudu.Client
             return new ConnectToMasterResponse(response, serverInfo);
         }
 
-        private bool TryGetConnectResponse(
+        private static bool TryGetConnectResponse(
             Task<ConnectToMasterResponse> task,
             out ServerInfo serverInfo,
             out ConnectToMasterResponsePB responsePb,

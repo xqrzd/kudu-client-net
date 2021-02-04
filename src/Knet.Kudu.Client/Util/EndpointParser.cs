@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using Knet.Kudu.Client.Connection;
 
 namespace Knet.Kudu.Client.Util

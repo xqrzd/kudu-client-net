@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Knet.Kudu.Client;
 using Microsoft.Extensions.Logging;
 
