@@ -268,16 +268,24 @@ namespace Knet.Kudu.Client.FunctionalTests
                 _cache = new ConcurrentDictionary<IPEndPoint, Task<KuduConnection>>();
             }
 
-            public Task<KuduConnection> ConnectAsync(ServerInfo serverInfo, CancellationToken cancellationToken = default)
+            public Task<KuduConnection> ConnectAsync(
+                ServerInfo serverInfo, CancellationToken cancellationToken = default)
             {
                 var connectionTask = _realConnectionFactory.ConnectAsync(serverInfo, cancellationToken);
                 _cache[serverInfo.Endpoint] = connectionTask;
                 return connectionTask;
             }
 
-            public Task<ServerInfo> GetServerInfoAsync(string uuid, string location, HostAndPort hostPort)
+            public Task<List<ServerInfo>> GetMasterServerInfoAsync(
+                HostAndPort hostPort, CancellationToken cancellationToken = default)
             {
-                return _realConnectionFactory.GetServerInfoAsync(uuid, location, hostPort);
+                return _realConnectionFactory.GetMasterServerInfoAsync(hostPort, cancellationToken);
+            }
+
+            public Task<ServerInfo> GetTabletServerInfoAsync(
+                HostAndPort hostPort, string uuid, string location, CancellationToken cancellationToken = default)
+            {
+                return _realConnectionFactory.GetTabletServerInfoAsync(hostPort, uuid, location, cancellationToken);
             }
 
             public async Task DisconnectRandomConnectionAsync()

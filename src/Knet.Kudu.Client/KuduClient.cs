@@ -974,16 +974,14 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
-        /// Return the <see cref="ServerInfo"/> of the current master leader.
+        /// Locate the leader master and retrieve the cluster information.
         /// </summary>
         /// <param name="cancellationToken">The cancellation token.</param>
-        private async Task<ServerInfo> ConnectToClusterAsync(CancellationToken cancellationToken)
+        public async Task<ServerInfo> ConnectToClusterAsync(CancellationToken cancellationToken)
         {
             var masterAddresses = _options.MasterAddresses;
-            var tasks = new Dictionary<Task<ConnectToMasterResponse>, HostAndPort>();
-            var results = new Dictionary<HostAndPort, Exception>();
-            ServerInfo leaderServerInfo = null;
-            List<HostPortPB> clusterMasterAddresses = null;
+            var tasks = new Dictionary<Task<ConnectToMasterResponse>, HostAndPort>(masterAddresses.Count);
+            var builder = new ExceptionBuilder();
 
             using var cts = new CancellationTokenSource();
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
@@ -992,61 +990,41 @@ namespace Knet.Kudu.Client
             // Attempt to connect to all configured masters in parallel.
             foreach (var address in masterAddresses)
             {
-                var task = ConnectToMasterAsync(address, cancellationToken);
+                var task = ConnectToMasterAsync(address, builder, cancellationToken);
                 tasks.Add(task, address);
             }
 
-            while (tasks.Count > 0 && leaderServerInfo == null)
+            ServerInfo leaderServerInfo = null;
+            ConnectToMasterResponsePB leaderResponsePb = null;
+            List<HostPortPB> clusterMasterAddresses = null;
+
+            while (tasks.Count > 0)
             {
                 var task = await Task.WhenAny(tasks.Keys).ConfigureAwait(false);
-                tasks.Remove(task, out HostAndPort hostPort);
+                tasks.Remove(task, out var hostPort);
 
-                if (!TryGetConnectResponse(task,
-                    out ServerInfo serverInfo,
-                    out ConnectToMasterResponsePB responsePb,
-                    out Exception exception))
+                ConnectToMasterResponse response;
+
+                try
                 {
-                    // Failed to connect to this master.
-                    // Failures are fine here, as long as we can
-                    // connect to the leader.
-
-                    results.Add(hostPort, exception);
+                    response = await task.ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    builder.AddException(hostPort, ex);
                     continue;
                 }
 
-                clusterMasterAddresses = responsePb.MasterAddrs;
+                clusterMasterAddresses = response.ClusterMasterAddresses;
 
-                if (responsePb.Role == RaftPeerPB.Role.Leader)
+                if (response.IsLeader)
                 {
-                    leaderServerInfo = serverInfo;
-
-                    _location = responsePb.ClientLocation;
-
-                    var hmsConfig = responsePb.HmsConfig;
-                    if (hmsConfig != null)
-                    {
-                        _hiveMetastoreConfig = new HiveMetastoreConfig(
-                            hmsConfig.HmsUris,
-                            hmsConfig.HmsSaslEnabled,
-                            hmsConfig.HmsUuid);
-                    }
-
-                    var authnToken = responsePb.AuthnToken;
-                    if (authnToken != null)
-                    {
-                        // If the response has security info, adopt it.
-                        _securityContext.SetAuthenticationToken(authnToken);
-                    }
-
-                    var certificates = responsePb.CaCertDers;
-                    if (certificates.Count > 0)
-                    {
-                        // TODO: Log any exceptions from this.
-                        _securityContext.TrustCertificates(certificates);
-                    }
+                    leaderServerInfo = response.LeaderServerInfo;
+                    leaderResponsePb = response.LeaderResponsePb;
 
                     // Found the leader, that's all we care about.
                     cts.Cancel();
+                    break;
                 }
             }
 
@@ -1056,61 +1034,110 @@ namespace Knet.Kudu.Client
                 _logger.MisconfiguredMasterAddresses(masterAddresses, clusterMasterAddresses);
             }
 
-            if (leaderServerInfo != null)
+            if (leaderServerInfo is null)
             {
-                _masterLeaderInfo = leaderServerInfo;
-                _hasConnectedToMaster = true;
+                var exception = builder.CreateException();
+                throw exception;
+            }
 
-                return leaderServerInfo;
-            }
-            else
-            {
-                throw new NoLeaderFoundException(masterAddresses, results);
-            }
+            SetMasterLeaderInfo(leaderServerInfo, leaderResponsePb);
+            return leaderServerInfo;
         }
 
         private async Task<ConnectToMasterResponse> ConnectToMasterAsync(
-            HostAndPort hostPort, CancellationToken cancellationToken)
+            HostAndPort hostPort, ExceptionBuilder builder, CancellationToken cancellationToken)
         {
-            ServerInfo serverInfo = await _connectionFactory.GetServerInfoAsync(
-                "master", location: null, hostPort).ConfigureAwait(false);
+            var servers = await _connectionFactory.GetMasterServerInfoAsync(
+                hostPort, cancellationToken).ConfigureAwait(false);
 
-            var rpc = new ConnectToMasterRequest();
-            var response = await SendRpcToMasterAsync(rpc, serverInfo, cancellationToken)
-                .ConfigureAwait(false);
+            var tasks = new Dictionary<Task<ConnectToMasterResponsePB>, ServerInfo>(servers.Count);
 
-            return new ConnectToMasterResponse(response, serverInfo);
+            foreach (var serverInfo in servers)
+            {
+                var task = ConnectToMasterAsync(serverInfo, cancellationToken);
+                tasks.Add(task, serverInfo);
+            }
+
+            ServerInfo leaderServerInfo = null;
+            ConnectToMasterResponsePB leaderResponsePb = null;
+            List<HostPortPB> clusterMasterAddresses = null;
+
+            while (tasks.Count > 0)
+            {
+                var task = await Task.WhenAny(tasks.Keys).ConfigureAwait(false);
+                tasks.Remove(task, out var serverInfo);
+
+                ConnectToMasterResponsePB responsePb;
+
+                try
+                {
+                    responsePb = await task.ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    // Failed to connect to this master.
+                    // Failures are fine here, as long as we can
+                    // connect to the leader.
+
+                    builder.AddException(serverInfo, ex);
+                    continue;
+                }
+
+                clusterMasterAddresses = responsePb.MasterAddrs;
+
+                if (responsePb.Role == RaftPeerPB.Role.Leader)
+                {
+                    leaderServerInfo = serverInfo;
+                    leaderResponsePb = responsePb;
+
+                    // Found the leader, that's all we care about.
+                    break;
+                }
+
+                builder.AddNonLeaderMaster(serverInfo);
+            }
+
+            return new ConnectToMasterResponse(
+                leaderResponsePb,
+                leaderServerInfo,
+                clusterMasterAddresses);
         }
 
-        private static bool TryGetConnectResponse(
-            Task<ConnectToMasterResponse> task,
-            out ServerInfo serverInfo,
-            out ConnectToMasterResponsePB responsePb,
-            out Exception exception)
+        private Task<ConnectToMasterResponsePB> ConnectToMasterAsync(
+            ServerInfo serverInfo, CancellationToken cancellationToken)
         {
-            serverInfo = null;
-            responsePb = null;
+            var rpc = new ConnectToMasterRequest();
+            return SendRpcToMasterAsync(rpc, serverInfo, cancellationToken);
+        }
 
-            if (!task.IsCompletedSuccessfully())
+        private void SetMasterLeaderInfo(ServerInfo serverInfo, ConnectToMasterResponsePB responsePb)
+        {
+            var hmsConfig = responsePb.HmsConfig;
+            if (hmsConfig is not null)
             {
-                exception = task.Exception.InnerException;
-                return false;
+                _hiveMetastoreConfig = new HiveMetastoreConfig(
+                    hmsConfig.HmsUris,
+                    hmsConfig.HmsSaslEnabled,
+                    hmsConfig.HmsUuid);
             }
 
-            ConnectToMasterResponse response = task.Result;
-
-            if (response.ResponsePB.Error != null)
+            var authnToken = responsePb.AuthnToken;
+            if (authnToken is not null)
             {
-                var status = KuduStatus.FromMasterErrorPB(response.ResponsePB.Error);
-                exception = new RecoverableException(status);
-                return false;
+                // If the response has security info, adopt it.
+                _securityContext.SetAuthenticationToken(authnToken);
             }
 
-            serverInfo = response.ServerInfo;
-            responsePb = response.ResponsePB;
-            exception = null;
+            var certificates = responsePb.CaCertDers;
+            if (certificates.Count > 0)
+            {
+                // TODO: Log any exceptions from this.
+                _securityContext.TrustCertificates(certificates);
+            }
 
-            return true;
+            _location = responsePb.ClientLocation;
+            _masterLeaderInfo = serverInfo;
+            _hasConnectedToMaster = true;
         }
 
         internal async Task<T> SendRpcAsync<T>(
@@ -1560,21 +1587,6 @@ namespace Knet.Kudu.Client
             return new KuduClientBuilder(masterAddresses);
         }
 
-        private readonly struct ConnectToMasterResponse
-        {
-            public ConnectToMasterResponsePB ResponsePB { get; }
-
-            public ServerInfo ServerInfo { get; }
-
-            public ConnectToMasterResponse(
-                ConnectToMasterResponsePB responsePB,
-                ServerInfo serverInfo)
-            {
-                ResponsePB = responsePB;
-                ServerInfo = serverInfo;
-            }
-        }
-
         private readonly struct SplitKeyRangeResponse
         {
             public RemoteTablet Tablet { get; }
@@ -1587,6 +1599,95 @@ namespace Knet.Kudu.Client
             {
                 Tablet = tablet;
                 KeyRanges = keyRanges;
+            }
+        }
+
+        private class ConnectToMasterResponse
+        {
+            public ConnectToMasterResponsePB LeaderResponsePb { get; }
+
+            public ServerInfo LeaderServerInfo { get; }
+
+            public List<HostPortPB> ClusterMasterAddresses { get; }
+
+            public ConnectToMasterResponse(
+                ConnectToMasterResponsePB leaderResponsePb,
+                ServerInfo leaderServerInfo,
+                List<HostPortPB> clusterMasterAddresses)
+            {
+                LeaderResponsePb = leaderResponsePb;
+                LeaderServerInfo = leaderServerInfo;
+                ClusterMasterAddresses = clusterMasterAddresses;
+            }
+
+            public bool IsLeader => LeaderServerInfo is not null;
+        }
+
+        private class ConnectToClusterResponse
+        {
+            public ServerInfo ServerInfo { get; }
+
+            public ConnectToMasterResponsePB ResponsePb { get; }
+
+            public ConnectToClusterResponse(
+                ServerInfo serverInfo,
+                ConnectToMasterResponsePB responsePb)
+            {
+                ServerInfo = serverInfo;
+                ResponsePb = responsePb;
+            }
+        }
+
+        private class ExceptionBuilder
+        {
+            private readonly List<string> _results = new(3);
+            private readonly List<Exception> _exceptions = new(0);
+
+            public void AddNonLeaderMaster(ServerInfo serverInfo)
+            {
+                var result = $"{serverInfo.HostPort} [{serverInfo.Endpoint.Address}] => Not the leader";
+
+                lock (_results)
+                {
+                    _results.Add(result);
+                }
+            }
+
+            public void AddException(ServerInfo serverInfo, Exception exception)
+            {
+                var result = $"{serverInfo.HostPort} [{serverInfo.Endpoint.Address}] => {exception.Message}";
+
+                lock (_results)
+                {
+                    _results.Add(result);
+                    _exceptions.Add(exception);
+                }
+            }
+
+            public void AddException(HostAndPort hostPort, Exception exception)
+            {
+                var result = $"{hostPort} => {exception.Message}";
+
+                lock (_results)
+                {
+                    _results.Add(result);
+                    _exceptions.Add(exception);
+                }
+            }
+
+            public NoLeaderFoundException CreateException()
+            {
+                List<string> results;
+                List<Exception> exceptions;
+
+                lock (_results)
+                {
+                    results = new List<string>(_results);
+                    exceptions = new List<Exception>(_exceptions);
+                }
+
+                var innerException = new AggregateException(exceptions);
+                return new NoLeaderFoundException(results, innerException);
             }
         }
     }
