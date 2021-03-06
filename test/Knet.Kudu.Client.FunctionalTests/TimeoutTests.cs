@@ -49,9 +49,8 @@ namespace Knet.Kudu.Client.FunctionalTests
 
                 Assert.False(true, "Scan did not time out");
             }
-            catch (Exception ex)
+            catch (OperationCanceledException)
             {
-                Assert.IsType<TaskCanceledException>(ex);
             }
         }
     }
