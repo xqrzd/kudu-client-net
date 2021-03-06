@@ -5,6 +5,7 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Negotiate;
 using Microsoft.Extensions.Logging;
 using Pipelines.Sockets.Unofficial;
@@ -32,32 +33,47 @@ namespace Knet.Kudu.Client.Connection
         public async Task<KuduConnection> ConnectAsync(
             ServerInfo serverInfo, CancellationToken cancellationToken = default)
         {
-            var socket = await ConnectAsync(serverInfo.Endpoint).ConfigureAwait(false);
+            var endpoint = serverInfo.Endpoint;
+            var socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            SocketConnection.SetRecommendedClientOptions(socket);
 
-            var negotiator = new Negotiator(_options, _securityContext, _loggerFactory, serverInfo, socket);
-            return await negotiator.NegotiateAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await ConnectAsync(socket, endpoint, cancellationToken).ConfigureAwait(false);
+
+                var negotiator = new Negotiator(_options, _securityContext, _loggerFactory, serverInfo, socket);
+                return await negotiator.NegotiateAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                socket.Dispose();
+                throw;
+            }
         }
 
-        public async Task<ServerInfo> GetServerInfoAsync(string uuid, string location, HostAndPort hostPort)
+        public async Task<List<ServerInfo>> GetMasterServerInfoAsync(
+            HostAndPort hostPort, CancellationToken cancellationToken = default)
         {
-            var ipAddresses = await Dns.GetHostAddressesAsync(hostPort.Host).ConfigureAwait(false);
-            if (ipAddresses == null || ipAddresses.Length == 0)
-                throw new Exception($"Failed to resolve the IP of '{hostPort.Host}'");
+            var ipAddresses = await GetHostAddressesAsync(hostPort.Host).ConfigureAwait(false);
+            var servers = new List<ServerInfo>(ipAddresses.Length);
 
-            var ipAddress = ipAddresses[0];
-            if (ipAddress.AddressFamily != AddressFamily.InterNetwork)
+            foreach (var ipAddress in ipAddresses)
             {
-                // Prefer an IPv4 address.
-                for (int i = 1; i < ipAddresses.Length; i++)
-                {
-                    var newAddress = ipAddresses[i];
-                    if (newAddress.AddressFamily == AddressFamily.InterNetwork)
-                    {
-                        ipAddress = newAddress;
-                        break;
-                    }
-                }
+                var endpoint = new IPEndPoint(ipAddress, hostPort.Port);
+                var isLocal = IsLocal(ipAddress);
+                var serverInfo = new ServerInfo("master", hostPort, endpoint, null, isLocal);
+
+                servers.Add(serverInfo);
             }
+
+            return servers;
+        }
+
+        public async Task<ServerInfo> GetTabletServerInfoAsync(
+            HostAndPort hostPort, string uuid, string location, CancellationToken cancellationToken = default)
+        {
+            var ipAddresses = await GetHostAddressesAsync(hostPort.Host).ConfigureAwait(false);
+            var ipAddress = ipAddresses[0];
 
             var endpoint = new IPEndPoint(ipAddress, hostPort.Port);
             var isLocal = IsLocal(ipAddress);
@@ -70,13 +86,40 @@ namespace Knet.Kudu.Client.Connection
             return IPAddress.IsLoopback(ipAddress) || _localIPs.Contains(ipAddress);
         }
 
-        private static async Task<Socket> ConnectAsync(IPEndPoint endpoint)
+#if NET5_0
+        private static ValueTask ConnectAsync(
+            Socket socket, EndPoint endpoint, CancellationToken cancellationToken)
         {
-            var socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            SocketConnection.SetRecommendedClientOptions(socket);
+            return socket.ConnectAsync(endpoint, cancellationToken);
+        }
+#else
+        private static Task ConnectAsync(
+            Socket socket, EndPoint endpoint, CancellationToken cancellationToken)
+        {
+            return socket.ConnectAsync(endpoint);
+        }
+#endif
 
-            await socket.ConnectAsync(endpoint).ConfigureAwait(false);
-            return socket;
+        private static async Task<IPAddress[]> GetHostAddressesAsync(string hostName)
+        {
+            Exception exception = null;
+
+            try
+            {
+                var ipAddresses = await Dns.GetHostAddressesAsync(hostName).ConfigureAwait(false);
+
+                if (ipAddresses is not null && ipAddresses.Length > 0)
+                {
+                    return ipAddresses;
+                }
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+            }
+
+            var status = KuduStatus.IOError($"Unable to resolve address for {hostName}");
+            throw new NonRecoverableException(status, exception);
         }
 
         private static HashSet<IPAddress> GetLocalAddresses()
@@ -84,7 +127,7 @@ namespace Knet.Kudu.Client.Connection
             var addresses = new HashSet<IPAddress>();
 
             // Dns.GetHostAddresses(Dns.GetHostName()) returns incomplete results on Linux.
-            // https://github.com/dotnet/corefx/issues/32611
+            // https://github.com/dotnet/runtime/issues/27534
             foreach (var networkInterface in NetworkInterface.GetAllNetworkInterfaces())
             {
                 foreach (var ipInfo in networkInterface.GetIPProperties().UnicastAddresses)

@@ -27,7 +27,7 @@ namespace Knet.Kudu.Client.Connection
             // based on some kind of policy. For now just use the first always.
             var hostPort = addresses[0].ToHostAndPort();
 
-            return connectionFactory.GetServerInfoAsync(uuid, location, hostPort);
+            return connectionFactory.GetTabletServerInfoAsync(hostPort, uuid, location);
         }
 
         public static async Task<List<RemoteTablet>> GetTabletsAsync(

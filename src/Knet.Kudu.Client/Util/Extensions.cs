@@ -30,15 +30,6 @@ namespace Knet.Kudu.Client.Util
         public static bool SequenceEqual<T>(this T[] array, ReadOnlySpan<T> other)
             where T : IEquatable<T> => MemoryExtensions.SequenceEqual(array, other);
 
-        public static bool IsCompletedSuccessfully(this Task task)
-        {
-#if NETSTANDARD2_0
-            return task.IsCompleted && !(task.IsCanceled || task.IsFaulted);
-#else
-            return task.IsCompletedSuccessfully;
-#endif
-        }
-
         // https://github.com/dotnet/runtime/blob/master/src/libraries/Common/src/System/Threading/Tasks/TaskTimeoutExtensions.cs
         public static Task WithCancellation(this Task task, CancellationToken cancellationToken)
         {
