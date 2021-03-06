@@ -86,7 +86,7 @@ namespace Knet.Kudu.Client.Connection
             return IPAddress.IsLoopback(ipAddress) || _localIPs.Contains(ipAddress);
         }
 
-#if NET5_0
+#if NET5_0_OR_GREATER
         private static ValueTask ConnectAsync(
             Socket socket, EndPoint endpoint, CancellationToken cancellationToken)
         {

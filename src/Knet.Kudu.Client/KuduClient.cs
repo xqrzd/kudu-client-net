@@ -764,16 +764,10 @@ namespace Knet.Kudu.Client
 
         private TableLocationsCache GetTableLocationsCache(string tableId)
         {
-#if NETSTANDARD2_0
             return _tableLocations.GetOrAdd(
                 tableId,
-                key => new TableLocationsCache(_systemClock));
-#else
-            return _tableLocations.GetOrAdd(
-                tableId,
-                (key, clock) => new TableLocationsCache(clock),
+                static (key, clock) => new TableLocationsCache(clock),
                 _systemClock);
-#endif
         }
 
         private async ValueTask<List<RemoteTablet>> LoopLocateTableAsync(
