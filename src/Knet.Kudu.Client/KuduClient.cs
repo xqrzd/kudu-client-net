@@ -977,7 +977,7 @@ namespace Knet.Kudu.Client
         /// Locate the leader master and retrieve the cluster information.
         /// </summary>
         /// <param name="cancellationToken">The cancellation token.</param>
-        public async Task<ServerInfo> ConnectToClusterAsync(CancellationToken cancellationToken)
+        private async Task<ServerInfo> ConnectToClusterAsync(CancellationToken cancellationToken)
         {
             var masterAddresses = _options.MasterAddresses;
             var tasks = new Dictionary<Task<ConnectToMasterResponse>, HostAndPort>(masterAddresses.Count);
