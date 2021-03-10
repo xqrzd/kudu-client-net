@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
 using McMaster.Extensions.Xunit;
@@ -27,7 +28,9 @@ namespace Knet.Kudu.Client.FunctionalTests
             if (killBefore == KillBefore.CreateClient)
                 await DoActionAsync();
 
-            await using var client = harness.CreateClient();
+            await using var client = harness.CreateClientBuilder()
+                .SetDefaultOperationTimeout(TimeSpan.FromMinutes(1))
+                .Build();
 
             if (killBefore == KillBefore.CreateTable)
                 await DoActionAsync();
