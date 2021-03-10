@@ -1355,15 +1355,15 @@ namespace Knet.Kudu.Client
                 var errStatusCode = rpc.Error.Status.Code;
                 var status = KuduStatus.FromTabletServerErrorPB(rpc.Error);
 
-                if (errCode == TabletServerErrorPB.Code.TabletNotFound)
+                if (errCode == TabletServerErrorPB.Code.TabletNotFound ||
+                    errCode == TabletServerErrorPB.Code.TabletNotRunning)
                 {
                     // We're handling a tablet server that's telling us it doesn't
                     // have the tablet we're asking for.
                     RemoveTabletFromCache(rpc);
                     throw new RecoverableException(status);
                 }
-                else if (errCode == TabletServerErrorPB.Code.TabletNotRunning ||
-                    errStatusCode == AppStatusPB.ErrorCode.ServiceUnavailable)
+                else if (errStatusCode == AppStatusPB.ErrorCode.ServiceUnavailable)
                 {
                     throw new RecoverableException(status);
                 }

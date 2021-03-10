@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Knet.Kudu.Binary;
 using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
 using Knet.Kudu.Client.FunctionalTests.Util;
@@ -25,6 +28,71 @@ namespace Knet.Kudu.Client.FunctionalTests
             _generator = new DataGeneratorBuilder()
                 .Random(_random)
                 .Build();
+        }
+
+        /// <summary>
+        /// Test that scans get retried at other tablet servers when they're quiescing.
+        /// </summary>
+        [SkippableFact]
+        public async Task TestScanQuiescingTabletServer()
+        {
+            await using var miniCluster = await new MiniKuduClusterBuilder().BuildAsync();
+            await using var client = miniCluster.CreateClient();
+
+            var builder = new TableBuilder(nameof(TestScanQuiescingTabletServer))
+                .AddColumn("key", KuduType.Int32, opt => opt.Key(true))
+                .SetRangePartitionColumns("key")
+                .SetNumReplicas(3);
+
+            var table = await client.CreateTableAsync(builder);
+
+            var numRows = 500;
+            var rows = Enumerable.Range(0, numRows).Select(i =>
+            {
+                var row = table.NewInsert();
+                row.SetInt32("key", i);
+                return row;
+            });
+
+            await client.WriteAsync(rows);
+
+            // Quiesce a single tablet server.
+            var tservers = miniCluster.GetTabletServers();
+            var kuduExe = KuduBinaryLocator.FindBinary("kudu");
+            var workingDirectory = Path.GetDirectoryName(kuduExe.ExePath);
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = kuduExe.ExePath,
+                WorkingDirectory = workingDirectory,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            foreach (var env in kuduExe.EnvironmentVariables)
+            {
+                startInfo.EnvironmentVariables.Add(env.Key, env.Value);
+            }
+
+            startInfo.ArgumentList.Add("tserver");
+            startInfo.ArgumentList.Add("quiesce");
+            startInfo.ArgumentList.Add("start");
+            startInfo.ArgumentList.Add(tservers[0].ToString());
+
+            using var quiesceTserver = new Process { StartInfo = startInfo };
+            quiesceTserver.Start();
+            await quiesceTserver.WaitForExitAsync();
+
+            // Now start a scan. Even if the scan goes to the quiescing server, the
+            // scan request should eventually be routed to a non-quiescing server
+            // and complete. We aren't guaranteed to hit the quiescing server, but this
+            // test would frequently fail if we didn't handle quiescing servers properly.
+            var foundRows = 0;
+            var scanner = client.NewScanBuilder(table).Build();
+            await foreach (var resultSet in scanner)
+            {
+                foundRows += resultSet.Count;
+            }
         }
 
         [SkippableFact]

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Tablet;
@@ -32,6 +33,16 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
         public KuduClient CreateClient() => _miniCluster.CreateClient();
 
         public KuduClientBuilder CreateClientBuilder() => _miniCluster.CreateClientBuilder();
+
+        public List<HostAndPort> GetMasterServers()
+        {
+            return _miniCluster.GetMasterServers();
+        }
+
+        public List<HostAndPort> GetTabletServers()
+        {
+            return _miniCluster.GetTabletServers();
+        }
 
         /// <summary>
         /// Helper method to easily kill the leader master.
