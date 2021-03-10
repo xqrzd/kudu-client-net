@@ -1171,7 +1171,7 @@ namespace Knet.Kudu.Client
                     catch (RecoverableException ex)
                     {
                         // Record the exception and retry.
-                        HandleRpcException(rpc, ex);
+                        HandleRpcException(rpc, ex, token);
                         await DelayRpcAsync(rpc, token).ConfigureAwait(false);
                     }
                 }
@@ -1542,10 +1542,14 @@ namespace Knet.Kudu.Client
             return Task.Delay(sleepTime, cancellationToken);
         }
 
-        private void HandleRpcException(KuduRpc rpc, Exception exception)
+        private void HandleRpcException(KuduRpc rpc, Exception exception, CancellationToken cancellationToken)
         {
             // Record the last exception, so if the rpc times out we can report it.
-            rpc.Exception = exception;
+            if (!cancellationToken.IsCancellationRequested || rpc.Exception is null)
+            {
+                rpc.Exception = exception;
+            }
+
             rpc.Attempt++;
 
             _logger.RecoverableRpcException(exception);
