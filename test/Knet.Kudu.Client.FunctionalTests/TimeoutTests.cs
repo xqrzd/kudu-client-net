@@ -41,18 +41,12 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             // The server will not respond for the lifetime of the test, so we
             // expect the operation to time out.
-            try
+            await Assert.ThrowsAsync<OperationCanceledException>(async () =>
             {
                 await foreach (var resultSet in scanner.WithCancellation(cts.Token))
                 {
                 }
-
-                Assert.False(true, "Scan did not time out");
-            }
-            catch (Exception ex)
-            {
-                Assert.IsType<TaskCanceledException>(ex);
-            }
+            });
         }
     }
 }

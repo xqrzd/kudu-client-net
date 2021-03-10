@@ -1172,26 +1172,15 @@ namespace Knet.Kudu.Client
                     {
                         // Record the exception and retry.
                         HandleRpcException(rpc, ex, token);
-
-                        rpc.Attempt++;
                         await DelayRpcAsync(rpc, token).ConfigureAwait(false);
                     }
                 }
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
-                var lastException = rpc.Exception;
-
-                if (lastException == null)
-                {
-                    // If we haven't recorded any exceptions then this
-                    // RPC really did just time out.
-                    throw;
-                }
-
                 throw new OperationCanceledException(
-                    $"Couldn't complete RPC before timeout: {lastException.Message}",
-                    lastException);
+                    $"Couldn't complete RPC before timeout ({rpc.Attempt} attempts)",
+                    rpc.Exception);
             }
             finally
             {
@@ -1553,26 +1542,23 @@ namespace Knet.Kudu.Client
             return Task.Delay(sleepTime, cancellationToken);
         }
 
-        private void HandleRpcException(
-            KuduRpc rpc, Exception exception, CancellationToken cancellationToken)
+        private void HandleRpcException(KuduRpc rpc, Exception exception, CancellationToken cancellationToken)
         {
-            _logger.RecoverableRpcException(exception);
+            // Record the last exception, so if the rpc times out we can report it.
+            if (!cancellationToken.IsCancellationRequested || rpc.Exception is null)
+            {
+                rpc.Exception = exception;
+            }
 
-            // Record the last exception, so if the operation times out we can report it.
-            rpc.Exception = exception;
+            rpc.Attempt++;
+
+            _logger.RecoverableRpcException(exception);
 
             var numAttempts = rpc.Attempt;
             if (numAttempts > MaxRpcAttempts)
             {
                 throw new NonRecoverableException(
                     KuduStatus.TimedOut($"Too many RPC attempts: {numAttempts}"),
-                    exception);
-            }
-
-            if (cancellationToken.IsCancellationRequested)
-            {
-                throw new OperationCanceledException(
-                    $"Couldn't complete RPC before timeout: {exception.Message}",
                     exception);
             }
         }
