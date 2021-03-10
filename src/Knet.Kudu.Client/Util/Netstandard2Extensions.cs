@@ -1,6 +1,7 @@
 #if NETSTANDARD2_0
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -64,6 +65,13 @@ namespace Knet.Kudu.Client.Util
         {
             dictionary.TryGetValue(key, out value);
             return dictionary.Remove(key);
+        }
+
+        public static TValue GetOrAdd<TKey, TValue, TArg>(
+            this ConcurrentDictionary<TKey, TValue> dictionary,
+            TKey key, Func<TKey, TArg, TValue> valueFactory, TArg factoryArgument)
+        {
+            return dictionary.GetOrAdd(key, key => valueFactory(key, factoryArgument));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

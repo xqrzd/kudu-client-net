@@ -499,7 +499,7 @@ namespace Knet.Kudu.Client.Negotiate
 
         private static string GetTlsInfoLogString(SslStream tlsStream)
         {
-#if NETCOREAPP3_1 || NET5_0
+#if NETCOREAPP3_1_OR_GREATER
             return $"{tlsStream.SslProtocol.ToString().ToUpper()} [{tlsStream.NegotiatedCipherSuite}]";
 #else
             return $"{tlsStream.SslProtocol.ToString().ToUpper()}";

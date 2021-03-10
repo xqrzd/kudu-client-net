@@ -48,7 +48,7 @@ namespace Knet.Kudu.Client.Util
             static async Task WithCancellationCore(Task task, CancellationToken cancellationToken)
             {
                 var tcs = new TaskCompletionSource();
-#if NET5_0
+#if NET5_0_OR_GREATER
                 using var _ = cancellationToken.UnsafeRegister(
                     static s => ((TaskCompletionSource)s).TrySetResult(), tcs);
 #else
