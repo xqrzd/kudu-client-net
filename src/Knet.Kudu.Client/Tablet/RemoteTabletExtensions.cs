@@ -1,15 +1,17 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace Knet.Kudu.Client.Tablet
 {
     public static class RemoteTabletExtensions
     {
-        public static RemoteTablet FindTablet(
+        public static FindTabletResult FindTablet(
             this List<RemoteTablet> tablets, ReadOnlySpan<byte> partitionKey)
         {
             int lo = 0;
             int hi = tablets.Count - 1;
+
             // If length == 0, hi == -1, and loop will not be entered
             while (lo <= hi)
             {
@@ -21,11 +23,11 @@ namespace Knet.Kudu.Client.Tablet
                 //       `int i = lo + ((hi - lo) >> 1);`
                 int i = (int)(((uint)hi + (uint)lo) >> 1);
 
-                RemoteTablet tablet = tablets[i];
+                var tablet = tablets[i];
                 int c = partitionKey.SequenceCompareTo(tablet.Partition.PartitionKeyStart);
                 if (c == 0)
                 {
-                    return tablet;
+                    return new FindTabletResult(tablet, i);
                 }
                 else if (c > 0)
                 {
@@ -39,31 +41,71 @@ namespace Knet.Kudu.Client.Tablet
 
             if (hi >= 0)
             {
-                RemoteTablet tablet = tablets[hi];
-
+                var tablet = tablets[hi];
                 if (tablet.Partition.ContainsPartitionKey(partitionKey))
                 {
-                    return tablet;
+                    return new FindTabletResult(tablet, hi);
                 }
+
+                return HandleMissingTablet(tablets, lo, tablet);
             }
 
-            return null;
+            // The key is before the first partition.
+            return HandleMissingTablet(tablets);
         }
 
-        internal static byte[] GetNonCoveredRangeEnd(
-            this List<RemoteTablet> tablets, ReadOnlySpan<byte> partitionKey)
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static FindTabletResult HandleMissingTablet(List<RemoteTablet> tablets)
         {
-            // Inefficient search, but this is only used to display
-            // more info in a NonCoveredRangeException.
-            foreach (var tablet in tablets)
-            {
-                var start = tablet.Partition.PartitionKeyStart;
+            var nonCoveredRangeEnd = tablets.Count == 0
+                ? Array.Empty<byte>()
+                : tablets[0].Partition.PartitionKeyStart;
 
-                if (partitionKey.SequenceCompareTo(start) < 0)
-                    return start;
-            }
-
-            return Array.Empty<byte>();
+            return new FindTabletResult(Array.Empty<byte>(), nonCoveredRangeEnd);
         }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static FindTabletResult HandleMissingTablet(
+            List<RemoteTablet> tablets, int nextIndex, RemoteTablet tablet)
+        {
+            var nonCoveredRangeStart = tablet.Partition.PartitionKeyEnd;
+
+            var nonCoveredRangeEnd = tablets.Count == nextIndex
+                ? Array.Empty<byte>()
+                : tablets[nextIndex].Partition.PartitionKeyStart;
+
+            return new FindTabletResult(nonCoveredRangeStart, nonCoveredRangeEnd);
+        }
+    }
+
+    public readonly struct FindTabletResult
+    {
+        public RemoteTablet Tablet { get; }
+
+        public int Index { get; }
+
+        public byte[] NonCoveredRangeStart { get; }
+
+        public byte[] NonCoveredRangeEnd { get; }
+
+        public FindTabletResult(RemoteTablet tablet, int index)
+        {
+            Tablet = tablet;
+            Index = index;
+            NonCoveredRangeStart = null;
+            NonCoveredRangeEnd = null;
+        }
+
+        public FindTabletResult(byte[] nonCoveredRangeStart, byte[] nonCoveredRangeEnd)
+        {
+            Tablet = null;
+            Index = -1;
+            NonCoveredRangeStart = nonCoveredRangeStart;
+            NonCoveredRangeEnd = nonCoveredRangeEnd;
+        }
+
+        public bool IsCoveredRange => Tablet is not null;
+
+        public bool IsNonCoveredRange => Tablet is null;
     }
 }
