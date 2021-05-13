@@ -716,15 +716,15 @@ namespace Knet.Kudu.Client
                 FetchTabletsPerPointLookup,
                 cancellationToken).ConfigureAwait(false);
 
-            var tablet = tablets.FindTablet(partitionKey);
+            var result = tablets.FindTablet(partitionKey);
 
-            if (tablet == null)
+            if (result.IsNonCoveredRange)
             {
                 throw new NonCoveredRangeException(
-                    partitionKey, tablets.GetNonCoveredRangeEnd(partitionKey));
+                    result.NonCoveredRangeStart, result.NonCoveredRangeEnd);
             }
 
-            return tablet;
+            return result.Tablet;
         }
 
         /// <summary>

@@ -53,8 +53,8 @@ namespace Knet.Kudu.Client.FunctionalTests
             {
                 var row = table.NewInsert();
                 row.SetInt32("key", i);
-                var tabletInfo = partitioner.GetRowTablet(row);
-                countsByPartition[tabletInfo.PartitionIndex]++;
+                var partitionIndex = partitioner.PartitionRow(row);
+                countsByPartition[partitionIndex]++;
             }
 
             // We don't expect a completely even division of rows into partitions, but
@@ -80,7 +80,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(numRanges * numHashPartitions, partitioner.NumPartitions);
             var row2 = table.NewInsert();
             row2.SetInt32("key", 1000);
-            Assert.Equal(0, partitioner.GetRowTablet(row2).PartitionIndex);
+            Assert.Equal(0, partitioner.PartitionRow(row2));
 
             // If we recreate the partitioner, it should get the new partitioning info.
             partitioner = await client.CreatePartitionerAsync(table);
@@ -115,14 +115,14 @@ namespace Knet.Kudu.Client.FunctionalTests
             {
                 var under = table.NewInsert();
                 under.SetInt32("key", 999);
-                partitioner.GetRowTablet(under);
+                partitioner.PartitionRow(under);
             });
 
             Assert.Throws<NonCoveredRangeException>(() =>
             {
                 var over = table.NewInsert();
                 over.SetInt32("key", 2000);
-                partitioner.GetRowTablet(over);
+                partitioner.PartitionRow(over);
             });
         }
     }
