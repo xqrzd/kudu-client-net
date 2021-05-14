@@ -4,16 +4,22 @@ using Knet.Kudu.Client.Util;
 namespace Knet.Kudu.Client.Tablet
 {
     /// <summary>
-    /// A Partition describes the set of rows that a Tablet is responsible
-    /// for serving. Each tablet is assigned a single Partition.
+    /// <para>
+    /// A partition describes the set of rows that a tablet is responsible
+    /// for serving. Each tablet is assigned a single partition.
+    /// </para>
     ///
+    /// <para>
     /// Partitions consist primarily of a start and end key.
-    /// Every row with a Partition key that falls in a Tablet's Partition
+    /// Every row with a partition key that falls in a tablet's partition
     /// will be served by that tablet.
+    /// </para>
     ///
-    /// In addition to the start and end partition keys, a Partition
+    /// <para>
+    /// In addition to the start and end partition keys, a partition
     /// holds metadata to determine if a scan can prune, or skip, a partition
     /// based on the scan's start and end primary keys, and predicates.
+    /// </para>
     /// </summary>
     public class Partition : IEquatable<Partition>, IComparable<Partition>
     {
@@ -63,7 +69,7 @@ namespace Knet.Kudu.Client.Tablet
         /// number of buckets in the partition schema.
         /// </summary>
         /// <param name="partitionKey">The partition key containing the range key.</param>
-        /// <param name="numHashBuckets">the number of hash bucket components of the table.</param>
+        /// <param name="numHashBuckets">The number of hash bucket components of the table.</param>
         private static byte[] RangeKey(byte[] partitionKey, int numHashBuckets)
         {
             int bucketsLen = numHashBuckets * EncodedBucketSize;
@@ -106,7 +112,8 @@ namespace Knet.Kudu.Client.Tablet
             if (ReferenceEquals(this, other))
                 return true;
 
-            return PartitionKeyStart.SequenceEqual(other.PartitionKeyStart) &&
+            return
+                PartitionKeyStart.SequenceEqual(other.PartitionKeyStart) &&
                 PartitionKeyEnd.SequenceEqual(other.PartitionKeyEnd);
         }
 
@@ -133,8 +140,7 @@ namespace Knet.Kudu.Client.Tablet
         /// The hash code only takes into account the partition keys, since there is a 1 to 1
         /// correspondence between partition keys and the hash buckets and range keys.
         /// </summary>
-        public override int GetHashCode() => HashCode.Combine(
-            PartitionKeyStart.GetContentHashCode(), PartitionKeyEnd.GetContentHashCode());
+        public override int GetHashCode() => PartitionKeyStart.GetContentHashCode();
 
         public override string ToString()
         {
