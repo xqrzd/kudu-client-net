@@ -33,8 +33,10 @@ namespace Knet.Kudu.Client.FunctionalTests
         /// <summary>
         /// Test that scans get retried at other tablet servers when they're quiescing.
         /// </summary>
-        [SkippableFact]
-        public async Task TestScanQuiescingTabletServer()
+        [SkippableTheory]
+        [InlineData(ReplicaSelection.LeaderOnly)]
+        [InlineData(ReplicaSelection.ClosestReplica)]
+        public async Task TestScanQuiescingTabletServer(ReplicaSelection replicaSelection)
         {
             await using var miniCluster = await new MiniKuduClusterBuilder().BuildAsync();
             await using var client = miniCluster.CreateClient();
@@ -88,7 +90,9 @@ namespace Knet.Kudu.Client.FunctionalTests
             // and complete. We aren't guaranteed to hit the quiescing server, but this
             // test would frequently fail if we didn't handle quiescing servers properly.
             var foundRows = 0;
-            var scanner = client.NewScanBuilder(table).Build();
+            var scanner = client.NewScanBuilder(table)
+                .SetReplicaSelection(replicaSelection)
+                .Build();
             await foreach (var resultSet in scanner)
             {
                 foundRows += resultSet.Count;

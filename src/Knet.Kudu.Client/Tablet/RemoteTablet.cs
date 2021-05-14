@@ -58,6 +58,18 @@ namespace Knet.Kudu.Client.Tablet
         public ServerInfo GetLeaderServerInfo() =>
             _cache.GetLeaderServerInfo();
 
+        public RemoteTablet DemoteLeader(string uuid)
+        {
+            var cache = _cache.DemoteLeader(uuid);
+            return new RemoteTablet(TableId, TabletId, Partition, cache, Replicas);
+        }
+
+        public RemoteTablet RemoveTabletServer(string uuid)
+        {
+            var cache = _cache.RemoveTabletServer(uuid);
+            return new RemoteTablet(TableId, TabletId, Partition, cache, Replicas);
+        }
+
         public bool Equals(RemoteTablet other) =>
             TabletId == other.TabletId;
 

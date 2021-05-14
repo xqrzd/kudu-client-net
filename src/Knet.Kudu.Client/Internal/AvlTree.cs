@@ -29,7 +29,7 @@ using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Internal
 {
-    public class AvlTree : IEnumerable<TableLocationEntry>
+    internal sealed class AvlTree : IEnumerable<TableLocationEntry>
     {
         private AvlNode _root;
 
