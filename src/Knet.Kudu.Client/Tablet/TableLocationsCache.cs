@@ -88,9 +88,9 @@ namespace Knet.Kudu.Client.Tablet
                 // bound partition key on the request.
 
                 newEntries.Add(TableLocationEntry.NewNonCoveredRange(
-                            Array.Empty<byte>(),
-                            Array.Empty<byte>(),
-                            expiration));
+                    Array.Empty<byte>(),
+                    Array.Empty<byte>(),
+                    expiration));
             }
             else
             {
