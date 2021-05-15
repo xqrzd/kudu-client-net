@@ -153,39 +153,27 @@ namespace Knet.Kudu.Client.Connection
         {
             var servers = _servers;
             var numServers = servers.Count;
-            var serverToRemove = -1;
+            var newServers = new List<ServerInfo>(numServers);
+            var leaderIndex = _leaderIndex;
 
             for (int i = 0; i < numServers; i++)
             {
                 var server = servers[i];
                 if (server.Uuid == uuid)
                 {
-                    serverToRemove = i;
-                    break;
-                }
-            }
+                    if (leaderIndex > i)
+                    {
+                        leaderIndex--;
+                    }
+                    else if (leaderIndex == i)
+                    {
+                        leaderIndex = -1;
+                    }
 
-            if (serverToRemove == -1)
-                return this;
-
-            var numNewServers = numServers - 1;
-            var newServers = new List<ServerInfo>(numNewServers);
-            for (int i = 0; i < numNewServers; i++)
-            {
-                if (i == serverToRemove)
                     continue;
+                }
 
-                newServers.Add(servers[i]);
-            }
-
-            var leaderIndex = _leaderIndex;
-            if (leaderIndex == serverToRemove)
-            {
-                leaderIndex = -1;
-            }
-            else if (leaderIndex > serverToRemove)
-            {
-                leaderIndex--;
+                newServers.Add(server);
             }
 
             return new ServerInfoCache(newServers, leaderIndex);
