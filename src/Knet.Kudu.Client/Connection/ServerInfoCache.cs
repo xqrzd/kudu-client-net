@@ -19,7 +19,10 @@ namespace Knet.Kudu.Client.Connection
         {
             _servers = servers;
             _leaderIndex = leaderIndex;
-            _randomIndex = _randomInt % servers.Count;
+
+            var numServers = servers.Count;
+            if (numServers > 0)
+                _randomIndex = _randomInt % numServers;
         }
 
         /// <summary>
