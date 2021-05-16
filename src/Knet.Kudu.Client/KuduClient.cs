@@ -768,7 +768,7 @@ namespace Knet.Kudu.Client
             rpc.Tablet = tablet;
 
             TableLocationsCache cache = GetTableLocationsCache(tablet.TableId);
-            cache.ReplaceTablet(tablet);
+            cache.UpdateTablet(tablet);
         }
 
         private TableLocationsCache GetTableLocationsCache(string tableId)

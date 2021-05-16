@@ -191,7 +191,7 @@ namespace Knet.Kudu.Client.Tablet
             }
         }
 
-        public void ReplaceTablet(RemoteTablet tablet)
+        public void UpdateTablet(RemoteTablet tablet)
         {
             _lock.EnterWriteLock();
             try
@@ -200,8 +200,6 @@ namespace Knet.Kudu.Client.Tablet
                     cacheEntry.IsCoveredRange)
                 {
                     var newEntry = TableLocationEntry.NewTablet(tablet, cacheEntry.Expiration);
-
-                    _cache.Delete(cacheEntry.LowerBoundPartitionKey);
                     _cache.Insert(newEntry);
                 }
             }
