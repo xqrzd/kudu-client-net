@@ -762,6 +762,15 @@ namespace Knet.Kudu.Client
             cache.RemoveTablet(tablet.Partition.PartitionKeyStart);
         }
 
+        private void RemoveTabletServerFromCache<T>(KuduTabletRpc<T> rpc, ServerInfo serverInfo)
+        {
+            RemoteTablet tablet = rpc.Tablet.RemoveTabletServer(serverInfo.Uuid);
+            rpc.Tablet = tablet;
+
+            TableLocationsCache cache = GetTableLocationsCache(tablet.TableId);
+            cache.UpdateTablet(tablet);
+        }
+
         private TableLocationsCache GetTableLocationsCache(string tableId)
         {
             return _tableLocations.GetOrAdd(
@@ -1355,15 +1364,15 @@ namespace Knet.Kudu.Client
                 var errStatusCode = rpc.Error.Status.Code;
                 var status = KuduStatus.FromTabletServerErrorPB(rpc.Error);
 
-                if (errCode == TabletServerErrorPB.Code.TabletNotFound)
+                if (errCode == TabletServerErrorPB.Code.TabletNotFound ||
+                    errCode == TabletServerErrorPB.Code.TabletNotRunning)
                 {
                     // We're handling a tablet server that's telling us it doesn't
                     // have the tablet we're asking for.
-                    RemoveTabletFromCache(rpc);
+                    RemoveTabletServerFromCache(rpc, serverInfo);
                     throw new RecoverableException(status);
                 }
-                else if (errCode == TabletServerErrorPB.Code.TabletNotRunning ||
-                    errStatusCode == AppStatusPB.ErrorCode.ServiceUnavailable)
+                else if (errStatusCode == AppStatusPB.ErrorCode.ServiceUnavailable)
                 {
                     throw new RecoverableException(status);
                 }

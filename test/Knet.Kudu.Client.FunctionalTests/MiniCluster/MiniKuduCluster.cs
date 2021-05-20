@@ -147,6 +147,16 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
             return KuduClient.NewBuilder(_masterServers.Keys.ToList());
         }
 
+        public List<HostAndPort> GetMasterServers()
+        {
+            return _masterServers.Keys.ToList();
+        }
+
+        public List<HostAndPort> GetTabletServers()
+        {
+            return _tabletServers.Keys.ToList();
+        }
+
         /// <summary>
         /// Starts a master server identified by a host and port.
         /// Does nothing if the server was already running.

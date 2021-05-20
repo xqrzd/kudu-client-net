@@ -191,6 +191,24 @@ namespace Knet.Kudu.Client.Tablet
             }
         }
 
+        public void UpdateTablet(RemoteTablet tablet)
+        {
+            _lock.EnterWriteLock();
+            try
+            {
+                if (_cache.Search(tablet.Partition.PartitionKeyStart, out var cacheEntry) &&
+                    cacheEntry.IsCoveredRange)
+                {
+                    var newEntry = TableLocationEntry.NewTablet(tablet, cacheEntry.Expiration);
+                    _cache.Insert(newEntry);
+                }
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
+        }
+
         public void ClearCache()
         {
             _lock.EnterWriteLock();
@@ -221,15 +239,14 @@ namespace Knet.Kudu.Client.Tablet
     public class TableLocationEntry
     {
         /// <summary>
-        /// The lower bound partition key, only set if this is a non-covered range.
+        /// The lower bound partition key.
         /// </summary>
-        private readonly byte[] _lowerBoundPartitionKey;
+        public byte[] LowerBoundPartitionKey { get; }
 
         /// <summary>
-        /// The upper bound partition key, only set if this is a non-covered range.
+        /// The upper bound partition key.
         /// </summary>
-        /// 
-        private readonly byte[] _upperBoundPartitionKey;
+        public byte[] UpperBoundPartitionKey { get; }
 
         /// <summary>
         /// The remote tablet, only set if this entry represents a tablet.
@@ -248,8 +265,8 @@ namespace Knet.Kudu.Client.Tablet
             long expiration)
         {
             Tablet = tablet;
-            _lowerBoundPartitionKey = lowerBoundPartitionKey;
-            _upperBoundPartitionKey = upperBoundPartitionKey;
+            LowerBoundPartitionKey = lowerBoundPartitionKey;
+            UpperBoundPartitionKey = upperBoundPartitionKey;
             Expiration = expiration;
         }
 
@@ -261,15 +278,7 @@ namespace Knet.Kudu.Client.Tablet
         /// <summary>
         /// If this entry is a covered range.
         /// </summary>
-        public bool IsCoveredRange => Tablet != null;
-
-        public byte[] LowerBoundPartitionKey => Tablet is null
-            ? _lowerBoundPartitionKey
-            : Tablet.Partition.PartitionKeyStart;
-
-        public byte[] UpperBoundPartitionKey => Tablet is null
-            ? _upperBoundPartitionKey
-            : Tablet.Partition.PartitionKeyEnd;
+        public bool IsCoveredRange => Tablet is not null;
 
         public static TableLocationEntry NewNonCoveredRange(
             byte[] lowerBoundPartitionKey,
@@ -283,10 +292,14 @@ namespace Knet.Kudu.Client.Tablet
                 expiration);
         }
 
-        public static TableLocationEntry NewTablet(
-            RemoteTablet tablet, long expiration)
+        public static TableLocationEntry NewTablet(RemoteTablet tablet, long expiration)
         {
-            return new TableLocationEntry(tablet, null, null, expiration);
+            var partition = tablet.Partition;
+            var lowerBoundPartitionKey = partition.PartitionKeyStart;
+            var upperBoundPartitionKey = partition.PartitionKeyEnd;
+
+            return new TableLocationEntry(
+                tablet, lowerBoundPartitionKey, upperBoundPartitionKey, expiration);
         }
     }
 }

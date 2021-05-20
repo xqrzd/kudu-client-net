@@ -19,7 +19,10 @@ namespace Knet.Kudu.Client.Connection
         {
             _servers = servers;
             _leaderIndex = leaderIndex;
-            _randomIndex = _randomInt % servers.Count;
+
+            var numServers = servers.Count;
+            if (numServers > 0)
+                _randomIndex = _randomInt % numServers;
         }
 
         /// <summary>
@@ -42,11 +45,15 @@ namespace Knet.Kudu.Client.Connection
         }
 
         /// <summary>
-        /// Get the information on the closest server. Servers are ranked from
-        /// closest to furthest as follows:
-        /// 1) Local servers
-        /// 2) Servers in the same location as the client
-        /// 3) All other servers
+        /// Select the closest replica to the client. Replicas are classified
+        /// from closest to furthest as follows:
+        /// <list type="number">
+        /// <item><description>Local replicas</description></item>
+        /// <item><description>
+        /// Replicas whose tablet server has the same location as the client
+        /// </description></item>
+        /// <item><description>All other replicas</description></item>
+        /// </list>
         /// </summary>
         /// <param name="location">The location of the client.</param>
         public ServerInfo GetClosestServerInfo(string location = null)
@@ -117,6 +124,59 @@ namespace Knet.Kudu.Client.Connection
                 return GetLeaderServerInfo();
 
             return GetClosestServerInfo(location);
+        }
+
+        /// <summary>
+        /// Clears the leader UUID if the passed tablet server is the current leader.
+        /// If it is the current leader, then the next call to this tablet will have
+        /// to query the master to find the new leader.
+        /// </summary>
+        /// <param name="uuid">
+        /// A tablet server that gave a sign that it isn't this tablet's leader.
+        /// </param>
+        public ServerInfoCache DemoteLeader(string uuid)
+        {
+            if (_leaderIndex == -1)
+            {
+                // There is no leader for this tablet.
+                return this;
+            }
+
+            return new ServerInfoCache(_servers, -1);
+        }
+
+        /// <summary>
+        /// Removes the passed tablet server from this tablet's list of tablet servers.
+        /// </summary>
+        /// <param name="uuid">A tablet server to remove from this cache.</param>
+        public ServerInfoCache RemoveTabletServer(string uuid)
+        {
+            var servers = _servers;
+            var numServers = servers.Count;
+            var newServers = new List<ServerInfo>(numServers);
+            var leaderIndex = _leaderIndex;
+
+            for (int i = 0; i < numServers; i++)
+            {
+                var server = servers[i];
+                if (server.Uuid == uuid)
+                {
+                    if (leaderIndex > i)
+                    {
+                        leaderIndex--;
+                    }
+                    else if (leaderIndex == i)
+                    {
+                        leaderIndex = -1;
+                    }
+
+                    continue;
+                }
+
+                newServers.Add(server);
+            }
+
+            return new ServerInfoCache(newServers, leaderIndex);
         }
     }
 }
