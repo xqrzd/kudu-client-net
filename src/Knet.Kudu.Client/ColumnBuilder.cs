@@ -100,9 +100,7 @@ namespace Knet.Kudu.Client
         /// <param name="scale">The decimal scale.</param>
         public ColumnBuilder DecimalAttributes(int precision, int scale)
         {
-            _typeAttributes = ColumnTypeAttributes.NewDecimalAttributes(
-                precision, scale);
-
+            _typeAttributes = ColumnTypeAttributes.NewDecimalAttributes(precision, scale);
             return this;
         }
 

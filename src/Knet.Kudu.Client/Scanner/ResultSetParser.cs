@@ -1,6 +1,6 @@
 using System;
 using Knet.Kudu.Client.Connection;
-using Knet.Kudu.Client.Protocol.Tserver;
+using Knet.Kudu.Client.Protobuf.Tserver;
 
 namespace Knet.Kudu.Client.Scanner
 {
@@ -38,9 +38,9 @@ namespace Knet.Kudu.Client.Scanner
                 resultSet, numRows);
         }
 
-        private ReadOnlyMemory<byte> GetRowData(ScanResponsePB responsePb, KuduSidecars sidecars)
+        private static ReadOnlyMemory<byte> GetRowData(ScanResponsePB responsePb, KuduSidecars sidecars)
         {
-            if (responsePb.Data.ShouldSerializeRowsSidecar())
+            if (responsePb.Data.HasRowsSidecar)
             {
                 return sidecars.GetSidecarMemory(responsePb.Data.RowsSidecar);
             }
@@ -48,9 +48,9 @@ namespace Knet.Kudu.Client.Scanner
             return default;
         }
 
-        private ReadOnlyMemory<byte> GetIndirectData(ScanResponsePB responsePb, KuduSidecars sidecars)
+        private static ReadOnlyMemory<byte> GetIndirectData(ScanResponsePB responsePb, KuduSidecars sidecars)
         {
-            if (responsePb.Data.ShouldSerializeIndirectDataSidecar())
+            if (responsePb.Data.HasIndirectDataSidecar)
             {
                 return sidecars.GetSidecarMemory(responsePb.Data.IndirectDataSidecar);
             }

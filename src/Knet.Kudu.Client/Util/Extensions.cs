@@ -8,8 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Internal;
-using Knet.Kudu.Client.Protocol;
-using Knet.Kudu.Client.Protocol.Rpc;
+using Knet.Kudu.Client.Protobuf;
 
 namespace Knet.Kudu.Client.Util
 {
@@ -22,7 +21,7 @@ namespace Knet.Kudu.Client.Util
             Encoding.UTF8.GetBytes(source);
 
         public static HostAndPort ToHostAndPort(this HostPortPB hostPort) =>
-            new HostAndPort(hostPort.Host, (int)hostPort.Port);
+            new(hostPort.Host, (int)hostPort.Port);
 
         public static int SequenceCompareTo<T>(this T[] array, ReadOnlySpan<T> other)
             where T : IComparable<T> => MemoryExtensions.SequenceCompareTo(array, other);
@@ -145,12 +144,6 @@ namespace Knet.Kudu.Client.Util
                 result = 31 * result + element;
 
             return result;
-        }
-
-        public static bool HasRpcFeature(this NegotiatePB negotiatePb, RpcFeatureFlag flag)
-        {
-            return negotiatePb.SupportedFeatures != null &&
-                negotiatePb.SupportedFeatures.Contains(flag);
         }
 
         internal static int GetScannerBatchSizeEstimate(this KuduSchema schema)

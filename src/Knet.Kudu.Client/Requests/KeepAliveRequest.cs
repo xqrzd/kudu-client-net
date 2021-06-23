@@ -1,8 +1,7 @@
 using System.Buffers;
-using System.IO;
-using Knet.Kudu.Client.Protocol.Tserver;
+using Google.Protobuf;
+using Knet.Kudu.Client.Protobuf.Tserver;
 using Knet.Kudu.Client.Tablet;
-using ProtoBuf;
 
 namespace Knet.Kudu.Client.Requests
 {
@@ -17,7 +16,10 @@ namespace Knet.Kudu.Client.Requests
             RemoteTablet tablet,
             byte[] partitionKey)
         {
-            _request = new ScannerKeepAliveRequestPB { ScannerId = scannerId };
+            _request = new ScannerKeepAliveRequestPB
+            {
+                ScannerId = UnsafeByteOperations.UnsafeWrap(scannerId),
+            };
 
             ReplicaSelection = replicaSelection;
             TableId = tableId;
@@ -29,19 +31,14 @@ namespace Knet.Kudu.Client.Requests
 
         public override ReplicaSelection ReplicaSelection { get; }
 
-        public override void Serialize(Stream stream)
-        {
-            Serializer.SerializeWithLengthPrefix(stream, _request, PrefixStyle.Base128);
-        }
+        public override int CalculateSize() => _request.CalculateSize();
+
+        public override void WriteTo(IBufferWriter<byte> output) => _request.WriteTo(output);
 
         public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
         {
-            var responsePb = Serializer.Deserialize<ScannerKeepAliveResponsePB>(buffer);
-
-            if (responsePb.Error == null)
-                Output = responsePb;
-            else
-                Error = responsePb.Error;
+            Output = ScannerKeepAliveResponsePB.Parser.ParseFrom(buffer);
+            Error = Output.Error;
         }
     }
 }

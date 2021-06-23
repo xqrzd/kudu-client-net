@@ -1,6 +1,6 @@
 using System.IO;
 using System.Threading.Tasks;
-using Knet.Kudu.Client.Protocol.Tools;
+using Knet.Kudu.Client.Protobuf.Tools;
 
 namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
 {

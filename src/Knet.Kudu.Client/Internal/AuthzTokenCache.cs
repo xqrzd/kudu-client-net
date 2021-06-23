@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using Knet.Kudu.Client.Protocol.Security;
+using Knet.Kudu.Client.Protobuf.Security;
 
 namespace Knet.Kudu.Client.Internal
 {

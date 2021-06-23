@@ -1,6 +1,6 @@
 using System.Buffers;
-using System.IO;
-using Knet.Kudu.Client.Protocol.Tserver;
+using Google.Protobuf;
+using Knet.Kudu.Client.Protobuf.Tserver;
 using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Requests
@@ -20,7 +20,7 @@ namespace Knet.Kudu.Client.Requests
             IsRequestTracked = true;
         }
 
-        public override void Serialize(Stream stream)
+        public override int CalculateSize()
         {
             if (AuthzToken != null)
                 _request.AuthzToken = AuthzToken;
@@ -28,14 +28,16 @@ namespace Knet.Kudu.Client.Requests
             if (PropagatedTimestamp != KuduClient.NoTimestamp)
                 _request.PropagatedTimestamp = (ulong)PropagatedTimestamp;
 
-            _request.TabletId = Tablet.TabletId.ToUtf8ByteArray();
+            _request.TabletId = UnsafeByteOperations.UnsafeWrap(Tablet.TabletId.ToUtf8ByteArray());
 
-            Serialize(stream, _request);
+            return _request.CalculateSize();
         }
+
+        public override void WriteTo(IBufferWriter<byte> output) => _request.WriteTo(output);
 
         public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
         {
-            Output = Deserialize(buffer);
+            Output = WriteResponsePB.Parser.ParseFrom(buffer);
             Error = Output.Error;
         }
     }

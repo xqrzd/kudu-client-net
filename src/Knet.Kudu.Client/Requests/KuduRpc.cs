@@ -1,12 +1,11 @@
 using System;
 using System.Buffers;
-using System.IO;
+using Google.Protobuf.Collections;
 using Knet.Kudu.Client.Connection;
-using Knet.Kudu.Client.Protocol.Master;
-using Knet.Kudu.Client.Protocol.Security;
-using Knet.Kudu.Client.Protocol.Tserver;
+using Knet.Kudu.Client.Protobuf.Master;
+using Knet.Kudu.Client.Protobuf.Security;
+using Knet.Kudu.Client.Protobuf.Tserver;
 using Knet.Kudu.Client.Tablet;
-using ProtoBuf;
 
 namespace Knet.Kudu.Client.Requests
 {
@@ -24,7 +23,7 @@ namespace Knet.Kudu.Client.Requests
         /// <summary>
         /// Returns the set of application-specific feature flags required to service the RPC.
         /// </summary>
-        public uint[] RequiredFeatures { get; protected set; }
+        public RepeatedField<uint> RequiredFeatures { get; protected set; }
 
         /// <summary>
         /// The external consistency mode for this RPC.
@@ -51,8 +50,9 @@ namespace Knet.Kudu.Client.Requests
 
         internal long SequenceId { get; set; } = RequestTracker.NoSeqNo;
 
-        //void WriteRequest(IBufferWriter<byte> writer);
-        public abstract void Serialize(Stream stream);
+        public abstract int CalculateSize();
+
+        public abstract void WriteTo(IBufferWriter<byte> output);
 
         public abstract void ParseProtobuf(ReadOnlySequence<byte> buffer);
 
@@ -65,16 +65,6 @@ namespace Knet.Kudu.Client.Requests
     public abstract class KuduRpc<T> : KuduRpc
     {
         public virtual T Output { get; protected set; }
-
-        public static void Serialize<TInput>(Stream stream, TInput value)
-        {
-            Serializer.SerializeWithLengthPrefix(stream, value, PrefixStyle.Base128);
-        }
-
-        public static T Deserialize(ReadOnlySequence<byte> buffer)
-        {
-            return Serializer.Deserialize<T>(buffer);
-        }
     }
 
     public abstract class KuduMasterRpc<T> : KuduRpc<T>

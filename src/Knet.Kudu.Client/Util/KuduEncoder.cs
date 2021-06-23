@@ -194,7 +194,7 @@ namespace Knet.Kudu.Client.Util
         }
 
         public static object DecodeDefaultValue(
-            KuduType type, ColumnTypeAttributes typeAttributes, byte[] value)
+            KuduType type, ColumnTypeAttributes typeAttributes, ReadOnlySpan<byte> value)
         {
             return type switch
             {
@@ -207,7 +207,7 @@ namespace Knet.Kudu.Client.Util
                 KuduType.Bool => DecodeBool(value),
                 KuduType.Float => DecodeFloat(value),
                 KuduType.Double => DecodeDouble(value),
-                KuduType.Binary => value,
+                KuduType.Binary => value.ToArray(),
                 KuduType.UnixtimeMicros => DecodeDateTime(value),
                 KuduType.Date => DecodeDate(value),
                 KuduType.Decimal32 => DecodeDecimal(

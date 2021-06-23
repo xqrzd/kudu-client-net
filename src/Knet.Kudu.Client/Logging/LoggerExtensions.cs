@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using Knet.Kudu.Client.Connection;
-using Knet.Kudu.Client.Protocol;
+using Knet.Kudu.Client.Protobuf;
 using Knet.Kudu.Client.Tablet;
 using Knet.Kudu.Client.Util;
 using Microsoft.Extensions.Logging;
@@ -69,7 +69,7 @@ namespace Knet.Kudu.Client.Logging
             _connectedToServer(logger, hostPort, ipAddress, tlsInfo, negotiateInfo, isLocal, null);
         }
 
-        public static void MisconfiguredMasterAddresses(this ILogger logger, IReadOnlyList<HostAndPort> clientMasters, List<HostPortPB> clusterMasters)
+        public static void MisconfiguredMasterAddresses(this ILogger logger, IReadOnlyList<HostAndPort> clientMasters, IReadOnlyList<HostPortPB> clusterMasters)
         {
             var clientMastersStr = string.Join(",", clientMasters);
             var clusterMastersStr = string.Join(",", clusterMasters.Select(m => m.ToHostAndPort()));

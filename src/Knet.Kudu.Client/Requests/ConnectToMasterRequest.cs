@@ -1,18 +1,18 @@
 using System.Buffers;
-using System.IO;
-using Knet.Kudu.Client.Protocol.Master;
+using Google.Protobuf;
+using Google.Protobuf.Collections;
+using Knet.Kudu.Client.Protobuf.Master;
 
 namespace Knet.Kudu.Client.Requests
 {
     public class ConnectToMasterRequest : KuduMasterRpc<ConnectToMasterResponsePB>
     {
-        private static readonly uint[] _requiredFeatures = new uint[]
+        private static readonly RepeatedField<uint> _requiredFeatures = new()
         {
             (uint)MasterFeatures.ConnectToMaster
         };
 
-        private static readonly ConnectToMasterResponsePB _request =
-            new ConnectToMasterResponsePB();
+        private static readonly byte[] _requestBytes = new ConnectToMasterRequestPB().ToByteArray();
 
         public ConnectToMasterRequest()
         {
@@ -21,14 +21,13 @@ namespace Knet.Kudu.Client.Requests
 
         public override string MethodName => "ConnectToMaster";
 
-        public override void Serialize(Stream stream)
-        {
-            Serialize(stream, _request);
-        }
+        public override int CalculateSize() => _requestBytes.Length;
+
+        public override void WriteTo(IBufferWriter<byte> output) => output.Write(_requestBytes);
 
         public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
         {
-            Output = Deserialize(buffer);
+            Output = ConnectToMasterResponsePB.Parser.ParseFrom(buffer);
             Error = Output.Error;
         }
     }

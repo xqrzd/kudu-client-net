@@ -2,10 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Google.Protobuf;
 using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Logging;
-using Knet.Kudu.Client.Protocol;
-using Knet.Kudu.Client.Protocol.Tserver;
+using Knet.Kudu.Client.Protobuf;
+using Knet.Kudu.Client.Protobuf.Tserver;
 using Knet.Kudu.Client.Requests;
 using Knet.Kudu.Client.Scanner;
 using Knet.Kudu.Client.Tablet;
@@ -16,6 +17,9 @@ namespace Knet.Kudu.Client
 {
     public class KuduScanEnumerator<T> : IAsyncEnumerator<T>
     {
+        private static readonly ByteString _defaultDeletedColumnValue =
+            UnsafeByteOperations.UnsafeWrap(new byte[] { 0 });
+
         private readonly ILogger _logger;
         private readonly KuduClient _client;
         private readonly KuduTable _table;
@@ -470,13 +474,13 @@ namespace Knet.Kudu.Client
             }
 
             if (_isFaultTolerant && _lastPrimaryKey.Length > 0)
-                newRequest.LastPrimaryKey = _lastPrimaryKey;
+                newRequest.LastPrimaryKey = UnsafeByteOperations.UnsafeWrap(_lastPrimaryKey);
 
             if (_startPrimaryKey.Length > 0)
-                newRequest.StartPrimaryKey = _startPrimaryKey;
+                newRequest.StartPrimaryKey = UnsafeByteOperations.UnsafeWrap(_startPrimaryKey);
 
             if (_endPrimaryKey.Length > 0)
-                newRequest.StopPrimaryKey = _endPrimaryKey;
+                newRequest.StopPrimaryKey = UnsafeByteOperations.UnsafeWrap(_endPrimaryKey);
 
             foreach (KuduPredicate predicate in _predicates.Values)
                 newRequest.ColumnPredicates.Add(predicate.ToProtobuf());
@@ -499,7 +503,7 @@ namespace Knet.Kudu.Client
         {
             var request = new ScanRequestPB
             {
-                ScannerId = _scannerId,
+                ScannerId = UnsafeByteOperations.UnsafeWrap(_scannerId),
                 CallSeqId = _sequenceId,
                 BatchSizeBytes = (uint)_batchSizeBytes
             };
@@ -520,7 +524,7 @@ namespace Knet.Kudu.Client
         {
             var request = new ScanRequestPB
             {
-                ScannerId = _scannerId,
+                ScannerId = UnsafeByteOperations.UnsafeWrap(_scannerId),
                 BatchSizeBytes = 0,
                 CloseScanner = true
             };
@@ -605,7 +609,7 @@ namespace Knet.Kudu.Client
             {
                 Name = columnName,
                 Type = DataTypePB.IsDeleted,
-                ReadDefaultValue = new byte[] { 0 },
+                ReadDefaultValue = _defaultDeletedColumnValue,
                 IsNullable = false,
                 IsKey = false
             };

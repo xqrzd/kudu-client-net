@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Knet.Kudu.Client.Protocol;
-using Knet.Kudu.Client.Protocol.Master;
+using Knet.Kudu.Client.Protobuf;
+using Knet.Kudu.Client.Protobuf.Master;
 using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client
@@ -22,14 +22,18 @@ namespace Knet.Kudu.Client
         {
             _createTableRequest = new CreateTableRequestPB
             {
-                Name = tableName,
                 Schema = new SchemaPB(),
                 PartitionSchema = new PartitionSchemaPB
                 {
-                    RangeSchema = new PartitionSchemaPB.RangeSchemaPB()
+                    RangeSchema = new PartitionSchemaPB.Types.RangeSchemaPB()
                 },
                 SplitRowsRangeBounds = new RowOperationsPB()
             };
+
+            if (tableName != null)
+            {
+                _createTableRequest.Name = tableName;
+            }
 
             _splitRowsRangeBounds = new List<PartialRowOperation>();
         }
@@ -155,7 +159,7 @@ namespace Knet.Kudu.Client
         /// <param name="columns">The columns to hash.</param>
         public TableBuilder AddHashPartitions(int buckets, uint seed, params string[] columns)
         {
-            var partition = new PartitionSchemaPB.HashBucketSchemaPB
+            var partition = new PartitionSchemaPB.Types.HashBucketSchemaPB
             {
                 NumBuckets = buckets,
                 Seed = seed
@@ -164,7 +168,7 @@ namespace Knet.Kudu.Client
             foreach (var column in columns)
             {
                 partition.Columns.Add(
-                    new PartitionSchemaPB.ColumnIdentifierPB { Name = column });
+                    new PartitionSchemaPB.Types.ColumnIdentifierPB { Name = column });
             }
 
             _createTableRequest.PartitionSchema.HashBucketSchemas.Add(partition);
@@ -188,7 +192,7 @@ namespace Knet.Kudu.Client
             foreach (var column in columns)
             {
                 schemaColumns.Add(
-                    new PartitionSchemaPB.ColumnIdentifierPB { Name = column });
+                    new PartitionSchemaPB.Types.ColumnIdentifierPB { Name = column });
             }
 
             return this;

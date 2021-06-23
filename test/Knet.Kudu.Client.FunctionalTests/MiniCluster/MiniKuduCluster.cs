@@ -8,11 +8,11 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Google.Protobuf;
 using Knet.Kudu.Binary;
 using Knet.Kudu.Client.Connection;
-using Knet.Kudu.Client.Protocol.Tools;
+using Knet.Kudu.Client.Protobuf.Tools;
 using Knet.Kudu.Client.Util;
-using ProtoBuf;
 
 namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
 {
@@ -20,7 +20,7 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
     {
         // Hack-fix to avoid resource issues on CI.
         private static readonly int _maxConcurrentClusters = Math.Max(4, Environment.ProcessorCount);
-        private static readonly SemaphoreSlim _testLimiter = new SemaphoreSlim(
+        private static readonly SemaphoreSlim _testLimiter = new(
             _maxConcurrentClusters, _maxConcurrentClusters);
 
         private readonly CreateClusterRequestPB _createClusterRequestPB;
@@ -306,7 +306,7 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
         private Task<ControlShellResponsePB> SendRequestToClusterAsync(ControlShellRequestPB req)
         {
             var writer = new ArrayBufferWriter<byte>();
-            Serializer.Serialize(writer, req);
+            req.WriteTo(writer);
             var messageLength = writer.WrittenCount;
 
             var finalWriter = new ArrayBufferWriter<byte>();
@@ -340,7 +340,7 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
                 await ReadExactAsync(buffer);
 
                 var ms = new MemoryStream(buffer);
-                var response = Serializer.Deserialize<ControlShellResponsePB>(ms);
+                var response = ControlShellResponsePB.Parser.ParseFrom(ms);
 
                 if (response.Error != null)
                     throw new IOException(response.Error.Message);

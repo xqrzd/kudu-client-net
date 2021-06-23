@@ -1,5 +1,5 @@
 using System;
-using Knet.Kudu.Client.Protocol;
+using Knet.Kudu.Client.Protobuf;
 using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client
@@ -99,9 +99,9 @@ namespace Knet.Kudu.Client
         {
             var type = (KuduType)columnSchemaPb.Type;
             var typeAttributes = columnSchemaPb.TypeAttributes.ToTypeAttributes();
-            var defaultValue = columnSchemaPb.ShouldSerializeWriteDefaultValue()
+            var defaultValue = columnSchemaPb.HasWriteDefaultValue
                 ? KuduEncoder.DecodeDefaultValue(
-                    type, typeAttributes, columnSchemaPb.WriteDefaultValue)
+                    type, typeAttributes, columnSchemaPb.WriteDefaultValue.Span)
                 : null;
 
             return new ColumnSchema(

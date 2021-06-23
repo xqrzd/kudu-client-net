@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Knet.Kudu.Client.Protocol.Consensus;
-using Knet.Kudu.Client.Protocol.Master;
+using Knet.Kudu.Client.Protobuf.Consensus;
+using Knet.Kudu.Client.Protobuf.Master;
 using Knet.Kudu.Client.Tablet;
 using Knet.Kudu.Client.Util;
 
@@ -51,12 +51,12 @@ namespace Knet.Kudu.Client.Connection
             {
                 var tabletId = tabletInfo.TabletId.ToStringUtf8();
                 var partition = new Partition(
-                    tabletInfo.Partition.PartitionKeyStart,
-                    tabletInfo.Partition.PartitionKeyEnd,
-                    tabletInfo.Partition.HashBuckets);
+                    tabletInfo.Partition.PartitionKeyStart.ToByteArray(),
+                    tabletInfo.Partition.PartitionKeyEnd.ToByteArray(),
+                    tabletInfo.Partition.HashBuckets.ToArray());
 
                 var numReplicas = Math.Max(
-                    tabletInfo.DEPRECATEDreplicas.Count,
+                    tabletInfo.DEPRECATEDReplicas.Count,
                     tabletInfo.InternedReplicas.Count);
 
                 var servers = new List<ServerInfo>(numReplicas);
@@ -74,7 +74,7 @@ namespace Knet.Kudu.Client.Connection
                         replicaPb.Role,
                         replicaPb.DimensionLabel);
 
-                    if (replica.Role == RaftPeerPB.Role.Leader)
+                    if (replica.Role == RaftPeerPB.Types.Role.Leader)
                         leaderIndex = servers.Count;
 
                     servers.Add(serverInfo);
@@ -83,7 +83,7 @@ namespace Knet.Kudu.Client.Connection
 
                 // Handle "old-style" non-interned replicas.
                 // It's used for backward compatibility.
-                foreach (var replicaPb in tabletInfo.DEPRECATEDreplicas)
+                foreach (var replicaPb in tabletInfo.DEPRECATEDReplicas)
                 {
                     var serverInfo = await connectionFactory.GetServerInfoAsync(
                         replicaPb.TsInfo).ConfigureAwait(false);
@@ -95,7 +95,7 @@ namespace Knet.Kudu.Client.Connection
                             replicaPb.Role,
                             replicaPb.DimensionLabel);
 
-                        if (replica.Role == RaftPeerPB.Role.Leader)
+                        if (replica.Role == RaftPeerPB.Types.Role.Leader)
                             leaderIndex = servers.Count;
 
                         servers.Add(serverInfo);

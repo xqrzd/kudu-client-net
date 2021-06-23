@@ -1,6 +1,6 @@
 using System.Buffers;
-using System.IO;
-using Knet.Kudu.Client.Protocol.Master;
+using Google.Protobuf;
+using Knet.Kudu.Client.Protobuf.Master;
 
 namespace Knet.Kudu.Client.Requests
 {
@@ -18,14 +18,13 @@ namespace Knet.Kudu.Client.Requests
             // as it's supported in Kudu 1.3, the oldest version this client supports.
         }
 
-        public override void Serialize(Stream stream)
-        {
-            Serialize(stream, _request);
-        }
+        public override int CalculateSize() => _request.CalculateSize();
+
+        public override void WriteTo(IBufferWriter<byte> output) => _request.WriteTo(output);
 
         public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
         {
-            Output = Deserialize(buffer);
+            Output = CreateTableResponsePB.Parser.ParseFrom(buffer);
             Error = Output.Error;
         }
     }

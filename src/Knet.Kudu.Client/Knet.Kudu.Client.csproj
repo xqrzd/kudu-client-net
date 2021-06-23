@@ -23,9 +23,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.17.3" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="2.1.0" />
     <PackageReference Include="Pipelines.Sockets.Unofficial" Version="2.2.0" />
-    <PackageReference Include="protobuf-net" Version="3.0.73" />
     <PackageReference Include="System.IO.Pipelines" Version="5.0.1" />
   </ItemGroup>
 

@@ -1,24 +1,22 @@
 using System.Buffers;
-using System.IO;
-using Knet.Kudu.Client.Protocol.Master;
+using Google.Protobuf;
+using Knet.Kudu.Client.Protobuf.Master;
 
 namespace Knet.Kudu.Client.Requests
 {
     public class ListTabletServersRequest : KuduMasterRpc<ListTabletServersResponsePB>
     {
-        private static readonly ListTabletServersRequestPB _request =
-            new ListTabletServersRequestPB();
+        private static readonly byte[] _requestBytes = new ListTabletServersRequestPB().ToByteArray();
 
         public override string MethodName => "ListTabletServers";
 
-        public override void Serialize(Stream stream)
-        {
-            Serialize(stream, _request);
-        }
+        public override int CalculateSize() => _requestBytes.Length;
+
+        public override void WriteTo(IBufferWriter<byte> output) => output.Write(_requestBytes);
 
         public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
         {
-            Output = Deserialize(buffer);
+            Output = ListTabletServersResponsePB.Parser.ParseFrom(buffer);
             Error = Output.Error;
         }
     }

@@ -11,17 +11,18 @@ using System.Security.Cryptography.X509Certificates;
 using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
+using Google.Protobuf;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Logging;
-using Knet.Kudu.Client.Protocol.Rpc;
-using Knet.Kudu.Client.Protocol.Security;
+using Knet.Kudu.Client.Protobuf.Rpc;
+using Knet.Kudu.Client.Protobuf.Security;
 using Knet.Kudu.Client.Util;
 using Microsoft.Extensions.Logging;
 using Pipelines.Sockets.Unofficial;
-using ProtoBuf;
-using static Knet.Kudu.Client.Protocol.Rpc.NegotiatePB;
+using static Knet.Kudu.Client.Protobuf.Rpc.ErrorStatusPB.Types;
+using static Knet.Kudu.Client.Protobuf.Rpc.NegotiatePB.Types;
 
 namespace Knet.Kudu.Client.Negotiate
 {
@@ -102,7 +103,7 @@ namespace Knet.Kudu.Client.Negotiate
             var useTls = false;
 
             // Always use TLS if the server supports it.
-            if (features.HasRpcFeature(RpcFeatureFlag.Tls))
+            if (features.SupportedFeatures.Contains(RpcFeatureFlag.Tls))
             {
                 // If we negotiated TLS, then we want to start the TLS handshake;
                 // otherwise, we can move directly to the authentication phase.
@@ -110,7 +111,7 @@ namespace Knet.Kudu.Client.Negotiate
                     .ConfigureAwait(false);
 
                 // Don't wrap the TLS socket if we are using TLS for authentication only.
-                if (!features.HasRpcFeature(RpcFeatureFlag.TlsAuthenticationOnly))
+                if (!features.SupportedFeatures.Contains(RpcFeatureFlag.TlsAuthenticationOnly))
                 {
                     useTls = true;
                     _stream = tlsStream;
@@ -170,13 +171,13 @@ namespace Knet.Kudu.Client.Negotiate
             // Advertise our authentication types.
 
             // We always advertise SASL.
-            request.AuthnTypes.Add(new AuthenticationTypePB { sasl = new AuthenticationTypePB.Sasl() });
+            request.AuthnTypes.Add(new AuthenticationTypePB { Sasl = new AuthenticationTypePB.Types.Sasl() });
 
             // We may also have a token. But, we can only use the token
             // if we are able to use authenticated TLS to authenticate the server.
             if (_authnToken != null)
             {
-                request.AuthnTypes.Add(new AuthenticationTypePB { token = new AuthenticationTypePB.Token() });
+                request.AuthnTypes.Add(new AuthenticationTypePB { Token = new AuthenticationTypePB.Types.Token() });
             }
 
             // Certificate authentication is not supported for external clients.
@@ -215,7 +216,7 @@ namespace Knet.Kudu.Client.Negotiate
 
             var authType = features.AuthnTypes[0];
 
-            if (authType.sasl != null)
+            if (authType.Sasl != null)
             {
                 var serverMechs = new HashSet<string>();
 
@@ -231,7 +232,7 @@ namespace Knet.Kudu.Client.Negotiate
                 throw new NonRecoverableException(KuduStatus.IllegalState(
                     $"Server supplied unexpected sasl mechanisms {string.Join(",", serverMechs)}"));
             }
-            else if (authType.token != null)
+            else if (authType.Token != null)
             {
                 return AuthenticationType.Token;
             }
@@ -268,7 +269,8 @@ namespace Knet.Kudu.Client.Negotiate
         {
             var request = new NegotiatePB { Step = NegotiateStep.SaslInitiate };
             request.SaslMechanisms.Add(new SaslMechanism { Mechanism = "PLAIN" });
-            request.Token = SaslPlain.CreateToken(new NetworkCredential(Environment.UserName, ""));
+            var token = SaslPlain.CreateToken(new NetworkCredential(Environment.UserName, ""));
+            request.Token = UnsafeByteOperations.UnsafeWrap(token);
 
             await SendReceiveAsync(request, cancellationToken).ConfigureAwait(false);
             return new ConnectionContextPB();
@@ -305,7 +307,7 @@ namespace Knet.Kudu.Client.Negotiate
             // NegotiateStream expects a little-endian length header.
             var newToken = new byte[token.Length + 4];
             BinaryPrimitives.WriteInt32LittleEndian(newToken, token.Length);
-            token.CopyTo(newToken.AsSpan(4));
+            token.Memory.Span.CopyTo(newToken.AsSpan(4));
 
             var decryptedToken = gssApiStream.DecryptBuffer(newToken);
             var encryptedToken = gssApiStream.EncryptBuffer(decryptedToken);
@@ -330,7 +332,7 @@ namespace Knet.Kudu.Client.Negotiate
                         "No channel bindings provided by remote peer"));
                 }
 
-                byte[] provided = response.ChannelBindings;
+                byte[] provided = response.ChannelBindings.ToByteArray();
                 // Kudu supplies a length header in big-endian,
                 // but NegotiateStream expects little-endian.
                 provided.AsSpan(0, 4).Reverse();
@@ -348,14 +350,14 @@ namespace Knet.Kudu.Client.Negotiate
 
             if (response.Nonce != null)
             {
-                nonce = gssApiStream.EncryptBuffer(response.Nonce).ToArray();
+                nonce = gssApiStream.EncryptBuffer(response.Nonce.Memory).ToArray();
 
                 // NegotiateStream writes a little-endian length header,
                 // but Kudu is expecting big-endian.
                 nonce.AsSpan(0, 4).Reverse();
             }
 
-            return new ConnectionContextPB { EncodedNonce = nonce };
+            return new ConnectionContextPB { EncodedNonce = UnsafeByteOperations.UnsafeWrap(nonce) };
         }
 
         private async Task<ConnectionContextPB> AuthenticateTokenAsync(CancellationToken cancellationToken)
@@ -388,7 +390,7 @@ namespace Knet.Kudu.Client.Negotiate
             var request = new NegotiatePB
             {
                 Step = NegotiateStep.TlsHandshake,
-                TlsHandshake = tlsHandshake
+                TlsHandshake = UnsafeByteOperations.UnsafeWrap(tlsHandshake)
             };
 
             return SendReceiveAsync(request, cancellationToken);
@@ -400,7 +402,7 @@ namespace Knet.Kudu.Client.Negotiate
             var request = new NegotiatePB
             {
                 Step = step,
-                Token = saslToken.ToArray()
+                Token = UnsafeByteOperations.UnsafeWrap(saslToken)
             };
 
             if (step == NegotiateStep.SaslInitiate)
@@ -420,14 +422,18 @@ namespace Knet.Kudu.Client.Negotiate
         }
 
         private async Task SendAsync<TInput>(RequestHeader header, TInput body, CancellationToken cancellationToken)
+            where TInput : IMessage
         {
             using var stream = new RecyclableMemoryStream();
 
             // Make space to write the length of the entire message.
             stream.GetMemory(4);
 
-            Serializer.SerializeWithLengthPrefix(stream, header, PrefixStyle.Base128);
-            Serializer.SerializeWithLengthPrefix(stream, body, PrefixStyle.Base128);
+            header.WriteDelimitedTo(stream);
+            body.WriteDelimitedTo(stream);
+
+            //Serializer.SerializeWithLengthPrefix(stream, header, PrefixStyle.Base128);
+            //Serializer.SerializeWithLengthPrefix(stream, body, PrefixStyle.Base128);
 
             // Go back and write the length of the entire message, minus the 4
             // bytes we already allocated to store the length.
@@ -446,16 +452,16 @@ namespace Knet.Kudu.Client.Negotiate
             await ReadExactAsync(buffer, cancellationToken).ConfigureAwait(false);
 
             var ms = new MemoryStream(buffer);
-            var header = Serializer.DeserializeWithLengthPrefix<ResponseHeader>(ms, PrefixStyle.Base128);
+            var header = ResponseHeader.Parser.ParseDelimitedFrom(ms);
 
             if (header.IsError)
             {
-                var error = Serializer.DeserializeWithLengthPrefix<ErrorStatusPB>(ms, PrefixStyle.Base128);
+                var error = ErrorStatusPB.Parser.ParseDelimitedFrom(ms);
                 var code = error.Code;
                 KuduException exception;
 
-                if (code == ErrorStatusPB.RpcErrorCodePB.ErrorServerTooBusy ||
-                    code == ErrorStatusPB.RpcErrorCodePB.ErrorUnavailable)
+                if (code == RpcErrorCodePB.ErrorServerTooBusy ||
+                    code == RpcErrorCodePB.ErrorUnavailable)
                 {
                     exception = new RecoverableException(
                         KuduStatus.ServiceUnavailable(error.Message));
@@ -475,7 +481,7 @@ namespace Knet.Kudu.Client.Negotiate
                     $"Expected CallId {SaslNegotiationCallId}, got {header.CallId}"));
             }
 
-            var response = Serializer.DeserializeWithLengthPrefix<NegotiatePB>(ms, PrefixStyle.Base128);
+            var response = NegotiatePB.Parser.ParseDelimitedFrom(ms);
 
             return response;
         }

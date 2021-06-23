@@ -1,10 +1,10 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
-using Knet.Kudu.Client.Protocol;
-using Knet.Kudu.Client.Protocol.Client;
+using Google.Protobuf;
+using Knet.Kudu.Client.Protobuf;
+using Knet.Kudu.Client.Protobuf.Client;
 using Knet.Kudu.Client.Tablet;
-using ProtoBuf;
 
 namespace Knet.Kudu.Client
 {
@@ -51,7 +51,7 @@ namespace Knet.Kudu.Client
         public byte[] Serialize()
         {
             var writer = new ArrayBufferWriter<byte>();
-            Serializer.Serialize(writer, _message);
+            _message.WriteTo(writer);
             return writer.WrittenSpan.ToArray();
         }
 
@@ -68,7 +68,8 @@ namespace Knet.Kudu.Client
             TBuilder scanBuilder, ReadOnlyMemory<byte> buffer)
             where TBuilder : AbstractKuduScannerBuilder<TBuilder>
         {
-            var scanTokenPb = Serializer.Deserialize<ScanTokenPB>(buffer);
+            // TODO: Use span when Google.Protobuf 3.18 is released.
+            var scanTokenPb = ScanTokenPB.Parser.ParseFrom(buffer.ToArray());
             PbIntoScanner(scanBuilder, scanTokenPb);
             return scanBuilder;
         }
@@ -79,13 +80,13 @@ namespace Knet.Kudu.Client
         {
             var table = builder.Table;
 
-            if (scanTokenPb.FeatureFlags.Contains(ScanTokenPB.Feature.Unknown))
+            if (scanTokenPb.FeatureFlags.Contains(ScanTokenPB.Types.Feature.Unknown))
             {
                 throw new Exception("Scan token requires an unsupported feature. " +
                     "This Kudu client must be updated.");
             }
 
-            if (scanTokenPb.ShouldSerializeTableId())
+            if (scanTokenPb.HasTableId)
             {
                 if (scanTokenPb.TableId != table.TableId)
                 {
@@ -110,22 +111,22 @@ namespace Knet.Kudu.Client
                 builder.AddPredicate(KuduPredicate.FromPb(table.Schema, predicate));
             }
 
-            if (scanTokenPb.ShouldSerializeLowerBoundPrimaryKey())
-                builder.LowerBoundRaw(scanTokenPb.LowerBoundPrimaryKey);
+            if (scanTokenPb.HasLowerBoundPrimaryKey)
+                builder.LowerBoundRaw(scanTokenPb.LowerBoundPrimaryKey.ToByteArray());
 
-            if (scanTokenPb.ShouldSerializeUpperBoundPrimaryKey())
-                builder.ExclusiveUpperBoundRaw(scanTokenPb.UpperBoundPrimaryKey);
+            if (scanTokenPb.HasUpperBoundPrimaryKey)
+                builder.ExclusiveUpperBoundRaw(scanTokenPb.UpperBoundPrimaryKey.ToByteArray());
 
-            if (scanTokenPb.ShouldSerializeLowerBoundPartitionKey())
-                builder.LowerBoundPartitionKeyRaw(scanTokenPb.LowerBoundPartitionKey);
+            if (scanTokenPb.HasLowerBoundPartitionKey)
+                builder.LowerBoundPartitionKeyRaw(scanTokenPb.LowerBoundPartitionKey.ToByteArray());
 
-            if (scanTokenPb.ShouldSerializeUpperBoundPartitionKey())
-                builder.ExclusiveUpperBoundPartitionKeyRaw(scanTokenPb.UpperBoundPartitionKey);
+            if (scanTokenPb.HasUpperBoundPartitionKey)
+                builder.ExclusiveUpperBoundPartitionKeyRaw(scanTokenPb.UpperBoundPartitionKey.ToByteArray());
 
-            if (scanTokenPb.ShouldSerializeLimit())
+            if (scanTokenPb.HasLimit)
                 builder.SetLimit((long)scanTokenPb.Limit);
 
-            if (scanTokenPb.ShouldSerializeReadMode())
+            if (scanTokenPb.HasReadMode)
             {
                 switch (scanTokenPb.ReadMode)
                 {
@@ -133,11 +134,11 @@ namespace Knet.Kudu.Client
                         {
                             builder.SetReadMode(ReadMode.ReadAtSnapshot);
 
-                            if (scanTokenPb.ShouldSerializeSnapTimestamp())
+                            if (scanTokenPb.HasSnapTimestamp)
                                 builder.SnapshotTimestampRaw((long)scanTokenPb.SnapTimestamp);
 
                             // Set the diff scan timestamps if they are set.
-                            if (scanTokenPb.ShouldSerializeSnapStartTimestamp())
+                            if (scanTokenPb.HasSnapStartTimestamp)
                             {
                                 builder.DiffScan(
                                     (long)scanTokenPb.SnapStartTimestamp,
@@ -161,7 +162,7 @@ namespace Knet.Kudu.Client
                 }
             }
 
-            if (scanTokenPb.ShouldSerializeReplicaSelection())
+            if (scanTokenPb.HasReplicaSelection)
             {
                 switch (scanTokenPb.ReplicaSelection)
                 {
@@ -178,27 +179,27 @@ namespace Knet.Kudu.Client
                 }
             }
 
-            if (scanTokenPb.ShouldSerializePropagatedTimestamp() &&
+            if (scanTokenPb.HasPropagatedTimestamp &&
                 (long)scanTokenPb.PropagatedTimestamp != KuduClient.NoTimestamp)
             {
                 builder.Client.LastPropagatedTimestamp = (long)scanTokenPb.PropagatedTimestamp;
             }
 
-            if (scanTokenPb.ShouldSerializeCacheBlocks())
+            if (scanTokenPb.HasCacheBlocks)
                 builder.SetCacheBlocks(scanTokenPb.CacheBlocks);
 
-            if (scanTokenPb.ShouldSerializeFaultTolerant())
+            if (scanTokenPb.HasFaultTolerant)
                 builder.SetFaultTolerant(scanTokenPb.FaultTolerant);
 
-            if (scanTokenPb.ShouldSerializeBatchSizeBytes())
+            if (scanTokenPb.HasBatchSizeBytes)
                 builder.SetBatchSizeBytes((int)scanTokenPb.BatchSizeBytes);
 
-            if (scanTokenPb.ShouldSerializeScanRequestTimeoutMs())
+            if (scanTokenPb.HasScanRequestTimeoutMs)
             {
                 // TODO
             }
 
-            if (scanTokenPb.ShouldSerializeKeepAlivePeriodMs())
+            if (scanTokenPb.HasKeepAlivePeriodMs)
             {
                 // TODO
             }
@@ -211,7 +212,7 @@ namespace Knet.Kudu.Client
 
             foreach (var colSchemaFromPb in message.ProjectedColumns)
             {
-                int colIdx = colSchemaFromPb.ShouldSerializeId() && schema.HasColumnIds ?
+                int colIdx = colSchemaFromPb.HasId && schema.HasColumnIds ?
                     schema.GetColumnIndex((int)colSchemaFromPb.Id) :
                     schema.GetColumnIndex(colSchemaFromPb.Name);
 

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Knet.Kudu.Client.Connection;
-using Knet.Kudu.Client.Protocol.Master;
+using Knet.Kudu.Client.Protobuf.Master;
 
 namespace Knet.Kudu.Client
 {
