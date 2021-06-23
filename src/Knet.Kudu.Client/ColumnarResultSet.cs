@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using Knet.Kudu.Client.Connection;
-using Knet.Kudu.Client.Protocol;
+using Knet.Kudu.Client.Protobuf;
 
 namespace Knet.Kudu.Client
 {
@@ -42,19 +42,19 @@ namespace Knet.Kudu.Client
             {
                 var column = columns[i];
 
-                if (column.ShouldSerializeDataSidecar())
+                if (column.HasDataSidecar)
                 {
                     var offset = sidecars.GetOffset(column.DataSidecar);
                     dataSidecarOffsets[i] = offset;
                 }
 
-                if (column.ShouldSerializeVarlenDataSidecar())
+                if (column.HasVarlenDataSidecar)
                 {
                     var offset = sidecars.GetOffset(column.VarlenDataSidecar);
                     varlenDataSidecarOffsets[i] = offset;
                 }
 
-                if (column.ShouldSerializeNonNullBitmapSidecar())
+                if (column.HasNonNullBitmapSidecar)
                 {
                     var offset = sidecars.GetOffset(column.NonNullBitmapSidecar);
                     nonNullBitmapSidecarOffsets[i] = offset;
@@ -101,7 +101,7 @@ namespace Knet.Kudu.Client
 
         public override string ToString() => $"{Count} rows";
 
-        public Enumerator GetEnumerator() => new Enumerator(this);
+        public Enumerator GetEnumerator() => new(this);
 
         public ref struct Enumerator
         {

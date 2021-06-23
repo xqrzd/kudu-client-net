@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using Knet.Kudu.Client.Protocol;
-using Knet.Kudu.Client.Protocol.Master;
+using Google.Protobuf;
+using Knet.Kudu.Client.Protobuf;
+using Knet.Kudu.Client.Protobuf.Master;
 using Knet.Kudu.Client.Util;
+using static Knet.Kudu.Client.Protobuf.Master.AlterTableRequestPB.Types;
 
 namespace Knet.Kudu.Client
 {
@@ -77,10 +79,10 @@ namespace Knet.Kudu.Client
             if (schema.IsKey)
                 throw new ArgumentException("Key columns cannot be added");
 
-            _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
+            _request.AlterSchemaSteps.Add(new Step
             {
-                Type = AlterTableRequestPB.StepType.AddColumn,
-                AddColumn = new AlterTableRequestPB.AddColumn
+                Type = StepType.AddColumn,
+                AddColumn = new AddColumn
                 {
                     Schema = schema.ToColumnSchemaPb()
                 }
@@ -95,10 +97,10 @@ namespace Knet.Kudu.Client
         /// <param name="name">Name of the column.</param>
         public AlterTableBuilder DropColumn(string name)
         {
-            _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
+            _request.AlterSchemaSteps.Add(new Step
             {
-                Type = AlterTableRequestPB.StepType.DropColumn,
-                DropColumn = new AlterTableRequestPB.DropColumn
+                Type = StepType.DropColumn,
+                DropColumn = new DropColumn
                 {
                     Name = name
                 }
@@ -116,10 +118,10 @@ namespace Knet.Kudu.Client
         {
             // For backwards compatibility, this uses the RENAME_COLUMN step type.
             // Needed for Kudu 1.3, the oldest supported version.
-            _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
+            _request.AlterSchemaSteps.Add(new Step
             {
-                Type = AlterTableRequestPB.StepType.RenameColumn,
-                RenameColumn = new AlterTableRequestPB.RenameColumn
+                Type = StepType.RenameColumn,
+                RenameColumn = new RenameColumn
                 {
                     OldName = oldName,
                     NewName = newName
@@ -135,10 +137,10 @@ namespace Knet.Kudu.Client
         /// <param name="name">Name of the column.</param>
         public AlterTableBuilder RemoveDefault(string name)
         {
-            _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
+            _request.AlterSchemaSteps.Add(new Step
             {
-                Type = AlterTableRequestPB.StepType.AlterColumn,
-                AlterColumn = new AlterTableRequestPB.AlterColumn
+                Type = StepType.AlterColumn,
+                AlterColumn = new AlterColumn
                 {
                     Delta = new ColumnSchemaDeltaPB
                     {
@@ -168,15 +170,15 @@ namespace Knet.Kudu.Client
             var column = _table.Schema.GetColumn(name);
             var defaultValue = KuduEncoder.EncodeDefaultValue(column, newDefault);
 
-            _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
+            _request.AlterSchemaSteps.Add(new Step
             {
-                Type = AlterTableRequestPB.StepType.AlterColumn,
-                AlterColumn = new AlterTableRequestPB.AlterColumn
+                Type = StepType.AlterColumn,
+                AlterColumn = new AlterColumn
                 {
                     Delta = new ColumnSchemaDeltaPB
                     {
                         Name = name,
-                        DefaultValue = defaultValue
+                        DefaultValue = UnsafeByteOperations.UnsafeWrap(defaultValue)
                     }
                 }
             });
@@ -192,10 +194,10 @@ namespace Knet.Kudu.Client
         /// <param name="blockSize">The new block size.</param>
         public AlterTableBuilder ChangeDesiredBlockSize(string name, int blockSize)
         {
-            _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
+            _request.AlterSchemaSteps.Add(new Step
             {
-                Type = AlterTableRequestPB.StepType.AlterColumn,
-                AlterColumn = new AlterTableRequestPB.AlterColumn
+                Type = StepType.AlterColumn,
+                AlterColumn = new AlterColumn
                 {
                     Delta = new ColumnSchemaDeltaPB
                     {
@@ -215,10 +217,10 @@ namespace Knet.Kudu.Client
         /// <param name="encoding">The new encoding.</param>
         public AlterTableBuilder ChangeEncoding(string name, EncodingType encoding)
         {
-            _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
+            _request.AlterSchemaSteps.Add(new Step
             {
-                Type = AlterTableRequestPB.StepType.AlterColumn,
-                AlterColumn = new AlterTableRequestPB.AlterColumn
+                Type = StepType.AlterColumn,
+                AlterColumn = new AlterColumn
                 {
                     Delta = new ColumnSchemaDeltaPB
                     {
@@ -239,10 +241,10 @@ namespace Knet.Kudu.Client
         public AlterTableBuilder ChangeCompressionAlgorithm(
             string name, CompressionType compressionType)
         {
-            _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
+            _request.AlterSchemaSteps.Add(new Step
             {
-                Type = AlterTableRequestPB.StepType.AlterColumn,
-                AlterColumn = new AlterTableRequestPB.AlterColumn
+                Type = StepType.AlterColumn,
+                AlterColumn = new AlterColumn
                 {
                     Delta = new ColumnSchemaDeltaPB
                     {
@@ -265,10 +267,10 @@ namespace Knet.Kudu.Client
         /// </param>
         public AlterTableBuilder ChangeComment(string name, string comment)
         {
-            _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
+            _request.AlterSchemaSteps.Add(new Step
             {
-                Type = AlterTableRequestPB.StepType.AlterColumn,
-                AlterColumn = new AlterTableRequestPB.AlterColumn
+                Type = StepType.AlterColumn,
+                AlterColumn = new AlterColumn
                 {
                     Delta = new ColumnSchemaDeltaPB
                     {
@@ -418,15 +420,21 @@ namespace Knet.Kudu.Client
 
             configure(lowerBoundRow, upperBoundRow);
 
-            _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
+            var addRangePartition = new AddRangePartition
             {
-                Type = AlterTableRequestPB.StepType.AddRangePartition,
-                AddRangePartition = new AlterTableRequestPB.AddRangePartition
-                {
-                    DimensionLabel = dimensionLabel,
-                    RangeBounds = ProtobufHelper.EncodeRowOperations(
-                        lowerBoundRow, upperBoundRow)
-                }
+                RangeBounds = ProtobufHelper.EncodeRowOperations(
+                    lowerBoundRow, upperBoundRow)
+            };
+
+            if (dimensionLabel is not null)
+            {
+                addRangePartition.DimensionLabel = dimensionLabel;
+            }
+
+            _request.AlterSchemaSteps.Add(new Step
+            {
+                Type = StepType.AddRangePartition,
+                AddRangePartition = addRangePartition
             });
 
             if (_request.Schema == null)
@@ -463,10 +471,10 @@ namespace Knet.Kudu.Client
             var upperBoundRow = new PartialRowOperation(
                 lowerBoundRow, RowOperation.InclusiveRangeUpperBound);
 
-            _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
+            _request.AlterSchemaSteps.Add(new Step
             {
-                Type = AlterTableRequestPB.StepType.AddRangePartition,
-                AddRangePartition = new AlterTableRequestPB.AddRangePartition
+                Type = StepType.AddRangePartition,
+                AddRangePartition = new AddRangePartition
                 {
                     RangeBounds = ProtobufHelper.EncodeRowOperations(
                         lowerBoundRow, upperBoundRow)
@@ -539,10 +547,10 @@ namespace Knet.Kudu.Client
 
             configure(lowerBoundRow, upperBoundRow);
 
-            _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
+            _request.AlterSchemaSteps.Add(new Step
             {
-                Type = AlterTableRequestPB.StepType.DropRangePartition,
-                DropRangePartition = new AlterTableRequestPB.DropRangePartition
+                Type = StepType.DropRangePartition,
+                DropRangePartition = new DropRangePartition
                 {
                     RangeBounds = ProtobufHelper.EncodeRowOperations(
                         lowerBoundRow, upperBoundRow)
@@ -577,10 +585,10 @@ namespace Knet.Kudu.Client
             var upperBoundRow = new PartialRowOperation(
                 lowerBoundRow, RowOperation.InclusiveRangeUpperBound);
 
-            _request.AlterSchemaSteps.Add(new AlterTableRequestPB.Step
+            _request.AlterSchemaSteps.Add(new Step
             {
-                Type = AlterTableRequestPB.StepType.DropRangePartition,
-                DropRangePartition = new AlterTableRequestPB.DropRangePartition
+                Type = StepType.DropRangePartition,
+                DropRangePartition = new DropRangePartition
                 {
                     RangeBounds = ProtobufHelper.EncodeRowOperations(
                         lowerBoundRow, upperBoundRow)

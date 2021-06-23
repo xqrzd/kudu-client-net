@@ -2,8 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Knet.Kudu.Client.Protocol;
-using Knet.Kudu.Client.Protocol.Client;
+using Google.Protobuf;
+using Knet.Kudu.Client.Protobuf;
+using Knet.Kudu.Client.Protobuf.Client;
 using Knet.Kudu.Client.Scanner;
 using Knet.Kudu.Client.Tablet;
 using Knet.Kudu.Client.Util;
@@ -107,10 +108,10 @@ namespace Knet.Kudu.Client
             }
 
             if (LowerBoundPrimaryKey.Length > 0)
-                proto.LowerBoundPrimaryKey = LowerBoundPrimaryKey;
+                proto.LowerBoundPrimaryKey = UnsafeByteOperations.UnsafeWrap(LowerBoundPrimaryKey);
 
             if (UpperBoundPrimaryKey.Length > 0)
-                proto.UpperBoundPrimaryKey = UpperBoundPrimaryKey;
+                proto.UpperBoundPrimaryKey = UnsafeByteOperations.UnsafeWrap(UpperBoundPrimaryKey);
 
             proto.Limit = (ulong)Limit;
             proto.ReadMode = (ReadModePB)ReadMode;
@@ -189,34 +190,23 @@ namespace Knet.Kudu.Client
             {
                 var token = proto.Clone();
 
-                token.LowerBoundPartitionKey = keyRange.PartitionKeyStart;
-                token.UpperBoundPartitionKey = keyRange.PartitionKeyEnd;
+                token.LowerBoundPartitionKey = UnsafeByteOperations.UnsafeWrap(keyRange.PartitionKeyStart);
+                token.UpperBoundPartitionKey = UnsafeByteOperations.UnsafeWrap(keyRange.PartitionKeyEnd);
 
-                byte[] primaryKeyStart = keyRange.PrimaryKeyStart;
+                var primaryKeyStart = keyRange.PrimaryKeyStart;
 
-                if (primaryKeyStart != null && primaryKeyStart.Length > 0)
-                    token.LowerBoundPrimaryKey = primaryKeyStart;
+                if (primaryKeyStart.Length > 0)
+                    token.LowerBoundPrimaryKey = UnsafeByteOperations.UnsafeWrap(primaryKeyStart);
 
-                byte[] primaryKeyEnd = keyRange.PrimaryKeyEnd;
+                var primaryKeyEnd = keyRange.PrimaryKeyEnd;
 
-                if (primaryKeyEnd != null && primaryKeyEnd.Length > 0)
-                    token.UpperBoundPrimaryKey = primaryKeyEnd;
+                if (primaryKeyEnd.Length > 0)
+                    token.UpperBoundPrimaryKey = UnsafeByteOperations.UnsafeWrap(primaryKeyEnd);
 
                 tokens.Add(new KuduScanToken(keyRange, token));
             }
 
             return tokens;
-        }
-    }
-}
-
-namespace Knet.Kudu.Client.Protocol.Client
-{
-    public partial class ScanTokenPB
-    {
-        public ScanTokenPB Clone()
-        {
-            return (ScanTokenPB)MemberwiseClone();
         }
     }
 }

@@ -2,11 +2,12 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
+using Google.Protobuf;
+using Google.Protobuf.Collections;
 using Knet.Kudu.Client.Connection;
-using Knet.Kudu.Client.Protocol;
-using Knet.Kudu.Client.Protocol.Master;
-using Knet.Kudu.Client.Protocol.Rpc;
-using ProtoBuf;
+using Knet.Kudu.Client.Protobuf;
+using Knet.Kudu.Client.Protobuf.Master;
+using Knet.Kudu.Client.Protobuf.Rpc;
 
 namespace Knet.Kudu.Client.Util
 {
@@ -31,14 +32,42 @@ namespace Knet.Kudu.Client.Util
 
             return new RowOperationsPB
             {
-                Rows = rowData,
-                IndirectData = indirectData
+                Rows = UnsafeByteOperations.UnsafeWrap(rowData),
+                IndirectData = UnsafeByteOperations.UnsafeWrap(indirectData)
             };
+        }
+
+        public static T[] ToArray<T>(this RepeatedField<T> source)
+        {
+            var length = source.Count;
+            var arr = new T[length];
+
+            for (int i = 0; i < length; i++)
+            {
+                arr[i] = source[i];
+            }
+
+            return arr;
+        }
+
+        public static ReadOnlyMemory<byte>[] ToMemoryArray(
+            this RepeatedField<ByteString> source)
+        {
+            var length = source.Count;
+            var results = new ReadOnlyMemory<byte>[length];
+
+            for (int i = 0; i < length; i++)
+            {
+                var value = source[i];
+                results[i] = value.Memory;
+            }
+
+            return results;
         }
 
         public static ErrorStatusPB GetErrorStatus(ReadOnlySequence<byte> buffer)
         {
-            return Serializer.Deserialize<ErrorStatusPB>(buffer);
+            return ErrorStatusPB.Parser.ParseFrom(buffer);
         }
 
         public static ColumnTypeAttributes ToTypeAttributes(
@@ -48,9 +77,9 @@ namespace Knet.Kudu.Client.Util
                 return null;
 
             return new ColumnTypeAttributes(
-                pb.ShouldSerializePrecision() ? pb.Precision : default,
-                pb.ShouldSerializeScale() ? pb.Scale : default,
-                pb.ShouldSerializeLength() ? pb.Length : default);
+                pb.HasPrecision ? pb.Precision : default,
+                pb.HasScale ? pb.Scale : default,
+                pb.HasLength ? pb.Length : default);
         }
 
         public static ColumnTypeAttributesPB ToTypeAttributesPb(
@@ -75,28 +104,35 @@ namespace Knet.Kudu.Client.Util
 
         public static ColumnSchemaPB ToColumnSchemaPb(this ColumnSchema columnSchema)
         {
-            var defaultValue = columnSchema.DefaultValue;
-            var encodedDefaultValue = defaultValue != null
-                ? KuduEncoder.EncodeDefaultValue(columnSchema, columnSchema.DefaultValue)
-                : null;
-
-            return new ColumnSchemaPB
+            var result = new ColumnSchemaPB
             {
                 Name = columnSchema.Name,
                 Type = (DataTypePB)columnSchema.Type,
                 IsKey = columnSchema.IsKey,
                 IsNullable = columnSchema.IsNullable,
-                ReadDefaultValue = encodedDefaultValue,
                 CfileBlockSize = columnSchema.DesiredBlockSize,
                 Encoding = (EncodingTypePB)columnSchema.Encoding,
                 Compression = (CompressionTypePB)columnSchema.Compression,
-                TypeAttributes = columnSchema.TypeAttributes.ToTypeAttributesPb(),
-                Comment = columnSchema.Comment
+                TypeAttributes = columnSchema.TypeAttributes.ToTypeAttributesPb()
             };
+
+            var defaultValue = columnSchema.DefaultValue;
+            if (defaultValue is not null)
+            {
+                var encodedDefaultValue = KuduEncoder.EncodeDefaultValue(columnSchema, defaultValue);
+                result.ReadDefaultValue = UnsafeByteOperations.UnsafeWrap(encodedDefaultValue);
+            }
+
+            if (columnSchema.Comment != null)
+            {
+                result.Comment = columnSchema.Comment;
+            }
+
+            return result;
         }
 
         public static TabletServerInfo ToTabletServerInfo(
-            this ListTabletServersResponsePB.Entry entry)
+            this ListTabletServersResponsePB.Types.Entry entry)
         {
             var tsUuid = entry.InstanceId.PermanentUuid.ToStringUtf8();
             var registration = entry.Registration;
@@ -152,7 +188,7 @@ namespace Knet.Kudu.Client.Util
         }
 
         private static List<int> ToColumnIds(
-            List<PartitionSchemaPB.ColumnIdentifierPB> columns)
+            RepeatedField<PartitionSchemaPB.Types.ColumnIdentifierPB> columns)
         {
             var columnIds = new List<int>(columns.Count);
 
@@ -160,6 +196,27 @@ namespace Knet.Kudu.Client.Util
                 columnIds.Add(column.Id);
 
             return columnIds;
+        }
+
+        public static int WriteRawVarint32(Span<byte> buffer, uint value)
+        {
+            // Optimize for the common case of a single byte value.
+            if (value < 128)
+            {
+                buffer[0] = (byte)value;
+                return 1;
+            }
+
+            var position = 0;
+
+            while (value > 127)
+            {
+                buffer[position++] = (byte)((value & 0x7F) | 0x80);
+                value >>= 7;
+            }
+
+            buffer[position++] = (byte)value;
+            return position;
         }
     }
 }

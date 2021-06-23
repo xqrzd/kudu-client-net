@@ -7,6 +7,7 @@ namespace Knet.Kudu.Client.Tablet
     /// </summary>
     public class KeyRange
     {
+        // TODO: Use LocatedTablet
         /// <summary>
         /// The tablet which the key range belongs to.
         /// </summary>
@@ -15,12 +16,12 @@ namespace Knet.Kudu.Client.Tablet
         /// <summary>
         /// The encoded primary key where the key range starts (inclusive).
         /// </summary>
-        public byte[] PrimaryKeyStart { get; }
+        public ReadOnlyMemory<byte> PrimaryKeyStart { get; }
 
         /// <summary>
         /// The encoded primary key where the key range stops (exclusive).
         /// </summary>
-        public byte[] PrimaryKeyEnd { get; }
+        public ReadOnlyMemory<byte> PrimaryKeyEnd { get; }
 
         /// <summary>
         /// The estimated data size of the key range.
@@ -40,8 +41,8 @@ namespace Knet.Kudu.Client.Tablet
         /// <param name="dataSizeBytes">The estimated data size of the key range.</param>
         public KeyRange(
             RemoteTablet tablet,
-            byte[] primaryKeyStart,
-            byte[] primaryKeyEnd,
+            ReadOnlyMemory<byte> primaryKeyStart,
+            ReadOnlyMemory<byte> primaryKeyEnd,
             long dataSizeBytes)
         {
             Tablet = tablet;
@@ -64,11 +65,13 @@ namespace Knet.Kudu.Client.Tablet
 
         public override string ToString()
         {
-            var start = PrimaryKeyStart == null || PrimaryKeyStart.Length == 0 ?
-                "<start>" : BitConverter.ToString(PrimaryKeyStart);
+            var start = PrimaryKeyStart.Length == 0
+                ? "<start>"
+                : BitConverter.ToString(PrimaryKeyStart.ToArray());
 
-            var end = PrimaryKeyEnd == null || PrimaryKeyEnd.Length == 0 ?
-                "<end>" : BitConverter.ToString(PrimaryKeyEnd);
+            var end = PrimaryKeyEnd.Length == 0
+                ? "<end>"
+                : BitConverter.ToString(PrimaryKeyEnd.ToArray());
 
             return $"[{start}, {end}), {DataSizeBytes}, {Tablet.TabletId} {Tablet.Partition}";
         }

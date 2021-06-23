@@ -1,7 +1,6 @@
 using System.Buffers;
-using System.IO;
-using Knet.Kudu.Client.Protocol.Master;
-using ProtoBuf;
+using Google.Protobuf;
+using Knet.Kudu.Client.Protobuf.Master;
 
 namespace Knet.Kudu.Client.Requests
 {
@@ -16,19 +15,14 @@ namespace Knet.Kudu.Client.Requests
             _request = new IsAlterTableDoneRequestPB { Table = tableId };
         }
 
-        public override void Serialize(Stream stream)
-        {
-            Serialize(stream, _request);
-        }
+        public override int CalculateSize() => _request.CalculateSize();
+
+        public override void WriteTo(IBufferWriter<byte> output) => _request.WriteTo(output);
 
         public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
         {
-            var responsePb = Serializer.Deserialize<IsAlterTableDoneResponsePB>(buffer);
-
-            if (responsePb.Error == null)
-                Output = responsePb;
-            else
-                Error = responsePb.Error;
+            Output = IsAlterTableDoneResponsePB.Parser.ParseFrom(buffer);
+            Error = Output.Error;
         }
     }
 }

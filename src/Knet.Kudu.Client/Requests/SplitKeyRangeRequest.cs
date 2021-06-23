@@ -1,18 +1,12 @@
 using System.Buffers;
-using System.Collections.Generic;
-using System.IO;
-using Knet.Kudu.Client.Protocol;
-using Knet.Kudu.Client.Protocol.Tserver;
-using Knet.Kudu.Client.Util;
-using ProtoBuf;
+using Google.Protobuf;
+using Knet.Kudu.Client.Protobuf.Tserver;
 
 namespace Knet.Kudu.Client.Requests
 {
-    public class SplitKeyRangeRequest : KuduTabletRpc<List<KeyRangePB>>
+    public class SplitKeyRangeRequest : KuduTabletRpc<SplitKeyRangeResponsePB>
     {
-        private readonly byte[] _startPrimaryKey;
-        private readonly byte[] _endPrimaryKey;
-        private readonly long _splitSizeBytes;
+        private readonly SplitKeyRangeRequestPB _request;
 
         public SplitKeyRangeRequest(
             string tableId,
@@ -21,9 +15,16 @@ namespace Knet.Kudu.Client.Requests
             byte[] partitionKey,
             long splitSizeBytes)
         {
-            _startPrimaryKey = startPrimaryKey;
-            _endPrimaryKey = endPrimaryKey;
-            _splitSizeBytes = splitSizeBytes;
+            _request = new SplitKeyRangeRequestPB
+            {
+                TargetChunkSizeBytes = (ulong)splitSizeBytes
+            };
+
+            if (startPrimaryKey != null && startPrimaryKey.Length > 0)
+                _request.StartPrimaryKey = UnsafeByteOperations.UnsafeWrap(startPrimaryKey);
+
+            if (endPrimaryKey != null && endPrimaryKey.Length > 0)
+                _request.StopPrimaryKey = UnsafeByteOperations.UnsafeWrap(endPrimaryKey);
 
             TableId = tableId;
             PartitionKey = partitionKey;
@@ -32,32 +33,20 @@ namespace Knet.Kudu.Client.Requests
 
         public override string MethodName => "SplitKeyRange";
 
-        public override void Serialize(Stream stream)
+        public override int CalculateSize()
         {
-            var request = new SplitKeyRangeRequestPB
-            {
-                TabletId = Tablet.TabletId.ToUtf8ByteArray(),
-                TargetChunkSizeBytes = (ulong)_splitSizeBytes,
-                AuthzToken = AuthzToken
-            };
+            _request.TabletId = ByteString.CopyFromUtf8(Tablet.TabletId);
+            _request.AuthzToken = AuthzToken;
 
-            if (_startPrimaryKey != null && _startPrimaryKey.Length > 0)
-                request.StartPrimaryKey = _startPrimaryKey;
-
-            if (_endPrimaryKey != null && _endPrimaryKey.Length > 0)
-                request.StopPrimaryKey = _endPrimaryKey;
-
-            Serialize(stream, request);
+            return _request.CalculateSize();
         }
+
+        public override void WriteTo(IBufferWriter<byte> output) => _request.WriteTo(output);
 
         public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
         {
-            var result = Serializer.Deserialize<SplitKeyRangeResponsePB>(buffer);
-
-            if (result.Error == null)
-                Output = result.Ranges;
-            else
-                Error = result.Error;
+            Output = SplitKeyRangeResponsePB.Parser.ParseFrom(buffer);
+            Error = Output.Error;
         }
     }
 }

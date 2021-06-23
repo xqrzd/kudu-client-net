@@ -2,7 +2,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
 using Knet.Kudu.Client.FunctionalTests.Util;
-using Knet.Kudu.Client.Protocol.Client;
+using Knet.Kudu.Client.Protobuf.Client;
 using McMaster.Extensions.Xunit;
 using Xunit;
 
@@ -530,7 +530,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             return builder.Build();
         }
 
-        private async Task BuildScannerAndCheckColumnsCountAsync(
+        private static async Task BuildScannerAndCheckColumnsCountAsync(
             KuduScannerBuilder<ResultSet> builder, params string[] expectedColumnNames)
         {
             var scanner = builder.Build();

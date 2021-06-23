@@ -5,14 +5,15 @@ using System.Collections.Generic;
 using System.IO.Pipelines;
 using System.Threading;
 using System.Threading.Tasks;
+using Google.Protobuf;
 using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Logging;
-using Knet.Kudu.Client.Protocol.Rpc;
+using Knet.Kudu.Client.Protobuf.Rpc;
 using Knet.Kudu.Client.Requests;
 using Knet.Kudu.Client.Util;
 using Microsoft.Extensions.Logging;
-using ProtoBuf;
+using static Knet.Kudu.Client.Protobuf.Rpc.ErrorStatusPB.Types;
 
 namespace Knet.Kudu.Client.Connection
 {
@@ -39,8 +40,6 @@ namespace Knet.Kudu.Client.Connection
 
             _receiveTask = ReceiveAsync();
         }
-
-        private string LogPrefix => $"[peer {_ioPipe}]";
 
         public void OnDisconnected(Action<Exception, object> callback, object state)
         {
@@ -73,7 +72,7 @@ namespace Knet.Kudu.Client.Connection
 
             header.CallId = callId;
 
-            using var registration = cancellationToken.Register(
+            using var _ = cancellationToken.Register(
                 s => ((InflightRpc)s).TrySetCanceled(),
                 state: message,
                 useSynchronizationContext: false);
@@ -94,33 +93,13 @@ namespace Knet.Kudu.Client.Connection
             KuduRpc rpc,
             CancellationToken cancellationToken)
         {
-            // TODO: Use PipeWriter once protobuf-net supports it.
-            using (var stream = new RecyclableMemoryStream())
-            {
-                // Make space to write the length of the entire message.
-                stream.GetMemory(4);
-
-                Serializer.SerializeWithLengthPrefix(stream, header, PrefixStyle.Base128);
-                rpc.Serialize(stream);
-
-                // Go back and write the length of the entire message, minus the 4
-                // bytes we already allocated to store the length.
-                BinaryPrimitives.WriteUInt32BigEndian(stream.AsSpan(), (uint)stream.Length - 4);
-
-                await WriteAsync(stream.AsMemory(), cancellationToken).ConfigureAwait(false);
-            }
-        }
-
-        private async ValueTask WriteAsync(
-            ReadOnlyMemory<byte> source,
-            CancellationToken cancellationToken)
-        {
             PipeWriter output = _ioPipe.Output;
             await _singleWriter.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                var result = await output.WriteAsync(source, cancellationToken)
-                    .ConfigureAwait(false);
+                Write(output, header, rpc);
+
+                var result = await output.FlushAsync(cancellationToken).ConfigureAwait(false);
 
                 if (result.IsCanceled)
                     await output.CompleteAsync().ConfigureAwait(false);
@@ -134,6 +113,48 @@ namespace Knet.Kudu.Client.Connection
             {
                 _singleWriter.Release();
             }
+        }
+
+        private static void Write(PipeWriter output, RequestHeader header, KuduRpc rpc)
+        {
+            // +------------------------------------------------+
+            // | Total message length (4 bytes)                 |
+            // +------------------------------------------------+
+            // | RPC Header protobuf length (variable encoding) |
+            // +------------------------------------------------+
+            // | RPC Header protobuf                            |
+            // +------------------------------------------------+
+            // | Main message length (variable encoding)        |
+            // +------------------------------------------------+
+            // | Main message protobuf                          |
+            // +------------------------------------------------+
+
+            var headerSize = header.CalculateSize();
+            var messageSize = rpc.CalculateSize();
+
+            var headerSizeLength = CodedOutputStream.ComputeLengthSize(headerSize);
+            var messageSizeLength = CodedOutputStream.ComputeLengthSize(messageSize);
+
+            var totalSize = 4 +
+                headerSizeLength + headerSize +
+                messageSizeLength + messageSize;
+
+            var totalSizeWithoutMessage = totalSize - messageSize;
+            var buffer = output.GetSpan(totalSizeWithoutMessage);
+
+            BinaryPrimitives.WriteInt32BigEndian(buffer, totalSize - 4);
+            buffer = buffer.Slice(4);
+
+            ProtobufHelper.WriteRawVarint32(buffer, (uint)headerSize);
+            buffer = buffer.Slice(headerSizeLength);
+
+            header.WriteTo(buffer.Slice(0, headerSize));
+            buffer = buffer.Slice(headerSize);
+
+            ProtobufHelper.WriteRawVarint32(buffer, (uint)messageSize);
+
+            output.Advance(totalSizeWithoutMessage);
+            rpc.WriteTo(output);
         }
 
         private async Task ReceiveAsync()
@@ -321,25 +342,25 @@ namespace Knet.Kudu.Client.Connection
             var code = error.Code;
             KuduException exception;
 
-            if (code == ErrorStatusPB.RpcErrorCodePB.ErrorServerTooBusy ||
-                code == ErrorStatusPB.RpcErrorCodePB.ErrorUnavailable)
+            if (code == RpcErrorCodePB.ErrorServerTooBusy ||
+                code == RpcErrorCodePB.ErrorUnavailable)
             {
                 exception = new RecoverableException(
                     KuduStatus.ServiceUnavailable(error.Message));
             }
-            else if (code == ErrorStatusPB.RpcErrorCodePB.FatalInvalidAuthenticationToken)
+            else if (code == RpcErrorCodePB.FatalInvalidAuthenticationToken)
             {
                 exception = new InvalidAuthnTokenException(
                     KuduStatus.NotAuthorized(error.Message));
             }
-            else if (code == ErrorStatusPB.RpcErrorCodePB.ErrorInvalidAuthorizationToken)
+            else if (code == RpcErrorCodePB.ErrorInvalidAuthorizationToken)
             {
                 exception = new InvalidAuthzTokenException(
                     KuduStatus.NotAuthorized(error.Message));
             }
             else
             {
-                var message = $"{LogPrefix} server sent error {error.Message}";
+                var message = $"[peer {_ioPipe}] server sent error {error.Message}";
                 exception = new RpcRemoteException(KuduStatus.RemoteError(message), error);
             }
 
@@ -518,12 +539,12 @@ namespace Knet.Kudu.Client.Connection
             /// <summary>
             /// Gets the size of the main message protobuf.
             /// </summary>
-            public int ProtobufMessageLength => Header.SidecarOffsets == null ?
+            public int ProtobufMessageLength => Header.SidecarOffsets.Count == 0 ?
                 MainMessageLength : (int)Header.SidecarOffsets[0];
 
-            public bool HasSidecars => Header.SidecarOffsets != null;
+            public bool HasSidecars => Header.SidecarOffsets.Count != 0;
 
-            public int NumSidecars => Header.SidecarOffsets.Length;
+            public int NumSidecars => Header.SidecarOffsets.Count;
 
             public int SidecarLength => MainMessageLength - (int)Header.SidecarOffsets[0];
 
@@ -554,7 +575,7 @@ namespace Knet.Kudu.Client.Connection
                 }
 
                 var slice = reader.Sequence.Slice(reader.Position, length);
-                Header = Serializer.Deserialize<ResponseHeader>(slice);
+                Header = ResponseHeader.Parser.ParseFrom(slice);
 
                 reader.Advance(length);
 
@@ -646,7 +667,7 @@ namespace Knet.Kudu.Client.Connection
             private void SetSidecarOffsets()
             {
                 var rawSidecarOffsets = Header.SidecarOffsets;
-                int numSidecars = rawSidecarOffsets.Length;
+                int numSidecars = rawSidecarOffsets.Count;
                 int totalSize = 0;
 
                 var sidecarOffsets = new KuduSidecarOffset[numSidecars];

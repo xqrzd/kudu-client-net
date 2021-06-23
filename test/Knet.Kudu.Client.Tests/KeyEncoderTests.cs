@@ -99,7 +99,7 @@ namespace Knet.Kudu.Client.Tests
             rowA.SetDecimal("decimal128", 7m);
             rowA.SetString("varchar", "");
             rowA.SetString("string", "");
-            rowA.SetBinary("binary", new byte[0]);
+            rowA.SetBinary("binary", Array.Empty<byte>());
 
             var rowAEncoded = KeyEncoder.EncodePrimaryKey(rowA);
             Assert.Equal(new byte[]

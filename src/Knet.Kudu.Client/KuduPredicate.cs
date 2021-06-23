@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
+using Google.Protobuf;
 using Knet.Kudu.Client.Internal;
-using Knet.Kudu.Client.Protocol;
+using Knet.Kudu.Client.Protobuf;
 using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client
@@ -235,28 +236,45 @@ namespace Knet.Kudu.Client
             switch (Type)
             {
                 case PredicateType.Equality:
-                    predicate.equality = new ColumnPredicatePB.Equality { Value = Lower };
-                    break;
-
-                case PredicateType.Range:
-                    predicate.range = new ColumnPredicatePB.Range
+                    predicate.Equality = new ColumnPredicatePB.Types.Equality
                     {
-                        Lower = Lower,
-                        Upper = Upper
+                        Value = UnsafeByteOperations.UnsafeWrap(Lower)
                     };
                     break;
 
+                case PredicateType.Range:
+                    predicate.Range = new ColumnPredicatePB.Types.Range();
+                    if (Lower is not null)
+                    {
+                        predicate.Range.Lower = UnsafeByteOperations.UnsafeWrap(Lower);
+                    }
+                    if (Upper is not null)
+                    {
+                        predicate.Range.Upper = UnsafeByteOperations.UnsafeWrap(Upper);
+                    }
+                    break;
+
                 case PredicateType.IsNotNull:
-                    predicate.is_not_null = new ColumnPredicatePB.IsNotNull();
+                    predicate.IsNotNull = new ColumnPredicatePB.Types.IsNotNull();
                     break;
 
                 case PredicateType.IsNull:
-                    predicate.is_null = new ColumnPredicatePB.IsNull();
+                    predicate.IsNull = new ColumnPredicatePB.Types.IsNull();
                     break;
 
                 case PredicateType.InList:
-                    predicate.in_list = new ColumnPredicatePB.InList();
-                    predicate.in_list.Values.AddRange(InListValues);
+                    predicate.InList = new ColumnPredicatePB.Types.InList();
+                    var values = predicate.InList.Values;
+
+                    // TODO:proto
+                    // Make sure this doesn't need to allocate again.
+                    values.Capacity = InListValues.Count;
+
+                    foreach (var value in InListValues)
+                    {
+                        values.Add(UnsafeByteOperations.UnsafeWrap(value));
+                    }
+
                     break;
 
                 case PredicateType.None:
@@ -1149,32 +1167,33 @@ namespace Knet.Kudu.Client
         {
             ColumnSchema column = schema.GetColumn(pb.Column);
 
-            if (pb.equality != null)
+            if (pb.Equality != null)
             {
-                return new KuduPredicate(PredicateType.Equality, column,
-                    pb.equality.Value, null);
+                var equality = pb.Equality.HasValue ? pb.Equality.Value.ToByteArray() : null;
+                return new KuduPredicate(PredicateType.Equality, column, equality, null);
             }
-            else if (pb.range != null)
+            else if (pb.Range != null)
             {
-                var range = pb.range;
+                var range = pb.Range;
+                var lower = range.HasLower ? range.Lower.ToByteArray() : null;
+                var upper = range.HasLower ? range.Lower.ToByteArray() : null;
 
-                return new KuduPredicate(PredicateType.Range, column,
-                    range.Lower, range.Upper);
+                return new KuduPredicate(PredicateType.Range, column, lower, upper);
             }
-            else if (pb.is_not_null != null)
+            else if (pb.IsNotNull != null)
             {
                 return NewIsNotNullPredicate(column);
             }
-            else if (pb.is_null != null)
+            else if (pb.IsNull != null)
             {
                 return NewIsNullPredicate(column);
             }
-            else if (pb.in_list != null)
+            else if (pb.InList != null)
             {
                 var values = new SortedSet<byte[]>(new PredicateComparer(column));
 
-                foreach (var value in pb.in_list.Values)
-                    values.Add(value);
+                foreach (var value in pb.InList.Values)
+                    values.Add(value.ToByteArray());
 
                 return BuildInList(column, values);
             }

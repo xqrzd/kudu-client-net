@@ -1,5 +1,5 @@
 using Knet.Kudu.Client.Connection;
-using Knet.Kudu.Client.Protocol.Tserver;
+using Knet.Kudu.Client.Protobuf.Tserver;
 
 namespace Knet.Kudu.Client.Scanner
 {

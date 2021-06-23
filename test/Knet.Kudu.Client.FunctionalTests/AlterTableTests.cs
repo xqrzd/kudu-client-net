@@ -91,7 +91,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(CompressionType.DefaultCompression, col.Compression);
             Assert.Equal(EncodingType.AutoEncoding, col.Encoding);
             Assert.Null(col.DefaultValue);
-            Assert.Null(table.SchemaPb.Schema.Columns[1].WriteDefaultValue);
+            Assert.Empty(table.SchemaPb.Schema.Columns[1].WriteDefaultValue);
 
             // Alter the table.
             await _client.AlterTableAsync(new AlterTableBuilder(table)

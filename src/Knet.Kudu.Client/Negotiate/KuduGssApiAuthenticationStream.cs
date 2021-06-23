@@ -21,9 +21,9 @@ using System.IO;
 using System.Net.Security;
 using System.Threading;
 using System.Threading.Tasks;
-using Knet.Kudu.Client.Protocol.Rpc;
+using Knet.Kudu.Client.Protobuf.Rpc;
 using Knet.Kudu.Client.Util;
-using static Knet.Kudu.Client.Protocol.Rpc.NegotiatePB;
+using static Knet.Kudu.Client.Protobuf.Rpc.NegotiatePB.Types;
 
 namespace Knet.Kudu.Client.Negotiate
 {
@@ -65,7 +65,8 @@ namespace Knet.Kudu.Client.Negotiate
 
         public override void Write(byte[] buffer, int offset, int count)
         {
-            WriteAsyncInternal(new ReadOnlyMemory<byte>(buffer, offset, count), default).GetAwaiter().GetResult();
+            WriteAsyncInternal(new ReadOnlyMemory<byte>(buffer, offset, count), default)
+                .AsTask().GetAwaiter().GetResult();
         }
 
         public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
@@ -165,7 +166,7 @@ namespace Knet.Kudu.Client.Negotiate
                     .SendGssApiTokenAsync(NegotiateStep.SaslInitiate, buffer, cancellationToken)
                     .ConfigureAwait(false);
 
-                _readQueue = CreateReadHeader(_negotiatePB.Token);
+                _readQueue = CreateReadHeader(_negotiatePB.Token.Memory);
                 _leftToWrite -= buffer.Length;
             }
             else
@@ -184,7 +185,7 @@ namespace Knet.Kudu.Client.Negotiate
             return length;
         }
 
-        private int ReadFrameHeaderLength(ReadOnlySpan<byte> buffer)
+        private static int ReadFrameHeaderLength(ReadOnlySpan<byte> buffer)
         {
             if (buffer[0] != 22)
                 throw new Exception($"Expected HandshakeId (22), instead received {buffer[0]}");
@@ -198,7 +199,7 @@ namespace Knet.Kudu.Client.Negotiate
             return length;
         }
 
-        private ReadOnlyMemory<byte> CreateReadHeader(ReadOnlyMemory<byte> token)
+        private static ReadOnlyMemory<byte> CreateReadHeader(ReadOnlyMemory<byte> token)
         {
             // TODO: Verify token success
 

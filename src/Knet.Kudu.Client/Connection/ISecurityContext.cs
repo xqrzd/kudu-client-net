@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Security;
-using Knet.Kudu.Client.Protocol.Security;
+using Knet.Kudu.Client.Protobuf.Security;
 
 namespace Knet.Kudu.Client.Connection
 {
@@ -42,11 +42,11 @@ namespace Knet.Kudu.Client.Connection
         /// client. Replaces any previously trusted cert.
         /// </summary>
         /// <param name="certDers">The certificates to trust.</param>
-        public void TrustCertificates(List<byte[]> certDers);
+        public void TrustCertificates(IEnumerable<ReadOnlyMemory<byte>> certDers);
 
         /// <summary>
         /// Creates a <see cref="SslStream"/> that trusts the certificates provided
-        /// by <see cref="TrustCertificates(List{byte[]})"/>.
+        /// by <see cref="TrustCertificates(IEnumerable{ReadOnlyMemory{byte}})"/>.
         /// </summary>
         /// <param name="innerStream">The stream to wrap.</param>
         public SslStream CreateTlsStream(Stream innerStream);

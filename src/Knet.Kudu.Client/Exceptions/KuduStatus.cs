@@ -1,6 +1,7 @@
-using Knet.Kudu.Client.Protocol;
-using Knet.Kudu.Client.Protocol.Master;
-using Knet.Kudu.Client.Protocol.Tserver;
+using Knet.Kudu.Client.Protobuf;
+using Knet.Kudu.Client.Protobuf.Master;
+using Knet.Kudu.Client.Protobuf.Tserver;
+using static Knet.Kudu.Client.Protobuf.AppStatusPB.Types;
 
 namespace Knet.Kudu.Client.Exceptions
 {
@@ -13,7 +14,7 @@ namespace Knet.Kudu.Client.Exceptions
         internal const int MaxMessageLength = 32 * 1024;
         internal const string Abbreviation = "...";
 
-        public AppStatusPB.ErrorCode Code { get; }
+        public ErrorCode Code { get; }
 
         public string Message { get; }
 
@@ -23,7 +24,7 @@ namespace Knet.Kudu.Client.Exceptions
         /// </summary>
         public int PosixCode { get; }
 
-        private KuduStatus(AppStatusPB.ErrorCode code, string msg, int posixCode)
+        private KuduStatus(ErrorCode code, string msg, int posixCode)
         {
             Code = code;
             PosixCode = posixCode;
@@ -45,12 +46,7 @@ namespace Knet.Kudu.Client.Exceptions
         {
         }
 
-        private KuduStatus(AppStatusPB.ErrorCode code, string msg)
-            : this(code, msg, -1)
-        {
-        }
-
-        private KuduStatus(AppStatusPB.ErrorCode code)
+        private KuduStatus(ErrorCode code)
             : this(code, "", -1)
         {
         }
@@ -83,104 +79,104 @@ namespace Knet.Kudu.Client.Exceptions
         }
 
         // Keep a single OK status object else we'll end up instantiating tons of them.
-        public static KuduStatus Ok { get; } = new KuduStatus(AppStatusPB.ErrorCode.Ok);
+        public static KuduStatus Ok { get; } = new KuduStatus(ErrorCode.Ok);
 
         public static KuduStatus NotFound(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.NotFound, msg, posixCode);
+            new(ErrorCode.NotFound, msg, posixCode);
 
         public static KuduStatus Corruption(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.Corruption, msg, posixCode);
+            new(ErrorCode.Corruption, msg, posixCode);
 
         public static KuduStatus NotSupported(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.NotSupported, msg, posixCode);
+            new(ErrorCode.NotSupported, msg, posixCode);
 
         public static KuduStatus InvalidArgument(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.InvalidArgument, msg, posixCode);
+            new(ErrorCode.InvalidArgument, msg, posixCode);
 
         public static KuduStatus IOError(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.IoError, msg, posixCode);
+            new(ErrorCode.IoError, msg, posixCode);
 
         public static KuduStatus AlreadyPresent(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.AlreadyPresent, msg, posixCode);
+            new(ErrorCode.AlreadyPresent, msg, posixCode);
 
         public static KuduStatus RuntimeError(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.RuntimeError, msg, posixCode);
+            new(ErrorCode.RuntimeError, msg, posixCode);
 
         public static KuduStatus NetworkError(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.NetworkError, msg, posixCode);
+            new(ErrorCode.NetworkError, msg, posixCode);
 
         public static KuduStatus IllegalState(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.IllegalState, msg, posixCode);
+            new(ErrorCode.IllegalState, msg, posixCode);
 
         public static KuduStatus NotAuthorized(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.NotAuthorized, msg, posixCode);
+            new(ErrorCode.NotAuthorized, msg, posixCode);
 
         public static KuduStatus Aborted(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.Aborted, msg, posixCode);
+            new(ErrorCode.Aborted, msg, posixCode);
 
         public static KuduStatus RemoteError(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.RemoteError, msg, posixCode);
+            new(ErrorCode.RemoteError, msg, posixCode);
 
         public static KuduStatus ServiceUnavailable(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.ServiceUnavailable, msg, posixCode);
+            new(ErrorCode.ServiceUnavailable, msg, posixCode);
 
         public static KuduStatus TimedOut(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.TimedOut, msg, posixCode);
+            new(ErrorCode.TimedOut, msg, posixCode);
 
         public static KuduStatus Uninitialized(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.Uninitialized, msg, posixCode);
+            new(ErrorCode.Uninitialized, msg, posixCode);
 
         public static KuduStatus ConfigurationError(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.ConfigurationError, msg, posixCode);
+            new(ErrorCode.ConfigurationError, msg, posixCode);
 
         public static KuduStatus Incomplete(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.Incomplete, msg, posixCode);
+            new(ErrorCode.Incomplete, msg, posixCode);
 
         public static KuduStatus EndOfFile(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.EndOfFile, msg, posixCode);
+            new(ErrorCode.EndOfFile, msg, posixCode);
 
         public static KuduStatus Cancelled(string msg, int posixCode = -1) =>
-            new KuduStatus(AppStatusPB.ErrorCode.Cancelled, msg, posixCode);
+            new(ErrorCode.Cancelled, msg, posixCode);
 
-        public bool IsOk => Code == AppStatusPB.ErrorCode.Ok;
+        public bool IsOk => Code == ErrorCode.Ok;
 
-        public bool IsCorruption => Code == AppStatusPB.ErrorCode.Corruption;
+        public bool IsCorruption => Code == ErrorCode.Corruption;
 
-        public bool IsNotFound => Code == AppStatusPB.ErrorCode.NotFound;
+        public bool IsNotFound => Code == ErrorCode.NotFound;
 
-        public bool IsNotSupported => Code == AppStatusPB.ErrorCode.NotSupported;
+        public bool IsNotSupported => Code == ErrorCode.NotSupported;
 
-        public bool IsInvalidArgument => Code == AppStatusPB.ErrorCode.InvalidArgument;
+        public bool IsInvalidArgument => Code == ErrorCode.InvalidArgument;
 
-        public bool IsIOError => Code == AppStatusPB.ErrorCode.IoError;
+        public bool IsIOError => Code == ErrorCode.IoError;
 
-        public bool IsAlreadyPresent => Code == AppStatusPB.ErrorCode.AlreadyPresent;
+        public bool IsAlreadyPresent => Code == ErrorCode.AlreadyPresent;
 
-        public bool IsRuntimeError => Code == AppStatusPB.ErrorCode.RuntimeError;
+        public bool IsRuntimeError => Code == ErrorCode.RuntimeError;
 
-        public bool IsNetworkError => Code == AppStatusPB.ErrorCode.NetworkError;
+        public bool IsNetworkError => Code == ErrorCode.NetworkError;
 
-        public bool IsIllegalState => Code == AppStatusPB.ErrorCode.IllegalState;
+        public bool IsIllegalState => Code == ErrorCode.IllegalState;
 
-        public bool IsNotAuthorized => Code == AppStatusPB.ErrorCode.NotAuthorized;
+        public bool IsNotAuthorized => Code == ErrorCode.NotAuthorized;
 
-        public bool IsAborted => Code == AppStatusPB.ErrorCode.Aborted;
+        public bool IsAborted => Code == ErrorCode.Aborted;
 
-        public bool IsRemoteError => Code == AppStatusPB.ErrorCode.RemoteError;
+        public bool IsRemoteError => Code == ErrorCode.RemoteError;
 
-        public bool IsServiceUnavailable => Code == AppStatusPB.ErrorCode.ServiceUnavailable;
+        public bool IsServiceUnavailable => Code == ErrorCode.ServiceUnavailable;
 
-        public bool IsTimedOut => Code == AppStatusPB.ErrorCode.TimedOut;
+        public bool IsTimedOut => Code == ErrorCode.TimedOut;
 
-        public bool IsUninitialized => Code == AppStatusPB.ErrorCode.Uninitialized;
+        public bool IsUninitialized => Code == ErrorCode.Uninitialized;
 
-        public bool IsConfigurationError => Code == AppStatusPB.ErrorCode.ConfigurationError;
+        public bool IsConfigurationError => Code == ErrorCode.ConfigurationError;
 
-        public bool IsIncomplete => Code == AppStatusPB.ErrorCode.Incomplete;
+        public bool IsIncomplete => Code == ErrorCode.Incomplete;
 
-        public bool IsEndOfFile => Code == AppStatusPB.ErrorCode.EndOfFile;
+        public bool IsEndOfFile => Code == ErrorCode.EndOfFile;
 
-        public bool IsCancelled => Code == AppStatusPB.ErrorCode.Cancelled;
+        public bool IsCancelled => Code == ErrorCode.Cancelled;
 
         /// <summary>
         /// Return a human-readable version of the status code.
@@ -189,27 +185,27 @@ namespace Knet.Kudu.Client.Exceptions
         {
             return Code switch
             {
-                AppStatusPB.ErrorCode.Ok => "Ok",
-                AppStatusPB.ErrorCode.NotFound => "Not found",
-                AppStatusPB.ErrorCode.Corruption => "Corruption",
-                AppStatusPB.ErrorCode.NotSupported => "Not implemented",
-                AppStatusPB.ErrorCode.InvalidArgument => "Invalid argument",
-                AppStatusPB.ErrorCode.IoError => "IO error",
-                AppStatusPB.ErrorCode.AlreadyPresent => "Already present",
-                AppStatusPB.ErrorCode.RuntimeError => "Runtime error",
-                AppStatusPB.ErrorCode.NetworkError => "Network error",
-                AppStatusPB.ErrorCode.IllegalState => "Illegal state",
-                AppStatusPB.ErrorCode.NotAuthorized => "Not authorized",
-                AppStatusPB.ErrorCode.Aborted => "Aborted",
-                AppStatusPB.ErrorCode.RemoteError => "Remote error",
-                AppStatusPB.ErrorCode.ServiceUnavailable => "Service unavailable",
-                AppStatusPB.ErrorCode.TimedOut => "Timed out",
-                AppStatusPB.ErrorCode.Uninitialized => "Uninitialized",
-                AppStatusPB.ErrorCode.ConfigurationError => "Configuration error",
-                AppStatusPB.ErrorCode.Incomplete => "Incomplete",
-                AppStatusPB.ErrorCode.EndOfFile => "End of file",
-                AppStatusPB.ErrorCode.Cancelled => "Cancelled",
-                AppStatusPB.ErrorCode.UnknownError => "Unknown",
+                ErrorCode.Ok => "Ok",
+                ErrorCode.NotFound => "Not found",
+                ErrorCode.Corruption => "Corruption",
+                ErrorCode.NotSupported => "Not implemented",
+                ErrorCode.InvalidArgument => "Invalid argument",
+                ErrorCode.IoError => "IO error",
+                ErrorCode.AlreadyPresent => "Already present",
+                ErrorCode.RuntimeError => "Runtime error",
+                ErrorCode.NetworkError => "Network error",
+                ErrorCode.IllegalState => "Illegal state",
+                ErrorCode.NotAuthorized => "Not authorized",
+                ErrorCode.Aborted => "Aborted",
+                ErrorCode.RemoteError => "Remote error",
+                ErrorCode.ServiceUnavailable => "Service unavailable",
+                ErrorCode.TimedOut => "Timed out",
+                ErrorCode.Uninitialized => "Uninitialized",
+                ErrorCode.ConfigurationError => "Configuration error",
+                ErrorCode.Incomplete => "Incomplete",
+                ErrorCode.EndOfFile => "End of file",
+                ErrorCode.Cancelled => "Cancelled",
+                ErrorCode.UnknownError => "Unknown",
                 _ => $"Unknown error ({Code})"
             };
         }
@@ -217,7 +213,7 @@ namespace Knet.Kudu.Client.Exceptions
         public override string ToString()
         {
             string str = GetCodeAsstring();
-            if (Code == AppStatusPB.ErrorCode.Ok)
+            if (Code == ErrorCode.Ok)
             {
                 return str;
             }

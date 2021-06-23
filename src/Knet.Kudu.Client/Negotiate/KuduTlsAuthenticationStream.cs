@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Knet.Kudu.Client.Protocol.Rpc;
+using Knet.Kudu.Client.Protobuf.Rpc;
 
 namespace Knet.Kudu.Client.Negotiate
 {
@@ -32,7 +32,8 @@ namespace Knet.Kudu.Client.Negotiate
 
         public override void Write(byte[] buffer, int offset, int count)
         {
-            SendHandshakeAsync(new ReadOnlyMemory<byte>(buffer, offset, count), default).GetAwaiter().GetResult();
+            SendHandshakeAsync(new ReadOnlyMemory<byte>(buffer, offset, count), default)
+                .AsTask().GetAwaiter().GetResult();
         }
 
         public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
@@ -89,7 +90,7 @@ namespace Knet.Kudu.Client.Negotiate
         private int ReadHandshake(Memory<byte> buffer)
         {
             int length = Math.Min(buffer.Length, _result.TlsHandshake.Length);
-            _result.TlsHandshake.AsSpan(_readPosition, length).CopyTo(buffer.Span);
+            _result.TlsHandshake.Memory.Span.Slice(_readPosition, length).CopyTo(buffer.Span);
             _readPosition += length;
             return length;
         }

@@ -1,17 +1,19 @@
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Google.Protobuf;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Logging;
-using Knet.Kudu.Client.Protocol;
-using Knet.Kudu.Client.Protocol.Consensus;
-using Knet.Kudu.Client.Protocol.Master;
-using Knet.Kudu.Client.Protocol.Rpc;
-using Knet.Kudu.Client.Protocol.Tserver;
+using Knet.Kudu.Client.Protobuf;
+using Knet.Kudu.Client.Protobuf.Consensus;
+using Knet.Kudu.Client.Protobuf.Master;
+using Knet.Kudu.Client.Protobuf.Rpc;
+using Knet.Kudu.Client.Protobuf.Tserver;
 using Knet.Kudu.Client.Requests;
 using Knet.Kudu.Client.Tablet;
 using Knet.Kudu.Client.Util;
@@ -53,7 +55,7 @@ namespace Knet.Kudu.Client
         /// Timestamp required for HybridTime external consistency through timestamp propagation.
         /// </summary>
         private long _lastPropagatedTimestamp = NoTimestamp;
-        private readonly object _lastPropagatedTimestampLock = new object();
+        private readonly object _lastPropagatedTimestampLock = new();
 
         public KuduClient(
             KuduClientOptions options,
@@ -376,12 +378,20 @@ namespace Knet.Kudu.Client
         {
             var request = new GetTableLocationsRequestPB
             {
-                Table = new TableIdentifierPB { TableId = tableId.ToUtf8ByteArray() },
-                PartitionKeyStart = partitionKeyStart,
-                PartitionKeyEnd = partitionKeyEnd,
+                Table = new TableIdentifierPB { TableId = ByteString.CopyFromUtf8(tableId) },
                 MaxReturnedLocations = (uint)fetchBatchSize,
                 InternTsInfosInResponse = true
             };
+
+            if (partitionKeyStart is not null)
+            {
+                request.PartitionKeyStart = UnsafeByteOperations.UnsafeWrap(partitionKeyStart);
+            }
+
+            if (partitionKeyEnd is not null)
+            {
+                request.PartitionKeyEnd = UnsafeByteOperations.UnsafeWrap(partitionKeyEnd);
+            }
 
             var rpc = new GetTableLocationsRequest(request);
             var result = await SendRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
@@ -502,15 +512,17 @@ namespace Knet.Kudu.Client
                 out int rowSize,
                 out int indirectSize);
 
-            var rowData = new byte[rowSize];
-            var indirectData = new byte[indirectSize];
+            using var rowData = MemoryPool<byte>.Shared.Rent(rowSize);
+            using var indirectData = MemoryPool<byte>.Shared.Rent(indirectSize);
+            var rowDataMemory = rowData.Memory.Slice(0, rowSize);
+            var indirectDataMemory = indirectData.Memory.Slice(0, indirectSize);
 
-            OperationsEncoder.Encode(operations, rowData, indirectData);
+            OperationsEncoder.Encode(operations, rowDataMemory.Span, indirectDataMemory.Span);
 
             var rowOperations = new RowOperationsPB
             {
-                Rows = rowData,
-                IndirectData = indirectData
+                Rows = UnsafeByteOperations.UnsafeWrap(rowDataMemory),
+                IndirectData = UnsafeByteOperations.UnsafeWrap(indirectDataMemory)
             };
 
             var request = new WriteRequestPB
@@ -876,7 +888,7 @@ namespace Knet.Kudu.Client
         /// server may return a key range larger or smaller than this value.
         /// </param>
         /// <param name="cancellationToken">The cancellation token.</param>
-        private Task<List<KeyRangePB>> GetTabletKeyRangesAsync(
+        private Task<SplitKeyRangeResponsePB> GetTabletKeyRangesAsync(
             string tableId,
             byte[] startPrimaryKey,
             byte[] endPrimaryKey,
@@ -946,8 +958,8 @@ namespace Knet.Kudu.Client
                 {
                     var newRange = new KeyRange(
                         result.Tablet,
-                        keyRangePb.StartPrimaryKey,
-                        keyRangePb.StopPrimaryKey,
+                        keyRangePb.StartPrimaryKey.Memory,
+                        keyRangePb.StopPrimaryKey.Memory,
                         (long)keyRangePb.SizeBytesEstimates);
 
                     keyRanges.Add(newRange);
@@ -964,7 +976,7 @@ namespace Knet.Kudu.Client
                 long splitSizeBytes,
                 CancellationToken cancellationToken)
             {
-                var keyRanges = await client.GetTabletKeyRangesAsync(
+                var response = await client.GetTabletKeyRangesAsync(
                     tablet.TableId,
                     startPrimaryKey,
                     endPrimaryKey,
@@ -972,7 +984,7 @@ namespace Knet.Kudu.Client
                     splitSizeBytes,
                     cancellationToken).ConfigureAwait(false);
 
-                return new SplitKeyRangeResponse(tablet, keyRanges);
+                return new SplitKeyRangeResponse(tablet, response.Ranges);
             }
         }
 
@@ -999,7 +1011,7 @@ namespace Knet.Kudu.Client
 
             ServerInfo leaderServerInfo = null;
             ConnectToMasterResponsePB leaderResponsePb = null;
-            List<HostPortPB> clusterMasterAddresses = null;
+            IReadOnlyList<HostPortPB> clusterMasterAddresses = null;
 
             while (tasks.Count > 0)
             {
@@ -1063,7 +1075,7 @@ namespace Knet.Kudu.Client
 
             ServerInfo leaderServerInfo = null;
             ConnectToMasterResponsePB leaderResponsePb = null;
-            List<HostPortPB> clusterMasterAddresses = null;
+            IReadOnlyList<HostPortPB> clusterMasterAddresses = null;
 
             while (tasks.Count > 0)
             {
@@ -1088,7 +1100,7 @@ namespace Knet.Kudu.Client
 
                 clusterMasterAddresses = responsePb.MasterAddrs;
 
-                if (responsePb.Role == RaftPeerPB.Role.Leader)
+                if (responsePb.Role == RaftPeerPB.Types.Role.Leader)
                 {
                     leaderServerInfo = serverInfo;
                     leaderResponsePb = responsePb;
@@ -1131,11 +1143,11 @@ namespace Knet.Kudu.Client
                 _securityContext.SetAuthenticationToken(authnToken);
             }
 
-            var certificates = responsePb.CaCertDers;
+            var certificates = responsePb.CaCertDer;
             if (certificates.Count > 0)
             {
                 // TODO: Log any exceptions from this.
-                _securityContext.TrustCertificates(certificates);
+                _securityContext.TrustCertificates(certificates.ToMemoryArray());
             }
 
             _location = responsePb.ClientLocation;
@@ -1327,17 +1339,17 @@ namespace Knet.Kudu.Client
             await SendRpcToServerGenericAsync(rpc, serverInfo, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (rpc.Error != null)
+            if (rpc.Error is not null)
             {
                 var code = rpc.Error.Status.Code;
                 var status = KuduStatus.FromMasterErrorPB(rpc.Error);
 
-                if (rpc.Error.code == MasterErrorPB.Code.NotTheLeader)
+                if (rpc.Error.Code == MasterErrorPB.Types.Code.NotTheLeader)
                 {
                     InvalidateMasterServerCache();
                     throw new RecoverableException(status);
                 }
-                else if (code == AppStatusPB.ErrorCode.ServiceUnavailable)
+                else if (code == AppStatusPB.Types.ErrorCode.ServiceUnavailable)
                 {
                     throw new RecoverableException(status);
                 }
@@ -1358,27 +1370,27 @@ namespace Knet.Kudu.Client
             await SendRpcToServerGenericAsync(rpc, serverInfo, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (rpc.Error != null)
+            if (rpc.Error is not null)
             {
-                var errCode = rpc.Error.code;
+                var errCode = rpc.Error.Code;
                 var errStatusCode = rpc.Error.Status.Code;
                 var status = KuduStatus.FromTabletServerErrorPB(rpc.Error);
 
-                if (errCode == TabletServerErrorPB.Code.TabletNotFound ||
-                    errCode == TabletServerErrorPB.Code.TabletNotRunning)
+                if (errCode == TabletServerErrorPB.Types.Code.TabletNotFound ||
+                    errCode == TabletServerErrorPB.Types.Code.TabletNotRunning)
                 {
                     // We're handling a tablet server that's telling us it doesn't
                     // have the tablet we're asking for.
                     RemoveTabletServerFromCache(rpc, serverInfo);
                     throw new RecoverableException(status);
                 }
-                else if (errStatusCode == AppStatusPB.ErrorCode.ServiceUnavailable)
+                else if (errStatusCode == AppStatusPB.Types.ErrorCode.ServiceUnavailable)
                 {
                     throw new RecoverableException(status);
                 }
                 else if (
-                    errStatusCode == AppStatusPB.ErrorCode.IllegalState ||
-                    errStatusCode == AppStatusPB.ErrorCode.Aborted)
+                    errStatusCode == AppStatusPB.Types.ErrorCode.IllegalState ||
+                    errStatusCode == AppStatusPB.Types.ErrorCode.Aborted)
                 {
                     // These two error codes are an indication that the tablet
                     // isn't a leader.
@@ -1485,7 +1497,7 @@ namespace Knet.Kudu.Client
         {
             var tableIdPb = new TableIdentifierPB
             {
-                TableId = tableId.ToUtf8ByteArray()
+                TableId = ByteString.CopyFromUtf8(tableId)
             };
 
             // This call will also cache the authz token.
@@ -1511,9 +1523,14 @@ namespace Knet.Kudu.Client
                     ServiceName = rpc.ServiceName,
                     MethodName = rpc.MethodName
                 },
-                RequiredFeatureFlags = rpc.RequiredFeatures,
                 TimeoutMillis = (uint)_defaultOperationTimeoutMs
             };
+
+            var requiredFeatures = rpc.RequiredFeatures;
+            if (requiredFeatures is not null)
+            {
+                header.RequiredFeatureFlags.AddRange(requiredFeatures);
+            }
 
             if (rpc.IsRequestTracked)
             {
@@ -1580,11 +1597,11 @@ namespace Knet.Kudu.Client
         {
             public RemoteTablet Tablet { get; }
 
-            public List<KeyRangePB> KeyRanges { get; }
+            public IReadOnlyList<KeyRangePB> KeyRanges { get; }
 
             public SplitKeyRangeResponse(
                 RemoteTablet tablet,
-                List<KeyRangePB> keyRanges)
+                IReadOnlyList<KeyRangePB> keyRanges)
             {
                 Tablet = tablet;
                 KeyRanges = keyRanges;
@@ -1597,12 +1614,12 @@ namespace Knet.Kudu.Client
 
             public ServerInfo LeaderServerInfo { get; }
 
-            public List<HostPortPB> ClusterMasterAddresses { get; }
+            public IReadOnlyList<HostPortPB> ClusterMasterAddresses { get; }
 
             public ConnectToMasterResponse(
                 ConnectToMasterResponsePB leaderResponsePb,
                 ServerInfo leaderServerInfo,
-                List<HostPortPB> clusterMasterAddresses)
+                IReadOnlyList<HostPortPB> clusterMasterAddresses)
             {
                 LeaderResponsePb = leaderResponsePb;
                 LeaderServerInfo = leaderServerInfo;

@@ -5,23 +5,22 @@ using System.IO;
 using System.Linq;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
-using Knet.Kudu.Client.Protocol.Client;
-using Knet.Kudu.Client.Protocol.Security;
-using ProtoBuf;
+using Google.Protobuf;
+using Knet.Kudu.Client.Protobuf.Client;
+using Knet.Kudu.Client.Protobuf.Security;
+using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Connection
 {
+    /// <inheritdoc cref="ISecurityContext" />
     public class SecurityContext : ISecurityContext
     {
-        private readonly object _lockObj = new object();
+        private readonly object _lockObj = new();
 
         private SignedTokenPB _authnToken;
         private List<X509Certificate2> _trustedCertificates;
         private bool _isAuthenticationTokenImported;
 
-        /// <summary>
-        /// True if the user imported an authentication token to use.
-        /// </summary>
         public bool IsAuthenticationTokenImported
         {
             get
@@ -33,10 +32,6 @@ namespace Knet.Kudu.Client.Connection
             }
         }
 
-        /// <summary>
-        /// Set the token received from connecting to the leader master.
-        /// </summary>
-        /// <param name="token">The token to set.</param>
         public void SetAuthenticationToken(SignedTokenPB token)
         {
             lock (_lockObj)
@@ -45,9 +40,6 @@ namespace Knet.Kudu.Client.Connection
             }
         }
 
-        /// <summary>
-        /// Get the current authentication token, or null if we have no valid token.
-        /// </summary>
         public SignedTokenPB GetAuthenticationToken()
         {
             lock (_lockObj)
@@ -56,11 +48,6 @@ namespace Knet.Kudu.Client.Connection
             }
         }
 
-        /// <summary>
-        /// Export serialized authentication data that may be passed to a different
-        /// client instance and imported to provide that client the ability to connect
-        /// to the cluster.
-        /// </summary>
         public ReadOnlyMemory<byte> ExportAuthenticationCredentials()
         {
             var tokenPb = new AuthenticationCredentialsPB();
@@ -71,24 +58,21 @@ namespace Knet.Kudu.Client.Connection
 
                 foreach (var certificate in _trustedCertificates)
                 {
-                    tokenPb.CaCertDers.Add(certificate.RawData);
+                    tokenPb.CaCertDers.Add(UnsafeByteOperations.UnsafeWrap(certificate.RawData));
                 }
             }
 
             var writer = new ArrayBufferWriter<byte>();
-
-            Serializer.Serialize(writer, tokenPb);
+            tokenPb.WriteTo(writer);
 
             return writer.WrittenMemory;
         }
 
-        /// <summary>
-        /// Import data allowing this client to authenticate to the cluster.
-        /// </summary>
-        /// <param name="token">The authentication token.</param>
         public void ImportAuthenticationCredentials(ReadOnlyMemory<byte> token)
         {
-            var tokenPb = Serializer.Deserialize<AuthenticationCredentialsPB>(token);
+            // TODO: Use span overload when Google.Protobuf 3.18 is released.
+            var tokenPb = AuthenticationCredentialsPB.Parser.ParseFrom(token.ToArray());
+            var caCertDers = tokenPb.CaCertDers.ToMemoryArray();
 
             lock (_lockObj)
             {
@@ -97,24 +81,23 @@ namespace Knet.Kudu.Client.Connection
                     _authnToken = tokenPb.AuthnToken;
                 }
 
-                TrustCertificates(tokenPb.CaCertDers);
+                TrustCertificates(caCertDers);
 
                 _isAuthenticationTokenImported = true;
             }
         }
 
-        /// <summary>
-        /// Mark the given CA cert (provided in DER form) as the trusted CA cert for the
-        /// client. Replaces any previously trusted cert.
-        /// </summary>
-        /// <param name="certDers">The certificates to trust.</param>
-        public void TrustCertificates(List<byte[]> certDers)
+        public void TrustCertificates(IEnumerable<ReadOnlyMemory<byte>> certDers)
         {
-            var certificates = new List<X509Certificate2>(certDers.Count);
+            var certificates = new List<X509Certificate2>();
 
             foreach (var cert in certDers)
             {
-                certificates.Add(new X509Certificate2(cert));
+#if NET5_0_OR_GREATER
+                certificates.Add(new X509Certificate2(cert.Span));
+#else
+                certificates.Add(new X509Certificate2(cert.ToArray()));
+#endif
             }
 
             lock (_lockObj)
@@ -123,20 +106,11 @@ namespace Knet.Kudu.Client.Connection
             }
         }
 
-        /// <summary>
-        /// Creates a <see cref="SslStream"/> that trusts the certificates provided
-        /// by <see cref="TrustCertificates(List{byte[]})"/>.
-        /// </summary>
-        /// <param name="innerStream">The stream to wrap.</param>
         public SslStream CreateTlsStream(Stream innerStream) =>
-            new SslStream(innerStream, leaveInnerStreamOpen: true, ValidateCertificate);
+            new(innerStream, leaveInnerStreamOpen: true, ValidateCertificate);
 
-        /// <summary>
-        /// Creates a <see cref="SslStream"/> that trusts all certificates.
-        /// </summary>
-        /// <param name="innerStream">The stream to wrap.</param>
         public SslStream CreateTlsStreamTrustAll(Stream innerStream) =>
-            new SslStream(innerStream, leaveInnerStreamOpen: true, AllowAnyCertificate);
+            new(innerStream, leaveInnerStreamOpen: true, AllowAnyCertificate);
 
         private bool ValidateCertificate(
             object sender,

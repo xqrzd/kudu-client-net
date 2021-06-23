@@ -1,4 +1,4 @@
-using Knet.Kudu.Client.Protocol;
+using Knet.Kudu.Client.Protobuf;
 
 namespace Knet.Kudu.Client
 {

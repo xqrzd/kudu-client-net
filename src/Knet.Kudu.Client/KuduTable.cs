@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Knet.Kudu.Client.Protocol.Master;
+using Knet.Kudu.Client.Protobuf.Master;
 using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client
@@ -81,45 +81,11 @@ namespace Knet.Kudu.Client
 
             foreach (var column in clone.Schema.Columns)
             {
-                column.ResetComment();
-                column.ResetId();
+                column.ClearComment();
+                column.ClearId();
             }
 
             return clone;
-        }
-    }
-}
-
-namespace Knet.Kudu.Client.Protocol.Master
-{
-    public partial class GetTableSchemaResponsePB
-    {
-        public GetTableSchemaResponsePB Clone()
-        {
-            var clone = (GetTableSchemaResponsePB)MemberwiseClone();
-            var newSchema = new SchemaPB();
-            var numColumns = clone.Schema.Columns.Count;
-
-            for (int i = 0; i < numColumns; i++)
-            {
-                var column = clone.Schema.Columns[i].Clone();
-                newSchema.Columns.Add(column);
-            }
-
-            clone.Schema = newSchema;
-
-            return clone;
-        }
-    }
-}
-
-namespace Knet.Kudu.Client.Protocol
-{
-    public partial class ColumnSchemaPB
-    {
-        public ColumnSchemaPB Clone()
-        {
-            return (ColumnSchemaPB)MemberwiseClone();
         }
     }
 }

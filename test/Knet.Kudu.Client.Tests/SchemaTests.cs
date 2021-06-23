@@ -1,4 +1,3 @@
-using Knet.Kudu.Client.Protocol.Master;
 using Xunit;
 
 namespace Knet.Kudu.Client.Tests

@@ -1,6 +1,6 @@
 using Knet.Kudu.Client.Exceptions;
-using Knet.Kudu.Client.Protocol;
 using Xunit;
+using static Knet.Kudu.Client.Protobuf.AppStatusPB.Types;
 
 namespace Knet.Kudu.Client.Tests
 {
@@ -22,7 +22,7 @@ namespace Knet.Kudu.Client.Tests
             var status = KuduStatus.Aborted("foo");
             Assert.False(status.IsOk);
             Assert.True(status.IsAborted);
-            Assert.Equal(AppStatusPB.ErrorCode.Aborted, status.Code);
+            Assert.Equal(ErrorCode.Aborted, status.Code);
             Assert.Equal("foo", status.Message);
             Assert.Equal(-1, status.PosixCode);
             Assert.Equal("Aborted: foo", status.ToString());

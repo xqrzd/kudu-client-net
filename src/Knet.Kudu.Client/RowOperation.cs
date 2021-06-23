@@ -1,4 +1,4 @@
-using Knet.Kudu.Client.Protocol;
+using static Knet.Kudu.Client.Protobuf.RowOperationsPB.Types;
 
 namespace Knet.Kudu.Client
 {
@@ -10,38 +10,38 @@ namespace Knet.Kudu.Client
     /// </summary>
     public enum RowOperation : byte
     {
-        Insert = RowOperationsPB.Type.Insert,
-        Update = RowOperationsPB.Type.Update,
-        Delete = RowOperationsPB.Type.Delete,
-        Upsert = RowOperationsPB.Type.Upsert,
-        InsertIgnore = RowOperationsPB.Type.InsertIgnore,
+        Insert = Type.Insert,
+        Update = Type.Update,
+        Delete = Type.Delete,
+        Upsert = Type.Upsert,
+        InsertIgnore = Type.InsertIgnore,
         /// <summary>
         /// Used when specifying split rows on table creation.
         /// </summary>
-        SplitRow = RowOperationsPB.Type.SplitRow,
+        SplitRow = Type.SplitRow,
         /// <summary>
         /// Used when specifying an inclusive lower bound range on table creation.
         /// Should be followed by the associated upper bound. If all values are
         /// missing, then signifies unbounded.
         /// </summary>
-        RangeLowerBound = RowOperationsPB.Type.RangeLowerBound,
+        RangeLowerBound = Type.RangeLowerBound,
         /// <summary>
         /// Used when specifying an exclusive upper bound range on table creation.
         /// Should be preceded by the associated lower bound. If all values are
         /// missing, then signifies unbounded.
         /// </summary>
-        RangeUpperBound = RowOperationsPB.Type.RangeUpperBound,
+        RangeUpperBound = Type.RangeUpperBound,
         /// <summary>
         /// Used when specifying an exclusive lower bound range on table creation.
         /// Should be followed by the associated upper bound. If all values are
         /// missing, then signifies unbounded.
         /// </summary>
-        ExclusiveRangeLowerBound = RowOperationsPB.Type.ExclusiveRangeLowerBound,
+        ExclusiveRangeLowerBound = Type.ExclusiveRangeLowerBound,
         /// <summary>
         /// Used when specifying an inclusive upper bound range on table creation.
         /// Should be preceded by the associated lower bound. If all values are
         /// missing, then signifies unbounded.
         /// </summary>
-        InclusiveRangeUpperBound = RowOperationsPB.Type.InclusiveRangeUpperBound,
+        InclusiveRangeUpperBound = Type.InclusiveRangeUpperBound,
     }
 }

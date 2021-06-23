@@ -1,5 +1,5 @@
 using Knet.Kudu.Client.Connection;
-using static Knet.Kudu.Client.Protocol.Consensus.RaftPeerPB;
+using static Knet.Kudu.Client.Protobuf.Consensus.RaftPeerPB.Types;
 
 namespace Knet.Kudu.Client.Tablet
 {
