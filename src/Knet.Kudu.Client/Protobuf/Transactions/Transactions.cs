@@ -25,21 +25,23 @@ namespace Knet.Kudu.Client.Protobuf.Transactions {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "CiRrdWR1L3RyYW5zYWN0aW9ucy90cmFuc2FjdGlvbnMucHJvdG8SEWt1ZHUu",
-            "dHJhbnNhY3Rpb25zImgKEFR4blN0YXR1c0VudHJ5UEISLAoFc3RhdGUYASAB",
-            "KA4yHS5rdWR1LnRyYW5zYWN0aW9ucy5UeG5TdGF0ZVBCEgwKBHVzZXIYAiAB",
-            "KAkSGAoQY29tbWl0X3RpbWVzdGFtcBgDIAEoBiJFChVUeG5QYXJ0aWNpcGFu",
-            "dEVudHJ5UEISLAoFc3RhdGUYASABKA4yHS5rdWR1LnRyYW5zYWN0aW9ucy5U",
-            "eG5TdGF0ZVBCIlAKClR4blRva2VuUEISDgoGdHhuX2lkGAEgASgDEhgKEGtl",
-            "ZXBhbGl2ZV9taWxsaXMYAiABKA0SGAoQZW5hYmxlX2tlZXBhbGl2ZRgDIAEo",
-            "CCqIAQoKVHhuU3RhdGVQQhILCgdVTktOT1dOEAASCAoET1BFThABEhUKEUFC",
-            "T1JUX0lOX1BST0dSRVNTEAUSCwoHQUJPUlRFRBACEhYKEkNPTU1JVF9JTl9Q",
-            "Uk9HUkVTUxADEhgKFEZJTkFMSVpFX0lOX1BST0dSRVNTEAYSDQoJQ09NTUlU",
-            "VEVEEARCRwocb3JnLmFwYWNoZS5rdWR1LnRyYW5zYWN0aW9uc6oCJktuZXQu",
-            "S3VkdS5DbGllbnQuUHJvdG9idWYuVHJhbnNhY3Rpb25z"));
+            "dHJhbnNhY3Rpb25zIqQBChBUeG5TdGF0dXNFbnRyeVBCEiwKBXN0YXRlGAEg",
+            "ASgOMh0ua3VkdS50cmFuc2FjdGlvbnMuVHhuU3RhdGVQQhIMCgR1c2VyGAIg",
+            "ASgJEhgKEGNvbW1pdF90aW1lc3RhbXAYAyABKAYSFwoPc3RhcnRfdGltZXN0",
+            "YW1wGAQgASgDEiEKGWxhc3RfdHJhbnNpdGlvbl90aW1lc3RhbXAYBSABKAMi",
+            "RQoVVHhuUGFydGljaXBhbnRFbnRyeVBCEiwKBXN0YXRlGAEgASgOMh0ua3Vk",
+            "dS50cmFuc2FjdGlvbnMuVHhuU3RhdGVQQiJQCgpUeG5Ub2tlblBCEg4KBnR4",
+            "bl9pZBgBIAEoAxIYChBrZWVwYWxpdmVfbWlsbGlzGAIgASgNEhgKEGVuYWJs",
+            "ZV9rZWVwYWxpdmUYAyABKAgqiAEKClR4blN0YXRlUEISCwoHVU5LTk9XThAA",
+            "EggKBE9QRU4QARIVChFBQk9SVF9JTl9QUk9HUkVTUxAFEgsKB0FCT1JURUQQ",
+            "AhIWChJDT01NSVRfSU5fUFJPR1JFU1MQAxIYChRGSU5BTElaRV9JTl9QUk9H",
+            "UkVTUxAGEg0KCUNPTU1JVFRFRBAEQkcKHG9yZy5hcGFjaGUua3VkdS50cmFu",
+            "c2FjdGlvbnOqAiZLbmV0Lkt1ZHUuQ2xpZW50LlByb3RvYnVmLlRyYW5zYWN0",
+            "aW9ucw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Knet.Kudu.Client.Protobuf.Transactions.TxnStatePB), }, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::Knet.Kudu.Client.Protobuf.Transactions.TxnStatusEntryPB), global::Knet.Kudu.Client.Protobuf.Transactions.TxnStatusEntryPB.Parser, new[]{ "State", "User", "CommitTimestamp" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Knet.Kudu.Client.Protobuf.Transactions.TxnStatusEntryPB), global::Knet.Kudu.Client.Protobuf.Transactions.TxnStatusEntryPB.Parser, new[]{ "State", "User", "CommitTimestamp", "StartTimestamp", "LastTransitionTimestamp" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Knet.Kudu.Client.Protobuf.Transactions.TxnParticipantEntryPB), global::Knet.Kudu.Client.Protobuf.Transactions.TxnParticipantEntryPB.Parser, new[]{ "State" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Knet.Kudu.Client.Protobuf.Transactions.TxnTokenPB), global::Knet.Kudu.Client.Protobuf.Transactions.TxnTokenPB.Parser, new[]{ "TxnId", "KeepaliveMillis", "EnableKeepalive" }, null, null, null, null)
           }));
@@ -137,6 +139,8 @@ namespace Knet.Kudu.Client.Protobuf.Transactions {
       state_ = other.state_;
       user_ = other.user_;
       commitTimestamp_ = other.commitTimestamp_;
+      startTimestamp_ = other.startTimestamp_;
+      lastTransitionTimestamp_ = other.lastTransitionTimestamp_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -219,6 +223,62 @@ namespace Knet.Kudu.Client.Protobuf.Transactions {
       _hasBits0 &= ~2;
     }
 
+    /// <summary>Field number for the "start_timestamp" field.</summary>
+    public const int StartTimestampFieldNumber = 4;
+    private readonly static long StartTimestampDefaultValue = 0L;
+
+    private long startTimestamp_;
+    /// <summary>
+    /// The timestamp in seconds since the epoch that this transaction was
+    /// started.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public long StartTimestamp {
+      get { if ((_hasBits0 & 4) != 0) { return startTimestamp_; } else { return StartTimestampDefaultValue; } }
+      set {
+        _hasBits0 |= 4;
+        startTimestamp_ = value;
+      }
+    }
+    /// <summary>Gets whether the "start_timestamp" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public bool HasStartTimestamp {
+      get { return (_hasBits0 & 4) != 0; }
+    }
+    /// <summary>Clears the value of the "start_timestamp" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public void ClearStartTimestamp() {
+      _hasBits0 &= ~4;
+    }
+
+    /// <summary>Field number for the "last_transition_timestamp" field.</summary>
+    public const int LastTransitionTimestampFieldNumber = 5;
+    private readonly static long LastTransitionTimestampDefaultValue = 0L;
+
+    private long lastTransitionTimestamp_;
+    /// <summary>
+    /// The timestamp in seconds since the epoch that this transaction had a state
+    /// change.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public long LastTransitionTimestamp {
+      get { if ((_hasBits0 & 8) != 0) { return lastTransitionTimestamp_; } else { return LastTransitionTimestampDefaultValue; } }
+      set {
+        _hasBits0 |= 8;
+        lastTransitionTimestamp_ = value;
+      }
+    }
+    /// <summary>Gets whether the "last_transition_timestamp" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public bool HasLastTransitionTimestamp {
+      get { return (_hasBits0 & 8) != 0; }
+    }
+    /// <summary>Clears the value of the "last_transition_timestamp" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public void ClearLastTransitionTimestamp() {
+      _hasBits0 &= ~8;
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public override bool Equals(object other) {
       return Equals(other as TxnStatusEntryPB);
@@ -235,6 +295,8 @@ namespace Knet.Kudu.Client.Protobuf.Transactions {
       if (State != other.State) return false;
       if (User != other.User) return false;
       if (CommitTimestamp != other.CommitTimestamp) return false;
+      if (StartTimestamp != other.StartTimestamp) return false;
+      if (LastTransitionTimestamp != other.LastTransitionTimestamp) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -244,6 +306,8 @@ namespace Knet.Kudu.Client.Protobuf.Transactions {
       if (HasState) hash ^= State.GetHashCode();
       if (HasUser) hash ^= User.GetHashCode();
       if (HasCommitTimestamp) hash ^= CommitTimestamp.GetHashCode();
+      if (HasStartTimestamp) hash ^= StartTimestamp.GetHashCode();
+      if (HasLastTransitionTimestamp) hash ^= LastTransitionTimestamp.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -274,6 +338,14 @@ namespace Knet.Kudu.Client.Protobuf.Transactions {
         output.WriteRawTag(25);
         output.WriteFixed64(CommitTimestamp);
       }
+      if (HasStartTimestamp) {
+        output.WriteRawTag(32);
+        output.WriteInt64(StartTimestamp);
+      }
+      if (HasLastTransitionTimestamp) {
+        output.WriteRawTag(40);
+        output.WriteInt64(LastTransitionTimestamp);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -290,6 +362,12 @@ namespace Knet.Kudu.Client.Protobuf.Transactions {
       }
       if (HasCommitTimestamp) {
         size += 1 + 8;
+      }
+      if (HasStartTimestamp) {
+        size += 1 + pb::CodedOutputStream.ComputeInt64Size(StartTimestamp);
+      }
+      if (HasLastTransitionTimestamp) {
+        size += 1 + pb::CodedOutputStream.ComputeInt64Size(LastTransitionTimestamp);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -310,6 +388,12 @@ namespace Knet.Kudu.Client.Protobuf.Transactions {
       }
       if (other.HasCommitTimestamp) {
         CommitTimestamp = other.CommitTimestamp;
+      }
+      if (other.HasStartTimestamp) {
+        StartTimestamp = other.StartTimestamp;
+      }
+      if (other.HasLastTransitionTimestamp) {
+        LastTransitionTimestamp = other.LastTransitionTimestamp;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -337,6 +421,14 @@ namespace Knet.Kudu.Client.Protobuf.Transactions {
           }
           case 25: {
             CommitTimestamp = input.ReadFixed64();
+            break;
+          }
+          case 32: {
+            StartTimestamp = input.ReadInt64();
+            break;
+          }
+          case 40: {
+            LastTransitionTimestamp = input.ReadInt64();
             break;
           }
         }
