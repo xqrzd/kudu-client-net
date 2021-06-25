@@ -385,8 +385,7 @@ namespace Knet.Kudu.Client.Negotiate
             return SendAsync(header, context, cancellationToken);
         }
 
-        internal Task SendTlsHandshakeAsync(
-            ReadOnlyMemory<byte> tlsHandshake, CancellationToken cancellationToken)
+        internal Task SendTlsHandshakeAsync(ReadOnlyMemory<byte> tlsHandshake, CancellationToken cancellationToken)
         {
             var request = new NegotiatePB
             {
