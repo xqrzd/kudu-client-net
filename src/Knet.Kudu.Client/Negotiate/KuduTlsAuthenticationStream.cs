@@ -78,16 +78,12 @@ namespace Knet.Kudu.Client.Negotiate
             throw new NotImplementedException();
         }
 
-        private Task SendHandshakeAsync(
-            ReadOnlyMemory<byte> buffer,
-            CancellationToken cancellationToken = default)
+        private Task SendHandshakeAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
             return _negotiator.SendTlsHandshakeAsync(buffer, cancellationToken);
         }
 
-        private async Task<int> ReceiveHandshakeAsync(
-            Memory<byte> buffer,
-            CancellationToken cancellationToken = default)
+        private async Task<int> ReceiveHandshakeAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
             if (buffer.Length == 0)
             {
