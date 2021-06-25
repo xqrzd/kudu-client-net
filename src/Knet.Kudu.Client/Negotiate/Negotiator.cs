@@ -385,7 +385,7 @@ namespace Knet.Kudu.Client.Negotiate
             return SendAsync(header, context, cancellationToken);
         }
 
-        internal Task<NegotiatePB> SendTlsHandshakeAsync(byte[] tlsHandshake, CancellationToken cancellationToken)
+        internal Task SendTlsHandshakeAsync(ReadOnlyMemory<byte> tlsHandshake, CancellationToken cancellationToken)
         {
             var request = new NegotiatePB
             {
@@ -393,7 +393,12 @@ namespace Knet.Kudu.Client.Negotiate
                 TlsHandshake = UnsafeByteOperations.UnsafeWrap(tlsHandshake)
             };
 
-            return SendReceiveAsync(request, cancellationToken);
+            return SendAsync(request, cancellationToken);
+        }
+
+        internal Task<NegotiatePB> ReceiveTlsHandshakeAsync(CancellationToken cancellationToken)
+        {
+            return ReceiveAsync(cancellationToken);
         }
 
         internal Task<NegotiatePB> SendGssApiTokenAsync(
@@ -413,10 +418,15 @@ namespace Knet.Kudu.Client.Negotiate
             return SendReceiveAsync(request, cancellationToken);
         }
 
-        private async Task<NegotiatePB> SendReceiveAsync(NegotiatePB request, CancellationToken cancellationToken)
+        private Task SendAsync(NegotiatePB request, CancellationToken cancellationToken)
         {
             var header = new RequestHeader { CallId = SaslNegotiationCallId };
-            await SendAsync(header, request, cancellationToken).ConfigureAwait(false);
+            return SendAsync(header, request, cancellationToken);
+        }
+
+        private async Task<NegotiatePB> SendReceiveAsync(NegotiatePB request, CancellationToken cancellationToken)
+        {
+            await SendAsync(request, cancellationToken).ConfigureAwait(false);
             var response = await ReceiveAsync(cancellationToken).ConfigureAwait(false);
             return response;
         }
