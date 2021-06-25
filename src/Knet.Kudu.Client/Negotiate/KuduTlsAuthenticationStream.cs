@@ -32,36 +32,35 @@ namespace Knet.Kudu.Client.Negotiate
 
         public override void Write(byte[] buffer, int offset, int count)
         {
-            SendHandshakeAsync(new ReadOnlyMemory<byte>(buffer, offset, count), default)
-                .AsTask().GetAwaiter().GetResult();
+            SendHandshakeAsync(new ReadOnlyMemory<byte>(buffer, offset, count)).GetAwaiter().GetResult();
         }
 
         public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
-            return SendHandshakeAsync(new ReadOnlyMemory<byte>(buffer, offset, count), cancellationToken).AsTask();
+            return SendHandshakeAsync(new ReadOnlyMemory<byte>(buffer, offset, count), cancellationToken);
         }
 
 #if !NETSTANDARD2_0
         public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
-            return SendHandshakeAsync(buffer, cancellationToken);
+            return new ValueTask(SendHandshakeAsync(buffer, cancellationToken));
         }
 #endif
 
         public override int Read(byte[] buffer, int offset, int count)
         {
-            return ReadHandshake(new Memory<byte>(buffer, offset, count));
+            return ReceiveHandshakeAsync(new Memory<byte>(buffer, offset, count)).GetAwaiter().GetResult();
         }
 
         public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
-            return Task.FromResult(ReadHandshake(new Memory<byte>(buffer, offset, count)));
+            return ReceiveHandshakeAsync(new Memory<byte>(buffer, offset, count), cancellationToken);
         }
 
 #if !NETSTANDARD2_0
         public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {
-            return new ValueTask<int>(ReadHandshake(buffer));
+            return new ValueTask<int>(ReceiveHandshakeAsync(buffer, cancellationToken));
         }
 #endif
 
@@ -79,18 +78,35 @@ namespace Knet.Kudu.Client.Negotiate
             throw new NotImplementedException();
         }
 
-        private async ValueTask SendHandshakeAsync(
-            ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken)
+        private Task SendHandshakeAsync(
+            ReadOnlyMemory<byte> buffer,
+            CancellationToken cancellationToken = default)
         {
-            _readPosition = 0;
-            _result = await _negotiator.SendTlsHandshakeAsync(
-                buffer.ToArray(), cancellationToken).ConfigureAwait(false);
+            return _negotiator.SendTlsHandshakeAsync(buffer, cancellationToken);
         }
 
-        private int ReadHandshake(Memory<byte> buffer)
+        private async Task<int> ReceiveHandshakeAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
         {
-            int length = Math.Min(buffer.Length, _result.TlsHandshake.Length);
-            _result.TlsHandshake.Memory.Span.Slice(_readPosition, length).CopyTo(buffer.Span);
+            if (buffer.Length == 0)
+            {
+                return 0;
+            }
+
+            int totalLength = _result?.TlsHandshake?.Length ?? 0;
+            int available = totalLength - _readPosition;
+            if (available == 0)
+            {
+                _result = await _negotiator.ReceiveTlsHandshakeAsync(cancellationToken)
+                    .ConfigureAwait(false);
+
+                available = _result.TlsHandshake.Length;
+                _readPosition = 0;
+            }
+
+            int length = Math.Min(buffer.Length, available);
+            _result.TlsHandshake.Memory.Slice(_readPosition, length).CopyTo(buffer);
             _readPosition += length;
             return length;
         }

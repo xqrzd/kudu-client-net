@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Knet.Kudu.Binary" Version="1.14.0" />
+    <PackageReference Include="Knet.Kudu.Binary" Version="1.15.0" />
     <PackageReference Include="McMaster.Extensions.Xunit" Version="0.1.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.10.0" />
     <PackageReference Include="xunit" Version="2.4.1" />
