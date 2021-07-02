@@ -126,7 +126,7 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
             await StdOut.DisposeAsync();
             await StdErr.DisposeAsync();
 
-            await _nativeProcess.WaitUntilExitAsync();
+            await _nativeProcess.WaitForExitAsync();
             _nativeProcess.Dispose();
             _singleRequest.Dispose();
 
