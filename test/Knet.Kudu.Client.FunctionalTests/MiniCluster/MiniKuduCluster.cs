@@ -28,7 +28,7 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
         private readonly Dictionary<HostAndPort, DaemonInfo> _tabletServers;
         private readonly SemaphoreSlim _singleRequest;
 
-        private ProcessEx _nativeProcess;
+        private Process _nativeProcess;
 
         public MiniKuduCluster(CreateClusterRequestPB createClusterRequestPB)
         {
@@ -38,11 +38,11 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
             _singleRequest = new SemaphoreSlim(1, 1);
         }
 
-        private Stream StdIn => _nativeProcess.StdIn;
+        private Stream StdIn => _nativeProcess.StandardInput.BaseStream;
 
-        private Stream StdOut => _nativeProcess.StdOut;
+        private Stream StdOut => _nativeProcess.StandardOutput.BaseStream;
 
-        private Stream StdErr => _nativeProcess.StdErr;
+        private Stream StdErr => _nativeProcess.StandardError.BaseStream;
 
         public async Task StartAsync()
         {
@@ -72,7 +72,7 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
                 startInfo.EnvironmentVariables.Add(env.Key, env.Value);
             }
 
-            _nativeProcess = new ProcessEx(startInfo);
+            _nativeProcess = new Process { StartInfo = startInfo };
             _nativeProcess.Start();
 
             // Start listening for events.
