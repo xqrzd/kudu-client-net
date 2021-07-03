@@ -13,7 +13,6 @@ namespace Knet.Kudu.Client
     {
         private readonly IReadOnlyList<HostAndPort> _masterAddresses;
         private ILoggerFactory _loggerFactory = NullLoggerFactory.Instance;
-        private TimeSpan _defaultAdminOperationTimeout = TimeSpan.FromSeconds(30);
         private TimeSpan _defaultOperationTimeout = TimeSpan.FromSeconds(30);
         private PipeOptions _sendPipeOptions;
         private PipeOptions _receivePipeOptions;
@@ -43,12 +42,6 @@ namespace Knet.Kudu.Client
             return this;
         }
 
-        public KuduClientBuilder SetDefaultAdminOperationTimeout(TimeSpan timeout)
-        {
-            _defaultAdminOperationTimeout = timeout;
-            return this;
-        }
-
         public KuduClientBuilder SetDefaultOperationTimeout(TimeSpan timeout)
         {
             _defaultOperationTimeout = timeout;
@@ -71,7 +64,6 @@ namespace Knet.Kudu.Client
         {
             var options = new KuduClientOptions(
                 _masterAddresses,
-                _defaultAdminOperationTimeout,
                 _defaultOperationTimeout,
                 _sendPipeOptions,
                 _receivePipeOptions);

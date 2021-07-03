@@ -25,8 +25,6 @@ namespace Knet.Kudu.Client
 
         public IReadOnlyList<HostAndPort> MasterAddresses { get; }
 
-        public TimeSpan DefaultAdminOperationTimeout { get; }
-
         public TimeSpan DefaultOperationTimeout { get; }
 
         public PipeOptions SendPipeOptions { get; }
@@ -35,13 +33,11 @@ namespace Knet.Kudu.Client
 
         public KuduClientOptions(
             IReadOnlyList<HostAndPort> masterAddresses,
-            TimeSpan defaultAdminOperationTimeout,
             TimeSpan defaultOperationTimeout,
             PipeOptions sendPipeOptions,
             PipeOptions receivePipeOptions)
         {
             MasterAddresses = masterAddresses;
-            DefaultAdminOperationTimeout = defaultAdminOperationTimeout;
             DefaultOperationTimeout = defaultOperationTimeout;
 
             SendPipeOptions = sendPipeOptions ?? _defaultSendOptions;
