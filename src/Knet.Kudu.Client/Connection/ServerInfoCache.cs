@@ -136,13 +136,17 @@ namespace Knet.Kudu.Client.Connection
         /// </param>
         public ServerInfoCache DemoteLeader(string uuid)
         {
-            if (_leaderIndex == -1)
+            var leaderIndex = _leaderIndex;
+            if (leaderIndex != -1)
             {
-                // There is no leader for this tablet.
-                return this;
+                var serverInfo = _servers[leaderIndex];
+                if (serverInfo.Uuid == uuid)
+                {
+                    return new ServerInfoCache(_servers, -1);
+                }
             }
 
-            return new ServerInfoCache(_servers, -1);
+            return this;
         }
 
         /// <summary>
