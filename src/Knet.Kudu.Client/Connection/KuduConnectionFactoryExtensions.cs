@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Knet.Kudu.Client.Protobuf.Consensus;
 using Knet.Kudu.Client.Protobuf.Master;
 using Knet.Kudu.Client.Tablet;
 using Knet.Kudu.Client.Util;
@@ -60,7 +59,7 @@ namespace Knet.Kudu.Client.Connection
                     tabletInfo.InternedReplicas.Count);
 
                 var servers = new List<ServerInfo>(numReplicas);
-                var replicas = new List<Replica>(numReplicas);
+                var replicas = new List<KuduReplica>(numReplicas);
                 int leaderIndex = -1;
 
                 // Handle interned replicas.
@@ -69,12 +68,12 @@ namespace Knet.Kudu.Client.Connection
                     var tsInfoIdx = (int)replicaPb.TsInfoIdx;
                     var serverInfo = internedServers[tsInfoIdx];
 
-                    var replica = new Replica(
+                    var replica = new KuduReplica(
                         serverInfo.HostPort,
-                        replicaPb.Role,
+                        (ReplicaRole)replicaPb.Role,
                         replicaPb.DimensionLabel);
 
-                    if (replica.Role == RaftPeerPB.Types.Role.Leader)
+                    if (replica.Role == ReplicaRole.Leader)
                         leaderIndex = servers.Count;
 
                     servers.Add(serverInfo);
@@ -90,12 +89,12 @@ namespace Knet.Kudu.Client.Connection
 
                     if (serverInfo != null)
                     {
-                        var replica = new Replica(
+                        var replica = new KuduReplica(
                             serverInfo.HostPort,
-                            replicaPb.Role,
+                            (ReplicaRole)replicaPb.Role,
                             replicaPb.DimensionLabel);
 
-                        if (replica.Role == RaftPeerPB.Types.Role.Leader)
+                        if (replica.Role == ReplicaRole.Leader)
                             leaderIndex = servers.Count;
 
                         servers.Add(serverInfo);

@@ -33,14 +33,14 @@ namespace Knet.Kudu.Client.Tablet
 
         public Partition Partition { get; }
 
-        public IReadOnlyList<Replica> Replicas { get; }
+        public IReadOnlyList<KuduReplica> Replicas { get; }
 
         public RemoteTablet(
             string tableId,
             string tabletId,
             Partition partition,
             ServerInfoCache cache,
-            IReadOnlyList<Replica> replicas)
+            IReadOnlyList<KuduReplica> replicas)
         {
             TableId = tableId;
             TabletId = tabletId;
