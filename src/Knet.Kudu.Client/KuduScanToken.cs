@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using Google.Protobuf;
 using Knet.Kudu.Client.Protobuf;
@@ -50,9 +49,10 @@ namespace Knet.Kudu.Client
 
         public byte[] Serialize()
         {
-            var writer = new ArrayBufferWriter<byte>();
-            _message.WriteTo(writer);
-            return writer.WrittenSpan.ToArray();
+            var messageSize = _message.CalculateSize();
+            var buffer = new byte[messageSize];
+            _message.WriteTo(buffer);
+            return buffer;
         }
 
         public TBuilder IntoScanner<TBuilder>(TBuilder scanBuilder)
