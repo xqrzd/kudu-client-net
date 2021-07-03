@@ -119,7 +119,7 @@ namespace Knet.Kudu.Client
         }
 
         public static TBuilder ApplyScanToken<TBuilder>(
-            this TBuilder scanBuilder, ReadOnlyMemory<byte> buffer)
+            this TBuilder scanBuilder, ReadOnlySpan<byte> buffer)
             where TBuilder : AbstractKuduScannerBuilder<TBuilder>
         {
             return KuduScanToken.DeserializeIntoScanner(scanBuilder, buffer);

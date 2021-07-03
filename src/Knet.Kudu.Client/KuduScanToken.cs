@@ -24,7 +24,7 @@ namespace Knet.Kudu.Client
     /// <para>
     /// Scan tokens may be serialized using the <see cref="Serialize"/> method and
     /// deserialized back into a scanner using the
-    /// <see cref="DeserializeIntoScanner{TBuilder}(TBuilder, ReadOnlyMemory{byte})"/>
+    /// <see cref="DeserializeIntoScanner{TBuilder}(TBuilder, ReadOnlySpan{byte})"/>
     /// method. This allows use cases such as generating scan tokens in the planner
     /// component of a query engine, then sending the tokens to execution nodes based
     /// on locality, and then instantiating the scanners on those nodes.
@@ -65,11 +65,10 @@ namespace Knet.Kudu.Client
         public override string ToString() => _keyRange.ToString();
 
         public static TBuilder DeserializeIntoScanner<TBuilder>(
-            TBuilder scanBuilder, ReadOnlyMemory<byte> buffer)
+            TBuilder scanBuilder, ReadOnlySpan<byte> buffer)
             where TBuilder : AbstractKuduScannerBuilder<TBuilder>
         {
-            // TODO: Use span when Google.Protobuf 3.18 is released.
-            var scanTokenPb = ScanTokenPB.Parser.ParseFrom(buffer.ToArray());
+            var scanTokenPb = ScanTokenPB.Parser.ParseFrom(buffer);
             PbIntoScanner(scanBuilder, scanTokenPb);
             return scanBuilder;
         }
