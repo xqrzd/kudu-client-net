@@ -139,6 +139,7 @@ namespace Knet.Kudu.Client.Tests
             int sameLocationReplicaIndex)
         {
             var servers = new List<ServerInfo>();
+            var replicas = new List<KuduReplica>();
             var uuids = _uuids;
 
             for (int i = 0; i < uuids.Length; i++)
@@ -153,9 +154,10 @@ namespace Knet.Kudu.Client.Tests
                     new IPEndPoint(IPAddress.Parse("1.2.3.4"), port);
 
                 servers.Add(new ServerInfo(uuid, hostPort, endpoint, location, local));
+                replicas.Add(new KuduReplica(hostPort, ReplicaRole.Follower, ""));
             }
 
-            return new ServerInfoCache(servers, leaderIndex);
+            return new ServerInfoCache(servers, replicas, leaderIndex);
         }
     }
 }

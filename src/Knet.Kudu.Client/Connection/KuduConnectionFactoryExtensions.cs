@@ -102,14 +102,13 @@ namespace Knet.Kudu.Client.Connection
                     }
                 }
 
-                var serverCache = new ServerInfoCache(servers, leaderIndex);
+                var serverCache = new ServerInfoCache(servers, replicas, leaderIndex);
 
                 var tablet = new RemoteTablet(
                     tableId,
                     tabletId,
                     partition,
-                    serverCache,
-                    replicas);
+                    serverCache);
 
                 results.Add(tablet);
             }
