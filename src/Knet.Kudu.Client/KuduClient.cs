@@ -13,6 +13,7 @@ using Knet.Kudu.Client.Protobuf;
 using Knet.Kudu.Client.Protobuf.Consensus;
 using Knet.Kudu.Client.Protobuf.Master;
 using Knet.Kudu.Client.Protobuf.Rpc;
+using Knet.Kudu.Client.Protobuf.Security;
 using Knet.Kudu.Client.Protobuf.Tserver;
 using Knet.Kudu.Client.Requests;
 using Knet.Kudu.Client.Tablet;
@@ -706,7 +707,7 @@ namespace Knet.Kudu.Client
         /// </summary>
         /// <param name="tableId">The table.</param>
         /// <param name="partitionKey">The partition key of the tablet to find.</param>
-        private TableLocationEntry GetTableLocationEntry(
+        internal TableLocationEntry GetTableLocationEntry(
             string tableId, ReadOnlySpan<byte> partitionKey)
         {
             var cache = GetTableLocationsCache(tableId);
@@ -1303,6 +1304,11 @@ namespace Knet.Kudu.Client
         private ServerInfo GetServerInfo(RemoteTablet tablet, ReplicaSelection replicaSelection)
         {
             return tablet.GetServerInfo(replicaSelection, _location);
+        }
+
+        internal SignedTokenPB GetAuthzToken(string tableId)
+        {
+            return _authzTokenCache.GetAuthzToken(tableId);
         }
 
         internal async ValueTask<HostAndPort> FindLeaderMasterServerAsync(

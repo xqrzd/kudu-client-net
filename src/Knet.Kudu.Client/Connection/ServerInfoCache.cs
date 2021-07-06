@@ -167,7 +167,17 @@ namespace Knet.Kudu.Client.Connection
                 var serverInfo = _servers[leaderIndex];
                 if (serverInfo.Uuid == uuid)
                 {
-                    return new ServerInfoCache(_servers, _replicas, -1);
+                    var replicas = _replicas;
+                    var newReplicas = new List<KuduReplica>(replicas);
+                    var priorLeaderReplica = replicas[leaderIndex];
+                    var newLeaderReplica = new KuduReplica(
+                        priorLeaderReplica.HostPort,
+                        ReplicaRole.Follower,
+                        priorLeaderReplica.DimensionLabel);
+
+                    newReplicas[leaderIndex] = newLeaderReplica;
+
+                    return new ServerInfoCache(_servers, newReplicas, -1);
                 }
             }
 

@@ -45,6 +45,8 @@ namespace Knet.Kudu.Client.Tablet
             _cache = cache;
         }
 
+        public IReadOnlyList<ServerInfo> Servers => _cache.Servers;
+
         public IReadOnlyList<KuduReplica> Replicas => _cache.Replicas;
 
         public ServerInfo GetServerInfo(

@@ -45,6 +45,7 @@ namespace Knet.Kudu.Client
             _message = message;
         }
 
+        // TODO: LocatedTablet
         public RemoteTablet Tablet => _keyRange.Tablet;
 
         public byte[] Serialize()
@@ -62,6 +63,7 @@ namespace Knet.Kudu.Client
             return scanBuilder;
         }
 
+        // TODO: Use ScanTokenPB to generate ToString()
         public override string ToString() => _keyRange.ToString();
 
         public static TBuilder DeserializeIntoScanner<TBuilder>(

@@ -5,17 +5,21 @@ using System.Threading.Tasks;
 using Google.Protobuf;
 using Knet.Kudu.Client.Protobuf;
 using Knet.Kudu.Client.Protobuf.Client;
+using Knet.Kudu.Client.Protobuf.Consensus;
 using Knet.Kudu.Client.Scanner;
 using Knet.Kudu.Client.Tablet;
 using Knet.Kudu.Client.Util;
+using static Knet.Kudu.Client.Protobuf.Client.TabletMetadataPB.Types;
 
 namespace Knet.Kudu.Client
 {
     public class KuduScanTokenBuilder : AbstractKuduScannerBuilder<KuduScanTokenBuilder>
     {
         // By default, a scan token is created for each tablet to be scanned.
-        protected long SplitSizeBytes = -1;
-        protected int FetchTabletsPerRangeLookup = 1000;
+        private long _splitSizeBytes = -1;
+        private int _fetchTabletsPerRangeLookup = 1000;
+        private bool _includeTableMetadata = true;
+        private bool _includeTabletMetadata = true;
 
         public KuduScanTokenBuilder(KuduClient client, KuduTable table)
             : base(client, table)
@@ -32,21 +36,43 @@ namespace Knet.Kudu.Client
         /// <param name="splitSizeBytes">The data size of key range.</param>
         public KuduScanTokenBuilder SetSplitSizeBytes(long splitSizeBytes)
         {
-            SplitSizeBytes = splitSizeBytes;
+            _splitSizeBytes = splitSizeBytes;
             return this;
         }
 
         /// <summary>
-        /// The number of tablets to fetch from the master when looking up a range of
-        /// tablets.
+        /// The number of tablets to fetch from the master when looking up a range of tablets.
         /// </summary>
         /// <param name="fetchTabletsPerRangeLookup">
         /// Number of tablets to fetch per range lookup.
         /// </param>
-        public KuduScanTokenBuilder SetFetchTabletsPerRangeLookup(
-            int fetchTabletsPerRangeLookup)
+        public KuduScanTokenBuilder SetFetchTabletsPerRangeLookup(int fetchTabletsPerRangeLookup)
         {
-            FetchTabletsPerRangeLookup = fetchTabletsPerRangeLookup;
+            _fetchTabletsPerRangeLookup = fetchTabletsPerRangeLookup;
+            return this;
+        }
+
+        /// <summary>
+        /// If the table metadata is included on the scan token a GetTableSchema
+        /// RPC call to the master can be avoided when deserializing each scan token
+        /// into a scanner.
+        /// </summary>
+        /// <param name="includeMetadata">True, if table metadata should be included.</param>
+        public KuduScanTokenBuilder IncludeTableMetadata(bool includeMetadata)
+        {
+            _includeTableMetadata = includeMetadata;
+            return this;
+        }
+
+        /// <summary>
+        /// If the tablet metadata is included on the scan token a GetTableLocations
+        /// RPC call to the master can be avoided when scanning with a scanner constructed
+        /// from a scan token.
+        /// </summary>
+        /// <param name="includeMetadata">True, if tablet metadata should be included.</param>
+        public KuduScanTokenBuilder IncludeTabletMetadata(bool includeMetadata)
+        {
+            _includeTabletMetadata = includeMetadata;
             return this;
         }
 
@@ -69,37 +95,116 @@ namespace Knet.Kudu.Client
                 }
             }
 
-            var proto = new ScanTokenPB
-            {
-                TableId = Table.TableId,
-                TableName = Table.TableName
-            };
+            var proto = new ScanTokenPB();
 
-            // Map the column names or indices to actual columns in the table schema.
-            // If the user did not set either projection, then scan all columns.
-            var schema = Table.Schema;
-            if (ProjectedColumnNames != null)
+            if (_includeTableMetadata)
             {
-                foreach (var columnName in ProjectedColumnNames)
+                // Set the table metadata so that a call to the master is not needed when
+                // deserializing the token into a scanner.
+                var tableMetadataPb = new TableMetadataPB
                 {
-                    int columnIndex = schema.GetColumnIndex(columnName);
-                    var columnSchema = Table.SchemaPb.Schema.Columns[columnIndex];
+                    TableId = Table.TableId,
+                    TableName = Table.TableName,
+                    NumReplicas = Table.NumReplicas,
+                    Schema = Table.SchemaPb.Schema,
+                    PartitionSchema = Table.SchemaPb.PartitionSchema
+                };
 
-                    proto.ProjectedColumns.Add(columnSchema);
+                if (Table.Owner is not null)
+                {
+                    tableMetadataPb.Owner = Table.Owner;
                 }
-            }
-            else if (ProjectedColumnIndexes != null)
-            {
-                foreach (var columnIndex in ProjectedColumnIndexes)
-                {
-                    var columnSchema = Table.SchemaPb.Schema.Columns[columnIndex];
 
-                    proto.ProjectedColumns.Add(columnSchema);
+                // TODO: Set table comment
+
+                if (Table.ExtraConfig.Count > 0)
+                {
+                    foreach (var (key, value) in Table.ExtraConfig)
+                    {
+                        tableMetadataPb.ExtraConfigs.Add(key, value);
+                    }
+                }
+
+                proto.TableMetadata = tableMetadataPb;
+
+                // Only include the authz token if the table metadata is included.
+                // It is returned in the required GetTableSchema request otherwise.
+                var authzToken = Client.GetAuthzToken(Table.TableId);
+                if (authzToken is not null)
+                {
+                    proto.AuthzToken = authzToken;
                 }
             }
             else
             {
-                proto.ProjectedColumns.AddRange(Table.SchemaPb.Schema.Columns);
+                // If we add the table metadata, we don't need to set the old table id
+                // and table name. It is expected that the creation and use of a scan token
+                // will be on the same or compatible versions.
+                proto.TableId = Table.TableId;
+                proto.TableName = Table.TableName;
+            }
+
+            // Map the column names or indices to actual columns in the table schema.
+            // If the user did not set either projection, then scan all columns.
+            var schema = Table.Schema;
+            if (_includeTableMetadata)
+            {
+                // If the table metadata is included, then the column indexes can be
+                // used instead of duplicating the ColumnSchemaPBs in the serialized
+                // scan token.
+                if (ProjectedColumnNames is not null)
+                {
+                    proto.ProjectedColumnIdx.Capacity = ProjectedColumnNames.Count;
+
+                    foreach (var columnName in ProjectedColumnNames)
+                    {
+                        var columnIndex = schema.GetColumnIndex(columnName);
+                        proto.ProjectedColumnIdx.Add(columnIndex);
+                    }
+                }
+                else if (ProjectedColumnIndexes is not null)
+                {
+                    proto.ProjectedColumnIdx.AddRange(ProjectedColumnIndexes);
+                }
+                else
+                {
+                    var numColumns = schema.Columns.Count;
+                    proto.ProjectedColumnIdx.Capacity = numColumns;
+
+                    for (int i = 0; i < numColumns; i++)
+                    {
+                        proto.ProjectedColumnIdx.Add(i);
+                    }
+                }
+            }
+            else
+            {
+                if (ProjectedColumnNames is not null)
+                {
+                    proto.ProjectedColumns.Capacity = ProjectedColumnNames.Count;
+
+                    foreach (var columnName in ProjectedColumnNames)
+                    {
+                        int columnIndex = schema.GetColumnIndex(columnName);
+                        var columnSchema = Table.SchemaPb.Schema.Columns[columnIndex];
+
+                        proto.ProjectedColumns.Add(columnSchema);
+                    }
+                }
+                else if (ProjectedColumnIndexes is not null)
+                {
+                    proto.ProjectedColumns.Capacity = ProjectedColumnIndexes.Count;
+
+                    foreach (var columnIndex in ProjectedColumnIndexes)
+                    {
+                        var columnSchema = Table.SchemaPb.Schema.Columns[columnIndex];
+                        proto.ProjectedColumns.Add(columnSchema);
+                    }
+                }
+                else
+                {
+                    proto.ProjectedColumns.AddRange(Table.SchemaPb.Schema.Columns);
+                }
             }
 
             foreach (var predicate in Predicates.Values)
@@ -137,8 +242,8 @@ namespace Knet.Kudu.Client
                 }
             }
 
-            proto.CacheBlocks = (CacheBlocks);
-            proto.FaultTolerant = (IsFaultTolerant);
+            proto.CacheBlocks = CacheBlocks;
+            proto.FaultTolerant = IsFaultTolerant;
             proto.BatchSizeBytes = (uint)(BatchSizeBytes ?? schema.GetScannerBatchSizeEstimate());
             // TODO:
             //proto.setScanRequestTimeoutMs(scanRequestTimeout);
@@ -167,8 +272,8 @@ namespace Knet.Kudu.Client
                     UpperBoundPrimaryKey,
                     partitionRange.Lower.Length == 0 ? null : partitionRange.Lower,
                     partitionRange.Upper.Length == 0 ? null : partitionRange.Upper,
-                    FetchTabletsPerRangeLookup,
-                    SplitSizeBytes,
+                    _fetchTabletsPerRangeLookup,
+                    _splitSizeBytes,
                     cancellationToken).ConfigureAwait(false);
 
                 if (newKeyRanges.Count == 0)
@@ -194,14 +299,58 @@ namespace Knet.Kudu.Client
                 token.UpperBoundPartitionKey = UnsafeByteOperations.UnsafeWrap(keyRange.PartitionKeyEnd);
 
                 var primaryKeyStart = keyRange.PrimaryKeyStart;
-
                 if (primaryKeyStart.Length > 0)
                     token.LowerBoundPrimaryKey = UnsafeByteOperations.UnsafeWrap(primaryKeyStart);
 
                 var primaryKeyEnd = keyRange.PrimaryKeyEnd;
-
                 if (primaryKeyEnd.Length > 0)
                     token.UpperBoundPrimaryKey = UnsafeByteOperations.UnsafeWrap(primaryKeyEnd);
+
+                var tablet = keyRange.Tablet;
+
+                // Set the tablet metadata so that a call to the master is not needed to
+                // locate the tablet to scan when opening the scanner.
+                if (_includeTabletMetadata)
+                {
+                    // Build the list of server and replica metadata.
+                    var tabletServers = tablet.Servers;
+                    var replicas = tablet.Replicas;
+                    var numTabletServers = tabletServers.Count;
+
+                    var tabletMetadataPb = new TabletMetadataPB
+                    {
+                        TabletId = tablet.TabletId,
+                        Partition = ProtobufHelper.ToPartitionPb(tablet.Partition),
+                        TtlMillis = 1000 * 60 // TODO: Set this from the cache.
+                    };
+
+                    tabletMetadataPb.TabletServers.Capacity = numTabletServers;
+                    tabletMetadataPb.Replicas.Capacity = numTabletServers;
+
+                    for (int i = 0; i < numTabletServers; i++)
+                    {
+                        var serverInfo = tabletServers[i];
+                        var replica = replicas[i];
+                        var serverMetadataPb = ProtobufHelper.ToServerMetadataPb(serverInfo);
+
+                        tabletMetadataPb.TabletServers.Add(serverMetadataPb);
+
+                        var replicaMetadataPb = new ReplicaMetadataPB
+                        {
+                            TsIdx = (uint)i,
+                            Role = (RaftPeerPB.Types.Role)replica.Role
+                        };
+
+                        if (replica.DimensionLabel is not null)
+                        {
+                            replicaMetadataPb.DimensionLabel = replica.DimensionLabel;
+                        }
+
+                        tabletMetadataPb.Replicas.Add(replicaMetadataPb);
+                    }
+
+                    proto.TabletMetadata = tabletMetadataPb;
+                }
 
                 tokens.Add(new KuduScanToken(keyRange, token));
             }
