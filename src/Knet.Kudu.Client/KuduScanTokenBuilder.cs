@@ -119,9 +119,9 @@ namespace Knet.Kudu.Client
 
                 if (Table.ExtraConfig.Count > 0)
                 {
-                    foreach (var (key, value) in Table.ExtraConfig)
+                    foreach (var kvp in Table.ExtraConfig)
                     {
-                        tableMetadataPb.ExtraConfigs.Add(key, value);
+                        tableMetadataPb.ExtraConfigs.Add(kvp.Key, kvp.Value);
                     }
                 }
 
