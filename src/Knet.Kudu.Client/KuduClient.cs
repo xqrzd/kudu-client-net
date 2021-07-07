@@ -415,14 +415,11 @@ namespace Knet.Kudu.Client
         /// </summary>
         /// <param name="tableName">The table to open.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
-        public async Task<KuduTable> OpenTableAsync(
+        public Task<KuduTable> OpenTableAsync(
             string tableName, CancellationToken cancellationToken = default)
         {
             var tableIdentifier = new TableIdentifierPB { TableName = tableName };
-            var response = await GetTableSchemaAsync(tableIdentifier, cancellationToken)
-                .ConfigureAwait(false);
-
-            return new KuduTable(response);
+            return OpenTableAsync(tableIdentifier);
         }
 
         public async Task<WriteResponse> WriteAsync(
