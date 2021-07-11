@@ -281,9 +281,8 @@ namespace Knet.Kudu.Client.FunctionalTests
             foreach (var token in tokens)
             {
                 var existingCount = rows.Count;
-                var scanner = _client.NewScanBuilder(builder.Table)
-                    .ApplyScanToken(token)
-                    .Build();
+                var scanBuilder = await _client.NewScanBuilderFromTokenAsync(token);
+                var scanner = scanBuilder.Build();
 
                 var newRows = await CollectRowsAsync(scanner);
                 foreach (var row in newRows)

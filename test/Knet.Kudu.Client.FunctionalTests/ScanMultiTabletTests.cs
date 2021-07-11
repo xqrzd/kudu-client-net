@@ -268,9 +268,8 @@ namespace Knet.Kudu.Client.FunctionalTests
 
                 // Deserialize the scan token into a scanner, and make sure it is using
                 // 'CLOSEST_REPLICA' selection policy.
-                var scanner = _client.NewScanBuilder(_table)
-                    .ApplyScanToken(serializedToken)
-                    .Build();
+                var scanBuilder = await _client.NewScanBuilderFromTokenAsync(serializedToken);
+                var scanner = scanBuilder.Build();
 
                 Assert.Equal(ReplicaSelection.ClosestReplica, scanner.ReplicaSelection);
                 totalRows += await ClientTestUtil.CountRowsInScanAsync(scanner);
@@ -472,9 +471,8 @@ namespace Knet.Kudu.Client.FunctionalTests
             // timestamp is updated accordingly.
             Assert.Equal(tsPrev, _client.LastPropagatedTimestamp);
 
-            var tokenScanner = _client.NewScanBuilder(_table)
-                .ApplyScanToken(serializedToken)
-                .Build();
+            var scanBuilder = await _client.NewScanBuilderFromTokenAsync(serializedToken);
+            var tokenScanner = scanBuilder.Build();
 
             Assert.Equal(tsPropagated, _client.LastPropagatedTimestamp);
         }
@@ -491,9 +489,8 @@ namespace Knet.Kudu.Client.FunctionalTests
             // Deserialize scan tokens and make sure the read mode is updated accordingly.
             foreach (var token in tokens)
             {
-                var scanner = _client.NewScanBuilder(_table)
-                    .ApplyScanToken(token)
-                    .Build();
+                var scanBuilder = await _client.NewScanBuilderFromTokenAsync(token);
+                var scanner = scanBuilder.Build();
 
                 Assert.Equal(ReadMode.ReadYourWrites, scanner.ReadMode);
             }

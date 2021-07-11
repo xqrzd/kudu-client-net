@@ -133,6 +133,14 @@ namespace Knet.Kudu.Client.Util
             return result;
         }
 
+        public static Partition ToPartition(PartitionPB partition)
+        {
+            return new Partition(
+                partition.PartitionKeyStart.ToByteArray(),
+                partition.PartitionKeyEnd.ToByteArray(),
+                partition.HashBuckets.ToArray());
+        }
+
         public static PartitionPB ToPartitionPb(Partition partition)
         {
             var partitionPb = new PartitionPB

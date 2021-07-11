@@ -10,6 +10,7 @@ using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Logging;
 using Knet.Kudu.Client.Protobuf;
+using Knet.Kudu.Client.Protobuf.Client;
 using Knet.Kudu.Client.Protobuf.Consensus;
 using Knet.Kudu.Client.Protobuf.Master;
 using Knet.Kudu.Client.Protobuf.Rpc;
@@ -545,12 +546,103 @@ namespace Knet.Kudu.Client
 
         public KuduScannerBuilder<ResultSet> NewScanBuilder(KuduTable table)
         {
-            return new KuduScannerBuilder<ResultSet>(this, table, _scanLogger);
+            return NewScanBuilder<ResultSet>(table);
         }
 
         public KuduScannerBuilder<T> NewScanBuilder<T>(KuduTable table)
         {
             return new KuduScannerBuilder<T>(this, table, _scanLogger);
+        }
+
+        public ValueTask<KuduScannerBuilder<ResultSet>> NewScanBuilderFromTokenAsync(
+            ReadOnlyMemory<byte> scanToken, CancellationToken cancellationToken = default)
+        {
+            return NewScanBuilderFromTokenAsync<ResultSet>(scanToken, cancellationToken);
+        }
+
+        public ValueTask<KuduScannerBuilder<ResultSet>> NewScanBuilderFromTokenAsync(
+            KuduScanToken scanToken, CancellationToken cancellationToken = default)
+        {
+            return NewScanBuilderFromTokenAsync<ResultSet>(scanToken, cancellationToken);
+        }
+
+        public ValueTask<KuduScannerBuilder<T>> NewScanBuilderFromTokenAsync<T>(
+            ReadOnlyMemory<byte> scanToken, CancellationToken cancellationToken = default)
+        {
+            var scanTokenPb = KuduScanToken.DeserializePb(scanToken.Span);
+            return NewScanBuilderFromTokenAsync<T>(scanTokenPb, cancellationToken);
+        }
+
+        public ValueTask<KuduScannerBuilder<T>> NewScanBuilderFromTokenAsync<T>(
+            KuduScanToken scanToken, CancellationToken cancellationToken = default)
+        {
+            return NewScanBuilderFromTokenAsync<T>(scanToken.Message, cancellationToken);
+        }
+
+        private async ValueTask<KuduScannerBuilder<T>> NewScanBuilderFromTokenAsync<T>(
+            ScanTokenPB scanTokenPb, CancellationToken cancellationToken)
+        {
+            var table = await OpenTableAsync(scanTokenPb, cancellationToken).ConfigureAwait(false);
+            var scanBuilder = NewScanBuilder<T>(table);
+            KuduScanToken.PbIntoScanner(scanBuilder, scanTokenPb);
+
+            // Prime the client tablet location cache if no entry is already present.
+            var tableId = table.TableId;
+            var tabletMetadata = scanTokenPb.TabletMetadata;
+            if (tabletMetadata is not null &&
+                GetTableLocationEntry(
+                    tableId,
+                    tabletMetadata.Partition.PartitionKeyStart.Memory.Span) is null)
+            {
+                var tableLocationsCache = GetTableLocationsCache(tableId);
+                var replicas = new List<KuduReplica>(tabletMetadata.Replicas.Count);
+                var servers = new List<ServerInfo>(tabletMetadata.TabletServers.Count);
+                int leaderIndex = -1;
+
+                foreach (var replicaPb in tabletMetadata.Replicas)
+                {
+                    var serverPb = tabletMetadata.TabletServers[(int)replicaPb.TsIdx];
+                    var hostPort = serverPb.RpcAddresses[0].ToHostAndPort();
+                    var role = (ReplicaRole)replicaPb.Role;
+                    var replica = new KuduReplica(hostPort, role, replicaPb.DimensionLabel);
+
+                    if (role == ReplicaRole.Leader)
+                    {
+                        leaderIndex = replicas.Count;
+                    }
+
+                    replicas.Add(replica);
+                }
+
+                foreach (var serverPb in tabletMetadata.TabletServers)
+                {
+                    var hostPort = serverPb.RpcAddresses[0].ToHostAndPort();
+                    var serverInfo = await _connectionFactory.GetTabletServerInfoAsync(
+                        hostPort,
+                        serverPb.Uuid.ToStringUtf8(),
+                        serverPb.Location,
+                        cancellationToken).ConfigureAwait(false);
+
+                    servers.Add(serverInfo);
+                }
+
+                var partition = ProtobufHelper.ToPartition(tabletMetadata.Partition);
+                var cache = new ServerInfoCache(servers, replicas, leaderIndex);
+                var tablet = new RemoteTablet(tableId, tabletMetadata.TabletId, partition, cache);
+
+                tableLocationsCache.CacheTabletLocations(
+                    new List<RemoteTablet> { tablet },
+                    partition.PartitionKeyStart,
+                    1,
+                    (long)tabletMetadata.TtlMillis);
+            }
+
+            if (scanTokenPb.AuthzToken is not null)
+            {
+                _authzTokenCache.SetAuthzToken(table.TableId, scanTokenPb.AuthzToken);
+            }
+
+            return scanBuilder;
         }
 
         public KuduScanTokenBuilder NewScanTokenBuilder(KuduTable table)
@@ -602,6 +694,60 @@ namespace Knet.Kudu.Client
                 .ConfigureAwait(false);
 
             return new KuduTable(response);
+        }
+
+        private ValueTask<KuduTable> OpenTableAsync(
+            ScanTokenPB scanTokenPb, CancellationToken cancellationToken)
+        {
+            // Use the table metadata from the scan token if it exists,
+            // otherwise call OpenTable to get the metadata from the master.
+            var tableMetadata = scanTokenPb.TableMetadata;
+
+            if (tableMetadata is not null)
+            {
+                // TODO: This isn't the right type to pass to KuduTable.
+                var schemaPb = new GetTableSchemaResponsePB
+                {
+                    TableId = ByteString.CopyFromUtf8(tableMetadata.TableId),
+                    TableName = tableMetadata.TableName,
+                    NumReplicas = tableMetadata.NumReplicas,
+                    Schema = tableMetadata.Schema,
+                    PartitionSchema = tableMetadata.PartitionSchema
+                };
+
+                if (tableMetadata.HasOwner)
+                {
+                    schemaPb.Owner = tableMetadata.Owner;
+                }
+
+                if (tableMetadata.HasComment)
+                {
+                    schemaPb.Comment = tableMetadata.Comment;
+                }
+
+                if (tableMetadata.ExtraConfigs.Count > 0)
+                {
+                    schemaPb.ExtraConfigs.Add(tableMetadata.ExtraConfigs);
+                }
+
+                var table = new KuduTable(schemaPb);
+                return new ValueTask<KuduTable>(table);
+            }
+            else if (scanTokenPb.HasTableId)
+            {
+                var tableIdentifier = new TableIdentifierPB
+                {
+                    TableId = ByteString.CopyFromUtf8(scanTokenPb.TableId)
+                };
+
+                var task = OpenTableAsync(tableIdentifier, cancellationToken);
+                return new ValueTask<KuduTable>(task);
+            }
+            else
+            {
+                var task = OpenTableAsync(scanTokenPb.TableName, cancellationToken);
+                return new ValueTask<KuduTable>(task);
+            }
         }
 
         private Task<GetTableSchemaResponsePB> GetTableSchemaAsync(

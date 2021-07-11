@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
 using Knet.Kudu.Client.FunctionalTests.Util;
 using McMaster.Extensions.Xunit;
@@ -147,20 +148,26 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             var table = await _client.CreateTableAsync(builder);
 
-            List<KuduScanToken> tokens = await _client.NewScanTokenBuilder(table)
-                .BuildAsync();
+            var tokenBuilder = _client.NewScanTokenBuilder(table);
+            var tokens = await tokenBuilder.IncludeTableMetadata(false).BuildAsync();
+            var tokensWithMetadata = await tokenBuilder.IncludeTableMetadata(true).BuildAsync();
             var token = Assert.Single(tokens);
+            var tokenWithMetadata = Assert.Single(tokensWithMetadata);
 
             // Drop a column
             await _client.AlterTableAsync(new AlterTableBuilder(table)
                 .DropColumn("a"));
 
-            table = await _client.OpenTableAsync(_tableName);
+            await Assert.ThrowsAsync<KeyNotFoundException>(
+                async () => await _client.NewScanBuilderFromTokenAsync(token));
 
-            Assert.Throws<KeyNotFoundException>(() =>
+            var exception = await Assert.ThrowsAsync<NonRecoverableException>(async () =>
             {
-                _client.NewScanBuilder(table).ApplyScanToken(token);
+                var scanBuilder = await _client.NewScanBuilderFromTokenAsync(tokenWithMetadata);
+                await ClientTestUtil.CountRowsInScanAsync(scanBuilder.Build());
             });
+
+            Assert.Contains("Some columns are not present in the current schema: a", exception.Message);
 
             // Add a column with the same name, type, and nullability. It will have a
             // different id-- it's a  different column-- so the scan token will fail.
@@ -169,10 +176,73 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             table = await _client.OpenTableAsync(_tableName);
 
-            Assert.Throws<KeyNotFoundException>(() =>
-            {
-                _client.NewScanBuilder(table).ApplyScanToken(token);
-            });
+            await Assert.ThrowsAsync<KeyNotFoundException>(
+                async () => await _client.NewScanBuilderFromTokenAsync(token));
+        }
+
+        /// <summary>
+        /// Tests that it is possible to create a scan token, rename a column, and
+        /// rehydrate a scanner from the scan token with the old column name.
+        /// </summary>
+        [SkippableFact]
+        public async Task TestScanTokensConcurrentColumnRename()
+        {
+            var builder = ClientTestUtil.GetBasicSchema()
+                .SetTableName(_tableName)
+                .SetNumReplicas(1);
+
+            var oldColName = "column1_i";
+
+            var table = await _client.CreateTableAsync(builder);
+
+            var tokens = await _client.NewScanTokenBuilder(table)
+                // TODO(KUDU-3146): Disable including the table metadata so the new column
+                // name is retrieved when deserializing the scanner.
+                .IncludeTableMetadata(false)
+                .BuildAsync();
+
+            var token = Assert.Single(tokens);
+
+            // Rename a column.
+            var newColName = "new-name";
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .RenameColumn(oldColName, newColName));
+
+            var scanBuilder = await _client.NewScanBuilderFromTokenAsync(token);
+            var scanner = scanBuilder.Build();
+
+            // TODO(KUDU-3146): Handle renaming a column between when the token
+            // is rehydrated as a scanner and when the scanner first hits a replica.
+            // Note that this is almost certainly a very short period of vulnerability.
+
+            Assert.Equal(0, await ClientTestUtil.CountRowsInScanAsync(scanner));
+
+            // TODO: Test that the old name cannot be used and the new name can be.
+        }
+
+        /// <summary>
+        /// Tests that it is possible to rehydrate a scan token after a table rename.
+        /// </summary>
+        [SkippableFact]
+        public async Task TestScanTokensWithTableRename()
+        {
+            var builder = ClientTestUtil.GetBasicSchema()
+                .SetTableName(_tableName)
+                .SetNumReplicas(1);
+
+            var table = await _client.CreateTableAsync(builder);
+
+            var tokens = await _client.NewScanTokenBuilder(table).BuildAsync();
+            var token = Assert.Single(tokens);
+
+            // Rename the table.
+            await _client.AlterTableAsync(new AlterTableBuilder(table)
+                .RenameTable($"{_tableName}-renamed"));
+
+            var scanBuilder = await _client.NewScanBuilderFromTokenAsync(token);
+            var scanner = scanBuilder.Build();
+
+            Assert.Equal(0, await ClientTestUtil.CountRowsInScanAsync(scanner));
         }
 
         /// <summary>
@@ -231,9 +301,8 @@ namespace Knet.Kudu.Client.FunctionalTests
             var scanners = new List<KuduScanner<ResultSet>>();
             foreach (var token in tokens)
             {
-                var scanner = _client.NewScanBuilder(table)
-                    .ApplyScanToken(token)
-                    .Build();
+                var scanBuilder = await _client.NewScanBuilderFromTokenAsync(token);
+                var scanner = scanBuilder.Build();
 
                 scanners.Add(scanner);
             }
@@ -282,14 +351,16 @@ namespace Knet.Kudu.Client.FunctionalTests
             // to exclude the last row inserted in the first group of ops, and increment the
             // end timestamp to include the last row deleted in the second group of ops.
             List<KuduScanToken> tokens = await _client.NewScanTokenBuilder(table)
+                // TODO(KUDU-3146): Disable including the table metadata so the new column
+                // name is retrieved when deserializing the scanner.
+                .IncludeTableMetadata(false)
                 .DiffScan(timestamp + 1, _client.LastPropagatedTimestamp + 1)
                 .BuildAsync();
 
             var token = Assert.Single(tokens);
 
-            var scanner = _client.NewScanBuilder(table)
-                .ApplyScanToken(token)
-                .Build();
+            var scanBuilder = await _client.NewScanBuilderFromTokenAsync(token);
+            var scanner = scanBuilder.Build();
 
             await CheckDiffScanResultsAsync(scanner, 3 * numRows / 4, numRows / 4);
         }
@@ -314,6 +385,9 @@ namespace Knet.Kudu.Client.FunctionalTests
             // to exclude the last row inserted in the first group of ops, and increment the
             // end timestamp to include the last row deleted in the second group of ops.
             List<KuduScanToken> tokens = await _client.NewScanTokenBuilder(table)
+                // TODO(KUDU-3146): Disable including the table metadata so the new column
+                // name is retrieved when deserializing the scanner.
+                .IncludeTableMetadata(false)
                 .DiffScan(timestamp + 1, _client.LastPropagatedTimestamp + 1)
                 .BuildAsync();
 
@@ -326,11 +400,105 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             table = await _client.OpenTableAsync(_tableName);
 
-            var scanner = _client.NewScanBuilder(table)
-                .ApplyScanToken(token)
-                .Build();
+            var scanBuilder = await _client.NewScanBuilderFromTokenAsync(token);
+            var scanner = scanBuilder.Build();
 
             await CheckDiffScanResultsAsync(scanner, 3 * numRows / 4, numRows / 4);
+        }
+
+        [SkippableFact]
+        public async Task TestScanTokenSize()
+        {
+            var builder = new TableBuilder(_tableName)
+                .AddColumn("key", KuduType.Int8, opt => opt.Key(true))
+                .SetNumReplicas(1);
+
+            for (int i = 0; i < 100; i++)
+            {
+                builder.AddColumn($"int64-{i}", KuduType.Int64);
+            }
+
+            var table = await _client.CreateTableAsync(builder);
+
+            var tokenBuilder = _client.NewScanTokenBuilder(table);
+            var tokens = await tokenBuilder
+                .IncludeTabletMetadata(false)
+                .IncludeTableMetadata(false)
+                .BuildAsync();
+            var token = Assert.Single(tokens);
+            var tokenBytes = token.Serialize();
+
+            var tokensWithTabletMetadata = await tokenBuilder
+                .IncludeTabletMetadata(true)
+                .IncludeTableMetadata(false)
+                .BuildAsync();
+            var tokenWithTabletMetadata = Assert.Single(tokensWithTabletMetadata);
+            var tokenWithTabletMetadataBytes = tokenWithTabletMetadata.Serialize();
+
+            var tokensWithTableMetadata = await tokenBuilder
+                .IncludeTabletMetadata(false)
+                .IncludeTableMetadata(true)
+                .BuildAsync();
+            var tokenWithTableMetadata = Assert.Single(tokensWithTableMetadata);
+            var tokenWithTableMetadataBytes = tokenWithTableMetadata.Serialize();
+
+            var tokensWithAllMetadata = await tokenBuilder
+                .IncludeTabletMetadata(true)
+                .IncludeTableMetadata(true)
+                .BuildAsync();
+            var tokenWithAllMetadata = Assert.Single(tokensWithAllMetadata);
+            var tokenWithAllMetadataBytes = tokenWithAllMetadata.Serialize();
+
+            Assert.True(tokenWithAllMetadataBytes.Length > tokenWithTableMetadataBytes.Length);
+            Assert.True(tokenWithTableMetadataBytes.Length > tokenWithTabletMetadataBytes.Length);
+            Assert.True(tokenWithTabletMetadataBytes.Length > tokenBytes.Length);
+        }
+
+        [SkippableFact]
+        public async Task TestScanTokensWithExtraPredicate()
+        {
+            int numRows = 100;
+            int predicateIndex = 0;
+            int predicateValue = 1;
+
+            var builder = ClientTestUtil.GetBasicSchema()
+                .SetTableName(_tableName)
+                .CreateBasicRangePartition();
+
+            var table = await _client.CreateTableAsync(builder);
+            await ClientTestUtil.LoadDefaultTableAsync(_client, table, numRows);
+
+            var tokens = await _client.NewScanTokenBuilder(table).BuildAsync();
+
+            var columnSchema = table.Schema.GetColumn(predicateIndex);
+            var predicate = KuduPredicate.NewComparisonPredicate(
+                columnSchema, ComparisonOp.Equal, predicateValue);
+
+            var resultKeys = new List<int>();
+
+            foreach (var token in tokens)
+            {
+                byte[] serialized = token.Serialize();
+                var scanBuilder = await _client.NewScanBuilderFromTokenAsync(serialized);
+                var scanner = scanBuilder
+                    .AddPredicate(predicate)
+                    .Build();
+
+                await foreach (var resultSet in scanner)
+                {
+                    AccumulateResults(resultSet);
+
+                    void AccumulateResults(ResultSet rows)
+                    {
+                        foreach (var row in rows)
+                        {
+                            resultKeys.Add(row.GetInt32(predicateIndex));
+                        }
+                    }
+                }
+            }
+
+            Assert.Collection(resultKeys, key => Assert.Equal(predicateValue, key));
         }
 
         private async Task<long> SetupTableForDiffScansAsync(KuduTable table, int numRows)
@@ -406,9 +574,8 @@ namespace Knet.Kudu.Client.FunctionalTests
                     var count = 0;
                     var tokenBytes = token.Serialize();
 
-                    var scanner = client.NewScanBuilder(table)
-                        .ApplyScanToken(tokenBytes)
-                        .Build();
+                    var scanBuilder = await client.NewScanBuilderFromTokenAsync(tokenBytes);
+                    var scanner = scanBuilder.Build();
 
                     await foreach (var resultSet in scanner)
                     {

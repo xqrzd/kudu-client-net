@@ -49,10 +49,7 @@ namespace Knet.Kudu.Client.Connection
             foreach (var tabletInfo in locations.TabletLocations)
             {
                 var tabletId = tabletInfo.TabletId.ToStringUtf8();
-                var partition = new Partition(
-                    tabletInfo.Partition.PartitionKeyStart.ToByteArray(),
-                    tabletInfo.Partition.PartitionKeyEnd.ToByteArray(),
-                    tabletInfo.Partition.HashBuckets.ToArray());
+                var partition = ProtobufHelper.ToPartition(tabletInfo.Partition);
 
                 var numReplicas = Math.Max(
                     tabletInfo.DEPRECATEDReplicas.Count,

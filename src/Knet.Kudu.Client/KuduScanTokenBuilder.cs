@@ -349,7 +349,7 @@ namespace Knet.Kudu.Client
                         tabletMetadataPb.Replicas.Add(replicaMetadataPb);
                     }
 
-                    proto.TabletMetadata = tabletMetadataPb;
+                    token.TabletMetadata = tabletMetadataPb;
                 }
 
                 tokens.Add(new KuduScanToken(keyRange, token));
