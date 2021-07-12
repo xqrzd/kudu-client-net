@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -305,22 +304,13 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
 
         private Task<ControlShellResponsePB> SendRequestToClusterAsync(ControlShellRequestPB req)
         {
-            var writer = new ArrayBufferWriter<byte>();
-            req.WriteTo(writer);
-            var messageLength = writer.WrittenCount;
+            var messageSize = req.CalculateSize();
+            var buffer = new byte[messageSize + 4];
 
-            var finalWriter = new ArrayBufferWriter<byte>();
-            var lengthSpan = finalWriter.GetSpan(4);
-            BinaryPrimitives.WriteInt32BigEndian(lengthSpan, messageLength);
-            finalWriter.Advance(4);
+            BinaryPrimitives.WriteInt32BigEndian(buffer, messageSize);
+            req.WriteTo(buffer.AsSpan(4));
 
-            var span = finalWriter.GetSpan(messageLength);
-            writer.WrittenSpan.CopyTo(span);
-            finalWriter.Advance(messageLength);
-
-            var request = finalWriter.WrittenMemory;
-
-            return SendReceiveAsync(request);
+            return SendReceiveAsync(buffer);
         }
 
         private async Task<ControlShellResponsePB> SendReceiveAsync(ReadOnlyMemory<byte> request)
@@ -334,15 +324,14 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
 
                 var buffer = new byte[4];
                 await ReadExactAsync(buffer);
-                var messageLength = BinaryPrimitives.ReadInt32BigEndian(buffer);
+                var messageSize = BinaryPrimitives.ReadInt32BigEndian(buffer);
 
-                buffer = new byte[messageLength];
+                buffer = new byte[messageSize];
                 await ReadExactAsync(buffer);
 
-                var ms = new MemoryStream(buffer);
-                var response = ControlShellResponsePB.Parser.ParseFrom(ms);
+                var response = ControlShellResponsePB.Parser.ParseFrom(buffer);
 
-                if (response.Error != null)
+                if (response.Error is not null)
                     throw new IOException(response.Error.Message);
 
                 return response;
