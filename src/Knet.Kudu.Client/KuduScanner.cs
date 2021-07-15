@@ -76,6 +76,11 @@ namespace Knet.Kudu.Client
             byte[] lowerBoundPartitionKey,
             byte[] upperBoundPartitionKey)
         {
+            if (limit <= 0)
+            {
+                throw new ArgumentException($"Need a strictly positive number for the limit, got {limit}");
+            }
+
             if (htTimestamp != KuduClient.NoTimestamp)
             {
                 if (htTimestamp < 0)
