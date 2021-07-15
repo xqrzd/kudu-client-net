@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using Google.Protobuf;
 using Knet.Kudu.Client.Protobuf;
 using Knet.Kudu.Client.Scanner;
 using Knet.Kudu.Client.Util;
@@ -11,9 +10,6 @@ namespace Knet.Kudu.Client
 {
     public class KuduScanner<T> : IAsyncEnumerable<T>
     {
-        private static readonly ByteString _defaultDeletedColumnValue =
-            UnsafeByteOperations.UnsafeWrap(new byte[] { 0 });
-
         private readonly ILogger _logger;
         private readonly KuduClient _client;
         private readonly KuduTable _table;
@@ -132,51 +128,16 @@ namespace Knet.Kudu.Client
             _lowerBoundPartitionKey = lowerBoundPartitionKey;
             _upperBoundPartitionKey = upperBoundPartitionKey;
 
-            // Map the column names to actual columns in the table schema.
-            // If the user set this to 'null', we scan all columns.
-            _projectedColumnsPb = new List<ColumnSchemaPB>();
-            var columns = new List<ColumnSchema>();
-            if (projectedColumnNames != null)
-            {
-                foreach (string columnName in projectedColumnNames)
-                {
-                    ColumnSchema originalColumn = table.Schema.GetColumn(columnName);
-                    _projectedColumnsPb.Add(ToColumnSchemaPb(originalColumn));
-                    columns.Add(originalColumn);
-                }
-            }
-            else if (projectedColumnIndexes != null)
-            {
-                foreach (int columnIndex in projectedColumnIndexes)
-                {
-                    ColumnSchema originalColumn = table.Schema.GetColumn(columnIndex);
-                    _projectedColumnsPb.Add(ToColumnSchemaPb(originalColumn));
-                    columns.Add(originalColumn);
-                }
-            }
-            else
-            {
-                foreach (ColumnSchema columnSchema in table.Schema.Columns)
-                {
-                    _projectedColumnsPb.Add(ToColumnSchemaPb(columnSchema));
-                    columns.Add(columnSchema);
-                }
-            }
+            // Add the IS_DELETED column for diff scans.
+            bool includeDeletedColumn = startTimestamp != KuduClient.NoTimestamp;
 
-            int isDeletedIndex = -1;
+            ProjectionSchema = GenerateProjectionSchema(
+                table.Schema,
+                projectedColumnNames,
+                projectedColumnIndexes,
+                includeDeletedColumn);
 
-            // This is a diff scan so add the IS_DELETED column.
-            if (startTimestamp != KuduClient.NoTimestamp)
-            {
-                var deletedColumn = GenerateIsDeletedColumn(table.Schema);
-                _projectedColumnsPb.Add(deletedColumn);
-
-                var delColumn = new ColumnSchema(deletedColumn.Name, KuduType.Bool);
-                columns.Add(delColumn);
-                isDeletedIndex = columns.Count - 1;
-            }
-
-            ProjectionSchema = new KuduSchema(columns, isDeletedIndex);
+            _projectedColumnsPb = ToColumnSchemaPbs(ProjectionSchema);
             BatchSizeBytes = batchSizeBytes ?? ProjectionSchema.GetScannerBatchSizeEstimate();
         }
 
@@ -226,18 +187,94 @@ namespace Knet.Kudu.Client
             return GetAsyncEnumerator(cancellationToken);
         }
 
-        private static ColumnSchemaPB ToColumnSchemaPb(ColumnSchema columnSchema)
+        private static KuduSchema GenerateProjectionSchema(
+            KuduSchema schema,
+            List<string> projectedColumnNames,
+            List<int> projectedColumnIndexes,
+            bool includeDeletedColumn)
         {
-            return new ColumnSchemaPB
+            var numColumns = projectedColumnNames?.Count
+                ?? projectedColumnIndexes?.Count
+                ?? schema.Columns.Count;
+
+            if (includeDeletedColumn)
+                numColumns++;
+
+            // Map the column names to actual columns in the table schema.
+            // If the user set this to 'null', we scan all columns.
+            var columns = new List<ColumnSchema>(numColumns);
+            if (projectedColumnNames is not null)
+            {
+                foreach (string columnName in projectedColumnNames)
+                {
+                    var columnSchema = schema.GetColumn(columnName);
+                    columns.Add(columnSchema);
+                }
+            }
+            else if (projectedColumnIndexes is not null)
+            {
+                foreach (int columnIndex in projectedColumnIndexes)
+                {
+                    var columnSchema = schema.GetColumn(columnIndex);
+                    columns.Add(columnSchema);
+                }
+            }
+            else
+            {
+                columns.AddRange(schema.Columns);
+            }
+
+            int isDeletedIndex = -1;
+            if (includeDeletedColumn)
+            {
+                var deletedColumn = GenerateIsDeletedColumn(schema);
+                columns.Add(deletedColumn);
+                isDeletedIndex = columns.Count - 1;
+            }
+
+            return new KuduSchema(columns, isDeletedIndex);
+        }
+
+        private static List<ColumnSchemaPB> ToColumnSchemaPbs(KuduSchema schema)
+        {
+            var columnSchemas = schema.Columns;
+            var deletedColumn = schema.HasIsDeleted
+                ? schema.GetColumn(schema.IsDeletedIndex)
+                : null;
+
+            var columnSchemaPbs = new List<ColumnSchemaPB>(columnSchemas.Count);
+
+            foreach (var columnSchema in columnSchemas)
+            {
+                var isDeleted = columnSchema == deletedColumn;
+                var columnSchemaPb = ToColumnSchemaPb(columnSchema, isDeleted);
+                columnSchemaPbs.Add(columnSchemaPb);
+            }
+
+            return columnSchemaPbs;
+        }
+
+        private static ColumnSchemaPB ToColumnSchemaPb(
+            ColumnSchema columnSchema, bool isDeleted)
+        {
+            var type = isDeleted
+                ? DataTypePB.IsDeleted
+                : (DataTypePB)columnSchema.Type;
+
+            var columnSchemaPb = new ColumnSchemaPB
             {
                 Name = columnSchema.Name,
-                Type = (DataTypePB)columnSchema.Type,
+                Type = type,
                 IsNullable = columnSchema.IsNullable,
                 // Set isKey to false on the passed ColumnSchema.
                 // This allows out of order key columns in projections.
                 IsKey = false,
                 TypeAttributes = columnSchema.TypeAttributes.ToTypeAttributesPb()
             };
+
+            ProtobufHelper.CopyDefaultValueToPb(columnSchema, columnSchemaPb);
+
+            return columnSchemaPb;
         }
 
         /// <summary>
@@ -245,7 +282,7 @@ namespace Knet.Kudu.Client
         /// The column name is generated to ensure there is never a collision.
         /// </summary>
         /// <param name="schema">The table schema.</param>
-        private static ColumnSchemaPB GenerateIsDeletedColumn(KuduSchema schema)
+        private static ColumnSchema GenerateIsDeletedColumn(KuduSchema schema)
         {
             var columnName = "is_deleted";
 
@@ -255,14 +292,12 @@ namespace Knet.Kudu.Client
                 columnName += "_";
             }
 
-            return new ColumnSchemaPB
-            {
-                Name = columnName,
-                Type = DataTypePB.IsDeleted,
-                ReadDefaultValue = _defaultDeletedColumnValue,
-                IsNullable = false,
-                IsKey = false
-            };
+            return new ColumnSchema(
+                columnName,
+                KuduType.Bool,
+                isKey: false,
+                isNullable: false,
+                defaultValue: false);
         }
     }
 }
