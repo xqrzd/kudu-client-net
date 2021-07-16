@@ -116,19 +116,24 @@ namespace Knet.Kudu.Client.Util
                 TypeAttributes = columnSchema.TypeAttributes.ToTypeAttributesPb()
             };
 
-            var defaultValue = columnSchema.DefaultValue;
-            if (defaultValue is not null)
-            {
-                var encodedDefaultValue = KuduEncoder.EncodeDefaultValue(columnSchema, defaultValue);
-                result.ReadDefaultValue = UnsafeByteOperations.UnsafeWrap(encodedDefaultValue);
-            }
+            CopyDefaultValueToPb(columnSchema, result);
 
-            if (columnSchema.Comment != null)
+            if (columnSchema.Comment is not null)
             {
                 result.Comment = columnSchema.Comment;
             }
 
             return result;
+        }
+
+        public static void CopyDefaultValueToPb(ColumnSchema columnSchema, ColumnSchemaPB columnSchemaPb)
+        {
+            var defaultValue = columnSchema.DefaultValue;
+            if (defaultValue is not null)
+            {
+                var encodedDefaultValue = KuduEncoder.EncodeDefaultValue(columnSchema, defaultValue);
+                columnSchemaPb.ReadDefaultValue = UnsafeByteOperations.UnsafeWrap(encodedDefaultValue);
+            }
         }
 
         public static TabletServerInfo ToTabletServerInfo(
