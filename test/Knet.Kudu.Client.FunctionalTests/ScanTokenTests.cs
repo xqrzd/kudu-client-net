@@ -420,7 +420,7 @@ namespace Knet.Kudu.Client.FunctionalTests
         {
             var builder = ClientTestUtil.GetBasicSchema()
                 .SetTableName(_tableName)
-                .SetNumReplicas(1);
+                .SetNumReplicas(3);
 
             var table = await _client.CreateTableAsync(builder);
             await ClientTestUtil.LoadDefaultTableAsync(_client, table, 1);
