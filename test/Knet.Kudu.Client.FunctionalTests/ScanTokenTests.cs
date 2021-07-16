@@ -217,7 +217,11 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             Assert.Equal(0, await ClientTestUtil.CountRowsInScanAsync(scanner));
 
-            // TODO: Test that the old name cannot be used and the new name can be.
+            // Test that the old name cannot be used and the new name can be.
+            var alteredSchema = scanner.ProjectionSchema;
+            Assert.Throws<KeyNotFoundException>(() => alteredSchema.GetColumn(oldColName));
+
+            alteredSchema.GetColumn(newColName);
         }
 
         /// <summary>
@@ -404,6 +408,36 @@ namespace Knet.Kudu.Client.FunctionalTests
             var scanner = scanBuilder.Build();
 
             await CheckDiffScanResultsAsync(scanner, 3 * numRows / 4, numRows / 4);
+        }
+
+        [SkippableTheory]
+        [InlineData(true, true)]
+        [InlineData(true, false)]
+        [InlineData(false, true)]
+        [InlineData(false, false)]
+        public async Task TestScanTokenRequestsWithMetadata(
+            bool includeTableMetadata, bool includeTabletMetadata)
+        {
+            var builder = ClientTestUtil.GetBasicSchema()
+                .SetTableName(_tableName)
+                .SetNumReplicas(1);
+
+            var table = await _client.CreateTableAsync(builder);
+            await ClientTestUtil.LoadDefaultTableAsync(_client, table, 1);
+
+            var tokens = await _client.NewScanTokenBuilder(table)
+                .IncludeTableMetadata(includeTableMetadata)
+                .IncludeTabletMetadata(includeTabletMetadata)
+                .BuildAsync();
+            var token = Assert.Single(tokens);
+
+            // Use a new client to simulate hydrating in a new process.
+            var newClient = _harness.CreateClient();
+
+            var scanBuilder = await newClient.NewScanBuilderFromTokenAsync(token.Serialize());
+            var scanner = scanBuilder.Build();
+
+            Assert.Equal(1, await ClientTestUtil.CountRowsInScanAsync(scanner));
         }
 
         [SkippableFact]
