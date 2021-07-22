@@ -139,7 +139,7 @@ namespace Knet.Kudu.Client.Tablet
                     lastUpperBound = tabletUpperBound;
 
                     // Now add the tablet itself (such as B, D, or E).
-                    newEntries.Add(TableLocationEntry.NewTablet(tablet, expiration));
+                    newEntries.Add(TableLocationEntry.NewCoveredRange(tablet, expiration));
                 }
 
                 if (lastUpperBound.Length > 0 &&
@@ -199,22 +199,9 @@ namespace Knet.Kudu.Client.Tablet
                 if (_cache.Search(tablet.Partition.PartitionKeyStart, out var cacheEntry) &&
                     cacheEntry.IsCoveredRange)
                 {
-                    var newEntry = TableLocationEntry.NewTablet(tablet, cacheEntry.Expiration);
+                    var newEntry = TableLocationEntry.NewCoveredRange(tablet, cacheEntry.Expiration);
                     _cache.Insert(newEntry);
                 }
-            }
-            finally
-            {
-                _lock.ExitWriteLock();
-            }
-        }
-
-        public void ClearCache()
-        {
-            _lock.EnterWriteLock();
-            try
-            {
-                _cache.Clear();
             }
             finally
             {
@@ -292,7 +279,7 @@ namespace Knet.Kudu.Client.Tablet
                 expiration);
         }
 
-        public static TableLocationEntry NewTablet(RemoteTablet tablet, long expiration)
+        public static TableLocationEntry NewCoveredRange(RemoteTablet tablet, long expiration)
         {
             var partition = tablet.Partition;
             var lowerBoundPartitionKey = partition.PartitionKeyStart;
