@@ -647,7 +647,7 @@ namespace Knet.Kudu.Client
 
         public KuduScanTokenBuilder NewScanTokenBuilder(KuduTable table)
         {
-            return new KuduScanTokenBuilder(this, table);
+            return new KuduScanTokenBuilder(this, table, _systemClock);
         }
 
         public IKuduSession NewSession() => NewSession(new KuduSessionOptions());

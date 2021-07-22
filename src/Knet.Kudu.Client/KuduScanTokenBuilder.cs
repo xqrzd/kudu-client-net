@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Google.Protobuf;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protobuf;
 using Knet.Kudu.Client.Protobuf.Client;
 using Knet.Kudu.Client.Protobuf.Consensus;
@@ -15,15 +16,17 @@ namespace Knet.Kudu.Client
 {
     public class KuduScanTokenBuilder : AbstractKuduScannerBuilder<KuduScanTokenBuilder>
     {
+        private readonly ISystemClock _systemClock;
         // By default, a scan token is created for each tablet to be scanned.
         private long _splitSizeBytes = -1;
         private int _fetchTabletsPerRangeLookup = 1000;
         private bool _includeTableMetadata = true;
         private bool _includeTabletMetadata = true;
 
-        public KuduScanTokenBuilder(KuduClient client, KuduTable table)
+        public KuduScanTokenBuilder(KuduClient client, KuduTable table, ISystemClock systemClock)
             : base(client, table)
         {
+            _systemClock = systemClock;
         }
 
         /// <summary>
@@ -290,6 +293,7 @@ namespace Knet.Kudu.Client
             }
 
             var tokens = new List<KuduScanToken>(keyRanges.Count);
+            var nowMillis = _systemClock.CurrentMilliseconds;
 
             foreach (var keyRange in keyRanges)
             {
@@ -312,44 +316,56 @@ namespace Knet.Kudu.Client
                 // locate the tablet to scan when opening the scanner.
                 if (_includeTabletMetadata)
                 {
-                    // Build the list of server and replica metadata.
-                    var tabletServers = tablet.Servers;
-                    var replicas = tablet.Replicas;
-                    var numTabletServers = tabletServers.Count;
+                    // TODO: It would be more efficient to pass the TTL in instead of
+                    // looking it up again here.
+                    var entry = Client.GetTableLocationEntry(
+                        Table.TableId, tablet.Partition.PartitionKeyStart);
 
-                    var tabletMetadataPb = new TabletMetadataPB
+                    long ttl;
+
+                    if (entry is not null &&
+                        entry.IsCoveredRange &&
+                        (ttl = entry.Expiration - nowMillis) > 0)
                     {
-                        TabletId = tablet.TabletId,
-                        Partition = ProtobufHelper.ToPartitionPb(tablet.Partition),
-                        TtlMillis = 1000 * 60 // TODO: Set this from the cache.
-                    };
+                        // Build the list of server and replica metadata.
+                        var tabletServers = tablet.Servers;
+                        var replicas = tablet.Replicas;
+                        var numTabletServers = tabletServers.Count;
 
-                    tabletMetadataPb.TabletServers.Capacity = numTabletServers;
-                    tabletMetadataPb.Replicas.Capacity = numTabletServers;
-
-                    for (int i = 0; i < numTabletServers; i++)
-                    {
-                        var serverInfo = tabletServers[i];
-                        var replica = replicas[i];
-                        var serverMetadataPb = ProtobufHelper.ToServerMetadataPb(serverInfo);
-
-                        tabletMetadataPb.TabletServers.Add(serverMetadataPb);
-
-                        var replicaMetadataPb = new ReplicaMetadataPB
+                        var tabletMetadataPb = new TabletMetadataPB
                         {
-                            TsIdx = (uint)i,
-                            Role = (RaftPeerPB.Types.Role)replica.Role
+                            TabletId = tablet.TabletId,
+                            Partition = ProtobufHelper.ToPartitionPb(tablet.Partition),
+                            TtlMillis = (ulong)ttl
                         };
 
-                        if (replica.DimensionLabel is not null)
+                        tabletMetadataPb.TabletServers.Capacity = numTabletServers;
+                        tabletMetadataPb.Replicas.Capacity = numTabletServers;
+
+                        for (int i = 0; i < numTabletServers; i++)
                         {
-                            replicaMetadataPb.DimensionLabel = replica.DimensionLabel;
+                            var serverInfo = tabletServers[i];
+                            var replica = replicas[i];
+                            var serverMetadataPb = ProtobufHelper.ToServerMetadataPb(serverInfo);
+
+                            tabletMetadataPb.TabletServers.Add(serverMetadataPb);
+
+                            var replicaMetadataPb = new ReplicaMetadataPB
+                            {
+                                TsIdx = (uint)i,
+                                Role = (RaftPeerPB.Types.Role)replica.Role
+                            };
+
+                            if (replica.DimensionLabel is not null)
+                            {
+                                replicaMetadataPb.DimensionLabel = replica.DimensionLabel;
+                            }
+
+                            tabletMetadataPb.Replicas.Add(replicaMetadataPb);
                         }
 
-                        tabletMetadataPb.Replicas.Add(replicaMetadataPb);
+                        token.TabletMetadata = tabletMetadataPb;
                     }
-
-                    token.TabletMetadata = tabletMetadataPb;
                 }
 
                 tokens.Add(new KuduScanToken(keyRange, token));
