@@ -50,6 +50,7 @@ namespace Knet.Kudu.Client
 
         private volatile bool _hasConnectedToMaster;
         private volatile string _location;
+        private volatile string _clusterId;
         private volatile ServerInfo _masterLeaderInfo;
         private volatile HiveMetastoreConfig _hiveMetastoreConfig;
 
@@ -129,8 +130,7 @@ namespace Knet.Kudu.Client
 
             async ValueTask<HiveMetastoreConfig> ConnectAsync(CancellationToken cancellationToken)
             {
-                var rpc = new ConnectToMasterRequest();
-                await SendRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
+                await ConnectToMastersAsync(cancellationToken).ConfigureAwait(false);
                 return _hiveMetastoreConfig;
             }
         }
@@ -154,10 +154,15 @@ namespace Knet.Kudu.Client
 
             async ValueTask<ReadOnlyMemory<byte>> ConnectAsync(CancellationToken cancellationToken)
             {
-                var rpc = new ConnectToMasterRequest();
-                await SendRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
+                await ConnectToMastersAsync(cancellationToken).ConfigureAwait(false);
                 return _securityContext.ExportAuthenticationCredentials();
             }
+        }
+
+        private Task ConnectToMastersAsync(CancellationToken cancellationToken)
+        {
+            var rpc = new ConnectToMasterRequest();
+            return SendRpcAsync(rpc, cancellationToken);
         }
 
         /// <summary>
@@ -1298,6 +1303,7 @@ namespace Knet.Kudu.Client
             }
 
             _location = responsePb.ClientLocation;
+            _clusterId = responsePb.ClusterId;
             _masterLeaderInfo = serverInfo;
             _hasConnectedToMaster = true;
         }
