@@ -36,6 +36,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             // Test cached path.
             var cachedClusterId = await _client.GetClusterIdAsync();
             Assert.NotEmpty(cachedClusterId);
+            Assert.Equal(clusterId, cachedClusterId);
         }
 
         /// <summary>
