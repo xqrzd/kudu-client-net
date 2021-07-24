@@ -691,7 +691,7 @@ namespace Knet.Kudu.Client
         }
 
         private async Task<KuduTable> OpenTableAsync(
-            TableIdentifierPB tableIdentifier, CancellationToken cancellationToken = default)
+            TableIdentifierPB tableIdentifier, CancellationToken cancellationToken)
         {
             var response = await GetTableSchemaAsync(tableIdentifier, cancellationToken)
                 .ConfigureAwait(false);
