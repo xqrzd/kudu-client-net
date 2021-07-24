@@ -130,7 +130,7 @@ namespace Knet.Kudu.Client
 
             async ValueTask<HiveMetastoreConfig> ConnectAsync(CancellationToken cancellationToken)
             {
-                await ConnectToMastersAsync(cancellationToken).ConfigureAwait(false);
+                await SetMasterLeaderInfoAsync(cancellationToken).ConfigureAwait(false);
                 return _hiveMetastoreConfig;
             }
         }
@@ -152,7 +152,7 @@ namespace Knet.Kudu.Client
 
             async ValueTask<string> ConnectAsync(CancellationToken cancellationToken)
             {
-                await ConnectToMastersAsync(cancellationToken).ConfigureAwait(false);
+                await SetMasterLeaderInfoAsync(cancellationToken).ConfigureAwait(false);
                 return _location;
             }
         }
@@ -176,15 +176,9 @@ namespace Knet.Kudu.Client
 
             async ValueTask<ReadOnlyMemory<byte>> ConnectAsync(CancellationToken cancellationToken)
             {
-                await ConnectToMastersAsync(cancellationToken).ConfigureAwait(false);
+                await SetMasterLeaderInfoAsync(cancellationToken).ConfigureAwait(false);
                 return _securityContext.ExportAuthenticationCredentials();
             }
-        }
-
-        private Task ConnectToMastersAsync(CancellationToken cancellationToken)
-        {
-            var rpc = new ConnectToMasterRequest();
-            return SendRpcAsync(rpc, cancellationToken);
         }
 
         /// <summary>
@@ -1328,6 +1322,12 @@ namespace Knet.Kudu.Client
             _clusterId = responsePb.ClusterId;
             _masterLeaderInfo = serverInfo;
             _hasConnectedToMaster = true;
+        }
+
+        private Task SetMasterLeaderInfoAsync(CancellationToken cancellationToken)
+        {
+            var rpc = new ConnectToMasterRequest();
+            return SendRpcAsync(rpc, cancellationToken);
         }
 
         internal async Task<T> SendRpcAsync<T>(
