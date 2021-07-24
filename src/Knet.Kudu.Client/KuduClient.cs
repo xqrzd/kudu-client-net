@@ -594,25 +594,7 @@ namespace Knet.Kudu.Client
                     tableId,
                     tabletMetadata.Partition.PartitionKeyStart.Memory.Span) is null)
             {
-                var tableLocationsCache = GetTableLocationsCache(tableId);
-                var replicas = new List<KuduReplica>(tabletMetadata.Replicas.Count);
-                var servers = new List<ServerInfo>(tabletMetadata.TabletServers.Count);
-                int leaderIndex = -1;
-
-                foreach (var replicaPb in tabletMetadata.Replicas)
-                {
-                    var serverPb = tabletMetadata.TabletServers[(int)replicaPb.TsIdx];
-                    var hostPort = serverPb.RpcAddresses[0].ToHostAndPort();
-                    var role = (ReplicaRole)replicaPb.Role;
-                    var replica = new KuduReplica(hostPort, role, replicaPb.DimensionLabel);
-
-                    if (role == ReplicaRole.Leader)
-                    {
-                        leaderIndex = replicas.Count;
-                    }
-
-                    replicas.Add(replica);
-                }
+                var internedServers = new List<ServerInfo>(tabletMetadata.TabletServers.Count);
 
                 foreach (var serverPb in tabletMetadata.TabletServers)
                 {
@@ -623,9 +605,30 @@ namespace Knet.Kudu.Client
                         serverPb.Location,
                         cancellationToken).ConfigureAwait(false);
 
-                    servers.Add(serverInfo);
+                    internedServers.Add(serverInfo);
                 }
 
+                var servers = new List<ServerInfo>(tabletMetadata.Replicas.Count);
+                var replicas = new List<KuduReplica>(tabletMetadata.Replicas.Count);
+                int leaderIndex = -1;
+
+                foreach (var replicaPb in tabletMetadata.Replicas)
+                {
+                    var serverInfo = internedServers[(int)replicaPb.TsIdx];
+                    var role = (ReplicaRole)replicaPb.Role;
+                    var replica = new KuduReplica(
+                        serverInfo.HostPort, role, replicaPb.DimensionLabel);
+
+                    if (role == ReplicaRole.Leader)
+                    {
+                        leaderIndex = replicas.Count;
+                    }
+
+                    servers.Add(serverInfo);
+                    replicas.Add(replica);
+                }
+
+                var tableLocationsCache = GetTableLocationsCache(tableId);
                 var partition = ProtobufHelper.ToPartition(tabletMetadata.Partition);
                 var cache = new ServerInfoCache(servers, replicas, leaderIndex);
                 var tablet = new RemoteTablet(tableId, tabletMetadata.TabletId, partition, cache);
