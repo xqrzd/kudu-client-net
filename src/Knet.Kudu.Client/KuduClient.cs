@@ -420,7 +420,7 @@ namespace Knet.Kudu.Client
             string tableName, CancellationToken cancellationToken = default)
         {
             var tableIdentifier = new TableIdentifierPB { TableName = tableName };
-            return OpenTableAsync(tableIdentifier);
+            return OpenTableAsync(tableIdentifier, cancellationToken);
         }
 
         public async Task<WriteResponse> WriteAsync(
