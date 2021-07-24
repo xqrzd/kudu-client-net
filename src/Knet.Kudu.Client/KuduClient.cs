@@ -50,6 +50,7 @@ namespace Knet.Kudu.Client
 
         private volatile bool _hasConnectedToMaster;
         private volatile string _location;
+        private volatile string _clusterId;
         private volatile ServerInfo _masterLeaderInfo;
         private volatile HiveMetastoreConfig _hiveMetastoreConfig;
 
@@ -129,9 +130,53 @@ namespace Knet.Kudu.Client
 
             async ValueTask<HiveMetastoreConfig> ConnectAsync(CancellationToken cancellationToken)
             {
-                var rpc = new ConnectToMasterRequest();
-                await SendRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
+                await SetMasterLeaderInfoAsync(cancellationToken).ConfigureAwait(false);
                 return _hiveMetastoreConfig;
+            }
+        }
+
+        /// <summary>
+        /// Returns a string representation of this client's location. If this
+        /// client was not assigned a location, returns the empty string.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public ValueTask<string> GetLocationAsync(
+            CancellationToken cancellationToken = default)
+        {
+            if (_hasConnectedToMaster)
+            {
+                return new ValueTask<string>(_location);
+            }
+
+            return ConnectAsync(cancellationToken);
+
+            async ValueTask<string> ConnectAsync(CancellationToken cancellationToken)
+            {
+                await SetMasterLeaderInfoAsync(cancellationToken).ConfigureAwait(false);
+                return _location;
+            }
+        }
+
+        /// <summary>
+        /// Returns the ID of the cluster that this client is connected to.
+        /// It will be an empty string if the client is connected to a cluster
+        /// that doesn't support cluster IDs.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public ValueTask<string> GetClusterIdAsync(
+            CancellationToken cancellationToken = default)
+        {
+            if (_hasConnectedToMaster)
+            {
+                return new ValueTask<string>(_clusterId);
+            }
+
+            return ConnectAsync(cancellationToken);
+
+            async ValueTask<string> ConnectAsync(CancellationToken cancellationToken)
+            {
+                await SetMasterLeaderInfoAsync(cancellationToken).ConfigureAwait(false);
+                return _clusterId;
             }
         }
 
@@ -154,8 +199,7 @@ namespace Knet.Kudu.Client
 
             async ValueTask<ReadOnlyMemory<byte>> ConnectAsync(CancellationToken cancellationToken)
             {
-                var rpc = new ConnectToMasterRequest();
-                await SendRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
+                await SetMasterLeaderInfoAsync(cancellationToken).ConfigureAwait(false);
                 return _securityContext.ExportAuthenticationCredentials();
             }
         }
@@ -420,7 +464,7 @@ namespace Knet.Kudu.Client
             string tableName, CancellationToken cancellationToken = default)
         {
             var tableIdentifier = new TableIdentifierPB { TableName = tableName };
-            return OpenTableAsync(tableIdentifier);
+            return OpenTableAsync(tableIdentifier, cancellationToken);
         }
 
         public async Task<WriteResponse> WriteAsync(
@@ -691,7 +735,7 @@ namespace Knet.Kudu.Client
         }
 
         private async Task<KuduTable> OpenTableAsync(
-            TableIdentifierPB tableIdentifier, CancellationToken cancellationToken = default)
+            TableIdentifierPB tableIdentifier, CancellationToken cancellationToken)
         {
             var response = await GetTableSchemaAsync(tableIdentifier, cancellationToken)
                 .ConfigureAwait(false);
@@ -1298,8 +1342,15 @@ namespace Knet.Kudu.Client
             }
 
             _location = responsePb.ClientLocation;
+            _clusterId = responsePb.ClusterId;
             _masterLeaderInfo = serverInfo;
             _hasConnectedToMaster = true;
+        }
+
+        private Task SetMasterLeaderInfoAsync(CancellationToken cancellationToken)
+        {
+            var rpc = new ConnectToMasterRequest();
+            return SendRpcAsync(rpc, cancellationToken);
         }
 
         internal async Task<T> SendRpcAsync<T>(
