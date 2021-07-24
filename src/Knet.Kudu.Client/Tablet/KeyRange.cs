@@ -7,7 +7,6 @@ namespace Knet.Kudu.Client.Tablet
     /// </summary>
     public class KeyRange
     {
-        // TODO: Use LocatedTablet
         /// <summary>
         /// The tablet which the key range belongs to.
         /// </summary>
@@ -54,14 +53,12 @@ namespace Knet.Kudu.Client.Tablet
         /// <summary>
         /// The start partition key.
         /// </summary>
-        public byte[] PartitionKeyStart =>
-            Tablet.Partition.PartitionKeyStart;
+        public byte[] PartitionKeyStart => Tablet.Partition.PartitionKeyStart;
 
         /// <summary>
         /// The end partition key.
         /// </summary>
-        public byte[] PartitionKeyEnd =>
-            Tablet.Partition.PartitionKeyEnd;
+        public byte[] PartitionKeyEnd => Tablet.Partition.PartitionKeyEnd;
 
         public override string ToString()
         {

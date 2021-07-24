@@ -419,9 +419,8 @@ namespace Knet.Kudu.Client.FunctionalTests
             var results = new List<TestRowResult>();
             foreach (var token in tokens)
             {
-                var scanner = client.NewScanBuilder(table)
-                    .ApplyScanToken(token)
-                    .Build();
+                var scanBuilder = await client.NewScanBuilderFromTokenAsync(token);
+                var scanner = scanBuilder.Build();
 
                 await foreach (var resultSet in scanner)
                 {

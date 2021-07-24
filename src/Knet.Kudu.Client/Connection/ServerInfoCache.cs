@@ -5,19 +5,25 @@ namespace Knet.Kudu.Client.Connection
 {
     public class ServerInfoCache
     {
-        // Use a random number so all clients don't hit the same replicas.
-        // The randomInt variable is static so the choice is same across multiple
-        // RemoteTablet instances. This ensures follow up calls are routed to the
-        // same server with the scanner open.
+        // This random integer is used when making any random choice for replica
+        // selection. It is static to provide a deterministic selection for any given
+        // process and therefore also better cache affinity while ensuring that we can
+        // still benefit from spreading the load across replicas for other processes
+        // and applications.
         private static readonly int _randomInt = new Random().Next(int.MaxValue);
 
         private readonly List<ServerInfo> _servers;
+        private readonly List<KuduReplica> _replicas;
         private readonly int _leaderIndex;
         private readonly int _randomIndex;
 
-        public ServerInfoCache(List<ServerInfo> servers, int leaderIndex)
+        public ServerInfoCache(
+            List<ServerInfo> servers,
+            List<KuduReplica> replicas,
+            int leaderIndex)
         {
             _servers = servers;
+            _replicas = replicas;
             _leaderIndex = leaderIndex;
 
             var numServers = servers.Count;
@@ -29,6 +35,11 @@ namespace Knet.Kudu.Client.Connection
         /// Get replicas of this tablet.
         /// </summary>
         public IReadOnlyList<ServerInfo> Servers => _servers;
+
+        /// <summary>
+        /// Get replicas of this tablet.
+        /// </summary>
+        public IReadOnlyList<KuduReplica> Replicas => _replicas;
 
         /// <summary>
         /// Get the information on the tablet server that we think holds the
@@ -127,6 +138,20 @@ namespace Knet.Kudu.Client.Connection
         }
 
         /// <summary>
+        /// Get the information on the tablet server that we think holds the
+        /// leader replica for this tablet. Returns null if we don't know who
+        /// the leader is.
+        /// </summary>
+        public KuduReplica GetLeaderReplica()
+        {
+            // Check if we have a leader.
+            if (_leaderIndex == -1)
+                return null;
+
+            return _replicas[_leaderIndex];
+        }
+
+        /// <summary>
         /// Clears the leader UUID if the passed tablet server is the current leader.
         /// If it is the current leader, then the next call to this tablet will have
         /// to query the master to find the new leader.
@@ -136,13 +161,27 @@ namespace Knet.Kudu.Client.Connection
         /// </param>
         public ServerInfoCache DemoteLeader(string uuid)
         {
-            if (_leaderIndex == -1)
+            var leaderIndex = _leaderIndex;
+            if (leaderIndex != -1)
             {
-                // There is no leader for this tablet.
-                return this;
+                var serverInfo = _servers[leaderIndex];
+                if (serverInfo.Uuid == uuid)
+                {
+                    var replicas = _replicas;
+                    var newReplicas = new List<KuduReplica>(replicas);
+                    var priorLeaderReplica = replicas[leaderIndex];
+                    var newLeaderReplica = new KuduReplica(
+                        priorLeaderReplica.HostPort,
+                        ReplicaRole.Follower,
+                        priorLeaderReplica.DimensionLabel);
+
+                    newReplicas[leaderIndex] = newLeaderReplica;
+
+                    return new ServerInfoCache(_servers, newReplicas, -1);
+                }
             }
 
-            return new ServerInfoCache(_servers, -1);
+            return this;
         }
 
         /// <summary>
@@ -152,13 +191,16 @@ namespace Knet.Kudu.Client.Connection
         public ServerInfoCache RemoveTabletServer(string uuid)
         {
             var servers = _servers;
+            var replicas = _replicas;
             var numServers = servers.Count;
             var newServers = new List<ServerInfo>(numServers);
+            var newReplicas = new List<KuduReplica>(numServers);
             var leaderIndex = _leaderIndex;
 
             for (int i = 0; i < numServers; i++)
             {
                 var server = servers[i];
+                var replica = replicas[i];
                 if (server.Uuid == uuid)
                 {
                     if (leaderIndex > i)
@@ -174,9 +216,10 @@ namespace Knet.Kudu.Client.Connection
                 }
 
                 newServers.Add(server);
+                newReplicas.Add(replica);
             }
 
-            return new ServerInfoCache(newServers, leaderIndex);
+            return new ServerInfoCache(newServers, newReplicas, leaderIndex);
         }
     }
 }

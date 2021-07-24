@@ -33,21 +33,21 @@ namespace Knet.Kudu.Client.Tablet
 
         public Partition Partition { get; }
 
-        public IReadOnlyList<Replica> Replicas { get; }
-
         public RemoteTablet(
             string tableId,
             string tabletId,
             Partition partition,
-            ServerInfoCache cache,
-            IReadOnlyList<Replica> replicas)
+            ServerInfoCache cache)
         {
             TableId = tableId;
             TabletId = tabletId;
             Partition = partition;
-            Replicas = replicas;
             _cache = cache;
         }
+
+        public IReadOnlyList<ServerInfo> Servers => _cache.Servers;
+
+        public IReadOnlyList<KuduReplica> Replicas => _cache.Replicas;
 
         public ServerInfo GetServerInfo(
             ReplicaSelection replicaSelection, string location = null)
@@ -55,29 +55,30 @@ namespace Knet.Kudu.Client.Tablet
             return _cache.GetServerInfo(replicaSelection, location);
         }
 
-        public ServerInfo GetLeaderServerInfo() =>
-            _cache.GetLeaderServerInfo();
+        public ServerInfo GetLeaderServerInfo() => _cache.GetLeaderServerInfo();
+
+        /// <summary>
+        /// Return the current leader, or null if there is none.
+        /// </summary>
+        public KuduReplica GetLeaderReplica() => _cache.GetLeaderReplica();
 
         public RemoteTablet DemoteLeader(string uuid)
         {
             var cache = _cache.DemoteLeader(uuid);
-            return new RemoteTablet(TableId, TabletId, Partition, cache, Replicas);
+            return new RemoteTablet(TableId, TabletId, Partition, cache);
         }
 
         public RemoteTablet RemoveTabletServer(string uuid)
         {
             var cache = _cache.RemoveTabletServer(uuid);
-            return new RemoteTablet(TableId, TabletId, Partition, cache, Replicas);
+            return new RemoteTablet(TableId, TabletId, Partition, cache);
         }
 
-        public bool Equals(RemoteTablet other) =>
-            TabletId == other.TabletId;
+        public bool Equals(RemoteTablet other) => TabletId == other.TabletId;
 
-        public override bool Equals(object obj) =>
-            Equals(obj as RemoteTablet);
+        public override bool Equals(object obj) => Equals(obj as RemoteTablet);
 
-        public override int GetHashCode() =>
-            TabletId.GetHashCode();
+        public override int GetHashCode() => TabletId.GetHashCode();
 
         public override string ToString()
         {

@@ -1,6 +1,6 @@
 using System;
-using System.Buffers;
 using System.Collections.Generic;
+using System.Threading;
 using Google.Protobuf;
 using Knet.Kudu.Client.Protobuf;
 using Knet.Kudu.Client.Protobuf.Client;
@@ -18,14 +18,14 @@ namespace Knet.Kudu.Client
     /// 
     /// <para>
     /// Each scan token may be separately turned into a scanner using
-    /// <see cref="IntoScanner{TBuilder}(TBuilder)"/> with each scanner responsible
-    /// for a disjoint section of the table.
+    /// <see cref="KuduClient.NewScanBuilderFromTokenAsync(KuduScanToken, CancellationToken)"/>
+    /// with each scanner responsible for a disjoint section of the table.
     /// </para>
     /// 
     /// <para>
     /// Scan tokens may be serialized using the <see cref="Serialize"/> method and
     /// deserialized back into a scanner using the
-    /// <see cref="DeserializeIntoScanner{TBuilder}(TBuilder, ReadOnlyMemory{byte})"/>
+    /// <see cref="KuduClient.NewScanBuilderFromTokenAsync(ReadOnlyMemory{byte}, CancellationToken)"/>
     /// method. This allows use cases such as generating scan tokens in the planner
     /// component of a query engine, then sending the tokens to execution nodes based
     /// on locality, and then instantiating the scanners on those nodes.
@@ -46,39 +46,33 @@ namespace Knet.Kudu.Client
             _message = message;
         }
 
+        // TODO: LocatedTablet
         public RemoteTablet Tablet => _keyRange.Tablet;
+
+        internal ScanTokenPB Message => _message;
 
         public byte[] Serialize()
         {
-            var writer = new ArrayBufferWriter<byte>();
-            _message.WriteTo(writer);
-            return writer.WrittenSpan.ToArray();
+            var messageSize = _message.CalculateSize();
+            var buffer = new byte[messageSize];
+            _message.WriteTo(buffer);
+            return buffer;
         }
 
-        public TBuilder IntoScanner<TBuilder>(TBuilder scanBuilder)
-            where TBuilder : AbstractKuduScannerBuilder<TBuilder>
-        {
-            PbIntoScanner(scanBuilder, _message);
-            return scanBuilder;
-        }
-
+        // TODO: Use ScanTokenPB to generate ToString()
         public override string ToString() => _keyRange.ToString();
 
-        public static TBuilder DeserializeIntoScanner<TBuilder>(
-            TBuilder scanBuilder, ReadOnlyMemory<byte> buffer)
-            where TBuilder : AbstractKuduScannerBuilder<TBuilder>
+        internal static ScanTokenPB DeserializePb(ReadOnlySpan<byte> buffer)
         {
-            // TODO: Use span when Google.Protobuf 3.18 is released.
-            var scanTokenPb = ScanTokenPB.Parser.ParseFrom(buffer.ToArray());
-            PbIntoScanner(scanBuilder, scanTokenPb);
-            return scanBuilder;
+            return ScanTokenPB.Parser.ParseFrom(buffer);
         }
 
-        private static void PbIntoScanner<TBuilder>(
+        internal static void PbIntoScanner<TBuilder>(
             TBuilder builder, ScanTokenPB scanTokenPb)
             where TBuilder : AbstractKuduScannerBuilder<TBuilder>
         {
             var table = builder.Table;
+            var schema = table.Schema;
 
             if (scanTokenPb.FeatureFlags.Contains(ScanTokenPB.Types.Feature.Unknown))
             {
@@ -86,29 +80,12 @@ namespace Knet.Kudu.Client
                     "This Kudu client must be updated.");
             }
 
-            if (scanTokenPb.HasTableId)
-            {
-                if (scanTokenPb.TableId != table.TableId)
-                {
-                    throw new Exception($"Scan token table id {scanTokenPb.TableId} " +
-                        $"does not match the builder table id {table.TableId}");
-                }
-            }
-            else
-            {
-                if (scanTokenPb.TableName != table.TableName)
-                {
-                    throw new Exception($"Scan token table name {scanTokenPb.TableName} " +
-                        $"does not match the builder table name {table.TableName}");
-                }
-            }
-
             builder.SetProjectedColumns(
-                ComputeProjectedColumnIndexes(scanTokenPb, table.Schema));
+                ComputeProjectedColumnIndexes(scanTokenPb, schema));
 
             foreach (var predicate in scanTokenPb.ColumnPredicates)
             {
-                builder.AddPredicate(KuduPredicate.FromPb(table.Schema, predicate));
+                builder.AddPredicate(KuduPredicate.FromPb(schema, predicate));
             }
 
             if (scanTokenPb.HasLowerBoundPrimaryKey)
@@ -205,9 +182,14 @@ namespace Knet.Kudu.Client
             }
         }
 
-        private static List<int> ComputeProjectedColumnIndexes(
+        private static IReadOnlyList<int> ComputeProjectedColumnIndexes(
             ScanTokenPB message, KuduSchema schema)
         {
+            if (message.ProjectedColumnIdx.Count != 0)
+            {
+                return message.ProjectedColumnIdx;
+            }
+
             var columns = new List<int>(message.ProjectedColumns.Count);
 
             foreach (var colSchemaFromPb in message.ProjectedColumns)
@@ -216,7 +198,7 @@ namespace Knet.Kudu.Client
                     schema.GetColumnIndex((int)colSchemaFromPb.Id) :
                     schema.GetColumnIndex(colSchemaFromPb.Name);
 
-                ColumnSchema colSchema = schema.GetColumn(colIdx);
+                var colSchema = schema.GetColumn(colIdx);
 
                 if (colSchemaFromPb.Type != (DataTypePB)colSchema.Type)
                 {

@@ -6,8 +6,10 @@ using Google.Protobuf;
 using Google.Protobuf.Collections;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Protobuf;
+using Knet.Kudu.Client.Protobuf.Client;
 using Knet.Kudu.Client.Protobuf.Master;
 using Knet.Kudu.Client.Protobuf.Rpc;
+using Knet.Kudu.Client.Tablet;
 
 namespace Knet.Kudu.Client.Util
 {
@@ -134,6 +136,54 @@ namespace Knet.Kudu.Client.Util
                 var encodedDefaultValue = KuduEncoder.EncodeDefaultValue(columnSchema, defaultValue);
                 columnSchemaPb.ReadDefaultValue = UnsafeByteOperations.UnsafeWrap(encodedDefaultValue);
             }
+        }
+
+        public static Partition ToPartition(PartitionPB partition)
+        {
+            return new Partition(
+                partition.PartitionKeyStart.ToByteArray(),
+                partition.PartitionKeyEnd.ToByteArray(),
+                partition.HashBuckets.ToArray());
+        }
+
+        public static PartitionPB ToPartitionPb(Partition partition)
+        {
+            var partitionPb = new PartitionPB
+            {
+                PartitionKeyStart = UnsafeByteOperations.UnsafeWrap(partition.PartitionKeyStart),
+                PartitionKeyEnd = UnsafeByteOperations.UnsafeWrap(partition.PartitionKeyEnd)
+            };
+
+            partitionPb.HashBuckets.AddRange(partition.HashBuckets);
+
+            return partitionPb;
+        }
+
+        public static HostPortPB ToHostPortPb(HostAndPort hostAndPort)
+        {
+            return new HostPortPB
+            {
+                Host = hostAndPort.Host,
+                Port = (uint)hostAndPort.Port
+            };
+        }
+
+        public static ServerMetadataPB ToServerMetadataPb(ServerInfo serverInfo)
+        {
+            var serverMetadataPb = new ServerMetadataPB
+            {
+                Uuid = ByteString.CopyFromUtf8(serverInfo.Uuid)
+            };
+
+            if (serverInfo.HasLocation)
+            {
+                serverMetadataPb.Location = serverInfo.Location;
+            }
+
+            var hostPortPb = ToHostPortPb(serverInfo.HostPort);
+            serverMetadataPb.RpcAddresses.Add(hostPortPb);
+
+            return serverMetadataPb;
         }
 
         public static TabletServerInfo ToTabletServerInfo(

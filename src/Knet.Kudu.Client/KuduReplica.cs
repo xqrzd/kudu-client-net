@@ -1,20 +1,19 @@
 using Knet.Kudu.Client.Connection;
-using static Knet.Kudu.Client.Protobuf.Consensus.RaftPeerPB.Types;
 
-namespace Knet.Kudu.Client.Tablet
+namespace Knet.Kudu.Client
 {
     /// <summary>
     /// One of the replicas of the tablet.
     /// </summary>
-    public class Replica
+    public class KuduReplica
     {
         public HostAndPort HostPort { get; }
 
-        public Role Role { get; }
+        public ReplicaRole Role { get; }
 
         public string DimensionLabel { get; }
 
-        public Replica(HostAndPort hostPort, Role role, string dimensionLabel)
+        public KuduReplica(HostAndPort hostPort, ReplicaRole role, string dimensionLabel)
         {
             HostPort = hostPort;
             Role = role;

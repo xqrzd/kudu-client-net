@@ -110,19 +110,5 @@ namespace Knet.Kudu.Client
             var predicate = KuduPredicate.NewInListPredicate(column, values);
             return scanBuilder.AddPredicate(predicate);
         }
-
-        public static TBuilder ApplyScanToken<TBuilder>(
-            this TBuilder scanBuilder, KuduScanToken scanToken)
-            where TBuilder : AbstractKuduScannerBuilder<TBuilder>
-        {
-            return scanToken.IntoScanner(scanBuilder);
-        }
-
-        public static TBuilder ApplyScanToken<TBuilder>(
-            this TBuilder scanBuilder, ReadOnlyMemory<byte> buffer)
-            where TBuilder : AbstractKuduScannerBuilder<TBuilder>
-        {
-            return KuduScanToken.DeserializeIntoScanner(scanBuilder, buffer);
-        }
     }
 }
