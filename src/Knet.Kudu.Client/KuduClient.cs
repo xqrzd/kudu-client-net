@@ -136,6 +136,28 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// Returns a string representation of this client's location. If this
+        /// client was not assigned a location, returns the empty string.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public ValueTask<string> GetLocationAsync(
+            CancellationToken cancellationToken = default)
+        {
+            if (_hasConnectedToMaster)
+            {
+                return new ValueTask<string>(_location);
+            }
+
+            return ConnectAsync(cancellationToken);
+
+            async ValueTask<string> ConnectAsync(CancellationToken cancellationToken)
+            {
+                await ConnectToMastersAsync(cancellationToken).ConfigureAwait(false);
+                return _location;
+            }
+        }
+
+        /// <summary>
         /// Export serialized authentication data that may be passed to a different
         /// client instance and imported to provide that client the ability to connect
         /// to the cluster.
