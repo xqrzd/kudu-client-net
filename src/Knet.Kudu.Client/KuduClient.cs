@@ -158,6 +158,29 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// Returns the ID of the cluster that this client is connected to.
+        /// It will be an empty string if the client is connected to a cluster
+        /// that doesn't support cluster IDs.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        public ValueTask<string> GetClusterIdAsync(
+            CancellationToken cancellationToken = default)
+        {
+            if (_hasConnectedToMaster)
+            {
+                return new ValueTask<string>(_clusterId);
+            }
+
+            return ConnectAsync(cancellationToken);
+
+            async ValueTask<string> ConnectAsync(CancellationToken cancellationToken)
+            {
+                await SetMasterLeaderInfoAsync(cancellationToken).ConfigureAwait(false);
+                return _clusterId;
+            }
+        }
+
+        /// <summary>
         /// Export serialized authentication data that may be passed to a different
         /// client instance and imported to provide that client the ability to connect
         /// to the cluster.

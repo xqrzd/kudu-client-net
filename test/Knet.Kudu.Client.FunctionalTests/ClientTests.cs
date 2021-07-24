@@ -27,6 +27,17 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _harness.DisposeAsync();
         }
 
+        [SkippableFact]
+        public async Task TestClusterId()
+        {
+            var clusterId = await _client.GetClusterIdAsync();
+            Assert.NotEmpty(clusterId);
+
+            // Test cached path.
+            var cachedClusterId = await _client.GetClusterIdAsync();
+            Assert.NotEmpty(cachedClusterId);
+        }
+
         /// <summary>
         /// Stress test which performs upserts from many sessions on different threads
         /// sharing the same KuduClient and KuduTable instance.
