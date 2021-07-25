@@ -59,6 +59,16 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// Change a table's comment.
+        /// </summary>
+        /// <param name="comment">The new table comment.</param>
+        public AlterTableBuilder SetComment(string comment)
+        {
+            _request.NewTableComment = comment;
+            return this;
+        }
+
+        /// <summary>
         /// Add a new column to the table. The column defaults to a
         /// nullable non-key column.
         /// </summary>

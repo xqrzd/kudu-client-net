@@ -72,6 +72,16 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// Set the table comment.
+        /// </summary>
+        /// <param name="comment">The table comment.</param>
+        public TableBuilder SetComment(string comment)
+        {
+            _createTableRequest.Comment = comment;
+            return this;
+        }
+
+        /// <summary>
         /// Sets the dimension label for all tablets created at table creation time.
         /// 
         /// By default, the master will try to place newly created tablet replicas on
