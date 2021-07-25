@@ -15,6 +15,8 @@ namespace Knet.Kudu.Client
         Delete = Type.Delete,
         Upsert = Type.Upsert,
         InsertIgnore = Type.InsertIgnore,
+        UpdateIgnore = Type.UpdateIgnore,
+        DeleteIgnore = Type.DeleteIgnore,
         /// <summary>
         /// Used when specifying split rows on table creation.
         /// </summary>
