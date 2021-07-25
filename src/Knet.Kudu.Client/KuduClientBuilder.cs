@@ -14,6 +14,7 @@ namespace Knet.Kudu.Client
         private readonly IReadOnlyList<HostAndPort> _masterAddresses;
         private ILoggerFactory _loggerFactory = NullLoggerFactory.Instance;
         private TimeSpan _defaultOperationTimeout = TimeSpan.FromSeconds(30);
+        private string _saslProtocolName = "kudu";
         private PipeOptions _sendPipeOptions;
         private PipeOptions _receivePipeOptions;
 
@@ -48,6 +49,22 @@ namespace Knet.Kudu.Client
             return this;
         }
 
+        /// <summary>
+        /// <para>
+        /// Set the SASL protocol name. SASL protocol name is used when connecting
+        /// to a secure (Kerberos-enabled) cluster. It must match the servers'
+        /// service principal name (SPN).
+        /// </para>
+        /// <para>
+        /// If not provided, it will use the default SASL protocol name ("kudu").
+        /// </para>
+        /// </summary>
+        public KuduClientBuilder SetSaslProtocolName(string saslProtocolName)
+        {
+            _saslProtocolName = saslProtocolName;
+            return this;
+        }
+
         public KuduClientBuilder SetSendPipeOptions(PipeOptions options)
         {
             _sendPipeOptions = options;
@@ -65,6 +82,7 @@ namespace Knet.Kudu.Client
             var options = new KuduClientOptions(
                 _masterAddresses,
                 _defaultOperationTimeout,
+                _saslProtocolName,
                 _sendPipeOptions,
                 _receivePipeOptions);
 

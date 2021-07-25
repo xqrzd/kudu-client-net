@@ -281,7 +281,7 @@ namespace Knet.Kudu.Client.Negotiate
             using var gssApiStream = new KuduGssApiAuthenticationStream(this);
             using var negotiateStream = new NegotiateStream(gssApiStream);
 
-            var targetName = $"kudu/{_serverInfo.HostPort.Host}";
+            var targetName = $"{_options.SaslProtocolName}/{_serverInfo.HostPort.Host}";
             _logMessage.NegotiateInfo = $"SASL_GSSAPI [{targetName}]";
 
             // Hopefully a temporary hack-fix, until we can figure

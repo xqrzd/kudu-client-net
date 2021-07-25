@@ -27,6 +27,8 @@ namespace Knet.Kudu.Client
 
         public TimeSpan DefaultOperationTimeout { get; }
 
+        public string SaslProtocolName { get; }
+
         public PipeOptions SendPipeOptions { get; }
 
         public PipeOptions ReceivePipeOptions { get; }
@@ -34,11 +36,13 @@ namespace Knet.Kudu.Client
         public KuduClientOptions(
             IReadOnlyList<HostAndPort> masterAddresses,
             TimeSpan defaultOperationTimeout,
+            string saslProtocolName,
             PipeOptions sendPipeOptions,
             PipeOptions receivePipeOptions)
         {
             MasterAddresses = masterAddresses;
             DefaultOperationTimeout = defaultOperationTimeout;
+            SaslProtocolName = saslProtocolName;
 
             SendPipeOptions = sendPipeOptions ?? _defaultSendOptions;
             ReceivePipeOptions = receivePipeOptions ?? _defaultReceiveOptions;
