@@ -40,6 +40,11 @@ namespace Knet.Kudu.Client
         /// </summary>
         public string Owner => SchemaPb.Owner;
 
+        /// <summary>
+        /// The comment on the table.
+        /// </summary>
+        public string Comment => SchemaPb.Comment;
+
         public override string ToString() => TableName;
 
         /// <summary>

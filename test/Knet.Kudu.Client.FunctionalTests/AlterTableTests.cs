@@ -545,6 +545,25 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(newOwner, table.Owner);
         }
 
+        [SkippableFact]
+        public async Task TestAlterChangeComment()
+        {
+            var originalComment = "original comment";
+            var builder = new TableBuilder(nameof(TestAlterAddColumns))
+                .AddColumn("key", KuduType.Int32, opt => opt.Key(true))
+                .AddColumn("val", KuduType.Int32)
+                .SetRangePartitionColumns("key")
+                .SetComment(originalComment);
+
+            var table = await _client.CreateTableAsync(builder);
+            Assert.Equal(originalComment, table.Comment);
+
+            var newComment = "new comment";
+            await _client.AlterTableAsync(new AlterTableBuilder(table).SetComment(newComment));
+            table = await _client.OpenTableAsync(table.TableName);
+            Assert.Equal(newComment, table.Comment);
+        }
+
         /// <summary>
         /// Creates a new table with two int columns, c0 and c1. c0 is the primary key.
         /// The table is hash partitioned on c0 into two buckets, and range partitioned

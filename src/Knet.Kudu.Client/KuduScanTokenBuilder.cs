@@ -118,7 +118,10 @@ namespace Knet.Kudu.Client
                     tableMetadataPb.Owner = Table.Owner;
                 }
 
-                // TODO: Set table comment
+                if (Table.Comment is not null)
+                {
+                    tableMetadataPb.Comment = Table.Comment;
+                }
 
                 if (Table.ExtraConfig.Count > 0)
                 {
