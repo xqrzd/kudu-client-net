@@ -114,6 +114,28 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
             return row;
         }
 
+        public static KuduOperation CreateBasicSchemaUpdateIgnore(
+            KuduTable table, int key, int secondVal, bool hasNull)
+        {
+            var row = table.NewUpdateIgnore();
+            row.SetInt32(0, key);
+            row.SetInt32(1, secondVal);
+            row.SetInt32(2, 3);
+            if (hasNull)
+                row.SetNull(3);
+            else
+                row.SetString(3, "a string");
+            row.SetBool(4, true);
+            return row;
+        }
+
+        public static KuduOperation CreateBasicSchemaDeleteIgnore(KuduTable table, int key)
+        {
+            var row = table.NewDeleteIgnore();
+            row.SetInt32(0, key);
+            return row;
+        }
+
         public static KuduOperation CreateBasicSchemaUpsert(
             KuduTable table, int key, int secondVal, bool hasNull)
         {

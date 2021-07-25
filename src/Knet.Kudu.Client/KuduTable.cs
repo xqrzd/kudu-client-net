@@ -60,6 +60,13 @@ namespace Knet.Kudu.Client
         public KuduOperation NewUpdate() => NewOperation(RowOperation.Update);
 
         /// <summary>
+        /// Get a new update ignore configured with this table's schema. An update
+        /// ignore will ignore missing row errors. This is useful to update a row
+        /// only if it exists.
+        /// </summary>
+        public KuduOperation NewUpdateIgnore() => NewOperation(RowOperation.UpdateIgnore);
+
+        /// <summary>
         /// Get a new upsert configured with this table's schema.
         /// </summary>
         public KuduOperation NewUpsert() => NewOperation(RowOperation.Upsert);
@@ -68,6 +75,13 @@ namespace Knet.Kudu.Client
         /// Get a new delete configured with this table's schema.
         /// </summary>
         public KuduOperation NewDelete() => NewOperation(RowOperation.Delete);
+
+        /// <summary>
+        /// Get a new delete ignore configured with this table's schema. An delete
+        /// ignore will ignore missing row errors. This is useful to delete a row
+        /// only if it exists.
+        /// </summary>
+        public KuduOperation NewDeleteIgnore() => NewOperation(RowOperation.DeleteIgnore);
 
         private KuduOperation NewOperation(RowOperation rowOperation)
         {
