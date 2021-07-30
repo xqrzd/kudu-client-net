@@ -46,6 +46,7 @@ namespace Knet.Kudu.Client
         private readonly ConcurrentDictionary<string, TableLocationsCache> _tableLocations;
         private readonly RequestTracker _requestTracker;
         private readonly AuthzTokenCache _authzTokenCache;
+        private readonly SemaphoreSlim _singleClusterConnect;
         private readonly int _defaultOperationTimeoutMs;
 
         private volatile bool _hasConnectedToMaster;
@@ -53,6 +54,7 @@ namespace Knet.Kudu.Client
         private volatile string _clusterId;
         private volatile ServerInfo _masterLeaderInfo;
         private volatile HiveMetastoreConfig _hiveMetastoreConfig;
+        private long _lastConnectedToMaster;
 
         /// <summary>
         /// Timestamp required for HybridTime external consistency through timestamp propagation.
@@ -78,6 +80,7 @@ namespace Knet.Kudu.Client
             _tableLocations = new ConcurrentDictionary<string, TableLocationsCache>();
             _requestTracker = new RequestTracker(SecurityUtil.NewGuid().ToString("N"));
             _authzTokenCache = new AuthzTokenCache();
+            _singleClusterConnect = new SemaphoreSlim(1, 1);
             _defaultOperationTimeoutMs = (int)options.DefaultOperationTimeout.TotalMilliseconds;
         }
 
@@ -1184,6 +1187,30 @@ namespace Knet.Kudu.Client
         /// </summary>
         /// <param name="cancellationToken">The cancellation token.</param>
         private async Task<ServerInfo> ConnectToClusterAsync(CancellationToken cancellationToken)
+        {
+            var connectTime = _systemClock.CurrentMilliseconds;
+
+            await _singleClusterConnect.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                if (connectTime > _lastConnectedToMaster || _masterLeaderInfo is null)
+                {
+                    var result = await ConnectToClusterWithoutLockAsync(cancellationToken)
+                        .ConfigureAwait(false);
+
+                    _lastConnectedToMaster = _systemClock.CurrentMilliseconds;
+                    return result;
+                }
+            }
+            finally
+            {
+                _singleClusterConnect.Release();
+            }
+
+            return _masterLeaderInfo;
+        }
+
+        private async Task<ServerInfo> ConnectToClusterWithoutLockAsync(CancellationToken cancellationToken)
         {
             var masterAddresses = _options.MasterAddresses;
             var tasks = new Dictionary<Task<ConnectToMasterResponse>, HostAndPort>(masterAddresses.Count);
