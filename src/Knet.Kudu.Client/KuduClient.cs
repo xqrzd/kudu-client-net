@@ -49,12 +49,7 @@ namespace Knet.Kudu.Client
         private readonly SemaphoreSlim _singleClusterConnect;
         private readonly int _defaultOperationTimeoutMs;
 
-        private volatile bool _hasConnectedToMaster;
-        private volatile string _location;
-        private volatile string _clusterId;
-        private volatile ServerInfo _masterLeaderInfo;
-        private volatile HiveMetastoreConfig _hiveMetastoreConfig;
-        private long _lastConnectedToMaster;
+        private volatile MasterLeaderInfo _masterLeaderInfo;
 
         /// <summary>
         /// Timestamp required for HybridTime external consistency through timestamp propagation.
@@ -117,25 +112,17 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
-        /// Get the Hive Metastore configuration of the most recently connected-to leader master,
-        /// or null if the Hive Metastore integration is not enabled.
+        /// Get the Hive Metastore configuration of the most recently connected-to
+        /// leader master, or null if the Hive Metastore integration is not enabled.
         /// </summary>
         /// <param name="cancellationToken">The cancellation token.</param>
-        public ValueTask<HiveMetastoreConfig> GetHiveMetastoreConfigAsync(
+        public async ValueTask<HiveMetastoreConfig> GetHiveMetastoreConfigAsync(
             CancellationToken cancellationToken = default)
         {
-            if (_hasConnectedToMaster)
-            {
-                return new ValueTask<HiveMetastoreConfig>(_hiveMetastoreConfig);
-            }
+            var masterLeaderInfo = await GetMasterLeaderInfoAsync(cancellationToken)
+                .ConfigureAwait(false);
 
-            return ConnectAsync(cancellationToken);
-
-            async ValueTask<HiveMetastoreConfig> ConnectAsync(CancellationToken cancellationToken)
-            {
-                await SetMasterLeaderInfoAsync(cancellationToken).ConfigureAwait(false);
-                return _hiveMetastoreConfig;
-            }
+            return masterLeaderInfo.HiveMetastoreConfig;
         }
 
         /// <summary>
@@ -143,21 +130,13 @@ namespace Knet.Kudu.Client
         /// client was not assigned a location, returns the empty string.
         /// </summary>
         /// <param name="cancellationToken">The cancellation token.</param>
-        public ValueTask<string> GetLocationAsync(
+        public async ValueTask<string> GetLocationAsync(
             CancellationToken cancellationToken = default)
         {
-            if (_hasConnectedToMaster)
-            {
-                return new ValueTask<string>(_location);
-            }
+            var masterLeaderInfo = await GetMasterLeaderInfoAsync(cancellationToken)
+                .ConfigureAwait(false);
 
-            return ConnectAsync(cancellationToken);
-
-            async ValueTask<string> ConnectAsync(CancellationToken cancellationToken)
-            {
-                await SetMasterLeaderInfoAsync(cancellationToken).ConfigureAwait(false);
-                return _location;
-            }
+            return masterLeaderInfo.Location;
         }
 
         /// <summary>
@@ -166,21 +145,13 @@ namespace Knet.Kudu.Client
         /// that doesn't support cluster IDs.
         /// </summary>
         /// <param name="cancellationToken">The cancellation token.</param>
-        public ValueTask<string> GetClusterIdAsync(
+        public async ValueTask<string> GetClusterIdAsync(
             CancellationToken cancellationToken = default)
         {
-            if (_hasConnectedToMaster)
-            {
-                return new ValueTask<string>(_clusterId);
-            }
+            var masterLeaderInfo = await GetMasterLeaderInfoAsync(cancellationToken)
+                .ConfigureAwait(false);
 
-            return ConnectAsync(cancellationToken);
-
-            async ValueTask<string> ConnectAsync(CancellationToken cancellationToken)
-            {
-                await SetMasterLeaderInfoAsync(cancellationToken).ConfigureAwait(false);
-                return _clusterId;
-            }
+            return masterLeaderInfo.ClusterId;
         }
 
         /// <summary>
@@ -189,22 +160,11 @@ namespace Knet.Kudu.Client
         /// to the cluster.
         /// </summary>
         /// <param name="cancellationToken">The cancellation token.</param>
-        public ValueTask<ReadOnlyMemory<byte>> ExportAuthenticationCredentialsAsync(
+        public async ValueTask<ReadOnlyMemory<byte>> ExportAuthenticationCredentialsAsync(
             CancellationToken cancellationToken = default)
         {
-            if (_hasConnectedToMaster)
-            {
-                return new ValueTask<ReadOnlyMemory<byte>>(
-                    _securityContext.ExportAuthenticationCredentials());
-            }
-
-            return ConnectAsync(cancellationToken);
-
-            async ValueTask<ReadOnlyMemory<byte>> ConnectAsync(CancellationToken cancellationToken)
-            {
-                await SetMasterLeaderInfoAsync(cancellationToken).ConfigureAwait(false);
-                return _securityContext.ExportAuthenticationCredentials();
-            }
+            await GetMasterLeaderInfoAsync(cancellationToken).ConfigureAwait(false);
+            return _securityContext.ExportAuthenticationCredentials();
         }
 
         /// <summary>
@@ -1182,24 +1142,37 @@ namespace Knet.Kudu.Client
             }
         }
 
+        private ValueTask<MasterLeaderInfo> GetMasterLeaderInfoAsync(
+            CancellationToken cancellationToken)
+        {
+            var masterLeaderInfo = _masterLeaderInfo;
+            if (masterLeaderInfo is not null)
+            {
+                return new ValueTask<MasterLeaderInfo>(masterLeaderInfo);
+            }
+
+            var task = ConnectToClusterAsync(cancellationToken);
+            return new ValueTask<MasterLeaderInfo>(task);
+        }
+
         /// <summary>
         /// Locate the leader master and retrieve the cluster information.
         /// </summary>
         /// <param name="cancellationToken">The cancellation token.</param>
-        private async Task<ServerInfo> ConnectToClusterAsync(CancellationToken cancellationToken)
+        private async Task<MasterLeaderInfo> ConnectToClusterAsync(CancellationToken cancellationToken)
         {
-            var connectTime = _systemClock.CurrentMilliseconds;
+            var masterLeaderInfo = _masterLeaderInfo;
 
             await _singleClusterConnect.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                if (connectTime > _lastConnectedToMaster || _masterLeaderInfo is null)
+                if (ReferenceEquals(masterLeaderInfo, _masterLeaderInfo) ||
+                    _masterLeaderInfo is null)
                 {
                     var result = await ConnectToClusterWithoutLockAsync(cancellationToken)
                         .ConfigureAwait(false);
 
-                    _lastConnectedToMaster = _systemClock.CurrentMilliseconds;
-                    return result;
+                    SetMasterLeaderInfo(result);
                 }
             }
             finally
@@ -1210,7 +1183,8 @@ namespace Knet.Kudu.Client
             return _masterLeaderInfo;
         }
 
-        private async Task<ServerInfo> ConnectToClusterWithoutLockAsync(CancellationToken cancellationToken)
+        private async Task<ConnectToClusterResponse> ConnectToClusterWithoutLockAsync(
+            CancellationToken cancellationToken)
         {
             var masterAddresses = _options.MasterAddresses;
             var tasks = new Dictionary<Task<ConnectToMasterResponse>, HostAndPort>(masterAddresses.Count);
@@ -1273,8 +1247,7 @@ namespace Knet.Kudu.Client
                 throw exception;
             }
 
-            SetMasterLeaderInfo(leaderServerInfo, leaderResponsePb);
-            return leaderServerInfo;
+            return new ConnectToClusterResponse(leaderServerInfo, leaderResponsePb);
         }
 
         private async Task<ConnectToMasterResponse> ConnectToMasterAsync(
@@ -1343,17 +1316,9 @@ namespace Knet.Kudu.Client
             return SendRpcToMasterAsync(rpc, serverInfo, cancellationToken);
         }
 
-        private void SetMasterLeaderInfo(ServerInfo serverInfo, ConnectToMasterResponsePB responsePb)
+        private void SetMasterLeaderInfo(ConnectToClusterResponse clusterResponse)
         {
-            var hmsConfig = responsePb.HmsConfig;
-            if (hmsConfig is not null)
-            {
-                _hiveMetastoreConfig = new HiveMetastoreConfig(
-                    hmsConfig.HmsUris,
-                    hmsConfig.HmsSaslEnabled,
-                    hmsConfig.HmsUuid);
-            }
-
+            var responsePb = clusterResponse.ResponsePb;
             var authnToken = responsePb.AuthnToken;
             if (authnToken is not null)
             {
@@ -1368,16 +1333,13 @@ namespace Knet.Kudu.Client
                 _securityContext.TrustCertificates(certificates.ToMemoryArray());
             }
 
-            _location = responsePb.ClientLocation;
-            _clusterId = responsePb.ClusterId;
-            _masterLeaderInfo = serverInfo;
-            _hasConnectedToMaster = true;
-        }
+            var masterLeaderInfo = new MasterLeaderInfo(
+                responsePb.ClientLocation,
+                responsePb.ClusterId,
+                clusterResponse.ServerInfo,
+                responsePb.HmsConfig.ToHiveMetastoreConfig());
 
-        private Task SetMasterLeaderInfoAsync(CancellationToken cancellationToken)
-        {
-            var rpc = new ConnectToMasterRequest();
-            return SendRpcAsync(rpc, cancellationToken);
+            _masterLeaderInfo = masterLeaderInfo;
         }
 
         internal async Task<T> SendRpcAsync<T>(
@@ -1459,13 +1421,10 @@ namespace Knet.Kudu.Client
         private async Task<T> SendRpcToMasterAsync<T>(
             KuduMasterRpc<T> rpc, CancellationToken cancellationToken)
         {
-            ServerInfo serverInfo = _masterLeaderInfo;
+            var masterLeaderInfo = await GetMasterLeaderInfoAsync(cancellationToken)
+                .ConfigureAwait(false);
 
-            if (serverInfo == null)
-            {
-                serverInfo = await ConnectToClusterAsync(cancellationToken)
-                    .ConfigureAwait(false);
-            }
+            var serverInfo = masterLeaderInfo.ServerInfo;
 
             return await SendRpcToMasterAsync(rpc, serverInfo, cancellationToken)
                 .ConfigureAwait(false);
@@ -1527,7 +1486,8 @@ namespace Knet.Kudu.Client
 
         private ServerInfo GetServerInfo(RemoteTablet tablet, ReplicaSelection replicaSelection)
         {
-            return tablet.GetServerInfo(replicaSelection, _location);
+            var masterLeaderInfo = _masterLeaderInfo;
+            return tablet.GetServerInfo(replicaSelection, masterLeaderInfo.Location);
         }
 
         internal SignedTokenPB GetAuthzToken(string tableId)
@@ -1544,21 +1504,21 @@ namespace Knet.Kudu.Client
             // is discovered. We don't need the RPC's results; it's just a simple way to
             // wait until a leader master is elected.
 
-            var serverInfo = _masterLeaderInfo;
-            if (serverInfo == null)
+            var masterLeaderInfo = _masterLeaderInfo;
+            if (masterLeaderInfo is null)
             {
                 // If there's no leader master, this will time out and throw an exception.
                 await GetTabletServersAsync(cancellationToken).ConfigureAwait(false);
 
-                serverInfo = _masterLeaderInfo;
-                if (serverInfo == null)
+                masterLeaderInfo = _masterLeaderInfo;
+                if (masterLeaderInfo is null)
                 {
                     throw new NonRecoverableException(KuduStatus.IllegalState(
                         "Master leader could not be found"));
                 }
             }
 
-            return serverInfo.HostPort;
+            return masterLeaderInfo.ServerInfo.HostPort;
         }
 
         private async Task<T> SendRpcToMasterAsync<T>(
@@ -1825,9 +1785,9 @@ namespace Knet.Kudu.Client
 
         private readonly struct SplitKeyRangeResponse
         {
-            public RemoteTablet Tablet { get; }
+            public readonly RemoteTablet Tablet;
 
-            public IReadOnlyList<KeyRangePB> KeyRanges { get; }
+            public readonly IReadOnlyList<KeyRangePB> KeyRanges;
 
             public SplitKeyRangeResponse(
                 RemoteTablet tablet,
@@ -1838,7 +1798,13 @@ namespace Knet.Kudu.Client
             }
         }
 
-        private class ConnectToMasterResponse
+        private sealed record MasterLeaderInfo(
+            string Location,
+            string ClusterId,
+            ServerInfo ServerInfo,
+            HiveMetastoreConfig HiveMetastoreConfig);
+
+        private sealed class ConnectToMasterResponse
         {
             public ConnectToMasterResponsePB LeaderResponsePb { get; }
 
@@ -1859,11 +1825,11 @@ namespace Knet.Kudu.Client
             public bool IsLeader => LeaderServerInfo is not null;
         }
 
-        private class ConnectToClusterResponse
+        private readonly struct ConnectToClusterResponse
         {
-            public ServerInfo ServerInfo { get; }
+            public readonly ServerInfo ServerInfo;
 
-            public ConnectToMasterResponsePB ResponsePb { get; }
+            public readonly ConnectToMasterResponsePB ResponsePb;
 
             public ConnectToClusterResponse(
                 ServerInfo serverInfo,
@@ -1874,7 +1840,7 @@ namespace Knet.Kudu.Client
             }
         }
 
-        private class ExceptionBuilder
+        private sealed class ExceptionBuilder
         {
             private readonly List<string> _results = new(3);
             private readonly List<Exception> _exceptions = new(0);
