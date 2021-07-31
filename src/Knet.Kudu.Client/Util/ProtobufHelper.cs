@@ -159,6 +159,18 @@ namespace Knet.Kudu.Client.Util
             return partitionPb;
         }
 
+        public static HiveMetastoreConfig ToHiveMetastoreConfig(
+            this Protobuf.Master.HiveMetastoreConfig hmsConfig)
+        {
+            if (hmsConfig is null)
+                return null;
+
+            return new HiveMetastoreConfig(
+                hmsConfig.HmsUris,
+                hmsConfig.HmsSaslEnabled,
+                hmsConfig.HmsUuid);
+        }
+
         public static HostPortPB ToHostPortPb(HostAndPort hostAndPort)
         {
             return new HostPortPB
