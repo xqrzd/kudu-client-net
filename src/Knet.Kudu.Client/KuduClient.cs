@@ -1498,25 +1498,8 @@ namespace Knet.Kudu.Client
         internal async ValueTask<HostAndPort> FindLeaderMasterServerAsync(
             CancellationToken cancellationToken = default)
         {
-            // Consult the cache to determine the current leader master.
-            //
-            // If one isn't found, issue an RPC that retries until the leader master
-            // is discovered. We don't need the RPC's results; it's just a simple way to
-            // wait until a leader master is elected.
-
-            var masterLeaderInfo = _masterLeaderInfo;
-            if (masterLeaderInfo is null)
-            {
-                // If there's no leader master, this will time out and throw an exception.
-                await GetTabletServersAsync(cancellationToken).ConfigureAwait(false);
-
-                masterLeaderInfo = _masterLeaderInfo;
-                if (masterLeaderInfo is null)
-                {
-                    throw new NonRecoverableException(KuduStatus.IllegalState(
-                        "Master leader could not be found"));
-                }
-            }
+            var masterLeaderInfo = await GetMasterLeaderInfoAsync(cancellationToken)
+                .ConfigureAwait(false);
 
             return masterLeaderInfo.ServerInfo.HostPort;
         }
