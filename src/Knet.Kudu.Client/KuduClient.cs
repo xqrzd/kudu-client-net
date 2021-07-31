@@ -1487,7 +1487,7 @@ namespace Knet.Kudu.Client
         private ServerInfo GetServerInfo(RemoteTablet tablet, ReplicaSelection replicaSelection)
         {
             var masterLeaderInfo = _masterLeaderInfo;
-            return tablet.GetServerInfo(replicaSelection, masterLeaderInfo.Location);
+            return tablet.GetServerInfo(replicaSelection, masterLeaderInfo?.Location);
         }
 
         internal SignedTokenPB GetAuthzToken(string tableId)
