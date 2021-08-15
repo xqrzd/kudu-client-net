@@ -5,7 +5,7 @@ namespace Knet.Kudu.Client.Scanner
     /// <summary>
     /// Helper object that contains all the info sent by a TS after a Scan request.
     /// </summary>
-    public class ScanResponse<T>
+    public class ScanResponse
     {
         /// <summary>
         /// The ID associated with the scanner that issued the request.
@@ -15,12 +15,7 @@ namespace Knet.Kudu.Client.Scanner
         /// <summary>
         /// The actual payload of the response.
         /// </summary>
-        public T Data { get; }
-
-        /// <summary>
-        /// Number of rows returned by the scanner.
-        /// </summary>
-        public long NumRows { get; }
+        public ResultSet ResultSet { get; }
 
         /// <summary>
         /// If false, the filter we use decided there was no more data to scan.
@@ -57,8 +52,7 @@ namespace Knet.Kudu.Client.Scanner
 
         public ScanResponse(
             byte[] scannerId,
-            T data,
-            long numRows,
+            ResultSet resultSet,
             bool hasMoreResults,
             long scanTimestamp,
             long propagatedTimestamp,
@@ -66,8 +60,7 @@ namespace Knet.Kudu.Client.Scanner
             ResourceMetricsPB resourceMetricsPb)
         {
             ScannerId = scannerId;
-            Data = data;
-            NumRows = numRows;
+            ResultSet = resultSet;
             HasMoreResults = hasMoreResults;
             ScanTimestamp = scanTimestamp;
             PropagatedTimestamp = propagatedTimestamp;

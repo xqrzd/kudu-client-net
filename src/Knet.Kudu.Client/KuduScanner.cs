@@ -8,17 +8,15 @@ using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client
 {
-    public class KuduScanner<T> : IAsyncEnumerable<T>
+    public class KuduScanner : IAsyncEnumerable<ResultSet>
     {
         private readonly ILogger _logger;
         private readonly KuduClient _client;
         private readonly KuduTable _table;
-        private readonly IKuduScanParser<T> _parser;
         private readonly List<ColumnSchemaPB> _projectedColumnsPb;
         private readonly Dictionary<string, KuduPredicate> _predicates;
 
         private readonly OrderModePB _orderMode;
-        private readonly RowDataFormat _rowDataFormat;
         private readonly bool _isFaultTolerant;
         private readonly long _limit;
         private readonly long _startTimestamp;
@@ -58,13 +56,11 @@ namespace Knet.Kudu.Client
             ILogger logger,
             KuduClient client,
             KuduTable table,
-            IKuduScanParser<T> parser,
             List<string> projectedColumnNames,
             List<int> projectedColumnIndexes,
             Dictionary<string, KuduPredicate> predicates,
             ReadMode readMode,
             ReplicaSelection replicaSelection,
-            RowDataFormat rowDataFormat,
             bool isFaultTolerant,
             int? batchSizeBytes,
             long limit,
@@ -118,11 +114,9 @@ namespace Knet.Kudu.Client
             _logger = logger;
             _client = client;
             _table = table;
-            _parser = parser;
             _predicates = predicates;
             ReadMode = readMode;
             ReplicaSelection = replicaSelection;
-            _rowDataFormat = rowDataFormat;
             _isFaultTolerant = isFaultTolerant;
             _limit = limit;
             CacheBlocks = cacheBlocks;
@@ -152,7 +146,7 @@ namespace Knet.Kudu.Client
         /// </summary>
         public long? Limit => _limit > 0 ? _limit : null;
 
-        public KuduScanEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+        public KuduScanEnumerator GetAsyncEnumerator(CancellationToken cancellationToken = default)
         {
             var partitionPruner = PartitionPruner.Create(
                 _table.Schema,
@@ -163,17 +157,15 @@ namespace Knet.Kudu.Client
                 _lowerBoundPartitionKey,
                 _upperBoundPartitionKey);
 
-            return new KuduScanEnumerator<T>(
+            return new KuduScanEnumerator(
                 _logger,
                 _client,
                 _table,
-                _parser,
                 _projectedColumnsPb,
                 ProjectionSchema,
                 _orderMode,
                 ReadMode,
                 ReplicaSelection,
-                _rowDataFormat,
                 _isFaultTolerant,
                 _predicates,
                 _limit,
@@ -187,7 +179,7 @@ namespace Knet.Kudu.Client
                 cancellationToken);
         }
 
-        IAsyncEnumerator<T> IAsyncEnumerable<T>.GetAsyncEnumerator(CancellationToken cancellationToken)
+        IAsyncEnumerator<ResultSet> IAsyncEnumerable<ResultSet>.GetAsyncEnumerator(CancellationToken cancellationToken)
         {
             return GetAsyncEnumerator(cancellationToken);
         }

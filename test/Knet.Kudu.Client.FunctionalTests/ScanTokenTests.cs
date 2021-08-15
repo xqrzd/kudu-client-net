@@ -70,7 +70,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(16, tokens.Count);
 
             await using var newClient = _harness.CreateClient();
-            var rowCount = await CountScanTokenRowsAsync(newClient, table, tokens);
+            var rowCount = await CountScanTokenRowsAsync(newClient, tokens);
 
             Assert.Equal(100, rowCount);
         }
@@ -129,7 +129,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(6, tokens.Count);
 
             await using var newClient = _harness.CreateClient();
-            var rowCount = await CountScanTokenRowsAsync(newClient, table, tokens);
+            var rowCount = await CountScanTokenRowsAsync(newClient, tokens);
 
             Assert.Equal('f' - 'a' + 'z' - 'h', rowCount);
         }
@@ -302,7 +302,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 }));
 
             // Rehydrate the tokens.
-            var scanners = new List<KuduScanner<ResultSet>>();
+            var scanners = new List<KuduScanner>();
             foreach (var token in tokens)
             {
                 var scanBuilder = await _client.NewScanBuilderFromTokenAsync(token);
@@ -322,7 +322,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             // Check the scanners work. The scanners for the tablets in the range
             // [10, 20) definitely won't see any rows. The scanners for the tablets
             // in the range [20, 30) might see rows.
-            int scannedRows = 0;
+            long scannedRows = 0;
             foreach (var scanner in scanners)
             {
                 await foreach (var resultSet in scanner)
@@ -401,8 +401,6 @@ namespace Knet.Kudu.Client.FunctionalTests
             // rehydrated into a scanner
             await _client.AlterTableAsync(new AlterTableBuilder(table)
                 .RenameColumn("column1_i", "column1_i_new"));
-
-            table = await _client.OpenTableAsync(_tableName);
 
             var scanBuilder = await _client.NewScanBuilderFromTokenAsync(token);
             var scanner = scanBuilder.Build();
@@ -568,8 +566,8 @@ namespace Knet.Kudu.Client.FunctionalTests
             return timestamp;
         }
 
-        private async Task CheckDiffScanResultsAsync(
-            KuduScanner<ResultSet> scanner,
+        private static async Task CheckDiffScanResultsAsync(
+            KuduScanner scanner,
             int numExpectedMutations,
             int numExpectedDeletes)
         {
@@ -596,16 +594,16 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(numExpectedDeletes, numDeletes);
         }
 
-        private static async Task<int> CountScanTokenRowsAsync(
-            KuduClient client, KuduTable table, List<KuduScanToken> tokens)
+        private static async Task<long> CountScanTokenRowsAsync(
+            KuduClient client, List<KuduScanToken> tokens)
         {
-            var tasks = new List<Task<int>>();
+            var tasks = new List<Task<long>>();
 
             foreach (var token in tokens)
             {
                 var task = Task.Run(async () =>
                 {
-                    var count = 0;
+                    long count = 0;
                     var tokenBytes = token.Serialize();
 
                     var scanBuilder = await client.NewScanBuilderFromTokenAsync(tokenBytes);

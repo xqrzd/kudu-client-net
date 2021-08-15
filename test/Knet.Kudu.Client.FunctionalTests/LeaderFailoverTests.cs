@@ -37,7 +37,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             await client.WriteAsync(rows);
 
             // Make sure the rows are in there before messing things up.
-            var numRows = 0;
+            long numRows = 0;
             var scanner = client.NewScanBuilder(table)
                 .Build();
 
@@ -58,7 +58,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             await client.WriteAsync(rows2);
 
-            var numRows2 = 0;
+            long numRows2 = 0;
 
             await foreach (var resultSet in scanner)
             {

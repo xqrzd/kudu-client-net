@@ -23,7 +23,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client
 {
-    public class KuduClient : IAsyncDisposable
+    public sealed class KuduClient : IAsyncDisposable
     {
         /// <summary>
         /// The number of tablets to fetch from the master in a round trip when
@@ -551,46 +551,29 @@ namespace Knet.Kudu.Client
             return response;
         }
 
-        public KuduScannerBuilder<ResultSet> NewScanBuilder(KuduTable table)
+        public KuduScannerBuilder NewScanBuilder(KuduTable table)
         {
-            return NewScanBuilder<ResultSet>(table);
+            return new KuduScannerBuilder(this, table, _scanLogger);
         }
 
-        public KuduScannerBuilder<T> NewScanBuilder<T>(KuduTable table)
-        {
-            return new KuduScannerBuilder<T>(this, table, _scanLogger);
-        }
-
-        public ValueTask<KuduScannerBuilder<ResultSet>> NewScanBuilderFromTokenAsync(
-            ReadOnlyMemory<byte> scanToken, CancellationToken cancellationToken = default)
-        {
-            return NewScanBuilderFromTokenAsync<ResultSet>(scanToken, cancellationToken);
-        }
-
-        public ValueTask<KuduScannerBuilder<ResultSet>> NewScanBuilderFromTokenAsync(
-            KuduScanToken scanToken, CancellationToken cancellationToken = default)
-        {
-            return NewScanBuilderFromTokenAsync<ResultSet>(scanToken, cancellationToken);
-        }
-
-        public ValueTask<KuduScannerBuilder<T>> NewScanBuilderFromTokenAsync<T>(
+        public ValueTask<KuduScannerBuilder> NewScanBuilderFromTokenAsync(
             ReadOnlyMemory<byte> scanToken, CancellationToken cancellationToken = default)
         {
             var scanTokenPb = KuduScanToken.DeserializePb(scanToken.Span);
-            return NewScanBuilderFromTokenAsync<T>(scanTokenPb, cancellationToken);
+            return NewScanBuilderFromTokenAsync(scanTokenPb, cancellationToken);
         }
 
-        public ValueTask<KuduScannerBuilder<T>> NewScanBuilderFromTokenAsync<T>(
+        public ValueTask<KuduScannerBuilder> NewScanBuilderFromTokenAsync(
             KuduScanToken scanToken, CancellationToken cancellationToken = default)
         {
-            return NewScanBuilderFromTokenAsync<T>(scanToken.Message, cancellationToken);
+            return NewScanBuilderFromTokenAsync(scanToken.Message, cancellationToken);
         }
 
-        private async ValueTask<KuduScannerBuilder<T>> NewScanBuilderFromTokenAsync<T>(
+        private async ValueTask<KuduScannerBuilder> NewScanBuilderFromTokenAsync(
             ScanTokenPB scanTokenPb, CancellationToken cancellationToken)
         {
             var table = await OpenTableAsync(scanTokenPb, cancellationToken).ConfigureAwait(false);
-            var scanBuilder = NewScanBuilder<T>(table);
+            var scanBuilder = NewScanBuilder(table);
             KuduScanToken.PbIntoScanner(scanBuilder, scanTokenPb);
 
             // Prime the client tablet location cache if no entry is already present.

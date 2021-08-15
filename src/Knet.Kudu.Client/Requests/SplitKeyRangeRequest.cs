@@ -1,10 +1,11 @@
 using System.Buffers;
 using Google.Protobuf;
 using Knet.Kudu.Client.Protobuf.Tserver;
+using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client.Requests
 {
-    public class SplitKeyRangeRequest : KuduTabletRpc<SplitKeyRangeResponsePB>
+    internal class SplitKeyRangeRequest : KuduTabletRpc<SplitKeyRangeResponsePB>
     {
         private readonly SplitKeyRangeRequestPB _request;
 
@@ -43,9 +44,9 @@ namespace Knet.Kudu.Client.Requests
 
         public override void WriteTo(IBufferWriter<byte> output) => _request.WriteTo(output);
 
-        public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
+        public override void ParseResponse(KuduMessage message)
         {
-            Output = SplitKeyRangeResponsePB.Parser.ParseFrom(buffer);
+            Output = SplitKeyRangeResponsePB.Parser.ParseFrom(message.MessageProtobuf);
             Error = Output.Error;
         }
     }

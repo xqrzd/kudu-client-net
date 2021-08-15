@@ -83,7 +83,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 var insert = ClientTestUtil.CreateBasicSchemaInsert(table, i);
                 await session.EnqueueAsync(insert);
                 await session.FlushAsync();
-                int numRows = await ClientTestUtil.CountRowsAsync(client, table);
+                long numRows = await ClientTestUtil.CountRowsAsync(client, table);
                 Assert.Equal(i + 1, numRows);
             }
 

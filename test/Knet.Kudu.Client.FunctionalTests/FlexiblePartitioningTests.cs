@@ -255,7 +255,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _client.WriteAsync(operations);
         }
 
-        private async Task<HashSet<Row>> CollectRowsAsync(KuduScanner<ResultSet> scanner)
+        private static async Task<HashSet<Row>> CollectRowsAsync(KuduScanner scanner)
         {
             var rows = new HashSet<Row>();
             await foreach (var resultSet in scanner)

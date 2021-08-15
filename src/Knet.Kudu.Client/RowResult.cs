@@ -1,25 +1,17 @@
 using System;
-using System.Runtime.CompilerServices;
 using System.Text;
-using Knet.Kudu.Client.Internal;
-using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client
 {
-    public readonly ref struct RowResult
+    public readonly struct RowResult
     {
         private readonly ResultSet _resultSet;
-        private readonly ReadOnlySpan<byte> _rowData;
-        private readonly ReadOnlySpan<byte> _indirectData;
+        private readonly int _index;
 
-        public RowResult(
-            ResultSet resultSet,
-            ReadOnlySpan<byte> rowData,
-            ReadOnlySpan<byte> indirectData)
+        internal RowResult(ResultSet resultSet, int index)
         {
             _resultSet = resultSet;
-            _rowData = rowData;
-            _indirectData = indirectData;
+            _index = index;
         }
 
         /// <summary>
@@ -32,500 +24,163 @@ namespace Knet.Kudu.Client
         /// </summary>
         public bool IsDeleted => GetBool(_resultSet.Schema.IsDeletedIndex);
 
-        public bool GetBool(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetBool(columnIndex);
-        }
-
-        public bool GetBool(int columnIndex)
-        {
-            CheckTypeNotNull(columnIndex, KuduType.Bool);
-            return ReadBool(columnIndex);
-        }
-
-        public bool? GetNullableBool(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetNullableBool(columnIndex);
-        }
-
-        public bool? GetNullableBool(int columnIndex)
-        {
-            CheckType(columnIndex, KuduType.Bool);
-
-            if (IsNull(columnIndex))
-                return null;
-
-            return ReadBool(columnIndex);
-        }
-
-        private bool ReadBool(int columnIndex)
-        {
-            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 1);
-            return KuduEncoder.DecodeBool(data);
-        }
-
-        public byte GetByte(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetByte(columnIndex);
-        }
-
-        public byte GetByte(int columnIndex)
-        {
-            CheckTypeNotNull(columnIndex, KuduType.Int8);
-            return ReadByte(columnIndex);
-        }
-
-        public byte? GetNullableByte(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetNullableByte(columnIndex);
-        }
-
-        public byte? GetNullableByte(int columnIndex)
-        {
-            CheckType(columnIndex, KuduType.Int8);
-
-            if (IsNull(columnIndex))
-                return null;
-
-            return ReadByte(columnIndex);
-        }
-
-        private byte ReadByte(int columnIndex)
-        {
-            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 1);
-            return KuduEncoder.DecodeUInt8(data);
-        }
-
-        public sbyte GetSByte(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetSByte(columnIndex);
-        }
-
-        public sbyte GetSByte(int columnIndex)
-        {
-            CheckTypeNotNull(columnIndex, KuduType.Int8);
-            return ReadSByte(columnIndex);
-        }
-
-        public sbyte? GetNullableSByte(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetNullableSByte(columnIndex);
-        }
-
-        public sbyte? GetNullableSByte(int columnIndex)
-        {
-            CheckType(columnIndex, KuduType.Int8);
-
-            if (IsNull(columnIndex))
-                return null;
-
-            return ReadSByte(columnIndex);
-        }
-
-        private sbyte ReadSByte(int columnIndex)
-        {
-            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 1);
-            return KuduEncoder.DecodeInt8(data);
-        }
-
-        public short GetInt16(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetInt16(columnIndex);
-        }
-
-        public short GetInt16(int columnIndex)
-        {
-            CheckTypeNotNull(columnIndex, KuduType.Int16);
-            return ReadInt16(columnIndex);
-        }
-
-        public short? GetNullableInt16(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetNullableInt16(columnIndex);
-        }
-
-        public short? GetNullableInt16(int columnIndex)
-        {
-            CheckType(columnIndex, KuduType.Int16);
-
-            if (IsNull(columnIndex))
-                return null;
-
-            return ReadInt16(columnIndex);
-        }
-
-        private short ReadInt16(int columnIndex)
-        {
-            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 2);
-            return KuduEncoder.DecodeInt16(data);
-        }
-
-        public int GetInt32(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetInt32(columnIndex);
-        }
-
-        public int GetInt32(int columnIndex)
-        {
-            CheckTypeNotNull(columnIndex, KuduTypeFlags.Int32 | KuduTypeFlags.Date);
-            return ReadInt32(columnIndex);
-        }
-
-        public int? GetNullableInt32(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetNullableInt32(columnIndex);
-        }
-
-        public int? GetNullableInt32(int columnIndex)
-        {
-            CheckType(columnIndex, KuduTypeFlags.Int32 | KuduTypeFlags.Date);
-
-            if (IsNull(columnIndex))
-                return null;
-
-            return ReadInt32(columnIndex);
-        }
-
-        private int ReadInt32(int columnIndex)
-        {
-            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 4);
-            return KuduEncoder.DecodeInt32(data);
-        }
-
-        public long GetInt64(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetInt64(columnIndex);
-        }
-
-        public long GetInt64(int columnIndex)
-        {
-            CheckTypeNotNull(columnIndex,
-                KuduTypeFlags.Int64 |
-                KuduTypeFlags.UnixtimeMicros);
-
-            return ReadInt64(columnIndex);
-        }
-
-        public long? GetNullableInt64(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetNullableInt64(columnIndex);
-        }
-
-        public long? GetNullableInt64(int columnIndex)
-        {
-            CheckType(columnIndex,
-                KuduTypeFlags.Int64 |
-                KuduTypeFlags.UnixtimeMicros);
-
-            if (IsNull(columnIndex))
-                return null;
-
-            return ReadInt64(columnIndex);
-        }
-
-        private long ReadInt64(int columnIndex)
-        {
-            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 8);
-            return KuduEncoder.DecodeInt64(data);
-        }
-
-        public DateTime GetDateTime(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetDateTime(columnIndex);
-        }
-
-        public DateTime GetDateTime(int columnIndex)
-        {
-            var columnSchema = GetColumnSchema(columnIndex);
-            var type = columnSchema.Type;
-
-            CheckNotNull(columnSchema, columnIndex);
-
-            if (type == KuduType.UnixtimeMicros)
-            {
-                return ReadDateTime(columnIndex);
-            }
-            else if (type == KuduType.Date)
-            {
-                return ReadDate(columnIndex);
-            }
-
-            return KuduTypeValidation.ThrowException<DateTime>(columnSchema,
-                KuduTypeFlags.UnixtimeMicros |
-                KuduTypeFlags.Date);
-        }
-
-        public DateTime? GetNullableDateTime(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetNullableDateTime(columnIndex);
-        }
-
-        public DateTime? GetNullableDateTime(int columnIndex)
-        {
-            var columnSchema = GetColumnSchema(columnIndex);
-            var type = columnSchema.Type;
-
-            if (IsNull(columnIndex))
-                return null;
-
-            if (type == KuduType.UnixtimeMicros)
-            {
-                return ReadDateTime(columnIndex);
-            }
-            else if (type == KuduType.Date)
-            {
-                return ReadDate(columnIndex);
-            }
-
-            return KuduTypeValidation.ThrowException<DateTime>(columnSchema,
-                KuduTypeFlags.UnixtimeMicros |
-                KuduTypeFlags.Date);
-        }
-
-        private DateTime ReadDateTime(int columnIndex)
-        {
-            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 8);
-            return KuduEncoder.DecodeDateTime(data);
-        }
-
-        private DateTime ReadDate(int columnIndex)
-        {
-            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 4);
-            return KuduEncoder.DecodeDate(data);
-        }
-
-        public float GetFloat(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetFloat(columnIndex);
-        }
-
-        public float GetFloat(int columnIndex)
-        {
-            CheckTypeNotNull(columnIndex, KuduType.Float);
-            return ReadFloat(columnIndex);
-        }
-
-        public float? GetNullableFloat(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetNullableFloat(columnIndex);
-        }
-
-        public float? GetNullableFloat(int columnIndex)
-        {
-            CheckType(columnIndex, KuduType.Float);
-
-            if (IsNull(columnIndex))
-                return null;
-
-            return ReadFloat(columnIndex);
-        }
-
-        private float ReadFloat(int columnIndex)
-        {
-            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 4);
-            return KuduEncoder.DecodeFloat(data);
-        }
-
-        public double GetDouble(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetDouble(columnIndex);
-        }
-
-        public double GetDouble(int columnIndex)
-        {
-            CheckTypeNotNull(columnIndex, KuduType.Double);
-            return ReadDouble(columnIndex);
-        }
-
-        public double? GetNullableDouble(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetNullableDouble(columnIndex);
-        }
-
-        public double? GetNullableDouble(int columnIndex)
-        {
-            CheckType(columnIndex, KuduType.Double);
-
-            if (IsNull(columnIndex))
-                return null;
-
-            return ReadDouble(columnIndex);
-        }
-
-        private double ReadDouble(int columnIndex)
-        {
-            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, 8);
-            return KuduEncoder.DecodeDouble(data);
-        }
-
-        public decimal GetDecimal(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetDecimal(columnIndex);
-        }
-
-        public decimal GetDecimal(int columnIndex)
-        {
-            CheckTypeNotNull(columnIndex,
-                KuduTypeFlags.Decimal32 |
-                KuduTypeFlags.Decimal64 |
-                KuduTypeFlags.Decimal128);
-
-            return ReadDecimal(columnIndex);
-        }
-
-        public decimal? GetNullableDecimal(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetNullableDecimal(columnIndex);
-        }
-
-        public decimal? GetNullableDecimal(int columnIndex)
-        {
-            CheckType(columnIndex,
-                KuduTypeFlags.Decimal32 |
-                KuduTypeFlags.Decimal64 |
-                KuduTypeFlags.Decimal128);
-
-            if (IsNull(columnIndex))
-                return null;
-
-            return ReadDecimal(columnIndex);
-        }
-
-        private decimal ReadDecimal(int columnIndex)
-        {
-            ColumnSchema column = GetColumnSchema(columnIndex);
-            int scale = column.TypeAttributes.Scale.GetValueOrDefault();
-
-            ReadOnlySpan<byte> data = ReadDataSlice(columnIndex, column.Size);
-            return KuduEncoder.DecodeDecimal(data, column.Type, scale);
-        }
+        public bool GetBool(string columnName) =>
+            _resultSet.GetBool(columnName, _index);
+
+        public bool GetBool(int columnIndex) =>
+            _resultSet.GetBool(columnIndex, _index);
+
+        public bool? GetNullableBool(string columnName) =>
+            _resultSet.GetNullableBool(columnName, _index);
+
+        public bool? GetNullableBool(int columnIndex) =>
+            _resultSet.GetNullableBool(columnIndex, _index);
+
+        public byte GetByte(string columnName) =>
+            _resultSet.GetByte(columnName, _index);
+
+        public byte GetByte(int columnIndex) =>
+            _resultSet.GetByte(columnIndex, _index);
+
+        public byte? GetNullableByte(string columnName) =>
+            _resultSet.GetNullableByte(columnName, _index);
+
+        public byte? GetNullableByte(int columnIndex) =>
+            _resultSet.GetNullableByte(columnIndex, _index);
+
+        public sbyte GetSByte(string columnName) =>
+            _resultSet.GetSByte(columnName, _index);
+
+        public sbyte GetSByte(int columnIndex) =>
+            _resultSet.GetSByte(columnIndex, _index);
+
+        public sbyte? GetNullableSByte(string columnName) =>
+            _resultSet.GetNullableSByte(columnName, _index);
+
+        public sbyte? GetNullableSByte(int columnIndex) =>
+            _resultSet.GetNullableSByte(columnIndex, _index);
+
+        public short GetInt16(string columnName) =>
+            _resultSet.GetInt16(columnName, _index);
+
+        public short GetInt16(int columnIndex) =>
+            _resultSet.GetInt16(columnIndex, _index);
+
+        public short? GetNullableInt16(string columnName) =>
+            _resultSet.GetNullableInt16(columnName, _index);
+
+        public short? GetNullableInt16(int columnIndex) =>
+            _resultSet.GetNullableInt16(columnIndex, _index);
+
+        public int GetInt32(string columnName) =>
+            _resultSet.GetInt32(columnName, _index);
+
+        public int GetInt32(int columnIndex) =>
+            _resultSet.GetInt32(columnIndex, _index);
+
+        public int? GetNullableInt32(string columnName) =>
+            _resultSet.GetNullableInt32(columnName, _index);
+
+        public int? GetNullableInt32(int columnIndex) =>
+            _resultSet.GetNullableInt32(columnIndex, _index);
+
+        public long GetInt64(string columnName) =>
+            _resultSet.GetInt64(columnName, _index);
+
+        public long GetInt64(int columnIndex) =>
+            _resultSet.GetInt64(columnIndex, _index);
+
+        public long? GetNullableInt64(string columnName) =>
+            _resultSet.GetNullableInt64(columnName, _index);
+
+        public long? GetNullableInt64(int columnIndex) =>
+            _resultSet.GetNullableInt64(columnIndex, _index);
+
+        public DateTime GetDateTime(string columnName) =>
+            _resultSet.GetDateTime(columnName, _index);
+
+        public DateTime GetDateTime(int columnIndex) =>
+            _resultSet.GetDateTime(columnIndex, _index);
+
+        public DateTime? GetNullableDateTime(string columnName) =>
+            _resultSet.GetNullableDateTime(columnName, _index);
+
+        public DateTime? GetNullableDateTime(int columnIndex) =>
+            _resultSet.GetNullableDateTime(columnIndex, _index);
+
+        public float GetFloat(string columnName) =>
+            _resultSet.GetFloat(columnName, _index);
+
+        public float GetFloat(int columnIndex) =>
+            _resultSet.GetFloat(columnIndex, _index);
+
+        public float? GetNullableFloat(string columnName) =>
+            _resultSet.GetNullableFloat(columnName, _index);
+
+        public float? GetNullableFloat(int columnIndex) =>
+            _resultSet.GetNullableFloat(columnIndex, _index);
+
+        public double GetDouble(string columnName) =>
+            _resultSet.GetDouble(columnName, _index);
+
+        public double GetDouble(int columnIndex) =>
+            _resultSet.GetDouble(columnIndex, _index);
+
+        public double? GetNullableDouble(string columnName) =>
+            _resultSet.GetNullableDouble(columnName, _index);
+
+        public double? GetNullableDouble(int columnIndex) =>
+            _resultSet.GetNullableDouble(columnIndex, _index);
+
+        public decimal GetDecimal(string columnName) =>
+            _resultSet.GetDecimal(columnName, _index);
+
+        public decimal GetDecimal(int columnIndex) =>
+            _resultSet.GetDecimal(columnIndex, _index);
+
+        public decimal? GetNullableDecimal(string columnName) =>
+            _resultSet.GetNullableDecimal(columnName, _index);
+
+        public decimal? GetNullableDecimal(int columnIndex) =>
+            _resultSet.GetNullableDecimal(columnIndex, _index);
 
         /// <summary>
         /// Get the raw value of a fixed length data column.
         /// </summary>
         /// <param name="columnName">The column name.</param>
-        public ReadOnlySpan<byte> GetRawFixed(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetRawFixed(columnIndex);
-        }
+        public ReadOnlySpan<byte> GetRawFixed(string columnName) =>
+            _resultSet.GetRawFixed(columnName, _index);
 
         /// <summary>
         /// Get the raw value of a fixed length data column.
         /// </summary>
         /// <param name="columnIndex">The column index.</param>
-        public ReadOnlySpan<byte> GetRawFixed(int columnIndex)
-        {
-            ColumnSchema column = CheckFixedLengthType(columnIndex);
+        public ReadOnlySpan<byte> GetRawFixed(int columnIndex) =>
+            _resultSet.GetRawFixed(columnIndex, _index);
 
-            if (IsNull(columnIndex))
-                return default;
+        public string GetString(string columnName) =>
+            _resultSet.GetString(columnName, _index);
 
-            return ReadDataSlice(columnIndex, column.Size);
-        }
+        public string GetString(int columnIndex) =>
+            _resultSet.GetString(columnIndex, _index);
 
-        public string GetString(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetString(columnIndex);
-        }
+        public string GetNullableString(string columnName) =>
+            _resultSet.GetNullableString(columnName, _index);
 
-        public string GetString(int columnIndex)
-        {
-            CheckTypeNotNull(columnIndex,
-                KuduTypeFlags.String |
-                KuduTypeFlags.Varchar);
+        public string GetNullableString(int columnIndex) =>
+            _resultSet.GetNullableString(columnIndex, _index);
 
-            return ReadString(columnIndex);
-        }
+        public ReadOnlySpan<byte> GetBinary(string columnName) =>
+            _resultSet.GetBinary(columnName, _index);
 
-        public string GetNullableString(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetNullableString(columnIndex);
-        }
+        public ReadOnlySpan<byte> GetBinary(int columnIndex) =>
+            _resultSet.GetBinary(columnIndex, _index);
 
-        public string GetNullableString(int columnIndex)
-        {
-            CheckType(columnIndex,
-                KuduTypeFlags.String |
-                KuduTypeFlags.Varchar);
+        public bool IsNull(string columnName) =>
+            _resultSet.IsNull(columnName, _index);
 
-            if (IsNull(columnIndex))
-                return null;
-
-            return ReadString(columnIndex);
-        }
-
-        private string ReadString(int columnIndex)
-        {
-            ReadOnlySpan<byte> data = ReadBinary(columnIndex);
-            return KuduEncoder.DecodeString(data);
-        }
-
-        public ReadOnlySpan<byte> GetBinary(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return GetBinary(columnIndex);
-        }
-
-        public ReadOnlySpan<byte> GetBinary(int columnIndex)
-        {
-            CheckType(columnIndex, KuduType.Binary);
-
-            if (IsNull(columnIndex))
-                return default;
-
-            return ReadBinary(columnIndex);
-        }
-
-        private ReadOnlySpan<byte> ReadBinary(int columnIndex)
-        {
-            int position = _resultSet.GetOffset(columnIndex);
-            ReadOnlySpan<byte> offsetData = _rowData.Slice(position, 8);
-            ReadOnlySpan<byte> lengthData = _rowData.Slice(position + 8, 8);
-
-            int offset = (int)KuduEncoder.DecodeInt64(offsetData);
-            int length = (int)KuduEncoder.DecodeInt64(lengthData);
-
-            return _indirectData.Slice(offset, length);
-        }
-
-        public bool IsNull(string columnName)
-        {
-            int columnIndex = GetColumnIndex(columnName);
-            return IsNull(columnIndex);
-        }
-
-        public bool IsNull(int columnIndex)
-        {
-            if (!_resultSet.HasNullableColumns)
-                return false;
-
-            int nullBitSetOffset = _resultSet.NullBitSetOffset;
-            bool isNull = _rowData.GetBit(nullBitSetOffset, columnIndex);
-            return isNull;
-        }
+        public bool IsNull(int columnIndex) =>
+            _resultSet.IsNull(columnIndex, _index);
 
         public override string ToString()
         {
@@ -588,6 +243,11 @@ namespace Knet.Kudu.Client
                         case KuduType.Bool:
                             stringBuilder.Append(GetBool(i));
                             break;
+                        case KuduType.Decimal32:
+                        case KuduType.Decimal64:
+                        case KuduType.Decimal128:
+                            stringBuilder.Append(GetDecimal(i));
+                            break;
                         default:
                             stringBuilder.Append("<unknown type!>");
                             break;
@@ -596,66 +256,6 @@ namespace Knet.Kudu.Client
             }
 
             return stringBuilder.ToString();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ReadOnlySpan<byte> ReadDataSlice(int columnIndex, int dataSize)
-        {
-            int position = _resultSet.GetOffset(columnIndex);
-            return _rowData.Slice(position, dataSize);
-        }
-
-        private ColumnSchema CheckType(int columnIndex, KuduType type)
-        {
-            var columnSchema = GetColumnSchema(columnIndex);
-            KuduTypeValidation.ValidateColumnType(columnSchema, type);
-            return columnSchema;
-        }
-
-        private ColumnSchema CheckType(int columnIndex, KuduTypeFlags typeFlags)
-        {
-            var columnSchema = GetColumnSchema(columnIndex);
-            KuduTypeValidation.ValidateColumnType(columnSchema, typeFlags);
-            return columnSchema;
-        }
-
-        private ColumnSchema CheckFixedLengthType(int columnIndex)
-        {
-            var columnSchema = GetColumnSchema(columnIndex);
-            KuduTypeValidation.ValidateColumnIsFixedLengthType(columnSchema);
-            return columnSchema;
-        }
-
-        private ColumnSchema CheckTypeNotNull(int columnIndex, KuduType type)
-        {
-            var columnSchema = CheckType(columnIndex, type);
-            CheckNotNull(columnSchema, columnIndex);
-            return columnSchema;
-        }
-
-        private ColumnSchema CheckTypeNotNull(int columnIndex, KuduTypeFlags typeFlags)
-        {
-            var columnSchema = CheckType(columnIndex, typeFlags);
-            CheckNotNull(columnSchema, columnIndex);
-            return columnSchema;
-        }
-
-        private void CheckNotNull(ColumnSchema columnSchema, int columnIndex)
-        {
-            if (IsNull(columnIndex))
-            {
-                KuduTypeValidation.ThrowNullException(columnSchema);
-            }
-        }
-
-        private ColumnSchema GetColumnSchema(int columnIndex)
-        {
-            return _resultSet.Schema.GetColumn(columnIndex);
-        }
-
-        private int GetColumnIndex(string columnName)
-        {
-            return _resultSet.Schema.GetColumnIndex(columnName);
         }
     }
 }

@@ -36,7 +36,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             await session.FlushAsync();
 
-            var scanner = client.NewScanBuilder<ResultSet>(table).Build();
+            var scanner = client.NewScanBuilder(table).Build();
 
             await foreach (var resultSet in scanner)
             {
@@ -111,7 +111,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             await session.FlushAsync();
 
-            var scanner = client.NewScanBuilder<ResultSet>(table).Build();
+            var scanner = client.NewScanBuilder(table).Build();
 
             await foreach (var resultSet in scanner)
             {
@@ -200,7 +200,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             await session.FlushAsync();
 
-            var scanner = client.NewScanBuilder<ResultSet>(table)
+            var scanner = client.NewScanBuilder(table)
                 .SetEmptyProjection()
                 .Build();
 

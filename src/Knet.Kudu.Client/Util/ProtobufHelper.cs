@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using Google.Protobuf;
@@ -8,7 +7,6 @@ using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Protobuf;
 using Knet.Kudu.Client.Protobuf.Client;
 using Knet.Kudu.Client.Protobuf.Master;
-using Knet.Kudu.Client.Protobuf.Rpc;
 using Knet.Kudu.Client.Tablet;
 
 namespace Knet.Kudu.Client.Util
@@ -65,11 +63,6 @@ namespace Knet.Kudu.Client.Util
             }
 
             return results;
-        }
-
-        public static ErrorStatusPB GetErrorStatus(ReadOnlySequence<byte> buffer)
-        {
-            return ErrorStatusPB.Parser.ParseFrom(buffer);
         }
 
         public static ColumnTypeAttributes ToTypeAttributes(

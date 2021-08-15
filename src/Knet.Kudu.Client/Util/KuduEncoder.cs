@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace Knet.Kudu.Client.Util
@@ -287,6 +288,103 @@ namespace Knet.Kudu.Client.Util
 
         public static string DecodeString(ReadOnlySpan<byte> source) =>
             Encoding.UTF8.GetString(source);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool DecodeBool(byte[] source, int offset) => source[offset] > 0;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static byte DecodeUInt8(byte[] source, int offset) => source[offset];
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static short DecodeInt16(byte[] source, int offset)
+        {
+            short result = BitConverter.ToInt16(source, offset);
+            if (!BitConverter.IsLittleEndian)
+            {
+                result = BinaryPrimitives.ReverseEndianness(result);
+            }
+            return result;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int DecodeInt32(byte[] source, int offset)
+        {
+            int result = BitConverter.ToInt32(source, offset);
+            if (!BitConverter.IsLittleEndian)
+            {
+                result = BinaryPrimitives.ReverseEndianness(result);
+            }
+            return result;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static long DecodeInt64(byte[] source, int offset)
+        {
+            long result = BitConverter.ToInt64(source, offset);
+            if (!BitConverter.IsLittleEndian)
+            {
+                result = BinaryPrimitives.ReverseEndianness(result);
+            }
+            return result;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static KuduInt128 DecodeInt128(byte[] source, int offset)
+        {
+            var low = (ulong)DecodeInt64(source, offset);
+            var high = DecodeInt64(source, offset + 8);
+
+            return new KuduInt128(high, low);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static DateTime DecodeDate(byte[] source, int offset)
+        {
+            int days = DecodeInt32(source, offset);
+            return EpochTime.FromUnixTimeDays(days);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static DateTime DecodeDateTime(byte[] source, int offset)
+        {
+            long micros = DecodeInt64(source, offset);
+            return EpochTime.FromUnixTimeMicros(micros);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float DecodeFloat(byte[] source, int offset)
+        {
+            int value = DecodeInt32(source, offset);
+            return value.AsFloat();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static double DecodeDouble(byte[] source, int offset)
+        {
+            long value = DecodeInt64(source, offset);
+            return value.AsDouble();
+        }
+
+        public static decimal DecodeDecimal(byte[] source, int offset, KuduType kuduType, int scale)
+        {
+            switch (kuduType)
+            {
+                case KuduType.Decimal32:
+                    int intVal = DecodeInt32(source, offset);
+                    return DecimalUtil.DecodeDecimal32(intVal, scale);
+
+                case KuduType.Decimal64:
+                    long longVal = DecodeInt64(source, offset);
+                    return DecimalUtil.DecodeDecimal64(longVal, scale);
+
+                default:
+                    KuduInt128 int128Val = DecodeInt128(source, offset);
+                    return DecimalUtil.DecodeDecimal128(int128Val, scale);
+            }
+        }
+
+        public static string DecodeString(byte[] source, int offset, int length) =>
+            Encoding.UTF8.GetString(source, offset, length);
 
         public static int BitsToBytes(int bits) => (int)(((uint)bits + 7) / 8);
 
