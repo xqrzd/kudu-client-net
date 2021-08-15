@@ -1,14 +1,13 @@
 using System;
 using System.Runtime.CompilerServices;
 using Knet.Kudu.Client.Internal;
-using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client
 {
     public sealed class ResultSet : IDisposable
     {
-        private readonly KuduMessageOwner _message;
+        private readonly ArrayPoolBuffer<byte> _buffer;
         private readonly byte[] _data;
         private readonly int[] _dataSidecarOffsets;
         private readonly int[] _varlenDataSidecarOffsets;
@@ -19,15 +18,15 @@ namespace Knet.Kudu.Client
         public long Count { get; }
 
         internal ResultSet(
-            KuduMessageOwner message,
+            ArrayPoolBuffer<byte> buffer,
             KuduSchema schema,
             long count,
             int[] dataSidecarOffsets,
             int[] varlenDataSidecarOffsets,
             int[] nonNullBitmapSidecarOffsets)
         {
-            _message = message;
-            _data = message.Buffer;
+            _buffer = buffer;
+            _data = buffer.Buffer;
             _dataSidecarOffsets = dataSidecarOffsets;
             _varlenDataSidecarOffsets = varlenDataSidecarOffsets;
             _nonNullBitmapSidecarOffsets = nonNullBitmapSidecarOffsets;
@@ -38,7 +37,7 @@ namespace Knet.Kudu.Client
 
         public void Dispose()
         {
-            _message.Dispose();
+            _buffer.Dispose();
         }
 
         internal int GetDataOffset(int columnIndex) =>

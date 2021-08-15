@@ -72,10 +72,10 @@ namespace Knet.Kudu.Client.Scanner
                 }
             }
 
-            var messageOwner = message.TakeOwnership();
+            var buffer = message.TakeMemory();
 
             return new ResultSet(
-                messageOwner,
+                buffer,
                 schema,
                 columnarData.NumRows,
                 dataSidecarOffsets,

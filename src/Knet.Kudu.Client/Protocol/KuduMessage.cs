@@ -27,16 +27,11 @@ namespace Knet.Kudu.Client.Protocol
 
         public int GetSidecarOffset(int sidecar) => (int)_sidecarOffsets[sidecar];
 
-        public KuduMessageOwner TakeOwnership()
+        internal ArrayPoolBuffer<byte> TakeMemory()
         {
-            var kuduMessageOwner = new KuduMessageOwner(
-                _messageBuffer,
-                _messageProtobufLength,
-                _sidecarOffsets);
-
+            var messageBuffer = _messageBuffer;
             _messageBuffer = null;
-
-            return kuduMessageOwner;
+            return messageBuffer;
         }
 
         internal void Reset()
