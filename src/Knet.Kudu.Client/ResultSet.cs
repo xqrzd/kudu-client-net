@@ -26,7 +26,7 @@ namespace Knet.Kudu.Client
             int[] nonNullBitmapSidecarOffsets)
         {
             _buffer = buffer;
-            _data = buffer.Buffer;
+            _data = buffer?.Buffer;
             _dataSidecarOffsets = dataSidecarOffsets;
             _varlenDataSidecarOffsets = varlenDataSidecarOffsets;
             _nonNullBitmapSidecarOffsets = nonNullBitmapSidecarOffsets;
@@ -37,7 +37,7 @@ namespace Knet.Kudu.Client
 
         public void Dispose()
         {
-            _buffer.Dispose();
+            _buffer?.Dispose();
         }
 
         internal int GetDataOffset(int columnIndex) =>
@@ -611,7 +611,9 @@ namespace Knet.Kudu.Client
             {
                 _resultSet = resultSet;
                 _index = -1;
-                _numRows = (int)resultSet.Count;
+                _numRows = resultSet._dataSidecarOffsets is null
+                    ? 0 // Empty projection.
+                    : (int)resultSet.Count;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]

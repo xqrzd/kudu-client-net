@@ -12,63 +12,56 @@ namespace Knet.Kudu.Client.Scanner
             ScanResponsePB scanResponse,
             KuduMessage message)
         {
-            if (scanResponse.ColumnarData is null)
-                throw new NotImplementedException("Rowwise parser not implemented yet");
+            if (scanResponse.ColumnarData is not null)
+            {
+                return CreateResultSet(message, scanSchema, scanResponse.ColumnarData);
+            }
 
-            var columnarData = scanResponse.ColumnarData;
-            return CreateResultSet(message, scanSchema, columnarData);
+            return CreateResultSet(scanSchema, scanResponse.Data);
         }
 
         private static ResultSet CreateResultSet(
             KuduMessage message,
             KuduSchema schema,
-            ColumnarRowBlockPB columnarData)
+            ColumnarRowBlockPB data)
         {
-            var columns = columnarData.Columns;
-            var numColumns = columns.Count;
-
-            int[] dataSidecarOffsets;
-            int[] varlenDataSidecarOffsets;
-            int[] nonNullBitmapSidecarOffsets;
-
-            if (numColumns == 0)
+            if (data.Columns.Count == 0)
             {
                 // Empty projection, usually used for quick row counting.
-                dataSidecarOffsets = Array.Empty<int>();
-                varlenDataSidecarOffsets = Array.Empty<int>();
-                nonNullBitmapSidecarOffsets = Array.Empty<int>();
+                return new ResultSet(null, schema, data.NumRows, null, null, null);
             }
-            else
+
+            var columns = data.Columns;
+            var numColumns = columns.Count;
+
+            var dataSidecarOffsets = new int[numColumns];
+            var varlenDataSidecarOffsets = new int[numColumns];
+            var nonNullBitmapSidecarOffsets = new int[numColumns];
+
+            for (int i = 0; i < numColumns; i++)
             {
-                dataSidecarOffsets = new int[numColumns];
-                varlenDataSidecarOffsets = new int[numColumns];
-                nonNullBitmapSidecarOffsets = new int[numColumns];
+                var column = columns[i];
 
-                for (int i = 0; i < numColumns; i++)
+                if (column.HasDataSidecar)
                 {
-                    var column = columns[i];
+                    var offset = message.GetSidecarOffset(column.DataSidecar);
+                    dataSidecarOffsets[i] = offset;
+                }
 
-                    if (column.HasDataSidecar)
-                    {
-                        var offset = message.GetSidecarOffset(column.DataSidecar);
-                        dataSidecarOffsets[i] = offset;
-                    }
+                if (column.HasVarlenDataSidecar)
+                {
+                    var offset = message.GetSidecarOffset(column.VarlenDataSidecar);
+                    varlenDataSidecarOffsets[i] = offset;
+                }
 
-                    if (column.HasVarlenDataSidecar)
-                    {
-                        var offset = message.GetSidecarOffset(column.VarlenDataSidecar);
-                        varlenDataSidecarOffsets[i] = offset;
-                    }
-
-                    if (column.HasNonNullBitmapSidecar)
-                    {
-                        var offset = message.GetSidecarOffset(column.NonNullBitmapSidecar);
-                        nonNullBitmapSidecarOffsets[i] = offset;
-                    }
-                    else
-                    {
-                        nonNullBitmapSidecarOffsets[i] = -1;
-                    }
+                if (column.HasNonNullBitmapSidecar)
+                {
+                    var offset = message.GetSidecarOffset(column.NonNullBitmapSidecar);
+                    nonNullBitmapSidecarOffsets[i] = offset;
+                }
+                else
+                {
+                    nonNullBitmapSidecarOffsets[i] = -1;
                 }
             }
 
@@ -77,10 +70,23 @@ namespace Knet.Kudu.Client.Scanner
             return new ResultSet(
                 buffer,
                 schema,
-                columnarData.NumRows,
+                data.NumRows,
                 dataSidecarOffsets,
                 varlenDataSidecarOffsets,
                 nonNullBitmapSidecarOffsets);
+        }
+
+        private static ResultSet CreateResultSet(
+            KuduSchema schema,
+            RowwiseRowBlockPB data)
+        {
+            if (data is null || data.NumRows == 0)
+            {
+                // Empty projection, usually used for quick row counting.
+                return new ResultSet(null, schema, data.NumRows, null, null, null);
+            }
+
+            throw new NotImplementedException("Support for row data will be implemented in a future PR");
         }
     }
 }
