@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using Knet.Kudu.Client.Tablet;
@@ -22,7 +23,7 @@ namespace Knet.Kudu.Client
 
         protected internal ReadMode ReadMode = ReadMode.ReadLatest;
         protected internal bool IsFaultTolerant = false;
-        protected internal int? BatchSizeBytes;
+        protected internal int BatchSizeBytes = 1024 * 1024 * 8; // 8MB
         protected internal long Limit = long.MaxValue;
         protected internal bool CacheBlocks = true;
         protected internal long StartTimestamp = KuduClient.NoTimestamp;
@@ -149,9 +150,19 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Sets the maximum number of bytes returned by the scanner, on each batch.
-        /// The default is 1MB. Kudu may actually return more than this many bytes
+        /// The default is 8MB. Kudu may actually return more than this many bytes
         /// because it will not truncate a rowResult in the middle.
+        /// </para>
+        /// <para>
+        /// To increase this beyond 8MB, the Kudu server must be configured with a
+        /// larger --scanner_max_batch_size_bytes value.
+        /// </para>
+        /// <para>
+        /// Note: This client may slightly adjust this value to help prevent spilling
+        /// a small amount of data into a larger <see cref="ArrayPool{T}"/> bucket.
+        /// </para>
         /// </summary>
         /// <param name="batchSizeBytes">A strictly positive number of bytes.</param>
         public TBuilder SetBatchSizeBytes(int batchSizeBytes)

@@ -62,7 +62,7 @@ namespace Knet.Kudu.Client
             ReadMode readMode,
             ReplicaSelection replicaSelection,
             bool isFaultTolerant,
-            int? batchSizeBytes,
+            int batchSizeBytes,
             long limit,
             bool cacheBlocks,
             long startTimestamp,
@@ -137,7 +137,7 @@ namespace Knet.Kudu.Client
                 includeDeletedColumn);
 
             _projectedColumnsPb = ToColumnSchemaPbs(ProjectionSchema);
-            BatchSizeBytes = batchSizeBytes ?? ProjectionSchema.GetScannerBatchSizeEstimate();
+            BatchSizeBytes = GetBatchSizeEstimate(batchSizeBytes);
         }
 
         /// <summary>
@@ -182,6 +182,31 @@ namespace Knet.Kudu.Client
         IAsyncEnumerator<ResultSet> IAsyncEnumerable<ResultSet>.GetAsyncEnumerator(CancellationToken cancellationToken)
         {
             return GetAsyncEnumerator(cancellationToken);
+        }
+
+        private static int GetBatchSizeEstimate(int batchSize)
+        {
+            // Try to avoid spilling a small amount of data into the next
+            // sized ArrayPool bucket. There is overhead from 2 places:
+            // 1) ScanResponsePB will be stored in the buffer.
+            // 2) Batch size is a hint; Kudu may return slightly more data.
+
+            // The default batch size is 8MB. Due to the small amount of
+            // overhead listed above we would likely end up renting a 16MB
+            // buffer from ArrayPool, wasting about half of that. Instead,
+            // slightly reduce the batch size so everything is likely to fit
+            // in 8MB.
+
+            const int overhead = 4096;
+
+            // Optimize for the default case of 8MB.
+            if (batchSize == 1024 * 1024 * 8)
+            {
+                return batchSize - overhead;
+            }
+
+            // TODO: Optimize this for .NET 6.
+            return batchSize;
         }
 
         private static KuduSchema GenerateProjectionSchema(
