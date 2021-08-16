@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
 using Knet.Kudu.Client.FunctionalTests.Util;
@@ -191,7 +192,6 @@ namespace Knet.Kudu.Client.FunctionalTests
             var table = await client.CreateTableAsync(builder);
 
             int numRows = 5;
-            int currentRow = 0;
             for (int i = 0; i < numRows; i++)
             {
                 var insert = ClientTestUtil.CreateAllTypesInsert(table, i);
@@ -204,21 +204,11 @@ namespace Knet.Kudu.Client.FunctionalTests
                 .SetEmptyProjection()
                 .Build();
 
-            await foreach (var resultSet in scanner)
-            {
-                Assert.Empty(resultSet.Schema.Columns);
-                CheckResults(resultSet);
-            }
+            var results = await scanner.ToListAsync();
+            var scannedRows = results.Sum(resultSet => resultSet.Count);
 
-            void CheckResults(ResultSet resultSet)
-            {
-                foreach (var row in resultSet)
-                {
-                    currentRow++;
-                }
-            }
-
-            Assert.Equal(numRows, currentRow);
+            Assert.Equal(numRows, scannedRows);
+            Assert.All(results, result => Assert.False(result.GetEnumerator().MoveNext()));
         }
     }
 }
