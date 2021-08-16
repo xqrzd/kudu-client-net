@@ -8,17 +8,15 @@ using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client
 {
-    public class KuduScanner<T> : IAsyncEnumerable<T>
+    public class KuduScanner : IAsyncEnumerable<ResultSet>
     {
         private readonly ILogger _logger;
         private readonly KuduClient _client;
         private readonly KuduTable _table;
-        private readonly IKuduScanParser<T> _parser;
         private readonly List<ColumnSchemaPB> _projectedColumnsPb;
         private readonly Dictionary<string, KuduPredicate> _predicates;
 
         private readonly OrderModePB _orderMode;
-        private readonly RowDataFormat _rowDataFormat;
         private readonly bool _isFaultTolerant;
         private readonly long _limit;
         private readonly long _startTimestamp;
@@ -58,15 +56,13 @@ namespace Knet.Kudu.Client
             ILogger logger,
             KuduClient client,
             KuduTable table,
-            IKuduScanParser<T> parser,
             List<string> projectedColumnNames,
             List<int> projectedColumnIndexes,
             Dictionary<string, KuduPredicate> predicates,
             ReadMode readMode,
             ReplicaSelection replicaSelection,
-            RowDataFormat rowDataFormat,
             bool isFaultTolerant,
-            int? batchSizeBytes,
+            int batchSizeBytes,
             long limit,
             bool cacheBlocks,
             long startTimestamp,
@@ -118,11 +114,9 @@ namespace Knet.Kudu.Client
             _logger = logger;
             _client = client;
             _table = table;
-            _parser = parser;
             _predicates = predicates;
             ReadMode = readMode;
             ReplicaSelection = replicaSelection;
-            _rowDataFormat = rowDataFormat;
             _isFaultTolerant = isFaultTolerant;
             _limit = limit;
             CacheBlocks = cacheBlocks;
@@ -143,7 +137,7 @@ namespace Knet.Kudu.Client
                 includeDeletedColumn);
 
             _projectedColumnsPb = ToColumnSchemaPbs(ProjectionSchema);
-            BatchSizeBytes = batchSizeBytes ?? ProjectionSchema.GetScannerBatchSizeEstimate();
+            BatchSizeBytes = GetBatchSizeEstimate(batchSizeBytes);
         }
 
         /// <summary>
@@ -152,7 +146,7 @@ namespace Knet.Kudu.Client
         /// </summary>
         public long? Limit => _limit > 0 ? _limit : null;
 
-        public KuduScanEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+        public KuduScanEnumerator GetAsyncEnumerator(CancellationToken cancellationToken = default)
         {
             var partitionPruner = PartitionPruner.Create(
                 _table.Schema,
@@ -163,17 +157,15 @@ namespace Knet.Kudu.Client
                 _lowerBoundPartitionKey,
                 _upperBoundPartitionKey);
 
-            return new KuduScanEnumerator<T>(
+            return new KuduScanEnumerator(
                 _logger,
                 _client,
                 _table,
-                _parser,
                 _projectedColumnsPb,
                 ProjectionSchema,
                 _orderMode,
                 ReadMode,
                 ReplicaSelection,
-                _rowDataFormat,
                 _isFaultTolerant,
                 _predicates,
                 _limit,
@@ -187,9 +179,34 @@ namespace Knet.Kudu.Client
                 cancellationToken);
         }
 
-        IAsyncEnumerator<T> IAsyncEnumerable<T>.GetAsyncEnumerator(CancellationToken cancellationToken)
+        IAsyncEnumerator<ResultSet> IAsyncEnumerable<ResultSet>.GetAsyncEnumerator(CancellationToken cancellationToken)
         {
             return GetAsyncEnumerator(cancellationToken);
+        }
+
+        private static int GetBatchSizeEstimate(int batchSize)
+        {
+            // Try to avoid spilling a small amount of data into the next
+            // sized ArrayPool bucket. There is overhead from 2 places:
+            // 1) ScanResponsePB will be stored in the buffer.
+            // 2) Batch size is a hint; Kudu may return slightly more data.
+
+            // The default batch size is 8MB. Due to the small amount of
+            // overhead listed above we would likely end up renting a 16MB
+            // buffer from ArrayPool, wasting about half of that. Instead,
+            // slightly reduce the batch size so everything is likely to fit
+            // in 8MB.
+
+            const int overhead = 4096;
+
+            // Optimize for the default case of 8MB.
+            if (batchSize == 1024 * 1024 * 8)
+            {
+                return batchSize - overhead;
+            }
+
+            // TODO: Optimize this for .NET 6.
+            return batchSize;
         }
 
         private static KuduSchema GenerateProjectionSchema(

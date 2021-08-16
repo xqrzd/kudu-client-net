@@ -1,11 +1,12 @@
 using System.Buffers;
 using Google.Protobuf;
 using Knet.Kudu.Client.Protobuf.Tserver;
+using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Requests
 {
-    public class WriteRequest : KuduTabletRpc<WriteResponsePB>
+    internal class WriteRequest : KuduTabletRpc<WriteResponsePB>
     {
         private readonly WriteRequestPB _request;
 
@@ -35,9 +36,9 @@ namespace Knet.Kudu.Client.Requests
 
         public override void WriteTo(IBufferWriter<byte> output) => _request.WriteTo(output);
 
-        public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
+        public override void ParseResponse(KuduMessage message)
         {
-            Output = WriteResponsePB.Parser.ParseFrom(buffer);
+            Output = WriteResponsePB.Parser.ParseFrom(message.MessageProtobuf);
             Error = Output.Error;
         }
     }

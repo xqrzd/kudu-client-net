@@ -260,7 +260,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 .SetReplicaSelection(ReplicaSelection.ClosestReplica)
                 .BuildAsync();
 
-            int totalRows = 0;
+            long totalRows = 0;
 
             foreach (var token in tokens)
             {
@@ -332,7 +332,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             // Since there isn't any write performed from the client, the count
             // should range from [0, 9].
-            int count = 0;
+            long count = 0;
             while (await scanEnumerator.MoveNextAsync())
             {
                 count += scanEnumerator.Current.Count;
@@ -366,7 +366,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(ReadMode.ReadYourWrites, scanner.ReadMode);
             Assert.Equal(KuduClient.NoTimestamp, scanEnumerator.SnapshotTimestamp);
 
-            int count = 0;
+            long count = 0;
             while (await scanEnumerator.MoveNextAsync())
             {
                 count += scanEnumerator.Current.Count;
@@ -422,7 +422,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             var scanEnumerator = scanner.GetAsyncEnumerator();
 
             Assert.True(await scanEnumerator.MoveNextAsync());
-            int rowCount = scanEnumerator.Current.Count;
+            long rowCount = scanEnumerator.Current.Count;
 
             // At this point, the call to the first tablet server should have been
             // done already, so the client should have received the propagated timestamp
@@ -496,7 +496,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             }
         }
 
-        private KuduScanner<ResultSet> GetScanner(
+        private KuduScanner GetScanner(
             string lowerBoundKeyOne,
             string lowerBoundKeyTwo,
             string exclusiveUpperBoundKeyOne,
@@ -528,7 +528,7 @@ namespace Knet.Kudu.Client.FunctionalTests
         }
 
         private static async Task BuildScannerAndCheckColumnsCountAsync(
-            KuduScannerBuilder<ResultSet> builder, params string[] expectedColumnNames)
+            KuduScannerBuilder builder, params string[] expectedColumnNames)
         {
             var scanner = builder.Build();
             KuduSchema schema = null;

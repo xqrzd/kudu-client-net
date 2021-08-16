@@ -223,7 +223,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             await using var scanEnumerator = scanner.GetAsyncEnumerator();
 
-            int rowCount = 0;
+            long rowCount = 0;
             int loopCount = 0;
             bool shouldClose = true;
 
@@ -248,9 +248,9 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(_numRows, rowCount);
         }
 
-        private List<int> ResultSetToKeys(ResultSet resultSet)
+        private static List<int> ResultSetToKeys(ResultSet resultSet)
         {
-            var results = new List<int>(resultSet.Count);
+            var results = new List<int>();
             foreach (var row in resultSet)
             {
                 results.Add(row.GetInt32(0));

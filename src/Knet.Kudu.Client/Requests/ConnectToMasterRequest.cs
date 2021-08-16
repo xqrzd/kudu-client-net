@@ -2,10 +2,11 @@ using System.Buffers;
 using Google.Protobuf;
 using Google.Protobuf.Collections;
 using Knet.Kudu.Client.Protobuf.Master;
+using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client.Requests
 {
-    public class ConnectToMasterRequest : KuduMasterRpc<ConnectToMasterResponsePB>
+    internal class ConnectToMasterRequest : KuduMasterRpc<ConnectToMasterResponsePB>
     {
         private static readonly RepeatedField<uint> _requiredFeatures = new()
         {
@@ -25,9 +26,9 @@ namespace Knet.Kudu.Client.Requests
 
         public override void WriteTo(IBufferWriter<byte> output) => output.Write(_requestBytes);
 
-        public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
+        public override void ParseResponse(KuduMessage message)
         {
-            Output = ConnectToMasterResponsePB.Parser.ParseFrom(buffer);
+            Output = ConnectToMasterResponsePB.Parser.ParseFrom(message.MessageProtobuf);
             Error = Output.Error;
         }
     }

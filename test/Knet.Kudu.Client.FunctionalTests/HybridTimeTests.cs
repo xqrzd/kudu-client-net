@@ -84,7 +84,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 long snapshotTime = HybridTimeUtil.PhysicalAndLogicalToHtTimestamp(
                     futureTs, logicalValue);
                 int expected = i + 1;
-                int numRows = await ScanAtSnapshotAsync(snapshotTime);
+                long numRows = await ScanAtSnapshotAsync(snapshotTime);
                 Assert.Equal(expected, numRows);
             }
 
@@ -95,11 +95,11 @@ namespace Knet.Kudu.Client.FunctionalTests
             _client.LastPropagatedTimestamp++;
             long snapshotTime2 = HybridTimeUtil.PhysicalAndLogicalToHtTimestamp(
                 futureTs, latestLogicalValue + 1);
-            int numRows2 = await ScanAtSnapshotAsync(snapshotTime2);
+            long numRows2 = await ScanAtSnapshotAsync(snapshotTime2);
             Assert.Equal(1 + keys.Length, numRows2);
         }
 
-        private Task<int> ScanAtSnapshotAsync(long time)
+        private Task<long> ScanAtSnapshotAsync(long time)
         {
             var scanner = _client.NewScanBuilder(_table)
                 .SnapshotTimestampRaw(time)

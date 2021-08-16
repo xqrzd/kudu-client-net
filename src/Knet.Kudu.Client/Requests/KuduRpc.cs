@@ -5,6 +5,7 @@ using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Protobuf.Master;
 using Knet.Kudu.Client.Protobuf.Security;
 using Knet.Kudu.Client.Protobuf.Tserver;
+using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Tablet;
 
 namespace Knet.Kudu.Client.Requests
@@ -54,27 +55,22 @@ namespace Knet.Kudu.Client.Requests
 
         public abstract void WriteTo(IBufferWriter<byte> output);
 
-        public abstract void ParseProtobuf(ReadOnlySequence<byte> buffer);
-
-        public virtual void ParseSidecars(KuduSidecars sidecars)
-        {
-            sidecars.Dispose();
-        }
+        public abstract void ParseResponse(KuduMessage message);
     }
 
     public abstract class KuduRpc<T> : KuduRpc
     {
-        public virtual T Output { get; protected set; }
+        public T Output { get; protected set; }
     }
 
-    public abstract class KuduMasterRpc<T> : KuduRpc<T>
+    internal abstract class KuduMasterRpc<T> : KuduRpc<T>
     {
         public override string ServiceName => MasterServiceName;
 
         public MasterErrorPB Error { get; protected set; }
     }
 
-    public abstract class KuduTabletRpc<T> : KuduRpc<T>
+    internal abstract class KuduTabletRpc<T> : KuduRpc<T>
     {
         public override string ServiceName => TabletServerServiceName;
 

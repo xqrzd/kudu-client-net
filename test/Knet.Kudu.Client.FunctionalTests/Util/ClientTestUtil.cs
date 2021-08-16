@@ -185,15 +185,15 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
             return row;
         }
 
-        public static Task<int> CountRowsAsync(KuduClient client, KuduTable table)
+        public static Task<long> CountRowsAsync(KuduClient client, KuduTable table)
         {
             var scanner = client.NewScanBuilder(table).Build();
             return CountRowsInScanAsync(scanner);
         }
 
-        public static async Task<int> CountRowsInScanAsync(KuduScanner<ResultSet> scanner)
+        public static async Task<long> CountRowsInScanAsync(KuduScanner scanner)
         {
-            var rows = 0;
+            long rows = 0;
 
             await foreach (var resultSet in scanner)
                 rows += resultSet.Count;
@@ -201,9 +201,9 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
             return rows;
         }
 
-        public static async Task<int> CountRowsInScanAsync(KuduScanEnumerator<ResultSet> scanner)
+        public static async Task<long> CountRowsInScanAsync(KuduScanEnumerator scanner)
         {
-            var rows = 0;
+            long rows = 0;
 
             while (await scanner.MoveNextAsync())
                 rows += scanner.Current.Count;

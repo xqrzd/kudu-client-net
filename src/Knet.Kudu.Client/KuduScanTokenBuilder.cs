@@ -250,7 +250,7 @@ namespace Knet.Kudu.Client
 
             proto.CacheBlocks = CacheBlocks;
             proto.FaultTolerant = IsFaultTolerant;
-            proto.BatchSizeBytes = (uint)(BatchSizeBytes ?? schema.GetScannerBatchSizeEstimate());
+            proto.BatchSizeBytes = (uint)BatchSizeBytes;
             // TODO:
             //proto.setScanRequestTimeoutMs(scanRequestTimeout);
             //proto.setKeepAlivePeriodMs(keepAlivePeriodMs);

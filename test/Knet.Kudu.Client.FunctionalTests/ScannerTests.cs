@@ -89,7 +89,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             // scan request should eventually be routed to a non-quiescing server
             // and complete. We aren't guaranteed to hit the quiescing server, but this
             // test would frequently fail if we didn't handle quiescing servers properly.
-            var foundRows = 0;
+            long foundRows = 0;
             var scanner = client.NewScanBuilder(table)
                 .SetReplicaSelection(replicaSelection)
                 .Build();
@@ -127,11 +127,6 @@ namespace Knet.Kudu.Client.FunctionalTests
             var scanner = client.NewScanBuilder(table).Build();
 
             await foreach (var resultSet in scanner)
-            {
-                CheckResults(resultSet);
-            }
-
-            void CheckResults(ResultSet resultSet)
             {
                 foreach (var row in resultSet)
                 {
@@ -248,7 +243,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             // Get the first batch and initialize the scanner.
             Assert.True(await scanEnumerator.MoveNextAsync());
-            int accum = scanEnumerator.Current.Count;
+            long accum = scanEnumerator.Current.Count;
 
             while (await scanEnumerator.MoveNextAsync())
             {
@@ -331,7 +326,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 .SetBatchSizeBytes(100)
                 .Build();
 
-            int rowsScanned = 0;
+            long rowsScanned = 0;
             int batchNum = 0;
 
             await foreach (var resultSet in scanner)
@@ -436,11 +431,6 @@ namespace Knet.Kudu.Client.FunctionalTests
                     Assert.Equal(projection.GetColumn(isDeletedIndex),
                         projection.GetColumn("is_deleted_"));
 
-                    AccumulateResults(resultSet);
-                }
-
-                void AccumulateResults(ResultSet resultSet)
-                {
                     foreach (var row in resultSet)
                     {
                         results.Add(new TestRowResult(row));
@@ -519,17 +509,11 @@ namespace Knet.Kudu.Client.FunctionalTests
                 .DiffScan(startHT, endHT)
                 .Build();
 
-            int rowCount = 0;
+            long rowCount = 0;
             await foreach (var resultSet in scanner)
             {
                 rowCount += resultSet.Count;
-                CheckResults(resultSet);
-            }
 
-            Assert.Equal(1, rowCount);
-
-            static void CheckResults(ResultSet resultSet)
-            {
                 foreach (var row in resultSet)
                 {
                     Assert.Equal(0, row.GetInt32(0));
@@ -537,6 +521,8 @@ namespace Knet.Kudu.Client.FunctionalTests
                     Assert.True(row.IsDeleted);
                 }
             }
+
+            Assert.Equal(1, rowCount);
         }
 
         /// <summary>

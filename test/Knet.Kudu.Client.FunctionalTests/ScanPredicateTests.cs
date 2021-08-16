@@ -449,14 +449,14 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(1, await CountRowsAsync(table, isNull));
         }
 
-        private TableBuilder GetDefaultTableBuilder()
+        private static TableBuilder GetDefaultTableBuilder()
         {
             return new TableBuilder()
                 .AddColumn("key", KuduType.Int64, opt => opt.Key(true))
                 .SetRangePartitionColumns("key");
         }
 
-        private async Task<int> CountRowsAsync(KuduTable table, params KuduPredicate[] predicates)
+        private async Task<long> CountRowsAsync(KuduTable table, params KuduPredicate[] predicates)
         {
             var scanBuilder = _client.NewScanBuilder(table);
 
@@ -464,7 +464,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 scanBuilder.AddPredicate(predicate);
 
             var scanner = scanBuilder.Build();
-            int count = 0;
+            long count = 0;
 
             await foreach (var resultSet in scanner)
             {
@@ -474,7 +474,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             return count;
         }
 
-        private SortedSet<long> CreateIntegerValues(KuduType type)
+        private static SortedSet<long> CreateIntegerValues(KuduType type)
         {
             var values = new SortedSet<long>();
             for (long i = -50; i < 50; i++)
@@ -488,7 +488,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             return values;
         }
 
-        private List<long> CreateIntegerTestValues(KuduType type)
+        private static List<long> CreateIntegerTestValues(KuduType type)
         {
             return new List<long>
             {
@@ -504,7 +504,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             };
         }
 
-        private SortedSet<DateTime> CreateTimestampValues()
+        private static SortedSet<DateTime> CreateTimestampValues()
         {
             var epoch = EpochTime.UnixEpoch;
             var values = new SortedSet<DateTime>();
@@ -519,7 +519,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             return values;
         }
 
-        private List<DateTime> CreateTimestampTestValues()
+        private static List<DateTime> CreateTimestampTestValues()
         {
             return new List<DateTime>
             {
@@ -535,7 +535,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             };
         }
 
-        private SortedSet<DateTime> CreateDateValues()
+        private static SortedSet<DateTime> CreateDateValues()
         {
             var values = new SortedSet<DateTime>();
             for (long i = -50; i < 50; i++)
@@ -549,7 +549,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             return values;
         }
 
-        private List<DateTime> CreateDateTestValues()
+        private static List<DateTime> CreateDateTestValues()
         {
             return new List<DateTime>
             {
@@ -565,7 +565,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             };
         }
 
-        private SortedSet<float> CreateFloatValues()
+        private static SortedSet<float> CreateFloatValues()
         {
             var values = new SortedSet<float>();
             for (long i = -50; i < 50; i++)
@@ -585,7 +585,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             return values;
         }
 
-        private List<float> CreateFloatTestValues()
+        private static List<float> CreateFloatTestValues()
         {
             return new List<float>
             {
@@ -607,7 +607,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             };
         }
 
-        private SortedSet<double> CreateDoubleValues()
+        private static SortedSet<double> CreateDoubleValues()
         {
             var values = new SortedSet<double>();
             for (long i = -50; i < 50; i++)
@@ -627,7 +627,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             return values;
         }
 
-        private List<double> CreateDoubleTestValues()
+        private static List<double> CreateDoubleTestValues()
         {
             return new List<double>
             {
@@ -651,7 +651,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
         // Returns a vector of decimal(4, 2) numbers from -50.50 (inclusive) to 50.50
         // (exclusive) (100 values) and boundary values.
-        private SortedSet<decimal> CreateDecimalValues()
+        private static SortedSet<decimal> CreateDecimalValues()
         {
             var values = new SortedSet<decimal>();
             for (long i = -50; i < 50; i++)
@@ -668,7 +668,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             return values;
         }
 
-        private List<decimal> CreateDecimalTestValues()
+        private static List<decimal> CreateDecimalTestValues()
         {
             return new List<decimal>
             {
@@ -684,7 +684,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             };
         }
 
-        private SortedSet<string> CreateStringValues()
+        private static SortedSet<string> CreateStringValues()
         {
             return new SortedSet<string>(StringComparer.Ordinal)
             {
@@ -698,7 +698,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             };
         }
 
-        private List<string> CreateStringTestValues()
+        private static List<string> CreateStringTestValues()
         {
             return new List<string>(CreateStringValues())
             {

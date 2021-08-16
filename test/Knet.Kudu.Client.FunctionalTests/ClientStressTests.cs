@@ -70,11 +70,11 @@ namespace Knet.Kudu.Client.FunctionalTests
             await Task.WhenAll(chaosTask, writeTask, scanTask);
 
             // If the test passed, do some extra validation at the end.
-            int rowCount = await ClientTestUtil.CountRowsAsync(_client, _table);
+            var rowCount = await ClientTestUtil.CountRowsAsync(_client, _table);
             Assert.True(rowCount > 0);
         }
 
-        private async Task RunTaskAsync(Func<Task> task, CancellationTokenSource cts)
+        private static async Task RunTaskAsync(Func<Task> task, CancellationTokenSource cts)
         {
             try
             {
@@ -90,7 +90,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
         private async Task DoChaosAsync(CancellationToken cancellationToken)
         {
-            await Task.Delay(2000);
+            await Task.Delay(2000, CancellationToken.None);
 
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -109,7 +109,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                     await _harness.RestartLeaderMasterAsync();
                 }
 
-                await Task.Delay(5000);
+                await Task.Delay(5000, CancellationToken.None);
             }
         }
 
@@ -143,10 +143,10 @@ namespace Knet.Kudu.Client.FunctionalTests
                     throw exception;
 
                 var row = ClientTestUtil.CreateBasicSchemaInsert(_table, currentRowKey);
-                await session.EnqueueAsync(row);
+                await session.EnqueueAsync(row, CancellationToken.None);
 
                 if (flush)
-                    await session.FlushAsync();
+                    await session.FlushAsync(CancellationToken.None);
 
                 // Every 10 rows we flush and change the flush mode randomly.
                 if (currentRowKey % 10 == 0)
@@ -155,7 +155,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 currentRowKey++;
             }
 
-            await session.FlushAsync();
+            await session.FlushAsync(CancellationToken.None);
 
             exception = Volatile.Read(ref sessionException);
             if (exception != null)
@@ -186,7 +186,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 }
 
                 if (lastRowCount == 0)
-                    await Task.Delay(50);
+                    await Task.Delay(50, CancellationToken.None);
             }
         }
 
@@ -198,7 +198,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             if (numRows < previousRows)
                 throw new Exception($"Row count unexpectedly decreased from {previousRows} to {numRows}");
 
-            return numRows;
+            return (int)numRows;
         }
 
         private async Task RandomGetAsync(int lastRowCount)
@@ -215,14 +215,9 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             await foreach (var resultSet in scanner)
             {
-                AccumulateResults(resultSet);
-
-                void AccumulateResults(ResultSet resultSet)
+                foreach (var row in resultSet)
                 {
-                    foreach (var row in resultSet)
-                    {
-                        results.Add(row.GetInt32(0));
-                    }
+                    results.Add(row.GetInt32(0));
                 }
             }
 
@@ -230,7 +225,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(key, result);
         }
 
-        private KuduScannerBuilder<ResultSet> GetScannerBuilder()
+        private KuduScannerBuilder GetScannerBuilder()
         {
             var timestamp = _client.LastPropagatedTimestamp;
 

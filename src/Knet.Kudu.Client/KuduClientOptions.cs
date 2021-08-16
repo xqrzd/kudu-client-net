@@ -20,7 +20,7 @@ namespace Knet.Kudu.Client
             writerScheduler: PipeScheduler.ThreadPool,
             pauseWriterThreshold: 1024 * 1024 * 128, // 128MB
             resumeWriterThreshold: 1024 * 1024 * 64, // 64MB
-            minimumSegmentSize: 1024 * 256,
+            minimumSegmentSize: 1024 * 1024, // 1MB
             useSynchronizationContext: false);
 
         public IReadOnlyList<HostAndPort> MasterAddresses { get; }

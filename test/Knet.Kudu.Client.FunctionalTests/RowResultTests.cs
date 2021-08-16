@@ -36,14 +36,9 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             await session.FlushAsync();
 
-            var scanner = client.NewScanBuilder<ResultSet>(table).Build();
+            var scanner = client.NewScanBuilder(table).Build();
 
             await foreach (var resultSet in scanner)
-            {
-                CheckResults(resultSet);
-            }
-
-            void CheckResults(ResultSet resultSet)
             {
                 foreach (var row in resultSet)
                 {
@@ -111,14 +106,9 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             await session.FlushAsync();
 
-            var scanner = client.NewScanBuilder<ResultSet>(table).Build();
+            var scanner = client.NewScanBuilder(table).Build();
 
             await foreach (var resultSet in scanner)
-            {
-                CheckResults(resultSet);
-            }
-
-            void CheckResults(ResultSet resultSet)
             {
                 foreach (var row in resultSet)
                 {
@@ -191,7 +181,6 @@ namespace Knet.Kudu.Client.FunctionalTests
             var table = await client.CreateTableAsync(builder);
 
             int numRows = 5;
-            int currentRow = 0;
             for (int i = 0; i < numRows; i++)
             {
                 var insert = ClientTestUtil.CreateAllTypesInsert(table, i);
@@ -200,25 +189,19 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             await session.FlushAsync();
 
-            var scanner = client.NewScanBuilder<ResultSet>(table)
+            var scanner = client.NewScanBuilder(table)
                 .SetEmptyProjection()
                 .Build();
 
+            long scannedRows = 0;
             await foreach (var resultSet in scanner)
             {
+                scannedRows += resultSet.Count;
                 Assert.Empty(resultSet.Schema.Columns);
-                CheckResults(resultSet);
+                Assert.Empty(resultSet);
             }
 
-            void CheckResults(ResultSet resultSet)
-            {
-                foreach (var row in resultSet)
-                {
-                    currentRow++;
-                }
-            }
-
-            Assert.Equal(numRows, currentRow);
+            Assert.Equal(numRows, scannedRows);
         }
     }
 }

@@ -255,22 +255,17 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _client.WriteAsync(operations);
         }
 
-        private async Task<HashSet<Row>> CollectRowsAsync(KuduScanner<ResultSet> scanner)
+        private static async Task<HashSet<Row>> CollectRowsAsync(KuduScanner scanner)
         {
             var rows = new HashSet<Row>();
             await foreach (var resultSet in scanner)
-            {
-                ParseRows(resultSet);
-            }
-            return rows;
-
-            void ParseRows(ResultSet resultSet)
             {
                 foreach (var row in resultSet)
                 {
                     rows.Add(Row.FromResult(row));
                 }
             }
+            return rows;
         }
 
         private async Task<HashSet<Row>> CollectRowsAsync(KuduScanTokenBuilder builder)
@@ -285,8 +280,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                 var scanner = scanBuilder.Build();
 
                 var newRows = await CollectRowsAsync(scanner);
-                foreach (var row in newRows)
-                    rows.Add(row);
+                rows.UnionWith(newRows);
 
                 Assert.Equal(existingCount + newRows.Count, rows.Count);
             }

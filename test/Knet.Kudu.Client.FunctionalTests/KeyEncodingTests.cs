@@ -71,15 +71,12 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             var scanner = _client.NewScanBuilder(table).Build();
 
+            var scannedRows = 0;
             await foreach (var resultSet in scanner)
-            {
-                CheckResults(resultSet);
-            }
-
-            static void CheckResults(ResultSet resultSet)
             {
                 foreach (var row in resultSet)
                 {
+                    scannedRows++;
                     Assert.Equal(1, row.GetSByte("int8"));
                     Assert.Equal(2, row.GetInt16("int16"));
                     Assert.Equal(3, row.GetInt32("int32"));
@@ -97,6 +94,8 @@ namespace Knet.Kudu.Client.FunctionalTests
                     Assert.Equal(9.9, row.GetDouble("double"));
                 }
             }
+
+            Assert.Equal(1, scannedRows);
         }
     }
 }

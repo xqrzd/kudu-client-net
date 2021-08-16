@@ -1,16 +1,17 @@
+using System;
 using System.Buffers;
 using Google.Protobuf;
 using Google.Protobuf.Collections;
-using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Protobuf;
 using Knet.Kudu.Client.Protobuf.Tserver;
+using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Scanner;
 using Knet.Kudu.Client.Tablet;
 
 namespace Knet.Kudu.Client.Requests
 {
-    public class ScanRequest<T> : KuduTabletRpc<ScanResponse<T>>
+    internal class ScanRequest : KuduTabletRpc<ScanResponse>, IDisposable
     {
         private static readonly RepeatedField<uint> _columnPredicateRequiredFeature = new()
         {
@@ -20,17 +21,12 @@ namespace Knet.Kudu.Client.Requests
         private readonly ScanRequestState _state;
         private readonly ScanRequestPB _scanRequestPb;
         private readonly KuduSchema _schema;
-        private readonly IKuduScanParser<T> _parser;
         private readonly bool _isFaultTolerant;
-
-        private ScanResponsePB _responsePb;
-        private KuduSidecars _sidecars;
 
         public ScanRequest(
             ScanRequestState state,
             ScanRequestPB scanRequestPb,
             KuduSchema schema,
-            IKuduScanParser<T> parser,
             ReplicaSelection replicaSelection,
             string tableId,
             RemoteTablet tablet,
@@ -40,7 +36,6 @@ namespace Knet.Kudu.Client.Requests
             _state = state;
             _scanRequestPb = scanRequestPb;
             _schema = schema;
-            _parser = parser;
             _isFaultTolerant = isFaultTolerant;
 
             ReplicaSelection = replicaSelection;
@@ -59,6 +54,16 @@ namespace Knet.Kudu.Client.Requests
         public override string MethodName => "Scan";
 
         public override ReplicaSelection ReplicaSelection { get; }
+
+        public void Dispose()
+        {
+            ClearOutput();
+        }
+
+        public void TakeOutput()
+        {
+            Output = null;
+        }
 
         public override int CalculateSize()
         {
@@ -87,16 +92,18 @@ namespace Knet.Kudu.Client.Requests
 
         public override void WriteTo(IBufferWriter<byte> output) => _scanRequestPb.WriteTo(output);
 
-        public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
+        public override void ParseResponse(KuduMessage message)
         {
-            var response = ScanResponsePB.Parser.ParseFrom(buffer);
+            ClearOutput();
+
+            var response = ScanResponsePB.Parser.ParseFrom(message.MessageProtobuf);
             var error = response.Error;
 
             Error = error;
-            _responsePb = response;
 
             if (error is null)
             {
+                Output = GetOutput(response, message);
                 return;
             }
 
@@ -127,39 +134,44 @@ namespace Knet.Kudu.Client.Requests
             }
         }
 
-        public override ScanResponse<T> Output
+        private ScanResponse GetOutput(ScanResponsePB responsePb, KuduMessage message)
         {
-            get
-            {
-                var result = _parser.ParseSidecars(_schema, _responsePb, _sidecars);
+            var scannerId = responsePb.HasScannerId
+                ? responsePb.ScannerId.ToByteArray()
+                : null;
 
-                var scannerId = _responsePb.HasScannerId
-                    ? _responsePb.ScannerId.ToByteArray() : null;
+            var scanTimestamp = responsePb.HasSnapTimestamp
+                ? (long)responsePb.SnapTimestamp
+                : KuduClient.NoTimestamp;
 
-                var scanTimestamp = _responsePb.HasSnapTimestamp
-                    ? (long)_responsePb.SnapTimestamp : KuduClient.NoTimestamp;
+            var propagatedTimestamp = responsePb.HasPropagatedTimestamp
+                ? (long)responsePb.PropagatedTimestamp
+                : KuduClient.NoTimestamp;
 
-                var propagatedTimestamp = _responsePb.HasPropagatedTimestamp
-                    ? (long)_responsePb.PropagatedTimestamp : KuduClient.NoTimestamp;
+            var lastPrimaryKey = responsePb.HasLastPrimaryKey
+                ? responsePb.LastPrimaryKey.ToByteArray()
+                : null;
 
-                var lastPrimaryKey = _responsePb.HasLastPrimaryKey
-                    ? _responsePb.LastPrimaryKey.ToByteArray() : null;
+            var resultSet = ResultSetFactory.Create(_schema, responsePb, message);
 
-                return new ScanResponse<T>(
-                    scannerId,
-                    result.Result,
-                    result.NumRows,
-                    _responsePb.HasMoreResults,
-                    scanTimestamp,
-                    propagatedTimestamp,
-                    lastPrimaryKey,
-                    _responsePb.ResourceMetrics);
-            }
+            return new ScanResponse(
+                scannerId,
+                resultSet,
+                responsePb.HasMoreResults,
+                scanTimestamp,
+                propagatedTimestamp,
+                lastPrimaryKey,
+                responsePb.ResourceMetrics);
         }
 
-        public override void ParseSidecars(KuduSidecars sidecars)
+        private void ClearOutput()
         {
-            _sidecars = sidecars;
+            var output = Output;
+            if (output is not null)
+            {
+                output = null;
+                output.ResultSet.Dispose();
+            }
         }
     }
 

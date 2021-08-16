@@ -614,8 +614,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             await _client.WriteAsync(rows);
         }
 
-        private async Task<List<string>> ScanTableToStrings(
-            KuduTable table, KuduScanner<ResultSet> scanner)
+        private static async Task<List<string>> ScanTableToStrings(KuduTable table, KuduScanner scanner)
         {
             var results = new List<string>();
 

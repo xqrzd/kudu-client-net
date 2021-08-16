@@ -1,10 +1,11 @@
 using System.Buffers;
 using Google.Protobuf;
 using Knet.Kudu.Client.Protobuf.Master;
+using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client.Requests
 {
-    public class GetTableLocationsRequest : KuduMasterRpc<GetTableLocationsResponsePB>
+    internal class GetTableLocationsRequest : KuduMasterRpc<GetTableLocationsResponsePB>
     {
         private readonly GetTableLocationsRequestPB _request;
 
@@ -19,9 +20,9 @@ namespace Knet.Kudu.Client.Requests
 
         public override void WriteTo(IBufferWriter<byte> output) => _request.WriteTo(output);
 
-        public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
+        public override void ParseResponse(KuduMessage message)
         {
-            Output = GetTableLocationsResponsePB.Parser.ParseFrom(buffer);
+            Output = GetTableLocationsResponsePB.Parser.ParseFrom(message.MessageProtobuf);
             Error = Output.Error;
         }
     }

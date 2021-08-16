@@ -14,12 +14,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client
 {
-    public class KuduScanEnumerator<T> : IAsyncEnumerator<T>
+    public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
     {
         private readonly ILogger _logger;
         private readonly KuduClient _client;
         private readonly KuduTable _table;
-        private readonly IKuduScanParser<T> _parser;
         private readonly List<ColumnSchemaPB> _columns;
         private readonly KuduSchema _schema;
         private readonly PartitionPruner _partitionPruner;
@@ -29,7 +28,6 @@ namespace Knet.Kudu.Client
         private readonly OrderModePB _orderMode;
         private readonly ReadMode _readMode;
         private readonly ReplicaSelection _replicaSelection;
-        private readonly RowDataFormat _rowDataFormat;
         private readonly bool _isFaultTolerant;
         private readonly int _batchSizeBytes;
         private readonly long _limit;
@@ -56,7 +54,7 @@ namespace Knet.Kudu.Client
 
         internal long SnapshotTimestamp { get; private set; }
 
-        public T Current { get; private set; }
+        public ResultSet Current { get; private set; }
 
         public ResourceMetrics ResourceMetrics { get; }
 
@@ -64,13 +62,11 @@ namespace Knet.Kudu.Client
             ILogger logger,
             KuduClient client,
             KuduTable table,
-            IKuduScanParser<T> parser,
             List<ColumnSchemaPB> projectedColumnsPb,
             KuduSchema projectionSchema,
             OrderModePB orderMode,
             ReadMode readMode,
             ReplicaSelection replicaSelection,
-            RowDataFormat rowDataFormat,
             bool isFaultTolerant,
             Dictionary<string, KuduPredicate> predicates,
             long limit,
@@ -86,7 +82,6 @@ namespace Knet.Kudu.Client
             _logger = logger;
             _client = client;
             _table = table;
-            _parser = parser;
             _partitionPruner = partitionPruner;
             _orderMode = orderMode;
             _readMode = readMode;
@@ -94,7 +89,6 @@ namespace Knet.Kudu.Client
             _schema = projectionSchema;
             _predicates = predicates;
             _replicaSelection = replicaSelection;
-            _rowDataFormat = rowDataFormat;
             _isFaultTolerant = isFaultTolerant;
             _limit = limit;
             _cacheBlocks = cacheBlocks;
@@ -133,7 +127,7 @@ namespace Knet.Kudu.Client
                 // means we were in between tablets.
                 if (Tablet != null)
                 {
-                    var rpc = GetCloseRequest();
+                    using var rpc = GetCloseRequest();
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
                     try
@@ -214,8 +208,8 @@ namespace Knet.Kudu.Client
 
         private async ValueTask<bool> OpenScannerAsync()
         {
-            var rpc = GetOpenRequest();
-            ScanResponse<T> response;
+            using var rpc = GetOpenRequest();
+            ScanResponse response;
 
             try
             {
@@ -285,8 +279,9 @@ namespace Knet.Kudu.Client
                 _lastPrimaryKey = response.LastPrimaryKey;
             }
 
-            _numRowsReturned += response.NumRows;
-            Current = response.Data;
+            _numRowsReturned += response.ResultSet.Count;
+            Current = response.ResultSet;
+            rpc.TakeOutput();
 
             if (response.ResourceMetricsPb != null)
                 ResourceMetrics.Update(response.ResourceMetricsPb);
@@ -295,24 +290,24 @@ namespace Knet.Kudu.Client
             {
                 ScanFinished();
 
-                if (response.NumRows == 0 && _partitionPruner.HasMorePartitionKeyRanges)
+                if (response.ResultSet.Count == 0 && _partitionPruner.HasMorePartitionKeyRanges)
                 {
                     return await MoveNextAsync().ConfigureAwait(false);
                 }
 
-                return response.NumRows > 0;
+                return response.ResultSet.Count > 0;
             }
 
             _scannerId = response.ScannerId;
             _sequenceId++;
 
-            return response.NumRows > 0;
+            return response.ResultSet.Count > 0;
         }
 
         private async ValueTask<bool> ScanNextRowsAsync()
         {
-            var rpc = GetNextRowsRequest();
-            ScanResponse<T> response;
+            using var rpc = GetNextRowsRequest();
+            ScanResponse response;
 
             try
             {
@@ -342,8 +337,9 @@ namespace Knet.Kudu.Client
 
             Tablet = rpc.Tablet;
 
-            _numRowsReturned += response.NumRows;
-            Current = response.Data;
+            _numRowsReturned += response.ResultSet.Count;
+            Current = response.ResultSet;
+            rpc.TakeOutput();
 
             if (response.ResourceMetricsPb != null)
                 ResourceMetrics.Update(response.ResourceMetricsPb);
@@ -352,14 +348,14 @@ namespace Knet.Kudu.Client
             {
                 // We're done scanning this tablet.
                 ScanFinished();
-                return response.NumRows > 0;
+                return response.ResultSet.Count > 0;
             }
             _sequenceId++;
 
-            return response.NumRows > 0;
+            return response.ResultSet.Count > 0;
         }
 
-        private ScanRequest<T> GetOpenRequest()
+        private ScanRequest GetOpenRequest()
         {
             var request = new ScanRequestPB();
 
@@ -368,13 +364,11 @@ namespace Knet.Kudu.Client
                 Limit = (ulong)(_limit - _numRowsReturned),
                 OrderMode = _orderMode,
                 CacheBlocks = _cacheBlocks,
-                ReadMode = (ReadModePB)_readMode
+                ReadMode = (ReadModePB)_readMode,
+                RowFormatFlags = (ulong)RowFormatFlags.ColumnarLayout
             };
 
             newRequest.ProjectedColumns.AddRange(_columns);
-
-            if (_rowDataFormat == RowDataFormat.Columnar)
-                newRequest.RowFormatFlags |= (ulong)RowFormatFlags.ColumnarLayout;
 
             // For READ_YOUR_WRITES scan, use the propagated timestamp from
             // the scanner.
@@ -409,11 +403,10 @@ namespace Knet.Kudu.Client
 
             request.BatchSizeBytes = (uint)_batchSizeBytes;
 
-            return new ScanRequest<T>(
+            return new ScanRequest(
                 ScanRequestState.Opening,
                 request,
                 _schema,
-                _parser,
                 _replicaSelection,
                 _table.TableId,
                 Tablet,
@@ -421,7 +414,7 @@ namespace Knet.Kudu.Client
                 _isFaultTolerant);
         }
 
-        private ScanRequest<T> GetNextRowsRequest()
+        private ScanRequest GetNextRowsRequest()
         {
             var request = new ScanRequestPB
             {
@@ -430,11 +423,10 @@ namespace Knet.Kudu.Client
                 BatchSizeBytes = (uint)_batchSizeBytes
             };
 
-            return new ScanRequest<T>(
+            return new ScanRequest(
                 ScanRequestState.Next,
                 request,
                 _schema,
-                _parser,
                 _replicaSelection,
                 _table.TableId,
                 Tablet,
@@ -442,7 +434,7 @@ namespace Knet.Kudu.Client
                 _isFaultTolerant);
         }
 
-        private ScanRequest<T> GetCloseRequest()
+        private ScanRequest GetCloseRequest()
         {
             var request = new ScanRequestPB
             {
@@ -451,11 +443,10 @@ namespace Knet.Kudu.Client
                 CloseScanner = true
             };
 
-            return new ScanRequest<T>(
+            return new ScanRequest(
                 ScanRequestState.Closing,
                 request,
                 _schema,
-                _parser,
                 _replicaSelection,
                 _table.TableId,
                 Tablet,
@@ -505,10 +496,10 @@ namespace Knet.Kudu.Client
         private void ClearCurrent()
         {
             var current = Current;
-            if (current != null)
+            if (current is not null)
             {
                 Current = default;
-                (current as IDisposable)?.Dispose();
+                current.Dispose();
             }
         }
     }

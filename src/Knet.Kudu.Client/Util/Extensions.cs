@@ -145,21 +145,5 @@ namespace Knet.Kudu.Client.Util
 
             return result;
         }
-
-        internal static int GetScannerBatchSizeEstimate(this KuduSchema schema)
-        {
-            if (schema.VarLengthColumnCount == 0)
-            {
-                // No variable length data, we can do an
-                // exact ideal estimate here.
-                return 1024 * 1024 - schema.RowSize;
-            }
-            else
-            {
-                // Assume everything evens out.
-                // Most of the time it probably does.
-                return 1024 * 1024;
-            }
-        }
     }
 }

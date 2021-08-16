@@ -2,10 +2,11 @@ using System.Buffers;
 using Google.Protobuf;
 using Google.Protobuf.Collections;
 using Knet.Kudu.Client.Protobuf.Master;
+using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client.Requests
 {
-    public class GetTableSchemaRequest : KuduMasterRpc<GetTableSchemaResponsePB>
+    internal class GetTableSchemaRequest : KuduMasterRpc<GetTableSchemaResponsePB>
     {
         private static readonly RepeatedField<uint> _requiredFeatures = new()
         {
@@ -30,9 +31,9 @@ namespace Knet.Kudu.Client.Requests
 
         public override void WriteTo(IBufferWriter<byte> output) => _request.WriteTo(output);
 
-        public override void ParseProtobuf(ReadOnlySequence<byte> buffer)
+        public override void ParseResponse(KuduMessage message)
         {
-            Output = GetTableSchemaResponsePB.Parser.ParseFrom(buffer);
+            Output = GetTableSchemaResponsePB.Parser.ParseFrom(message.MessageProtobuf);
             Error = Output.Error;
         }
     }
