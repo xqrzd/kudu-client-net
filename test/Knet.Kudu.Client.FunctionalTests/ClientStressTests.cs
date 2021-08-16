@@ -215,14 +215,9 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             await foreach (var resultSet in scanner)
             {
-                AccumulateResults(resultSet);
-
-                void AccumulateResults(ResultSet resultSet)
+                foreach (var row in resultSet)
                 {
-                    foreach (var row in resultSet)
-                    {
-                        results.Add(row.GetInt32(0));
-                    }
+                    results.Add(row.GetInt32(0));
                 }
             }
 

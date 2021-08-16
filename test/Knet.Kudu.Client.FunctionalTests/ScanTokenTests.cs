@@ -518,14 +518,9 @@ namespace Knet.Kudu.Client.FunctionalTests
 
                 await foreach (var resultSet in scanner)
                 {
-                    AccumulateResults(resultSet);
-
-                    void AccumulateResults(ResultSet rows)
+                    foreach (var row in resultSet)
                     {
-                        foreach (var row in rows)
-                        {
-                            resultKeys.Add(row.GetInt32(predicateIndex));
-                        }
+                        resultKeys.Add(row.GetInt32(predicateIndex));
                     }
                 }
             }
@@ -575,11 +570,6 @@ namespace Knet.Kudu.Client.FunctionalTests
             int numDeletes = 0;
 
             await foreach (var resultSet in scanner)
-            {
-                AccumulateResults(resultSet);
-            }
-
-            void AccumulateResults(ResultSet resultSet)
             {
                 foreach (var rowResult in resultSet)
                 {

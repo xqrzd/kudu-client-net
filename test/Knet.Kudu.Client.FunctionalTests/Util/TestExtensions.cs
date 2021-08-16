@@ -2,8 +2,6 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Knet.Kudu.Client.FunctionalTests.Util
 {
@@ -55,20 +53,6 @@ namespace Knet.Kudu.Client.FunctionalTests.Util
         public static bool NextBool(this Random random)
         {
             return random.Next(2) == 0;
-        }
-
-        public static async Task<List<T>> ToListAsync<T>(
-            this IAsyncEnumerable<T> source,
-            CancellationToken cancellationToken = default)
-        {
-            var results = new List<T>();
-
-            await foreach (var result in source.WithCancellation(cancellationToken))
-            {
-                results.Add(result);
-            }
-
-            return results;
         }
     }
 }

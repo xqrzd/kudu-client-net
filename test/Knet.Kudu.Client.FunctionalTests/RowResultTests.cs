@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
 using Knet.Kudu.Client.FunctionalTests.Util;
@@ -40,11 +39,6 @@ namespace Knet.Kudu.Client.FunctionalTests
             var scanner = client.NewScanBuilder(table).Build();
 
             await foreach (var resultSet in scanner)
-            {
-                CheckResults(resultSet);
-            }
-
-            void CheckResults(ResultSet resultSet)
             {
                 foreach (var row in resultSet)
                 {
@@ -115,11 +109,6 @@ namespace Knet.Kudu.Client.FunctionalTests
             var scanner = client.NewScanBuilder(table).Build();
 
             await foreach (var resultSet in scanner)
-            {
-                CheckResults(resultSet);
-            }
-
-            void CheckResults(ResultSet resultSet)
             {
                 foreach (var row in resultSet)
                 {
@@ -204,11 +193,15 @@ namespace Knet.Kudu.Client.FunctionalTests
                 .SetEmptyProjection()
                 .Build();
 
-            var results = await scanner.ToListAsync();
-            var scannedRows = results.Sum(resultSet => resultSet.Count);
+            long scannedRows = 0;
+            await foreach (var resultSet in scanner)
+            {
+                scannedRows += resultSet.Count;
+                Assert.Empty(resultSet.Schema.Columns);
+                Assert.Empty(resultSet);
+            }
 
             Assert.Equal(numRows, scannedRows);
-            Assert.All(results, result => Assert.False(result.GetEnumerator().MoveNext()));
         }
     }
 }

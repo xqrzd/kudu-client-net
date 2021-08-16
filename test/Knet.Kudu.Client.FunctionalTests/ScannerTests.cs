@@ -128,11 +128,6 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             await foreach (var resultSet in scanner)
             {
-                CheckResults(resultSet);
-            }
-
-            void CheckResults(ResultSet resultSet)
-            {
                 foreach (var row in resultSet)
                 {
                     var key = row.GetInt32(0);
@@ -436,11 +431,6 @@ namespace Knet.Kudu.Client.FunctionalTests
                     Assert.Equal(projection.GetColumn(isDeletedIndex),
                         projection.GetColumn("is_deleted_"));
 
-                    AccumulateResults(resultSet);
-                }
-
-                void AccumulateResults(ResultSet resultSet)
-                {
                     foreach (var row in resultSet)
                     {
                         results.Add(new TestRowResult(row));
@@ -523,13 +513,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             await foreach (var resultSet in scanner)
             {
                 rowCount += resultSet.Count;
-                CheckResults(resultSet);
-            }
 
-            Assert.Equal(1, rowCount);
-
-            static void CheckResults(ResultSet resultSet)
-            {
                 foreach (var row in resultSet)
                 {
                     Assert.Equal(0, row.GetInt32(0));
@@ -537,6 +521,8 @@ namespace Knet.Kudu.Client.FunctionalTests
                     Assert.True(row.IsDeleted);
                 }
             }
+
+            Assert.Equal(1, rowCount);
         }
 
         /// <summary>
