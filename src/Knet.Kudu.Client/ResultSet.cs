@@ -1,11 +1,13 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client
 {
-    public sealed class ResultSet : IDisposable
+    public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
     {
         private readonly ArrayPoolBuffer<byte> _buffer;
         private readonly byte[] _data;
@@ -601,7 +603,11 @@ namespace Knet.Kudu.Client
 
         public Enumerator GetEnumerator() => new(this);
 
-        public struct Enumerator
+        IEnumerator<RowResult> IEnumerable<RowResult>.GetEnumerator() => new Enumerator(this);
+
+        IEnumerator IEnumerable.GetEnumerator() => new Enumerator(this);
+
+        public struct Enumerator : IEnumerator<RowResult>, IEnumerator
         {
             private readonly ResultSet _resultSet;
             private readonly int _numRows;
@@ -630,6 +636,12 @@ namespace Knet.Kudu.Client
             }
 
             public RowResult Current => new(_resultSet, _index);
+
+            object IEnumerator.Current => Current;
+
+            public void Reset() { }
+
+            public void Dispose() { }
         }
     }
 }
