@@ -170,12 +170,11 @@ namespace Knet.Kudu.Client.FunctionalTests
             var table = await client.CreateTableAsync(builder);
 
             int numRows = 1000;
-            var rows = Enumerable.Range(0, numRows).Select(i =>
-            {
-                return ClientTestUtil.CreateBasicSchemaInsert(table, i);
-            });
+            var rows = Enumerable.Range(0, numRows)
+                .Select(i => ClientTestUtil.CreateBasicSchemaInsert(table, i));
 
             await client.WriteAsync(rows);
+            await ClientTestUtil.WaitUntilRowCountAsync(client, table, numRows);
 
             var scanner = client.NewScanBuilder(table)
                 .SetReplicaSelection(ReplicaSelection.ClosestReplica)
@@ -191,15 +190,10 @@ namespace Knet.Kudu.Client.FunctionalTests
             // Wait for the scanner to time out.
             await Task.Delay(ShortScannerTtlMs * 2);
 
-            try
-            {
-                await scanEnumerator.MoveNextAsync();
-                Assert.False(true, "Exception was not thrown when accessing an expired scanner");
-            }
-            catch (NonRecoverableException ex)
-            {
-                Assert.Matches(".*Scanner .* not found.*", ex.Message);
-            }
+            var exception = await Assert.ThrowsAsync<NonRecoverableException>(async () =>
+                await scanEnumerator.MoveNextAsync());
+
+            Assert.Matches(".*Scanner .* not found.*", exception.Message);
 
             // Closing an expired scanner shouldn't throw an exception.
             await scanEnumerator.DisposeAsync();
