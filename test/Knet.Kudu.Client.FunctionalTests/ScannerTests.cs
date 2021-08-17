@@ -218,10 +218,8 @@ namespace Knet.Kudu.Client.FunctionalTests
             var table = await client.CreateTableAsync(builder);
 
             int numRows = 1000;
-            var rows = Enumerable.Range(0, numRows).Select(i =>
-            {
-                return ClientTestUtil.CreateBasicSchemaInsert(table, i);
-            });
+            var rows = Enumerable.Range(0, numRows)
+                .Select(i => ClientTestUtil.CreateBasicSchemaInsert(table, i));
 
             await client.WriteAsync(rows);
 
@@ -230,7 +228,8 @@ namespace Knet.Kudu.Client.FunctionalTests
                 .SetBatchSizeBytes(100) // Use a small batch size so we get many batches.
                 .Build();
 
-            var scanEnumerator = scanner.GetAsyncEnumerator();
+            await ClientTestUtil.WaitUntilRowCountAsync(client, table, numRows);
+            await using var scanEnumerator = scanner.GetAsyncEnumerator();
 
             // KeepAlive on uninitialized scanner should be ok.
             await scanEnumerator.KeepAliveAsync();
@@ -248,8 +247,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                     break;
 
                 // Ensure we actually end up between tablets.
-                if (accum == numRows)
-                    Assert.False(true, "All rows were in a single tablet.");
+                Assert.False(accum == numRows, "All rows were in a single tablet.");
             }
 
             // In between scanners now and should be ok.
@@ -260,11 +258,11 @@ namespace Knet.Kudu.Client.FunctionalTests
             accum += scanEnumerator.Current.Count;
 
             // Wait for longer than the scanner ttl calling keepAlive throughout.
-            // Each loop sleeps 25% of the scanner ttl and we loop 10 times to ensure
+            // Each loop sleeps 20% of the scanner ttl and we loop 12 times to ensure
             // we extend over 2x the scanner ttl.
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 12; i++)
             {
-                await Task.Delay(ShortScannerTtlMs / 4);
+                await Task.Delay(ShortScannerTtlMs / 5);
                 await scanEnumerator.KeepAliveAsync();
             }
 
@@ -277,15 +275,10 @@ namespace Knet.Kudu.Client.FunctionalTests
             Assert.Equal(numRows, accum);
 
             // At this point the scanner is closed and there is nothing to keep alive.
-            try
-            {
-                await scanEnumerator.KeepAliveAsync();
-                Assert.False(true);
-            }
-            catch (Exception ex)
-            {
-                Assert.Contains("Scanner has already been closed", ex.Message);
-            }
+            var exception = await Assert.ThrowsAsync<Exception>(async () =>
+                await scanEnumerator.KeepAliveAsync());
+
+            Assert.Contains("Scanner has already been closed", exception.Message);
         }
 
         [SkippableFact]
