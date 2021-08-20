@@ -2,7 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Knet.Kudu.Client.Internal;
+using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client
@@ -11,9 +13,9 @@ namespace Knet.Kudu.Client
     {
         private readonly ArrayPoolBuffer<byte> _buffer;
         private readonly byte[] _data;
-        private readonly int[] _dataSidecarOffsets;
-        private readonly int[] _varlenDataSidecarOffsets;
-        private readonly int[] _nonNullBitmapSidecarOffsets;
+        private readonly SidecarOffset[] _dataSidecarOffsets;
+        private readonly SidecarOffset[] _varlenDataSidecarOffsets;
+        private readonly SidecarOffset[] _nonNullBitmapSidecarOffsets;
 
         public KuduSchema Schema { get; }
 
@@ -23,9 +25,9 @@ namespace Knet.Kudu.Client
             ArrayPoolBuffer<byte> buffer,
             KuduSchema schema,
             long count,
-            int[] dataSidecarOffsets,
-            int[] varlenDataSidecarOffsets,
-            int[] nonNullBitmapSidecarOffsets)
+            SidecarOffset[] dataSidecarOffsets,
+            SidecarOffset[] varlenDataSidecarOffsets,
+            SidecarOffset[] nonNullBitmapSidecarOffsets)
         {
             _buffer = buffer;
             _data = buffer?.Buffer;
@@ -35,21 +37,15 @@ namespace Knet.Kudu.Client
 
             Schema = schema;
             Count = count;
+
+            // TODO: Validation, so we can safely use these unsafe methods
+            // TODO: Better dispose behavior
         }
 
         public void Dispose()
         {
             _buffer?.Dispose();
         }
-
-        internal int GetDataOffset(int columnIndex) =>
-            _dataSidecarOffsets[columnIndex];
-
-        internal int GetVarLenOffset(int columnIndex) =>
-            _varlenDataSidecarOffsets[columnIndex];
-
-        internal int GetNonNullBitmapOffset(int columnIndex) =>
-            _nonNullBitmapSidecarOffsets[columnIndex];
 
         internal bool GetBool(string columnName, int rowIndex)
         {
@@ -60,7 +56,7 @@ namespace Knet.Kudu.Client
         internal bool GetBool(int columnIndex, int rowIndex)
         {
             CheckTypeNotNull(columnIndex, rowIndex, KuduType.Bool);
-            return ReadBool(columnIndex, rowIndex);
+            return ReadBoolUnsafe(columnIndex, rowIndex);
         }
 
         internal bool? GetNullableBool(string columnName, int rowIndex)
@@ -73,16 +69,16 @@ namespace Knet.Kudu.Client
         {
             CheckType(columnIndex, KuduType.Bool);
 
-            if (IsNull(columnIndex, rowIndex))
+            if (IsNullUnsafe(columnIndex, rowIndex))
                 return null;
 
-            return ReadBool(columnIndex, rowIndex);
+            return ReadBoolUnsafe(columnIndex, rowIndex);
         }
 
-        private bool ReadBool(int columnIndex, int rowIndex)
+        private bool ReadBoolUnsafe(int columnIndex, int rowIndex)
         {
-            int offset = GetStartIndex(columnIndex, rowIndex, 1);
-            return KuduEncoder.DecodeBool(_data, offset);
+            int offset = GetStartIndexUnsafe(columnIndex, rowIndex, 1);
+            return KuduEncoder.DecodeBoolUnsafe(_data, offset);
         }
 
         internal byte GetByte(string columnName, int rowIndex)
@@ -94,7 +90,7 @@ namespace Knet.Kudu.Client
         internal byte GetByte(int columnIndex, int rowIndex)
         {
             CheckTypeNotNull(columnIndex, rowIndex, KuduType.Int8);
-            return ReadByte(columnIndex, rowIndex);
+            return ReadByteUnsafe(columnIndex, rowIndex);
         }
 
         internal byte? GetNullableByte(string columnName, int rowIndex)
@@ -107,10 +103,10 @@ namespace Knet.Kudu.Client
         {
             CheckType(columnIndex, KuduType.Int8);
 
-            if (IsNull(columnIndex, rowIndex))
+            if (IsNullUnsafe(columnIndex, rowIndex))
                 return null;
 
-            return ReadByte(columnIndex, rowIndex);
+            return ReadByteUnsafe(columnIndex, rowIndex);
         }
 
         internal sbyte GetSByte(string columnName, int rowIndex)
@@ -122,7 +118,7 @@ namespace Knet.Kudu.Client
         internal sbyte GetSByte(int columnIndex, int rowIndex)
         {
             CheckTypeNotNull(columnIndex, rowIndex, KuduType.Int8);
-            return (sbyte)ReadByte(columnIndex, rowIndex);
+            return (sbyte)ReadByteUnsafe(columnIndex, rowIndex);
         }
 
         internal sbyte? GetNullableSByte(string columnName, int rowIndex)
@@ -135,16 +131,16 @@ namespace Knet.Kudu.Client
         {
             CheckType(columnIndex, KuduType.Int8);
 
-            if (IsNull(columnIndex, rowIndex))
+            if (IsNullUnsafe(columnIndex, rowIndex))
                 return null;
 
-            return (sbyte)ReadByte(columnIndex, rowIndex);
+            return (sbyte)ReadByteUnsafe(columnIndex, rowIndex);
         }
 
-        private byte ReadByte(int columnIndex, int rowIndex)
+        private byte ReadByteUnsafe(int columnIndex, int rowIndex)
         {
-            int offset = GetStartIndex(columnIndex, rowIndex, 1);
-            return KuduEncoder.DecodeUInt8(_data, offset);
+            int offset = GetStartIndexUnsafe(columnIndex, rowIndex, 1);
+            return KuduEncoder.DecodeUInt8Unsafe(_data, offset);
         }
 
         internal short GetInt16(string columnName, int rowIndex)
@@ -156,7 +152,7 @@ namespace Knet.Kudu.Client
         internal short GetInt16(int columnIndex, int rowIndex)
         {
             CheckTypeNotNull(columnIndex, rowIndex, KuduType.Int16);
-            return ReadInt16(columnIndex, rowIndex);
+            return ReadInt16Unsafe(columnIndex, rowIndex);
         }
 
         internal short? GetNullableInt16(string columnName, int rowIndex)
@@ -169,16 +165,16 @@ namespace Knet.Kudu.Client
         {
             CheckType(columnIndex, KuduType.Int16);
 
-            if (IsNull(columnIndex, rowIndex))
+            if (IsNullUnsafe(columnIndex, rowIndex))
                 return null;
 
-            return ReadInt16(columnIndex, rowIndex);
+            return ReadInt16Unsafe(columnIndex, rowIndex);
         }
 
-        private short ReadInt16(int columnIndex, int rowIndex)
+        private short ReadInt16Unsafe(int columnIndex, int rowIndex)
         {
-            int offset = GetStartIndex(columnIndex, rowIndex, 2);
-            return KuduEncoder.DecodeInt16(_data, offset);
+            int offset = GetStartIndexUnsafe(columnIndex, rowIndex, 2);
+            return KuduEncoder.DecodeInt16Unsafe(_data, offset);
         }
 
         internal int GetInt32(string columnName, int rowIndex)
@@ -190,7 +186,7 @@ namespace Knet.Kudu.Client
         internal int GetInt32(int columnIndex, int rowIndex)
         {
             CheckTypeNotNull(columnIndex, rowIndex, KuduTypeFlags.Int32 | KuduTypeFlags.Date);
-            return ReadInt32(columnIndex, rowIndex);
+            return ReadInt32Unsafe(columnIndex, rowIndex);
         }
 
         internal int? GetNullableInt32(string columnName, int rowIndex)
@@ -203,16 +199,16 @@ namespace Knet.Kudu.Client
         {
             CheckType(columnIndex, KuduTypeFlags.Int32 | KuduTypeFlags.Date);
 
-            if (IsNull(columnIndex, rowIndex))
+            if (IsNullUnsafe(columnIndex, rowIndex))
                 return null;
 
-            return ReadInt32(columnIndex, rowIndex);
+            return ReadInt32Unsafe(columnIndex, rowIndex);
         }
 
-        private int ReadInt32(int columnIndex, int rowIndex)
+        private int ReadInt32Unsafe(int columnIndex, int rowIndex)
         {
-            int offset = GetStartIndex(columnIndex, rowIndex, 4);
-            return KuduEncoder.DecodeInt32(_data, offset);
+            int offset = GetStartIndexUnsafe(columnIndex, rowIndex, 4);
+            return KuduEncoder.DecodeInt32Unsafe(_data, offset);
         }
 
         internal long GetInt64(string columnName, int rowIndex)
@@ -227,7 +223,7 @@ namespace Knet.Kudu.Client
                 KuduTypeFlags.Int64 |
                 KuduTypeFlags.UnixtimeMicros);
 
-            return ReadInt64(columnIndex, rowIndex);
+            return ReadInt64Unsafe(columnIndex, rowIndex);
         }
 
         internal long? GetNullableInt64(string columnName, int rowIndex)
@@ -242,16 +238,16 @@ namespace Knet.Kudu.Client
                 KuduTypeFlags.Int64 |
                 KuduTypeFlags.UnixtimeMicros);
 
-            if (IsNull(columnIndex, rowIndex))
+            if (IsNullUnsafe(columnIndex, rowIndex))
                 return null;
 
-            return ReadInt64(columnIndex, rowIndex);
+            return ReadInt64Unsafe(columnIndex, rowIndex);
         }
 
-        private long ReadInt64(int columnIndex, int rowIndex)
+        private long ReadInt64Unsafe(int columnIndex, int rowIndex)
         {
-            int offset = GetStartIndex(columnIndex, rowIndex, 8);
-            return KuduEncoder.DecodeInt64(_data, offset);
+            int offset = GetStartIndexUnsafe(columnIndex, rowIndex, 8);
+            return KuduEncoder.DecodeInt64Unsafe(_data, offset);
         }
 
         internal DateTime GetDateTime(string columnName, int rowIndex)
@@ -262,23 +258,13 @@ namespace Knet.Kudu.Client
 
         internal DateTime GetDateTime(int columnIndex, int rowIndex)
         {
-            var columnSchema = GetColumnSchema(columnIndex);
-            var type = columnSchema.Type;
-
-            CheckNotNull(columnSchema, columnIndex, rowIndex);
-
-            if (type == KuduType.UnixtimeMicros)
-            {
-                return ReadDateTime(columnIndex, rowIndex);
-            }
-            else if (type == KuduType.Date)
-            {
-                return ReadDate(columnIndex, rowIndex);
-            }
-
-            return KuduTypeValidation.ThrowException<DateTime>(columnSchema,
+            var columnSchema = CheckTypeNotNull(columnIndex, rowIndex,
                 KuduTypeFlags.UnixtimeMicros |
                 KuduTypeFlags.Date);
+
+            return columnSchema.Type == KuduType.UnixtimeMicros
+                ? ReadDateTimeUnsafe(columnIndex, rowIndex)
+                : ReadDateUnsafe(columnIndex, rowIndex);
         }
 
         internal DateTime? GetNullableDateTime(string columnName, int rowIndex)
@@ -289,36 +275,28 @@ namespace Knet.Kudu.Client
 
         internal DateTime? GetNullableDateTime(int columnIndex, int rowIndex)
         {
-            var columnSchema = GetColumnSchema(columnIndex);
-            var type = columnSchema.Type;
-
-            if (IsNull(columnIndex, rowIndex))
-                return null;
-
-            if (type == KuduType.UnixtimeMicros)
-            {
-                return ReadDateTime(columnIndex, rowIndex);
-            }
-            else if (type == KuduType.Date)
-            {
-                return ReadDate(columnIndex, rowIndex);
-            }
-
-            return KuduTypeValidation.ThrowException<DateTime>(columnSchema,
+            var columnSchema = CheckType(columnIndex,
                 KuduTypeFlags.UnixtimeMicros |
                 KuduTypeFlags.Date);
+
+            if (IsNullUnsafe(columnIndex, rowIndex))
+                return null;
+
+            return columnSchema.Type == KuduType.UnixtimeMicros
+                ? ReadDateTimeUnsafe(columnIndex, rowIndex)
+                : ReadDateUnsafe(columnIndex, rowIndex);
         }
 
-        private DateTime ReadDateTime(int columnIndex, int rowIndex)
+        private DateTime ReadDateTimeUnsafe(int columnIndex, int rowIndex)
         {
-            int offset = GetStartIndex(columnIndex, rowIndex, 8);
-            return KuduEncoder.DecodeDateTime(_data, offset);
+            int offset = GetStartIndexUnsafe(columnIndex, rowIndex, 8);
+            return KuduEncoder.DecodeDateTimeUnsafe(_data, offset);
         }
 
-        private DateTime ReadDate(int columnIndex, int rowIndex)
+        private DateTime ReadDateUnsafe(int columnIndex, int rowIndex)
         {
-            int offset = GetStartIndex(columnIndex, rowIndex, 4);
-            return KuduEncoder.DecodeDate(_data, offset);
+            int offset = GetStartIndexUnsafe(columnIndex, rowIndex, 4);
+            return KuduEncoder.DecodeDateUnsafe(_data, offset);
         }
 
         internal float GetFloat(string columnName, int rowIndex)
@@ -330,7 +308,7 @@ namespace Knet.Kudu.Client
         internal float GetFloat(int columnIndex, int rowIndex)
         {
             CheckTypeNotNull(columnIndex, rowIndex, KuduType.Float);
-            return ReadFloat(columnIndex, rowIndex);
+            return ReadFloatUnsafe(columnIndex, rowIndex);
         }
 
         internal float? GetNullableFloat(string columnName, int rowIndex)
@@ -343,16 +321,16 @@ namespace Knet.Kudu.Client
         {
             CheckType(columnIndex, KuduType.Float);
 
-            if (IsNull(columnIndex, rowIndex))
+            if (IsNullUnsafe(columnIndex, rowIndex))
                 return null;
 
-            return ReadFloat(columnIndex, rowIndex);
+            return ReadFloatUnsafe(columnIndex, rowIndex);
         }
 
-        private float ReadFloat(int columnIndex, int rowIndex)
+        private float ReadFloatUnsafe(int columnIndex, int rowIndex)
         {
-            int offset = GetStartIndex(columnIndex, rowIndex, 4);
-            return KuduEncoder.DecodeFloat(_data, offset);
+            int offset = GetStartIndexUnsafe(columnIndex, rowIndex, 4);
+            return KuduEncoder.DecodeFloatUnsafe(_data, offset);
         }
 
         internal double GetDouble(string columnName, int rowIndex)
@@ -364,7 +342,7 @@ namespace Knet.Kudu.Client
         internal double GetDouble(int columnIndex, int rowIndex)
         {
             CheckTypeNotNull(columnIndex, rowIndex, KuduType.Double);
-            return ReadDouble(columnIndex, rowIndex);
+            return ReadDoubleUnsafe(columnIndex, rowIndex);
         }
 
         internal double? GetNullableDouble(string columnName, int rowIndex)
@@ -377,16 +355,16 @@ namespace Knet.Kudu.Client
         {
             CheckType(columnIndex, KuduType.Double);
 
-            if (IsNull(columnIndex, rowIndex))
+            if (IsNullUnsafe(columnIndex, rowIndex))
                 return null;
 
-            return ReadDouble(columnIndex, rowIndex);
+            return ReadDoubleUnsafe(columnIndex, rowIndex);
         }
 
-        private double ReadDouble(int columnIndex, int rowIndex)
+        private double ReadDoubleUnsafe(int columnIndex, int rowIndex)
         {
-            int offset = GetStartIndex(columnIndex, rowIndex, 8);
-            return KuduEncoder.DecodeDouble(_data, offset);
+            int offset = GetStartIndexUnsafe(columnIndex, rowIndex, 8);
+            return KuduEncoder.DecodeDoubleUnsafe(_data, offset);
         }
 
         internal decimal GetDecimal(string columnName, int rowIndex)
@@ -397,12 +375,12 @@ namespace Knet.Kudu.Client
 
         internal decimal GetDecimal(int columnIndex, int rowIndex)
         {
-            CheckTypeNotNull(columnIndex, rowIndex,
+            var column = CheckTypeNotNull(columnIndex, rowIndex,
                 KuduTypeFlags.Decimal32 |
                 KuduTypeFlags.Decimal64 |
                 KuduTypeFlags.Decimal128);
 
-            return ReadDecimal(columnIndex, rowIndex);
+            return ReadDecimalUnsafe(column, columnIndex, rowIndex);
         }
 
         internal decimal? GetNullableDecimal(string columnName, int rowIndex)
@@ -413,24 +391,22 @@ namespace Knet.Kudu.Client
 
         internal decimal? GetNullableDecimal(int columnIndex, int rowIndex)
         {
-            CheckType(columnIndex,
+            var column = CheckType(columnIndex,
                 KuduTypeFlags.Decimal32 |
                 KuduTypeFlags.Decimal64 |
                 KuduTypeFlags.Decimal128);
 
-            if (IsNull(columnIndex, rowIndex))
+            if (IsNullUnsafe(columnIndex, rowIndex))
                 return null;
 
-            return ReadDecimal(columnIndex, rowIndex);
+            return ReadDecimalUnsafe(column, columnIndex, rowIndex);
         }
 
-        private decimal ReadDecimal(int columnIndex, int rowIndex)
+        private decimal ReadDecimalUnsafe(ColumnSchema column, int columnIndex, int rowIndex)
         {
-            var column = GetColumnSchema(columnIndex);
             int scale = column.TypeAttributes.Scale.GetValueOrDefault();
-
-            int offset = GetStartIndex(columnIndex, rowIndex, column.Size);
-            return KuduEncoder.DecodeDecimal(_data, offset, column.Type, scale);
+            int offset = GetStartIndexUnsafe(columnIndex, rowIndex, column.Size);
+            return KuduEncoder.DecodeDecimalUnsafe(_data, offset, column.Type, scale);
         }
 
         internal ReadOnlySpan<byte> GetRawFixed(string columnName, int rowIndex)
@@ -443,11 +419,11 @@ namespace Knet.Kudu.Client
         {
             var column = CheckFixedLengthType(columnIndex);
 
-            if (IsNull(columnIndex, rowIndex))
+            if (IsNullUnsafe(columnIndex, rowIndex))
                 return default;
 
             int size = column.Size;
-            int offset = GetStartIndex(columnIndex, rowIndex, size);
+            int offset = GetStartIndexUnsafe(columnIndex, rowIndex, size);
 
             return _data.AsSpan(offset, size);
         }
@@ -464,7 +440,7 @@ namespace Knet.Kudu.Client
                 KuduTypeFlags.String |
                 KuduTypeFlags.Varchar);
 
-            return ReadString(columnIndex, rowIndex);
+            return ReadStringUnsafe(columnIndex, rowIndex);
         }
 
         internal string GetNullableString(string columnName, int rowIndex)
@@ -477,21 +453,16 @@ namespace Knet.Kudu.Client
         {
             CheckType(columnIndex, KuduTypeFlags.String | KuduTypeFlags.Varchar);
 
-            if (IsNull(columnIndex, rowIndex))
+            if (IsNullUnsafe(columnIndex, rowIndex))
                 return null;
 
-            return ReadString(columnIndex, rowIndex);
+            return ReadStringUnsafe(columnIndex, rowIndex);
         }
 
-        private string ReadString(int columnIndex, int rowIndex)
+        private string ReadStringUnsafe(int columnIndex, int rowIndex)
         {
-            int offset = ReadInt32(columnIndex, rowIndex);
-            int length = ReadInt32(columnIndex, rowIndex + 1) - offset;
-
-            int sidecarOffset = GetVarLenOffset(columnIndex);
-            int realOffset = sidecarOffset + offset;
-
-            return KuduEncoder.DecodeString(_data, realOffset, length);
+            var (offset, length) = GetVarLenStartIndexUnsafe(columnIndex, rowIndex);
+            return KuduEncoder.DecodeString(_data, offset, length);
         }
 
         internal ReadOnlySpan<byte> GetBinary(string columnName, int rowIndex)
@@ -504,40 +475,46 @@ namespace Knet.Kudu.Client
         {
             CheckType(columnIndex, KuduType.Binary);
 
-            if (IsNull(columnIndex, rowIndex))
+            if (IsNullUnsafe(columnIndex, rowIndex))
                 return default;
 
-            return ReadBinary(columnIndex, rowIndex);
+            return ReadBinaryUnsafe(columnIndex, rowIndex);
         }
 
-        private ReadOnlySpan<byte> ReadBinary(int columnIndex, int rowIndex)
+        private ReadOnlySpan<byte> ReadBinaryUnsafe(int columnIndex, int rowIndex)
         {
-            int offset = ReadInt32(columnIndex, rowIndex);
-            int length = ReadInt32(columnIndex, rowIndex + 1) - offset;
-
-            int sidecarOffset = GetVarLenOffset(columnIndex);
-            int realOffset = sidecarOffset + offset;
-
-            return _data.AsSpan(realOffset, length);
+            var (offset, length) = GetVarLenStartIndexUnsafe(columnIndex, rowIndex);
+            return _data.AsSpan(offset, length);
         }
 
         internal bool IsNull(string columnName, int rowIndex)
         {
             int columnIndex = GetColumnIndex(columnName);
-            return IsNull(columnIndex, rowIndex);
+            return IsNullUnsafe(columnIndex, rowIndex);
         }
 
         internal bool IsNull(int columnIndex, int rowIndex)
         {
-            int offset = GetNonNullBitmapOffset(columnIndex);
+            int offset = _nonNullBitmapSidecarOffsets[columnIndex].Start;
+            return IsNullOffsetUnsafe(offset, rowIndex);
+        }
+
+        private bool IsNullUnsafe(int columnIndex, int rowIndex)
+        {
+            int offset = GetOffsetUnsafe(_nonNullBitmapSidecarOffsets, columnIndex);
+            return IsNullOffsetUnsafe(offset, rowIndex);
+        }
+
+        private bool IsNullOffsetUnsafe(int offset, int rowIndex)
+        {
             if (offset == -1)
             {
                 // This column isn't nullable.
                 return false;
             }
 
-            bool valueExists = _data.GetBit(offset, rowIndex);
-            return !valueExists;
+            bool nonNull = KuduEncoder.DecodeBitUnsafe(_data, offset, rowIndex);
+            return !nonNull;
         }
 
         private ColumnSchema CheckType(int columnIndex, KuduType type)
@@ -564,20 +541,20 @@ namespace Knet.Kudu.Client
         private ColumnSchema CheckTypeNotNull(int columnIndex, int rowIndex, KuduType type)
         {
             var columnSchema = CheckType(columnIndex, type);
-            CheckNotNull(columnSchema, columnIndex, rowIndex);
+            CheckNotNullUnsafe(columnSchema, columnIndex, rowIndex);
             return columnSchema;
         }
 
         private ColumnSchema CheckTypeNotNull(int columnIndex, int rowIndex, KuduTypeFlags typeFlags)
         {
             var columnSchema = CheckType(columnIndex, typeFlags);
-            CheckNotNull(columnSchema, columnIndex, rowIndex);
+            CheckNotNullUnsafe(columnSchema, columnIndex, rowIndex);
             return columnSchema;
         }
 
-        private void CheckNotNull(ColumnSchema columnSchema, int columnIndex, int rowIndex)
+        private void CheckNotNullUnsafe(ColumnSchema columnSchema, int columnIndex, int rowIndex)
         {
-            if (IsNull(columnIndex, rowIndex))
+            if (IsNullUnsafe(columnIndex, rowIndex))
             {
                 KuduTypeValidation.ThrowNullException(columnSchema);
             }
@@ -594,9 +571,30 @@ namespace Knet.Kudu.Client
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private int GetStartIndex(int columnIndex, int rowIndex, int dataSize)
+        private int GetStartIndexUnsafe(int columnIndex, int rowIndex, int dataSize)
         {
-            return GetDataOffset(columnIndex) + rowIndex * dataSize;
+            var offset = GetOffsetUnsafe(_dataSidecarOffsets, columnIndex);
+            return offset + rowIndex * dataSize;
+        }
+
+        private (int Offset, int Length) GetVarLenStartIndexUnsafe(int columnIndex, int rowIndex)
+        {
+            int sidecarOffset = GetOffsetUnsafe(_varlenDataSidecarOffsets, columnIndex);
+            int offset = ReadInt32Unsafe(columnIndex, rowIndex);
+            int length = ReadInt32Unsafe(columnIndex, rowIndex + 1) - offset;
+            int realOffset = sidecarOffset + offset;
+
+            return (realOffset, length);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int GetOffsetUnsafe(SidecarOffset[] source, int index)
+        {
+#if NET5_0_OR_GREATER
+            return Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(source), index).Start;
+#else
+            return source[index].Start;
+#endif
         }
 
         public override string ToString() => $"{Count} rows";
@@ -617,6 +615,7 @@ namespace Knet.Kudu.Client
             {
                 _resultSet = resultSet;
                 _index = -1;
+                // TODO: This isn't correct.
                 _numRows = resultSet._dataSidecarOffsets is null
                     ? 0 // Empty projection.
                     : (int)resultSet.Count;

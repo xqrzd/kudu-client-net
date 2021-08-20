@@ -1,5 +1,4 @@
 using System;
-using Google.Protobuf.Collections;
 using Knet.Kudu.Client.Internal;
 
 namespace Knet.Kudu.Client.Protocol
@@ -8,12 +7,12 @@ namespace Knet.Kudu.Client.Protocol
     {
         private ArrayPoolBuffer<byte> _messageBuffer;
         private int _messageProtobufLength;
-        private RepeatedField<uint> _sidecarOffsets;
+        private SidecarOffset[] _sidecarOffsets;
 
         internal void Init(
             ArrayPoolBuffer<byte> messageBuffer,
             int messageProtobufLength,
-            RepeatedField<uint> sidecarOffsets)
+            SidecarOffset[] sidecarOffsets)
         {
             _messageBuffer = messageBuffer;
             _messageProtobufLength = messageProtobufLength;
@@ -25,7 +24,7 @@ namespace Knet.Kudu.Client.Protocol
         public ReadOnlySpan<byte> MessageProtobuf =>
             Buffer.AsSpan(0, _messageProtobufLength);
 
-        public int GetSidecarOffset(int sidecar) => (int)_sidecarOffsets[sidecar];
+        public SidecarOffset GetSidecarOffset(int sidecar) => _sidecarOffsets[sidecar];
 
         internal ArrayPoolBuffer<byte> TakeMemory()
         {
@@ -36,8 +35,13 @@ namespace Knet.Kudu.Client.Protocol
 
         internal void Reset()
         {
-            _messageBuffer?.Dispose();
-            _messageBuffer = null;
+            var buffer = _messageBuffer;
+            if (buffer is not null)
+            {
+                _messageBuffer = null;
+                buffer.Dispose();
+            }
+
             _messageProtobufLength = 0;
             _sidecarOffsets = null;
         }

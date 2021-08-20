@@ -34,9 +34,9 @@ namespace Knet.Kudu.Client.Scanner
             var columns = data.Columns;
             var numColumns = columns.Count;
 
-            var dataSidecarOffsets = new int[numColumns];
-            var varlenDataSidecarOffsets = new int[numColumns];
-            var nonNullBitmapSidecarOffsets = new int[numColumns];
+            var dataSidecarOffsets = new SidecarOffset[numColumns];
+            var varlenDataSidecarOffsets = new SidecarOffset[numColumns];
+            var nonNullBitmapSidecarOffsets = new SidecarOffset[numColumns];
 
             for (int i = 0; i < numColumns; i++)
             {
@@ -61,7 +61,7 @@ namespace Knet.Kudu.Client.Scanner
                 }
                 else
                 {
-                    nonNullBitmapSidecarOffsets[i] = -1;
+                    nonNullBitmapSidecarOffsets[i] = new SidecarOffset(-1, 0);
                 }
             }
 
