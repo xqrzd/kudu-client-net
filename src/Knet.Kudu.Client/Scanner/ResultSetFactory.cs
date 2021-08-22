@@ -28,7 +28,7 @@ namespace Knet.Kudu.Client.Scanner
             if (data.Columns.Count == 0)
             {
                 // Empty projection, usually used for quick row counting.
-                return new ResultSet(null, schema, data.NumRows, null, null, null);
+                return CreateEmptyResultSet(schema, data.NumRows);
             }
 
             var columns = data.Columns;
@@ -83,10 +83,21 @@ namespace Knet.Kudu.Client.Scanner
             if (data is null || data.NumRows == 0)
             {
                 // Empty projection, usually used for quick row counting.
-                return new ResultSet(null, schema, data.NumRows, null, null, null);
+                return CreateEmptyResultSet(schema, data.NumRows);
             }
 
             throw new NotImplementedException("Support for row data will be implemented in a future PR");
+        }
+
+        private static ResultSet CreateEmptyResultSet(KuduSchema schema, long numRows)
+        {
+            return new ResultSet(
+                null,
+                schema,
+                numRows,
+                Array.Empty<SidecarOffset>(),
+                Array.Empty<SidecarOffset>(),
+                Array.Empty<SidecarOffset>());
         }
     }
 }

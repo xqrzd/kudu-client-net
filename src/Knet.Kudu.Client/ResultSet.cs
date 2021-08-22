@@ -16,8 +16,7 @@ namespace Knet.Kudu.Client
         private readonly SidecarOffset[] _dataSidecarOffsets;
         private readonly SidecarOffset[] _varlenDataSidecarOffsets;
         private readonly SidecarOffset[] _nonNullBitmapSidecarOffsets;
-
-        public KuduSchema Schema { get; }
+        private KuduSchema _schema;
 
         public long Count { get; }
 
@@ -34,16 +33,29 @@ namespace Knet.Kudu.Client
             _dataSidecarOffsets = dataSidecarOffsets;
             _varlenDataSidecarOffsets = varlenDataSidecarOffsets;
             _nonNullBitmapSidecarOffsets = nonNullBitmapSidecarOffsets;
-
-            Schema = schema;
+            _schema = schema;
             Count = count;
 
             // TODO: Validation, so we can safely use these unsafe methods
             // TODO: Better dispose behavior
         }
 
+        public KuduSchema Schema
+        {
+            get
+            {
+                var schema = _schema;
+
+                if (schema is null)
+                    ThrowObjectDisposedException();
+
+                return schema;
+            }
+        }
+
         public void Dispose()
         {
+            _schema = null;
             _buffer?.Dispose();
         }
 
@@ -597,6 +609,9 @@ namespace Knet.Kudu.Client
 #endif
         }
 
+        private static void ThrowObjectDisposedException() =>
+            throw new ObjectDisposedException(nameof(ResultSet));
+
         public override string ToString() => $"{Count} rows";
 
         public Enumerator GetEnumerator() => new(this);
@@ -615,8 +630,7 @@ namespace Knet.Kudu.Client
             {
                 _resultSet = resultSet;
                 _index = -1;
-                // TODO: This isn't correct.
-                _numRows = resultSet._dataSidecarOffsets is null
+                _numRows = resultSet._data is null
                     ? 0 // Empty projection.
                     : (int)resultSet.Count;
             }
