@@ -169,7 +169,7 @@ namespace Knet.Kudu.Client.Requests
             var output = Output;
             if (output is not null)
             {
-                output = null;
+                Output = null;
                 output.ResultSet.Dispose();
             }
         }
