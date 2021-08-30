@@ -1,11 +1,12 @@
 using System;
 using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Knet.Kudu.Client.Util
 {
-    public static class KuduEncoder
+    internal static class KuduEncoder
     {
         public static void EncodeBool(Span<byte> destination, bool value) =>
             destination[0] = (byte)(value ? 1 : 0);
@@ -290,15 +291,25 @@ namespace Knet.Kudu.Client.Util
             Encoding.UTF8.GetString(source);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool DecodeBool(byte[] source, int offset) => source[offset] > 0;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static byte DecodeUInt8(byte[] source, int offset) => source[offset];
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static short DecodeInt16(byte[] source, int offset)
+        public static bool DecodeBitUnsafe(byte[] source, int startIndex, int index)
         {
-            short result = BitConverter.ToInt16(source, offset);
+            int offset = (int)((uint)startIndex + ((uint)index / 8));
+            byte value = DecodeUInt8Unsafe(source, offset);
+            return (value & (1 << (int)((uint)index % 8))) != 0;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool DecodeBoolUnsafe(byte[] source, int offset) =>
+            DecodeUInt8Unsafe(source, offset) > 0;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static byte DecodeUInt8Unsafe(byte[] source, int offset) =>
+            ReadUnsafe<byte>(source, offset);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static short DecodeInt16Unsafe(byte[] source, int offset)
+        {
+            short result = ReadUnsafe<short>(source, offset);
             if (!BitConverter.IsLittleEndian)
             {
                 result = BinaryPrimitives.ReverseEndianness(result);
@@ -307,9 +318,9 @@ namespace Knet.Kudu.Client.Util
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int DecodeInt32(byte[] source, int offset)
+        public static int DecodeInt32Unsafe(byte[] source, int offset)
         {
-            int result = BitConverter.ToInt32(source, offset);
+            int result = ReadUnsafe<int>(source, offset);
             if (!BitConverter.IsLittleEndian)
             {
                 result = BinaryPrimitives.ReverseEndianness(result);
@@ -318,9 +329,9 @@ namespace Knet.Kudu.Client.Util
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static long DecodeInt64(byte[] source, int offset)
+        public static long DecodeInt64Unsafe(byte[] source, int offset)
         {
-            long result = BitConverter.ToInt64(source, offset);
+            long result = ReadUnsafe<long>(source, offset);
             if (!BitConverter.IsLittleEndian)
             {
                 result = BinaryPrimitives.ReverseEndianness(result);
@@ -329,56 +340,56 @@ namespace Knet.Kudu.Client.Util
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static KuduInt128 DecodeInt128(byte[] source, int offset)
+        public static KuduInt128 DecodeInt128Unsafe(byte[] source, int offset)
         {
-            var low = (ulong)DecodeInt64(source, offset);
-            var high = DecodeInt64(source, offset + 8);
+            var low = (ulong)DecodeInt64Unsafe(source, offset);
+            var high = DecodeInt64Unsafe(source, offset + 8);
 
             return new KuduInt128(high, low);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static DateTime DecodeDate(byte[] source, int offset)
+        public static DateTime DecodeDateUnsafe(byte[] source, int offset)
         {
-            int days = DecodeInt32(source, offset);
+            int days = DecodeInt32Unsafe(source, offset);
             return EpochTime.FromUnixTimeDays(days);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static DateTime DecodeDateTime(byte[] source, int offset)
+        public static DateTime DecodeDateTimeUnsafe(byte[] source, int offset)
         {
-            long micros = DecodeInt64(source, offset);
+            long micros = DecodeInt64Unsafe(source, offset);
             return EpochTime.FromUnixTimeMicros(micros);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static float DecodeFloat(byte[] source, int offset)
+        public static float DecodeFloatUnsafe(byte[] source, int offset)
         {
-            int value = DecodeInt32(source, offset);
+            int value = DecodeInt32Unsafe(source, offset);
             return value.AsFloat();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static double DecodeDouble(byte[] source, int offset)
+        public static double DecodeDoubleUnsafe(byte[] source, int offset)
         {
-            long value = DecodeInt64(source, offset);
+            long value = DecodeInt64Unsafe(source, offset);
             return value.AsDouble();
         }
 
-        public static decimal DecodeDecimal(byte[] source, int offset, KuduType kuduType, int scale)
+        public static decimal DecodeDecimalUnsafe(byte[] source, int offset, KuduType kuduType, int scale)
         {
             switch (kuduType)
             {
                 case KuduType.Decimal32:
-                    int intVal = DecodeInt32(source, offset);
+                    int intVal = DecodeInt32Unsafe(source, offset);
                     return DecimalUtil.DecodeDecimal32(intVal, scale);
 
                 case KuduType.Decimal64:
-                    long longVal = DecodeInt64(source, offset);
+                    long longVal = DecodeInt64Unsafe(source, offset);
                     return DecimalUtil.DecodeDecimal64(longVal, scale);
 
                 default:
-                    KuduInt128 int128Val = DecodeInt128(source, offset);
+                    KuduInt128 int128Val = DecodeInt128Unsafe(source, offset);
                     return DecimalUtil.DecodeDecimal128(int128Val, scale);
             }
         }
@@ -395,5 +406,16 @@ namespace Knet.Kudu.Client.Util
         /// </summary>
         /// <param name="buffer">Buffer whose left most bit will be xor'd.</param>
         public static byte XorLeftMostBit(Span<byte> buffer) => buffer[0] ^= 1 << 7;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static T ReadUnsafe<T>(byte[] source, int offset)
+        {
+#if NET5_0_OR_GREATER
+            return Unsafe.ReadUnaligned<T>(ref Unsafe.Add(
+                ref MemoryMarshal.GetArrayDataReference(source), offset));
+#else
+            return Unsafe.ReadUnaligned<T>(ref source[offset]);
+#endif
+        }
     }
 }

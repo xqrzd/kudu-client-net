@@ -2,6 +2,7 @@ using System;
 using Knet.Kudu.Client.Protobuf;
 using Knet.Kudu.Client.Protobuf.Tserver;
 using Knet.Kudu.Client.Protocol;
+using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Scanner
 {
@@ -25,27 +26,43 @@ namespace Knet.Kudu.Client.Scanner
             KuduSchema schema,
             ColumnarRowBlockPB data)
         {
-            if (data.Columns.Count == 0)
+            if (data.Columns.Count == 0 || data.NumRows == 0)
             {
                 // Empty projection, usually used for quick row counting.
-                return new ResultSet(null, schema, data.NumRows, null, null, null);
+                return CreateEmptyResultSet(schema, data.NumRows);
             }
 
             var columns = data.Columns;
             var numColumns = columns.Count;
+            var numRows = checked((int)data.NumRows);
+            var bufferLength = message.Buffer.Length;
 
-            var dataSidecarOffsets = new int[numColumns];
-            var varlenDataSidecarOffsets = new int[numColumns];
-            var nonNullBitmapSidecarOffsets = new int[numColumns];
+            if (numColumns != schema.Columns.Count)
+            {
+                ThrowColumnCountMismatchException(schema.Columns.Count, numColumns);
+            }
+
+            var nonNullBitmapLength = KuduEncoder.BitsToBytes(numRows);
+
+            var dataSidecarOffsets = new SidecarOffset[numColumns];
+            var varlenDataSidecarOffsets = new SidecarOffset[numColumns];
+            var nonNullBitmapSidecarOffsets = new SidecarOffset[numColumns];
 
             for (int i = 0; i < numColumns; i++)
             {
                 var column = columns[i];
+                var columnSchema = schema.GetColumn(i);
 
                 if (column.HasDataSidecar)
                 {
                     var offset = message.GetSidecarOffset(column.DataSidecar);
+                    var length = GetColumnDataSize(columnSchema, numRows);
+                    ValidateSidecar(offset, length, bufferLength);
                     dataSidecarOffsets[i] = offset;
+                }
+                else
+                {
+                    ThrowMissingDataSidecarException(columnSchema);
                 }
 
                 if (column.HasVarlenDataSidecar)
@@ -57,11 +74,12 @@ namespace Knet.Kudu.Client.Scanner
                 if (column.HasNonNullBitmapSidecar)
                 {
                     var offset = message.GetSidecarOffset(column.NonNullBitmapSidecar);
+                    ValidateSidecar(offset, nonNullBitmapLength, bufferLength);
                     nonNullBitmapSidecarOffsets[i] = offset;
                 }
                 else
                 {
-                    nonNullBitmapSidecarOffsets[i] = -1;
+                    nonNullBitmapSidecarOffsets[i] = new SidecarOffset(-1, 0);
                 }
             }
 
@@ -83,10 +101,63 @@ namespace Knet.Kudu.Client.Scanner
             if (data is null || data.NumRows == 0)
             {
                 // Empty projection, usually used for quick row counting.
-                return new ResultSet(null, schema, data.NumRows, null, null, null);
+                return CreateEmptyResultSet(schema, data.NumRows);
             }
 
             throw new NotImplementedException("Support for row data will be implemented in a future PR");
+        }
+
+        private static ResultSet CreateEmptyResultSet(KuduSchema schema, long numRows)
+        {
+            return new ResultSet(
+                null,
+                schema,
+                numRows,
+                Array.Empty<SidecarOffset>(),
+                Array.Empty<SidecarOffset>(),
+                Array.Empty<SidecarOffset>());
+        }
+
+        /// <summary>
+        /// Retrieves the expected size of the DataSidecar for the given column
+        /// and number of rows.
+        /// </summary>
+        private static int GetColumnDataSize(ColumnSchema column, int numRows)
+        {
+            // For var-length data types, DataSidecar stores the offset to the real
+            // data in VarlenDataSidecar. The size of the data can be determined by
+            // looking at the start of the next row, so we expect n + 1 offsets.
+            return column.IsFixedSize
+                ? numRows * column.Size
+                : numRows * 4 + 4;
+        }
+
+        private static void ValidateSidecar(SidecarOffset offset, int length, int bufferLength)
+        {
+            var offsetStart = offset.Start;
+            var endOffset = checked(offsetStart + length);
+            if (offsetStart < 0 || endOffset > bufferLength)
+            {
+                ThrowSidecarOutsideBoundsException(offsetStart, length, bufferLength);
+            }
+        }
+
+        private static void ThrowColumnCountMismatchException(int schemaColumns, int sidecarColumns)
+        {
+            throw new InvalidOperationException(
+                $"Projected schema has {schemaColumns} columns, but the server returned {sidecarColumns} columns");
+        }
+
+        private static void ThrowMissingDataSidecarException(ColumnSchema column)
+        {
+            throw new InvalidOperationException($"Server didn't supply a data sidecar for {column}");
+        }
+
+        private static void ThrowSidecarOutsideBoundsException(int start, int length, int bufferSize)
+        {
+            throw new InvalidOperationException(
+                "Sidecar offset is outside the bounds of the buffer. " +
+                $"Start: {start}, Length: {length}, Buffer size: {bufferSize}");
         }
     }
 }

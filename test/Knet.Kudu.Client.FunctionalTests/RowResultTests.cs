@@ -203,5 +203,80 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             Assert.Equal(numRows, scannedRows);
         }
+
+        [SkippableFact]
+        public async Task TestResultSetDispose()
+        {
+            await using var miniCluster = await new MiniKuduClusterBuilder().BuildAsync();
+            await using var client = miniCluster.CreateClient();
+            await using var session = client.NewSession();
+
+            var builder = ClientTestUtil.CreateAllTypesSchema()
+                .SetTableName(nameof(TestResultSetDispose))
+                .CreateBasicRangePartition();
+
+            var table = await client.CreateTableAsync(builder);
+
+            int numRows = 5;
+            for (int i = 0; i < numRows; i++)
+            {
+                var insert = ClientTestUtil.CreateAllTypesInsert(table, i);
+                await session.EnqueueAsync(insert);
+            }
+
+            await session.FlushAsync();
+
+            var scanner = client.NewScanBuilder(table)
+                .Build();
+
+            long scannedRows = 0;
+            await foreach (var resultSet in scanner)
+            {
+                foreach (var row in resultSet)
+                {
+                    scannedRows++;
+                    resultSet.Dispose();
+
+                    Assert.Throws<ObjectDisposedException>(() => row.GetInt32("key"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetNullableInt32("key"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetRawFixed("key"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetByte("int8"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetNullableByte("int8"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetSByte("int8"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetNullableSByte("int8"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetInt16("int16"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetNullableInt16("int16"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetInt32("int32"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetNullableInt32("int32"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetInt64("int64"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetNullableInt64("int64"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetBool("bool"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetNullableBool("bool"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetFloat("float"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetNullableFloat("float"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetDouble("double"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetNullableDouble("double"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetString("string"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetNullableString("string"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetString("varchar"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetNullableString("varchar"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetBinary("binary").ToArray());
+                    Assert.Throws<ObjectDisposedException>(() => row.GetDateTime("timestamp"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetNullableDateTime("timestamp"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetDateTime("date"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetNullableDateTime("date"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetDecimal("decimal32"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetNullableDecimal("decimal32"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetDecimal("decimal64"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetNullableDecimal("decimal64"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetDecimal("decimal128"));
+                    Assert.Throws<ObjectDisposedException>(() => row.GetNullableDecimal("decimal128"));
+                    Assert.Throws<ObjectDisposedException>(() => row.HasIsDeleted);
+                    Assert.Throws<ObjectDisposedException>(() => row.IsDeleted);
+                }
+            }
+
+            Assert.Equal(numRows, scannedRows);
+        }
     }
 }

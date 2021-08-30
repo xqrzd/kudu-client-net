@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Runtime.CompilerServices;
+using Google.Protobuf.Collections;
 using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protobuf.Rpc;
@@ -123,10 +124,42 @@ namespace Knet.Kudu.Client.Protocol
                 ? MainMessageLength
                 : (int)rawSidecarOffsets[0];
 
+            var sidecarOffsets = GetSidecarOffsets(rawSidecarOffsets, MainMessageLength);
             var buffer = new ArrayPoolBuffer<byte>(MainMessageLength);
 
-            Message.Init(buffer, messageProtobufLength, rawSidecarOffsets);
+            Message.Init(buffer, messageProtobufLength, sidecarOffsets);
             RemainingMainMessage = buffer.Buffer.AsMemory(0, MainMessageLength);
+        }
+
+        private static SidecarOffset[] GetSidecarOffsets(
+            RepeatedField<uint> rawOffsets, int mainMessageLength)
+        {
+            int numSidecars = rawOffsets.Count;
+
+            if (numSidecars <= 0)
+            {
+                return Array.Empty<SidecarOffset>();
+            }
+
+            var sidecarOffsets = new SidecarOffset[numSidecars];
+
+            for (int i = 0; i < numSidecars - 1; i++)
+            {
+                var currentOffset = rawOffsets[i];
+                var nextOffset = rawOffsets[i + 1];
+                var size = nextOffset - currentOffset;
+
+                var sidecarOffset = new SidecarOffset((int)currentOffset, (int)size);
+                sidecarOffsets[i] = sidecarOffset;
+            }
+
+            // Handle the last sidecar.
+            var lastOffset = (int)rawOffsets[numSidecars - 1];
+            var lastLength = mainMessageLength - lastOffset;
+            var lastSidecarOffset = new SidecarOffset(lastOffset, lastLength);
+            sidecarOffsets[numSidecars - 1] = lastSidecarOffset;
+
+            return sidecarOffsets;
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
