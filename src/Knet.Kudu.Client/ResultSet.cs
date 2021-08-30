@@ -35,9 +35,6 @@ namespace Knet.Kudu.Client
             _nonNullBitmapSidecarOffsets = nonNullBitmapSidecarOffsets;
             _schema = schema;
             Count = count;
-
-            // TODO: Validation, so we can safely use these unsafe methods
-            // TODO: Better dispose behavior
         }
 
         public KuduSchema Schema
