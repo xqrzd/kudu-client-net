@@ -15,7 +15,7 @@ namespace Knet.Kudu.Client
     /// </para>
     /// 
     /// <para>
-    /// NOTE: Because this operates on a metadata snapshot retrieved at
+    /// Note: Because this operates on a metadata snapshot retrieved at
     /// construction time, it will not reflect any metadata changes to the
     /// table that have occurred since its creation.
     /// </para>

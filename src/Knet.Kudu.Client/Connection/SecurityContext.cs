@@ -12,8 +12,8 @@ using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Connection
 {
-    /// <inheritdoc cref="ISecurityContext" />
-    public class SecurityContext : ISecurityContext
+    /// <inheritdoc />
+    public sealed class SecurityContext : ISecurityContext
     {
         private readonly object _lockObj = new();
 

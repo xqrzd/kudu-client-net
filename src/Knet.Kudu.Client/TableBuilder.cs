@@ -82,14 +82,18 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Sets the dimension label for all tablets created at table creation time.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// By default, the master will try to place newly created tablet replicas on
         /// tablet servers with a small number of tablet replicas. If the dimension label
         /// is provided, newly created replicas will be evenly distributed in the cluster
         /// based on the dimension label. In other words, the master will try to place
         /// newly created tablet replicas on tablet servers with a small number of tablet
         /// replicas belonging to this dimension label.
+        /// </para>
         /// </summary>
         /// <param name="dimensionLabel">The dimension label for the tablet to be created.</param>
         public TableBuilder SetDimensionLabel(string dimensionLabel)
@@ -129,16 +133,22 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Add a set of hash partitions to the table.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// Each column must be a part of the table's primary key, and an individual
         /// column may only appear in a single hash component.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// For each set of hash partitions added to the table, the total number of
         /// table partitions is multiplied by the number of buckets. For example, if a
         /// table is created with 3 split rows, and two hash partitions with 4 and 5
         /// buckets respectively, the total number of table partitions will be 80
         /// (4 range partitions * 4 hash buckets * 5 hash buckets).
+        /// </para>
         /// </summary>
         /// <param name="buckets">The number of buckets to hash into.</param>
         /// <param name="columns">The columns to hash.</param>
@@ -148,21 +158,29 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Add a set of hash partitions to the table.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// Each column must be a part of the table's primary key, and an individual
         /// column may only appear in a single hash component.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// For each set of hash partitions added to the table, the total number of
         /// table partitions is multiplied by the number of buckets. For example, if a
         /// table is created with 3 split rows, and two hash partitions with 4 and 5
         /// buckets respectively, the total number of table partitions will be 80
         /// (4 range partitions * 4 hash buckets * 5 hash buckets).
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// This constructor takes a seed value, which can be used to randomize the
         /// mapping of rows to hash buckets. Setting the seed may provide some
         /// amount of protection against denial of service attacks when the hashed
         /// columns contain user provided values.
+        /// </para>
         /// </summary>
         /// <param name="buckets">The number of buckets to hash into.</param>
         /// <param name="seed">A hash seed.</param>
@@ -187,12 +205,16 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Set the columns on which the table will be range-partitioned.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// Every column must be a part of the table's primary key. If not set,
         /// the table is range partitioned by the primary key columns with a single
         /// unbounded partition. If called with an empty set, the table will be
         /// created without range partitioning.
+        /// </para>
         /// </summary>
         /// <param name="columns">The range partitioned columns.</param>
         public TableBuilder SetRangePartitionColumns(params string[] columns)
@@ -209,18 +231,26 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Add a range partition to the table with an inclusive lower bound and an
         /// exclusive upper bound.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// If either row is empty, then that end of the range will be unbounded. If a
         /// range column is missing a value, the logical minimum value for that column
         /// type will be used as the default.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// Multiple range bounds may be added, but they must not overlap. All split
         /// rows must fall in one of the range bounds. The lower bound must be less
         /// than the upper bound.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// If not provided, the table's range will be unbounded.
+        /// </para>
         /// </summary>
         /// <param name="configure">
         /// Delegate to configure the inclusive lower bound and the exclusive upper
@@ -236,18 +266,26 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Add a range partition partition to the table with a lower bound and upper
         /// bound.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// If either row is empty, then that end of the range will be unbounded. If a
         /// range column is missing a value, the logical minimum value for that column
         /// type will be used as the default.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// Multiple range bounds may be added, but they must not overlap. All split
         /// rows must fall in one of the range bounds. The lower bound must be less
         /// than or equal to the upper bound.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// If not provided, the table's range will be unbounded.
+        /// </para>
         /// </summary>
         /// <param name="configure">
         /// Delegate to configure the lower bound and the upper bound (in that order).
@@ -285,16 +323,24 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Add a range partition partition to the table with an identical lower
         /// bound and upper bound.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// If arange column is missing a value, the logical minimum value for that
         /// column type will be used as the default.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// Multiple range bounds may be added, but they must not overlap. All split
         /// rows must fall in one of the range bounds.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// If not provided, the table's range will be unbounded.
+        /// </para>
         /// </summary>
         /// <param name="configure">
         /// Delegate to configure the partition row.
@@ -344,17 +390,25 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Whether to wait for the table to be fully created before this create
         /// operation is considered to be finished.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// If false, the create will finish quickly, but subsequent row operations
         /// may take longer as they may need to wait for portions of the table to be
         /// fully created.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// If true, the create will take longer, but the speed of subsequent row
         /// operations will not be impacted.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// If not provided, defaults to true.
+        /// </para>
         /// </summary>
         /// <param name="wait">Whether to wait for the table to be fully created.</param>
         public TableBuilder SetWait(bool wait)

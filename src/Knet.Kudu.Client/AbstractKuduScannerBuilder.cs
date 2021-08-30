@@ -128,17 +128,23 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Make scans resumable at another tablet server if current server fails if
         /// isFaultTolerant is true.
+        /// </para>
         ///
+        /// <para>
         /// Scans are by default non fault-tolerant, and scans will fail
         /// if scanning an individual tablet fails (for example, if a tablet server
         /// crashes in the middle of a tablet scan). If isFaultTolerant is set to true,
         /// scans will be resumed at another tablet server in the case of failure.
+        /// </para>
         ///
+        /// <para>
         /// Fault-tolerant scans typically have lower throughput than non
         /// fault-tolerant scans. Fault tolerant scans use READ_AT_SNAPSHOT read mode.
         /// If no snapshot timestamp is provided, the server will pick one.
+        /// </para>
         /// </summary>
         /// <param name="isFaultTolerant">Indicates if scan is fault-tolerant.</param>
         public TBuilder SetFaultTolerant(bool isFaultTolerant)

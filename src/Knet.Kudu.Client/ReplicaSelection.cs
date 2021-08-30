@@ -14,9 +14,13 @@ namespace Knet.Kudu.Client
         /// <summary>
         /// Select the closest replica to the client. Replicas are classified
         /// from closest to furthest as follows:
-        /// - Local replicas
-        /// - Replicas whose tablet server has the same location as the client
-        /// - All other replicas
+        /// <list type="number">
+        /// <item><description>Local replicas</description></item>
+        /// <item><description>
+        /// Replicas whose tablet server has the same location as the client
+        /// </description></item>
+        /// <item><description>All other replicas</description></item>
+        /// </list>
         /// </summary>
         ClosestReplica = ReplicaSelectionPB.ClosestReplica
     }
