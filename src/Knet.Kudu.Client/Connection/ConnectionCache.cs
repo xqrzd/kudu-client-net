@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client.Connection
 {
-    public class ConnectionCache : IAsyncDisposable
+    public sealed class ConnectionCache : IAsyncDisposable
     {
         private readonly IKuduConnectionFactory _connectionFactory;
         private readonly ILogger _logger;
@@ -30,7 +30,7 @@ namespace Knet.Kudu.Client.Connection
             ServerInfo serverInfo, CancellationToken cancellationToken = default)
         {
             if (_disposed)
-                throw new ObjectDisposedException(nameof(ConnectionCache));
+                ThrowObjectDisposedException();
 
             IPEndPoint endpoint = serverInfo.Endpoint;
             Task<KuduConnection> connectionTask;
@@ -128,5 +128,8 @@ namespace Knet.Kudu.Client.Connection
                 catch { }
             }
         }
+
+        private static void ThrowObjectDisposedException() =>
+            throw new ObjectDisposedException(nameof(ConnectionCache));
     }
 }

@@ -12,7 +12,7 @@ using Pipelines.Sockets.Unofficial;
 
 namespace Knet.Kudu.Client.Connection
 {
-    public class KuduConnectionFactory : IKuduConnectionFactory
+    public sealed class KuduConnectionFactory : IKuduConnectionFactory
     {
         private readonly KuduClientOptions _options;
         private readonly ISecurityContext _securityContext;

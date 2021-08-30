@@ -876,14 +876,12 @@ namespace Knet.Kudu.Client
             return columnSchema;
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private void ThrowNotSetException(int columnIndex)
         {
             var column = Schema.GetColumn(columnIndex);
             throw new Exception($"Column {column} is not set");
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private void ThrowNullException(int columnIndex)
         {
             var column = Schema.GetColumn(columnIndex);

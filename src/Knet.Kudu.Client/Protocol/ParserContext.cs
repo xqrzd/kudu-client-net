@@ -1,6 +1,5 @@
 using System;
 using System.Buffers;
-using System.Runtime.CompilerServices;
 using Google.Protobuf.Collections;
 using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Internal;
@@ -162,7 +161,6 @@ namespace Knet.Kudu.Client.Protocol
             return sidecarOffsets;
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowRpcTooLongException(int totalMessageLength)
         {
             var status = KuduStatus.IllegalState(

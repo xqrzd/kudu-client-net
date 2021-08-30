@@ -75,9 +75,8 @@ namespace Knet.Kudu.Client.Tablet
             }
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowException() =>
-            throw new Exception("Destination must be at least double source");
+            throw new ArgumentException("Destination must be at least double source");
     }
 }
 #endif

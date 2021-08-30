@@ -83,11 +83,11 @@ namespace Knet.Kudu.Client
 
             var schema = columnBuilder.Build();
 
-            if (!schema.IsNullable && schema.DefaultValue == null)
-                throw new ArgumentException("A new non-null column must have a default value");
+            if (!schema.IsNullable && schema.DefaultValue is null)
+                ThrowNewColumnMustHaveDefaultException();
 
             if (schema.IsKey)
-                throw new ArgumentException("Key columns cannot be added");
+                ThrowAddKeyColumnException();
 
             _request.AlterSchemaSteps.Add(new Step
             {
@@ -171,11 +171,8 @@ namespace Knet.Kudu.Client
         /// <param name="newDefault">The new default value.</param>
         public AlterTableBuilder ChangeDefault(string name, object newDefault)
         {
-            if (newDefault == null)
-            {
-                throw new ArgumentException("newDefault cannot be null: " +
-                    "use RemoveDefault to clear a default value");
-            }
+            if (newDefault is null)
+                ThrowDefaultValueNullException();
 
             var column = _table.Schema.GetColumn(name);
             var defaultValue = KuduEncoder.EncodeDefaultValue(column, newDefault);
@@ -632,5 +629,21 @@ namespace Knet.Kudu.Client
         }
 
         public static implicit operator AlterTableRequestPB(AlterTableBuilder builder) => builder._request;
+
+        private static void ThrowAddKeyColumnException()
+        {
+            throw new ArgumentException("Key columns cannot be added");
+        }
+
+        private static void ThrowNewColumnMustHaveDefaultException()
+        {
+            throw new ArgumentException("A new non-null column must have a default value");
+        }
+
+        private static void ThrowDefaultValueNullException()
+        {
+            throw new ArgumentException(
+                "newDefault cannot be null: use RemoveDefault to clear a default value");
+        }
     }
 }
