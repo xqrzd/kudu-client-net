@@ -15,13 +15,12 @@ namespace Knet.Kudu.Client
     /// </para>
     /// 
     /// <para>
-    /// Sessions are thread safe, however
-    /// FlushAsync is only guaranteed to flush rows for which EnqueueAsync
-    /// has completed. To guarantee ordering, prior calls to EnqueueAsync must
-    /// be awaited before issuing another write. There are no ordering guarantees
-    /// across concurrent calls to EnqueueAsync. Calling FlushAsync concurrently
-    /// will wait for prior flushes to complete, and thus will preserve ordering
-    /// guarantees.
+    /// Sessions are thread safe by default, however FlushAsync is only guaranteed
+    /// to flush rows for which EnqueueAsync has completed. To guarantee ordering,
+    /// prior calls to EnqueueAsync must be awaited before issuing another write.
+    /// There are no ordering guarantees across concurrent calls to EnqueueAsync.
+    /// Calling FlushAsync concurrently will wait for prior flushes to complete,
+    /// and thus will preserve ordering guarantees.
     /// </para>
     /// </summary>
     public interface IKuduSession : IAsyncDisposable
