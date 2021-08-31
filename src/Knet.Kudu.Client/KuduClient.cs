@@ -430,6 +430,13 @@ namespace Knet.Kudu.Client
             return OpenTableAsync(tableIdentifier, cancellationToken);
         }
 
+        /// <summary>
+        /// Writes the given rows to Kudu without batching. For writing a large
+        /// number of rows (>1000), consider using a session to handle batching.
+        /// </summary>
+        /// <param name="operations">The rows to write.</param>
+        /// <param name="externalConsistencyMode">The external consistency mode for this write.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         public async Task<WriteResponse> WriteAsync(
             IEnumerable<KuduOperation> operations,
             ExternalConsistencyMode externalConsistencyMode = ExternalConsistencyMode.ClientPropagated,
@@ -551,11 +558,20 @@ namespace Knet.Kudu.Client
             return response;
         }
 
+        /// <summary>
+        /// Creates a new <see cref="KuduScannerBuilder"/> for a particular table.
+        /// </summary>
+        /// <param name="table">The table to scan.</param>
         public KuduScannerBuilder NewScanBuilder(KuduTable table)
         {
             return new KuduScannerBuilder(this, table, _scanLogger);
         }
 
+        /// <summary>
+        /// Creates a new <see cref="KuduScannerBuilder"/> from the given scan token.
+        /// </summary>
+        /// <param name="scanToken">The scan token to use.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         public ValueTask<KuduScannerBuilder> NewScanBuilderFromTokenAsync(
             ReadOnlyMemory<byte> scanToken, CancellationToken cancellationToken = default)
         {
@@ -563,6 +579,11 @@ namespace Knet.Kudu.Client
             return NewScanBuilderFromTokenAsync(scanTokenPb, cancellationToken);
         }
 
+        /// <summary>
+        /// Creates a new <see cref="KuduScannerBuilder"/> from the given scan token.
+        /// </summary>
+        /// <param name="scanToken">The scan token to use.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
         public ValueTask<KuduScannerBuilder> NewScanBuilderFromTokenAsync(
             KuduScanToken scanToken, CancellationToken cancellationToken = default)
         {
