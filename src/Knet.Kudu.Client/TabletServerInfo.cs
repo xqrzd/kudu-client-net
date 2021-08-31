@@ -7,6 +7,10 @@ namespace Knet.Kudu.Client
 {
     public class TabletServerInfo
     {
+        /// <summary>
+        /// Unique ID which is created when the server is first started
+        /// up. This is stored persistently on disk.
+        /// </summary>
         public string TsUuid { get; }
 
         public int MillisSinceHeartbeat { get; }
@@ -21,8 +25,16 @@ namespace Knet.Kudu.Client
 
         public string SoftwareVersion { get; }
 
+        /// <summary>
+        /// True if HTTPS has been enabled for the web interface.
+        /// In this case, https:// URLs should be generated for the above
+        /// 'http_addresses' field.
+        /// </summary>
         public bool HttpsEnabled { get; }
 
+        /// <summary>
+        /// The wall clock time when the server started.
+        /// </summary>
         public DateTimeOffset StartTime { get; }
 
         public TabletServerInfo(

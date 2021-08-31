@@ -2,6 +2,10 @@ using Knet.Kudu.Client.Protobuf;
 
 namespace Knet.Kudu.Client
 {
+    /// <summary>
+    /// Supported Kudu data types.
+    /// See https://kudu.apache.org/docs/schema_design.html#column-design
+    /// </summary>
     public enum KuduType
     {
         Int8 = DataTypePB.Int8,

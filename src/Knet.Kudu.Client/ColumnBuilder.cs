@@ -71,20 +71,28 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Set the desired block size for this column.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// This is the number of bytes of user data packed per block on disk, and
         /// represents the unit of IO when reading this column. Larger values
         /// may improve scan performance, particularly on spinning media. Smaller
         /// values may improve random access performance, particularly for workloads
         /// that have high cache hit rates or operate on fast storage such as SSD.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// Note that the block size specified here corresponds to uncompressed data.
         /// The actual size of the unit read from disk may be smaller if
         /// compression is enabled.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// It's recommended that this not be set any lower than 4096 (4KB) or higher
         /// than 1048576 (1MB).
+        /// </para>
         /// </summary>
         /// <param name="desiredBlockSize">The desired block size, in bytes.</param>
         public ColumnBuilder DesiredBlockSize(int desiredBlockSize)

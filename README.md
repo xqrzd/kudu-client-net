@@ -79,11 +79,7 @@ KuduScanner scanner = client.NewScanBuilder(table)
 await foreach (ResultSet resultSet in scanner)
 {
     Console.WriteLine($"Received {resultSet.Count} rows");
-    PrintRows(resultSet);
-}
 
-static void PrintRows(ResultSet resultSet)
-{
     foreach (RowResult row in resultSet)
     {
         var tweetId = row.GetInt64("tweet_id");

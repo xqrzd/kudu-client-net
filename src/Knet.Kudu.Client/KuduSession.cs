@@ -10,7 +10,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client
 {
-    public class KuduSession : IKuduSession
+    /// <inheritdoc />
+    public sealed class KuduSession : IKuduSession
     {
         private readonly ILogger _logger;
         private readonly KuduClient _client;

@@ -6,6 +6,10 @@ using Knet.Kudu.Client.Protobuf.Security;
 
 namespace Knet.Kudu.Client.Connection
 {
+    /// <summary>
+    /// Stores security-related infrastructure, credentials, and trusted certificates.
+    /// Implementations of this should be thread safe.
+    /// </summary>
     public interface ISecurityContext
     {
         /// <summary>

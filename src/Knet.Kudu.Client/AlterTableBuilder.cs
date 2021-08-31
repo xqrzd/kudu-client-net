@@ -306,24 +306,32 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Add a range partition to the table with an inclusive lower bound and an
         /// exclusive upper bound.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// If either row is empty, then that end of the range will be unbounded.
         /// If a range column is missing a value, the logical minimum value for that
         /// column type will be used as the default.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// Multiple range partitions may be added as part of a single alter table
         /// transaction by calling this method multiple times. Added range partitions
         /// must not overlap with each other or any existing range partitions (unless
         /// the existing range partitions are dropped as part of the alter transaction
         /// first). The lower bound must be less than the upper bound.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// This client will immediately be able to write and scan the new tablets when
         /// the alter table operation returns success, however other existing clients may
         /// have to wait for a timeout period to elapse before the tablets become visible.
         /// This period is configured by the master's 'table_locations_ttl_ms' flag, and
         /// defaults to 5 minutes.
+        /// </para>
         /// </summary>
         /// <param name="configure">
         /// Delegate to configure the inclusive lower bound and the exclusive upper
@@ -340,23 +348,31 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Add a range partition to the table with a lower bound and upper bound.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// If either row is empty, then that end of the range will be unbounded.
         /// If a range column is missing a value, the logical minimum value for that
         /// column type will be used as the default.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// Multiple range partitions may be added as part of a single alter table
         /// transaction by calling this method multiple times. Added range partitions
         /// must not overlap with each other or any existing range partitions (unless
         /// the existing range partitions are dropped as part of the alter transaction
         /// first). The lower bound must be less than the upper bound.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// This client will immediately be able to write and scan the new tablets when
         /// the alter table operation returns success, however other existing clients may
         /// have to wait for a timeout period to elapse before the tablets become visible.
         /// This period is configured by the master's 'table_locations_ttl_ms' flag, and
         /// defaults to 5 minutes.
+        /// </para>
         /// </summary>
         /// <param name="configure">
         /// Delegate to configure the lower bound and the upper bound (in that order).
@@ -376,30 +392,40 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Add a range partition to the table with dimension label.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// If either row is empty, then that end of the range will be unbounded.
         /// If a range column is missing a value, the logical minimum value for that
         /// column type will be used as the default.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// Multiple range partitions may be added as part of a single alter table
         /// transaction by calling this method multiple times. Added range partitions
         /// must not overlap with each other or any existing range partitions (unless
         /// the existing range partitions are dropped as part of the alter transaction
         /// first). The lower bound must be less than the upper bound.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// This client will immediately be able to write and scan the new tablets when
         /// the alter table operation returns success, however other existing clients may
         /// have to wait for a timeout period to elapse before the tablets become visible.
         /// This period is configured by the master's 'table_locations_ttl_ms' flag, and
         /// defaults to 5 minutes.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// By default, the master will try to place newly created tablet replicas on
         /// tablet servers with a small number of tablet replicas. If the dimension label
         /// is provided, newly created replicas will be evenly distributed in the cluster
         /// based on the dimension label.In other words, the master will try to place newly
         /// created tablet replicas on tablet servers with a small number of tablet replicas
         /// belonging to this dimension label.
+        /// </para>
         /// </summary>
         /// <param name="configure">
         /// Delegate to configure the lower bound and the upper bound (in that order).
@@ -451,20 +477,26 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Add a range partition to the table with with an identical lower bound
         /// and upper bound.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// Multiple range partitions may be added as part of a single alter table
         /// transaction by calling this method multiple times. Added range partitions
         /// must not overlap with each other or any existing range partitions (unless
         /// the existing range partitions are dropped as part of the alter transaction
         /// first).
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// This client will immediately be able to write and scan the new tablets when
         /// the alter table operation returns success, however other existing clients may
         /// have to wait for a timeout period to elapse before the tablets become visible.
         /// This period is configured by the master's 'table_locations_ttl_ms' flag, and
         /// defaults to 5 minutes.
+        /// </para>
         /// </summary>
         /// <param name="configure">Delegate to configure the partition row.</param>
         public AlterTableBuilder AddRangePartition(
@@ -495,16 +527,22 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Drop the range partition from the table with the specified inclusive lower
         /// bound and exclusive upper bound. The bounds must match exactly, and may not
         /// span multiple range partitions.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// If either row is empty, then that end of the range will be unbounded. If a
         /// range column is missing a value, the logical minimum value for that column
         /// type will be used as the default.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// Multiple range partitions may be dropped as part of a single alter table
         /// transaction by calling this method multiple times.
+        /// </para>
         /// </summary>
         /// <param name="configure">
         /// Delegate to configure the lower bound and the upper bound (in that order).
@@ -519,16 +557,22 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Drop the range partition from the table with the specified lower bound and
         /// upper bound. The bounds must match exactly, and may not span multiple range
         /// partitions.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// If either row is empty, then that end of the range will be unbounded. If a
         /// range column is missing a value, the logical minimum value for that column
         /// type will be used as the default.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// Multiple range partitions may be dropped as part of a single alter table
         /// transaction by calling this method multiple times.
+        /// </para>
         /// </summary>
         /// <param name="configure">
         /// Delegate to configure the lower bound and the upper bound (in that order).
@@ -571,14 +615,20 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Drop the range partition from the table with with an identical lower
         /// bound and upper bound.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// If a range column is missing a value, the logical minimum value for that
         /// column type will be used as the default.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// Multiple range partitions may be dropped as part of a single alter table
         /// transaction by calling this method multiple times.
+        /// </para>
         /// </summary>
         /// <param name="configure">Delegate to configure the partition row.</param>
         public AlterTableBuilder DropRangePartition(
@@ -609,17 +659,25 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
+        /// <para>
         /// Whether to wait for the table to be fully altered before this alter
         /// operation is considered to be finished.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// If false, the alter will finish quickly, but a subsequent
         /// <see cref="KuduClient.OpenTableAsync(string, CancellationToken)"/>
         /// may return a <see cref="KuduTable"/> with an out-of-date schema.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// If true, the alter will take longer, but the very next schema is
         /// guaranteed to be up-to-date.
-        /// 
+        /// </para>
+        ///
+        /// <para>
         /// If not provided, defaults to true.
+        /// </para>
         /// </summary>
         /// <param name="wait">Whether to wait for the table to be fully altered.</param>
         public AlterTableBuilder SetWait(bool wait)
