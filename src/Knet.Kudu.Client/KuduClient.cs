@@ -35,6 +35,8 @@ namespace Knet.Kudu.Client
 
         public const long NoTimestamp = -1;
 
+        private static readonly KuduSessionOptions _defaultSessionOptions = new();
+
         private readonly KuduClientOptions _options;
         private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger _logger;
@@ -432,7 +434,7 @@ namespace Knet.Kudu.Client
 
         /// <summary>
         /// Writes the given rows to Kudu without batching. For writing a large
-        /// number of rows (>1000), consider using a session to handle batching.
+        /// number of rows (>2000), consider using a session to handle batching.
         /// </summary>
         /// <param name="operations">The rows to write.</param>
         /// <param name="externalConsistencyMode">The external consistency mode for this write.</param>
@@ -664,7 +666,7 @@ namespace Knet.Kudu.Client
             return new KuduScanTokenBuilder(this, table, _systemClock);
         }
 
-        public IKuduSession NewSession() => NewSession(new KuduSessionOptions());
+        public IKuduSession NewSession() => NewSession(_defaultSessionOptions);
 
         public IKuduSession NewSession(KuduSessionOptions options)
         {
