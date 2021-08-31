@@ -666,9 +666,11 @@ namespace Knet.Kudu.Client
             return new KuduScanTokenBuilder(this, table, _systemClock);
         }
 
-        public IKuduSession NewSession(KuduSessionOptions options = null)
+        public IKuduSession NewSession() => NewSession(_defaultSessionOptions);
+
+        public IKuduSession NewSession(KuduSessionOptions options)
         {
-            return new KuduSession(this, options ?? _defaultSessionOptions, _loggerFactory);
+            return new KuduSession(this, options, _loggerFactory);
         }
 
         /// <summary>
