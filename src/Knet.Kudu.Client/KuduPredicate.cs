@@ -264,10 +264,8 @@ namespace Knet.Kudu.Client
 
                 case PredicateType.InList:
                     predicate.InList = new ColumnPredicatePB.Types.InList();
-                    var values = predicate.InList.Values;
 
-                    // TODO:proto
-                    // Make sure this doesn't need to allocate again.
+                    var values = predicate.InList.Values;
                     values.Capacity = InListValues.Count;
 
                     foreach (var value in InListValues)

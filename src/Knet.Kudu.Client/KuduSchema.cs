@@ -35,24 +35,24 @@ namespace Knet.Kudu.Client
         /// </summary>
         private readonly int[] _columnOffsets;
 
-        /// <summary>
-        /// The size of all fixed-length columns.
-        /// </summary>
-        public int RowAllocSize { get; }
-
-        /// <summary>
-        /// Get the size a row built using this schema would be.
-        /// </summary>
-        public int RowSize { get; }
-
-        public int VarLengthColumnCount { get; }
-
         public bool HasNullableColumns { get; }
 
         /// <summary>
         /// Index of the IS_DELETED virtual column.
         /// </summary>
         public int IsDeletedIndex { get; }
+
+        /// <summary>
+        /// The size of all fixed-length columns.
+        /// </summary>
+        internal int RowAllocSize { get; }
+
+        /// <summary>
+        /// Get the size a row built using this schema would be.
+        /// </summary>
+        internal int RowSize { get; }
+
+        internal int VarLengthColumnCount { get; }
 
         public KuduSchema(List<ColumnSchema> columns, int isDeletedIndex = -1)
             : this(columns, null, isDeletedIndex) { }
@@ -161,7 +161,7 @@ namespace Knet.Kudu.Client
 
         public IReadOnlyList<ColumnSchema> Columns => _columnsByIndex;
 
-        public int PrimaryKeyColumnCount => _primaryKeyColumns.Count;
+        internal int PrimaryKeyColumnCount => _primaryKeyColumns.Count;
 
         /// <summary>
         /// Tells whether this schema includes IDs for columns. A schema created by a
@@ -179,7 +179,7 @@ namespace Knet.Kudu.Client
         /// be stored in <see cref="PartialRow._varLengthData"/>.
         /// </summary>
         /// <param name="index">The column index.</param>
-        public int GetColumnOffset(int index) => _columnOffsets[index];
+        internal int GetColumnOffset(int index) => _columnOffsets[index];
 
         public ColumnSchema GetColumn(int index) => _columnsByIndex[index];
 

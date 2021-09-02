@@ -1,5 +1,4 @@
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -62,16 +61,16 @@ namespace Knet.Kudu.Client.Connection
                 }
             }
 
-            var writer = new ArrayBufferWriter<byte>();
-            tokenPb.WriteTo(writer);
+            var messageSize = tokenPb.CalculateSize();
+            var buffer = new byte[messageSize];
+            tokenPb.WriteTo(buffer);
 
-            return writer.WrittenMemory;
+            return buffer;
         }
 
         public void ImportAuthenticationCredentials(ReadOnlyMemory<byte> token)
         {
-            // TODO: Use span overload when Google.Protobuf 3.18 is released.
-            var tokenPb = AuthenticationCredentialsPB.Parser.ParseFrom(token.ToArray());
+            var tokenPb = AuthenticationCredentialsPB.Parser.ParseFrom(token.Span);
             var caCertDers = tokenPb.CaCertDers.ToMemoryArray();
 
             lock (_lockObj)
