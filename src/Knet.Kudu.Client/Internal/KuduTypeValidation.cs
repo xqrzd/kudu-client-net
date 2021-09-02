@@ -56,17 +56,17 @@ namespace Knet.Kudu.Client.Internal
 
         public static void ThrowNullException(ColumnSchema column)
         {
-            throw new Exception($"Column {column} is null");
+            throw new ArgumentException($"Column {column} is null");
         }
 
         public static void ThrowNotNullableException(ColumnSchema column)
         {
-            throw new Exception($"Column {column} is not nullable");
+            throw new ArgumentException($"Column {column} is not nullable");
         }
 
         public static void ThrowNotFixedLengthException(ColumnSchema column)
         {
-            throw new Exception($"Column {column} is not a fixed length type");
+            throw new ArgumentException($"Column {column} is not a fixed length type");
         }
     }
 }
