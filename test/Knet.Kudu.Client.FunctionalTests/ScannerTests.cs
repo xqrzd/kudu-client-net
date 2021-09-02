@@ -247,7 +247,7 @@ namespace Knet.Kudu.Client.FunctionalTests
                     break;
 
                 // Ensure we actually end up between tablets.
-                Assert.False(accum == numRows, "All rows were in a single tablet.");
+                Assert.NotEqual(numRows, accum);
             }
 
             // In between scanners now and should be ok.
