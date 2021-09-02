@@ -179,7 +179,7 @@ namespace Knet.Kudu.Client
         /// be stored in <see cref="PartialRow._varLengthData"/>.
         /// </summary>
         /// <param name="index">The column index.</param>
-        public int GetColumnOffset(int index) => _columnOffsets[index];
+        internal int GetColumnOffset(int index) => _columnOffsets[index];
 
         public ColumnSchema GetColumn(int index) => _columnsByIndex[index];
 
