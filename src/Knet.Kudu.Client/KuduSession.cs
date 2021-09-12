@@ -20,6 +20,7 @@ namespace Knet.Kudu.Client
         private readonly ChannelReader<KuduOperation> _reader;
         private readonly SemaphoreSlim _singleFlush;
         private readonly Task _consumeTask;
+        private readonly long _txnId;
 
         private volatile CancellationTokenSource _flushCts;
         private volatile TaskCompletionSource _flushTcs;
@@ -27,10 +28,12 @@ namespace Knet.Kudu.Client
         public KuduSession(
             KuduClient client,
             KuduSessionOptions options,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            long txnId)
         {
             _client = client;
             _options = options;
+            _txnId = txnId;
             _logger = loggerFactory.CreateLogger<KuduSession>();
 
             var channelOptions = new BoundedChannelOptions(options.Capacity)
@@ -226,7 +229,7 @@ namespace Knet.Kudu.Client
         {
             try
             {
-                await _client.WriteAsync(queue, _options.ExternalConsistencyMode)
+                await _client.WriteAsync(queue, _options.ExternalConsistencyMode, _txnId)
                     .ConfigureAwait(false);
             }
             catch (Exception ex)

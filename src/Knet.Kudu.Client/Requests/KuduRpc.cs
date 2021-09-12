@@ -4,6 +4,7 @@ using Google.Protobuf.Collections;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Protobuf.Master;
 using Knet.Kudu.Client.Protobuf.Security;
+using Knet.Kudu.Client.Protobuf.Transactions;
 using Knet.Kudu.Client.Protobuf.Tserver;
 using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Tablet;
@@ -16,6 +17,7 @@ namespace Knet.Kudu.Client.Requests
         // Service names.
         protected const string MasterServiceName = "kudu.master.MasterService";
         protected const string TabletServerServiceName = "kudu.tserver.TabletServerService";
+        protected const string TxnManagerServiceName = "kudu.transactions.TxnManagerService";
 
         public abstract string ServiceName { get; }
 
@@ -68,6 +70,13 @@ namespace Knet.Kudu.Client.Requests
         public override string ServiceName => MasterServiceName;
 
         public MasterErrorPB Error { get; protected set; }
+    }
+
+    internal abstract class KuduTxnRpc<T> : KuduRpc<T>
+    {
+        public override string ServiceName => TxnManagerServiceName;
+
+        public TxnManagerErrorPB Error { get; protected set; }
     }
 
     internal abstract class KuduTabletRpc<T> : KuduRpc<T>

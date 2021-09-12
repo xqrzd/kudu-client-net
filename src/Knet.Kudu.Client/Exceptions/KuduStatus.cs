@@ -1,5 +1,6 @@
 using Knet.Kudu.Client.Protobuf;
 using Knet.Kudu.Client.Protobuf.Master;
+using Knet.Kudu.Client.Protobuf.Transactions;
 using Knet.Kudu.Client.Protobuf.Tserver;
 using static Knet.Kudu.Client.Protobuf.AppStatusPB.Types;
 
@@ -54,7 +55,7 @@ namespace Knet.Kudu.Client.Exceptions
         /// <summary>
         /// Create a status object from a master error.
         /// </summary>
-        /// <param name="masterErrorPB">PB object received via RPC from the master.</param>
+        /// <param name="masterErrorPB">Protobuf object received via RPC from the master.</param>
         internal static KuduStatus FromMasterErrorPB(MasterErrorPB masterErrorPB)
         {
             return new KuduStatus(masterErrorPB.Status);
@@ -63,16 +64,26 @@ namespace Knet.Kudu.Client.Exceptions
         /// <summary>
         /// Create a status object from a tablet server error.
         /// </summary>
-        /// <param name="tserverErrorPB">PB object received via RPC from the TS.</param>
+        /// <param name="tserverErrorPB">Protobuf object received via RPC from the TS.</param>
         internal static KuduStatus FromTabletServerErrorPB(TabletServerErrorPB tserverErrorPB)
         {
             return new KuduStatus(tserverErrorPB.Status);
         }
 
         /// <summary>
+        /// Create a status object from a TxnManager's error.
+        /// </summary>
+        /// <param name="pbError">Protobuf object received via RPC from the TxnManager.</param>
+        /// <returns></returns>
+        internal static KuduStatus FromTxnManagerErrorPB(TxnManagerErrorPB pbError)
+        {
+            return new KuduStatus(pbError.Status);
+        }
+
+        /// <summary>
         /// Create a Status object from a <see cref="AppStatusPB"/> protobuf object.
         /// </summary>
-        /// <param name="pb">PB object received via RPC from the server.</param>
+        /// <param name="pb">Protobuf object received via RPC from the server.</param>
         internal static KuduStatus FromPB(AppStatusPB pb)
         {
             return new KuduStatus(pb);

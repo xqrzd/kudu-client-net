@@ -15,6 +15,7 @@ using Knet.Kudu.Client.Protobuf.Consensus;
 using Knet.Kudu.Client.Protobuf.Master;
 using Knet.Kudu.Client.Protobuf.Rpc;
 using Knet.Kudu.Client.Protobuf.Security;
+using Knet.Kudu.Client.Protobuf.Transactions;
 using Knet.Kudu.Client.Protobuf.Tserver;
 using Knet.Kudu.Client.Requests;
 using Knet.Kudu.Client.Tablet;
@@ -34,8 +35,9 @@ namespace Knet.Kudu.Client
         private const int MaxRpcAttempts = 100;
 
         public const long NoTimestamp = -1;
+        public const long InvalidTxnId = -1;
 
-        private static readonly KuduSessionOptions _defaultSessionOptions = new();
+        internal static readonly KuduSessionOptions DefaultSessionOptions = new();
 
         private readonly KuduClientOptions _options;
         private readonly ILoggerFactory _loggerFactory;
@@ -439,9 +441,18 @@ namespace Knet.Kudu.Client
         /// <param name="operations">The rows to write.</param>
         /// <param name="externalConsistencyMode">The external consistency mode for this write.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
-        public async Task<WriteResponse> WriteAsync(
+        public Task<WriteResponse> WriteAsync(
             IEnumerable<KuduOperation> operations,
             ExternalConsistencyMode externalConsistencyMode = ExternalConsistencyMode.ClientPropagated,
+            CancellationToken cancellationToken = default)
+        {
+            return WriteAsync(operations, externalConsistencyMode, InvalidTxnId, cancellationToken);
+        }
+
+        internal async Task<WriteResponse> WriteAsync(
+            IEnumerable<KuduOperation> operations,
+            ExternalConsistencyMode externalConsistencyMode,
+            long txnId,
             CancellationToken cancellationToken = default)
         {
             var operationsByTablet = new Dictionary<RemoteTablet, List<KuduOperation>>();
@@ -469,6 +480,7 @@ namespace Knet.Kudu.Client
                     tabletOperations.Key,
                     tabletOperations.Value,
                     externalConsistencyMode,
+                    txnId,
                     cancellationToken);
 
                 tasks[i++] = task;
@@ -518,7 +530,8 @@ namespace Knet.Kudu.Client
             RemoteTablet tablet,
             List<KuduOperation> operations,
             ExternalConsistencyMode externalConsistencyMode,
-            CancellationToken cancellationToken = default)
+            long txnId,
+            CancellationToken cancellationToken)
         {
             var table = operations[0].Table;
 
@@ -546,6 +559,9 @@ namespace Knet.Kudu.Client
                 RowOperations = rowOperations,
                 ExternalConsistencyMode = (ExternalConsistencyModePB)externalConsistencyMode
             };
+
+            if (txnId != InvalidTxnId)
+                request.TxnId = txnId;
 
             var rpc = new WriteRequest(
                 request,
@@ -666,11 +682,52 @@ namespace Knet.Kudu.Client
             return new KuduScanTokenBuilder(this, table, _systemClock);
         }
 
-        public IKuduSession NewSession() => NewSession(_defaultSessionOptions);
+        public IKuduSession NewSession() => NewSession(DefaultSessionOptions);
 
         public IKuduSession NewSession(KuduSessionOptions options)
         {
-            return new KuduSession(this, options, _loggerFactory);
+            return new KuduSession(this, options, _loggerFactory, InvalidTxnId);
+        }
+
+        /// <summary>
+        /// Start a new multi-row distributed transaction.
+        /// </summary>
+        /// <param name="cancellationToken">Used to cancel creating the transaction.</param>
+        public async Task<KuduTransaction> NewTransactionAsync(
+            CancellationToken cancellationToken = default)
+        {
+            var rpc = new BeginTransactionRequest();
+            var response = await SendRpcAsync(rpc, cancellationToken);
+
+            var period = response.KeepaliveMillis / 2;
+            var keepaliveMillis = period <= 0 ? 1 : period;
+            var keepaliveInterval = TimeSpan.FromMilliseconds(keepaliveMillis);
+
+            return new KuduTransaction(this, _loggerFactory, response.TxnId, keepaliveInterval);
+        }
+
+        /// <summary>
+        /// <para>
+        /// Re-create KuduTransaction object given its serialized representation.
+        /// </para>
+        /// 
+        /// <para>
+        /// The newly created object automatically does or does not send keep-alive messages
+        /// depending on the <see cref="KuduTransactionSerializationOptions.EnableKeepalive"/>
+        /// setting when the original <see cref="KuduTransaction"/> object was serialized.
+        /// </para>
+        /// </summary>
+        /// <param name="transactionToken">Serialized representation of a KuduTransaction.</param>
+        public KuduTransaction NewTransactionFromToken(ReadOnlyMemory<byte> transactionToken)
+        {
+            var tokenPb = TxnTokenPB.Parser.ParseFrom(transactionToken.Span);
+            var txnId = tokenPb.TxnId;
+            var keepaliveEnabled = tokenPb.HasEnableKeepalive && tokenPb.EnableKeepalive;
+            var keepaliveInterval = keepaliveEnabled
+                ? TimeSpan.FromMilliseconds(tokenPb.KeepaliveMillis)
+                : TimeSpan.Zero;
+
+            return new KuduTransaction(this, _loggerFactory, txnId, keepaliveInterval);
         }
 
         /// <summary>
@@ -1361,20 +1418,15 @@ namespace Knet.Kudu.Client
                 {
                     try
                     {
-                        if (rpc is KuduMasterRpc<T> masterRpc)
+                        var task = rpc switch
                         {
-                            return await SendRpcToMasterAsync(masterRpc, token)
-                                .ConfigureAwait(false);
-                        }
-                        else if (rpc is KuduTabletRpc<T> tabletRpc)
-                        {
-                            return await SendRpcToTabletAsync(tabletRpc, token)
-                                .ConfigureAwait(false);
-                        }
-                        else
-                        {
-                            throw new NotSupportedException();
-                        }
+                            KuduMasterRpc<T> masterRpc => SendRpcToMasterAsync(masterRpc, token),
+                            KuduTabletRpc<T> tabletRpc => SendRpcToTabletAsync(tabletRpc, token),
+                            KuduTxnRpc<T> txnRpc => SendRpcToTxnAsync(txnRpc, token),
+                            _ => throw new NotSupportedException()
+                        };
+
+                        return await task.ConfigureAwait(false);
                     }
                     catch (RecoverableException ex)
                     {
@@ -1433,6 +1485,18 @@ namespace Knet.Kudu.Client
             var serverInfo = masterLeaderInfo.ServerInfo;
 
             return await SendRpcToMasterAsync(rpc, serverInfo, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        private async Task<T> SendRpcToTxnAsync<T>(
+            KuduTxnRpc<T> rpc, CancellationToken cancellationToken)
+        {
+            var masterLeaderInfo = await GetMasterLeaderInfoAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            var serverInfo = masterLeaderInfo.ServerInfo;
+
+            return await SendRpcToTxnAsync(rpc, serverInfo, cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -1541,6 +1605,32 @@ namespace Knet.Kudu.Client
             return rpc.Output;
         }
 
+        private async Task<T> SendRpcToTxnAsync<T>(
+            KuduTxnRpc<T> rpc,
+            ServerInfo serverInfo,
+            CancellationToken cancellationToken)
+        {
+            await SendRpcToServerGenericAsync(rpc, serverInfo, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (rpc.Error is not null)
+            {
+                var code = rpc.Error.Status.Code;
+                var status = KuduStatus.FromTxnManagerErrorPB(rpc.Error);
+
+                if (code == AppStatusPB.Types.ErrorCode.ServiceUnavailable)
+                {
+                    throw new RecoverableException(status);
+                }
+                else
+                {
+                    throw new NonRecoverableException(status);
+                }
+            }
+
+            return rpc.Output;
+        }
+
         private async Task<T> SendRpcToTabletAsync<T>(
             KuduTabletRpc<T> rpc,
             ServerInfo serverInfo,
@@ -1634,7 +1724,7 @@ namespace Knet.Kudu.Client
                     {
                         RemoveTabletFromCache(tabletRpc);
                     }
-                    else if (rpc is KuduMasterRpc<T>)
+                    else if (rpc is KuduMasterRpc<T> || rpc is KuduTxnRpc<T>)
                     {
                         InvalidateMasterServerCache();
                     }
@@ -1730,7 +1820,7 @@ namespace Knet.Kudu.Client
             return header;
         }
 
-        private static Task DelayRpcAsync(KuduRpc rpc, CancellationToken cancellationToken)
+        internal static Task DelayRpcAsync(KuduRpc rpc, CancellationToken cancellationToken)
         {
             int attemptCount = rpc.Attempt;
 
@@ -1756,6 +1846,7 @@ namespace Knet.Kudu.Client
             var numAttempts = rpc.Attempt;
             if (numAttempts > MaxRpcAttempts)
             {
+                // TODO: OperationCanceledException?
                 throw new NonRecoverableException(
                     KuduStatus.TimedOut($"Too many RPC attempts: {numAttempts}"),
                     exception);
