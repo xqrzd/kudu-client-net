@@ -70,7 +70,15 @@ namespace Knet.Kudu.Client
         }
 
         /// <summary>
-        /// Commit the multi-row distributed transaction.
+        /// <para>
+        /// Start committing the multi-row distributed transaction.
+        /// </para>
+        /// 
+        /// <para>
+        /// This method only starts committing the transaction, not awaiting for the
+        /// commit phase to finalize. Use <see cref="WaitForCommitAsync(CancellationToken)"/>
+        /// to wait for the commit to complete.
+        /// </para>
         /// </summary>
         /// <param name="cancellationToken">
         /// Used to cancel waiting for the commit. This will not rollback the transaction,
@@ -107,6 +115,13 @@ namespace Knet.Kudu.Client
             StopKeepaliveTimer();
         }
 
+        /// <summary>
+        /// Waits until the commit phase for a transaction is complete.
+        /// </summary>
+        /// <param name="cancellationToken">
+        /// Used to cancel waiting for transaction completion. This will not cancel the
+        /// transaction, use <see cref="RollbackAsync(CancellationToken)"/> for that.
+        /// </param>
         public async Task WaitForCommitAsync(CancellationToken cancellationToken = default)
         {
             var request = new GetTransactionStateRequestPB { TxnId = _txnId };
