@@ -1658,7 +1658,8 @@ namespace Knet.Kudu.Client
                     throw new RecoverableException(status);
                 }
                 else if (
-                    errStatusCode == AppStatusPB.Types.ErrorCode.IllegalState ||
+                    (errStatusCode == AppStatusPB.Types.ErrorCode.IllegalState &&
+                    errCode != TabletServerErrorPB.Types.Code.TxnIllegalState) ||
                     errStatusCode == AppStatusPB.Types.ErrorCode.Aborted)
                 {
                     // These two error codes are an indication that the tablet
@@ -1724,7 +1725,7 @@ namespace Knet.Kudu.Client
                     {
                         RemoveTabletFromCache(tabletRpc);
                     }
-                    else if (rpc is KuduMasterRpc<T> || rpc is KuduTxnRpc<T>)
+                    else if (rpc is KuduMasterRpc<T> or KuduTxnRpc<T>)
                     {
                         InvalidateMasterServerCache();
                     }
