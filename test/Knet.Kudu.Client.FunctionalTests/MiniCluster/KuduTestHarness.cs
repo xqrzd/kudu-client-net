@@ -47,20 +47,34 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
         /// <summary>
         /// Helper method to easily kill the leader master.
         /// </summary>
-        public async Task KillLeaderMasterServerAsync()
+        /// <returns>The host and port of the detected leader master.</returns>
+        public async Task<HostAndPort> KillLeaderMasterServerAsync()
         {
             var hostPort = await _client.FindLeaderMasterServerAsync();
             await _miniCluster.KillMasterServerAsync(hostPort);
+            return hostPort;
         }
 
         /// <summary>
         /// Kills and restarts the leader master.
         /// </summary>
-        public async Task RestartLeaderMasterAsync()
+        /// <returns>The host and port of the restarted master.</returns>
+        public async Task<HostAndPort> RestartLeaderMasterAsync()
         {
             var hostPort = await _client.FindLeaderMasterServerAsync();
             await _miniCluster.KillMasterServerAsync(hostPort);
             await _miniCluster.StartMasterServerAsync(hostPort);
+            return hostPort;
+        }
+
+        /// <summary>
+        /// Start master which has previously been registered at the specified
+        /// host and port.
+        /// </summary>
+        /// <param name="hostPort">Host and port of the master to start back.</param>
+        public Task StartMasterAsync(HostAndPort hostPort)
+        {
+            return _miniCluster.StartMasterServerAsync(hostPort);
         }
 
         /// <summary>
@@ -70,21 +84,27 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
         /// or if the tablet server was already killed.
         /// </summary>
         /// <param name="tablet">A RemoteTablet which will get its leader killed.</param>
-        public async Task KillTabletLeaderAsync(RemoteTablet tablet)
+        /// <returns>
+        /// The host and port of the tablet server which hosted the tablet's leader replica.
+        /// </returns>
+        public async Task<HostAndPort> KillTabletLeaderAsync(RemoteTablet tablet)
         {
             var hostPort = await FindLeaderTabletServerAsync(tablet);
             await _miniCluster.KillTabletServerAsync(hostPort);
+            return hostPort;
         }
 
         /// <summary>
         /// Kills a tablet server that serves the given tablet's leader and restarts it.
         /// </summary>
         /// <param name="tablet">A RemoteTablet which will get its leader killed and restarted.</param>
-        public async Task RestartTabletServerAsync(RemoteTablet tablet)
+        /// <returns>The host and port of the restarted tablet server.</returns>
+        public async Task<HostAndPort> RestartTabletServerAsync(RemoteTablet tablet)
         {
             var hostPort = await FindLeaderTabletServerAsync(tablet);
             await _miniCluster.KillTabletServerAsync(hostPort);
             await _miniCluster.StartTabletServerAsync(hostPort);
+            return hostPort;
         }
 
         /// <summary>
@@ -178,9 +198,8 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
                 var tablets = await _client.GetTableLocationsAsync(
                     tablet.TableId, tablet.Partition.PartitionKeyStart, 1);
 
-                Assert.Single(tablets);
-
-                leader = tablets[0].GetLeaderServerInfo();
+                var foundTablet = Assert.Single(tablets);
+                leader = foundTablet.GetLeaderServerInfo();
             }
 
             return leader.HostPort;

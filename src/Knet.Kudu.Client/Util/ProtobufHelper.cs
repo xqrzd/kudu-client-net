@@ -65,6 +65,15 @@ namespace Knet.Kudu.Client.Util
             return results;
         }
 
+        public static byte[] ToByteArray(IMessage message)
+        {
+            var size = message.CalculateSize();
+            var buffer = new byte[size];
+            message.WriteTo(buffer);
+
+            return buffer;
+        }
+
         public static ColumnTypeAttributes ToTypeAttributes(
             this ColumnTypeAttributesPB pb)
         {
