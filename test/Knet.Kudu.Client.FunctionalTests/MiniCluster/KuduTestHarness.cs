@@ -68,6 +68,16 @@ namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
         }
 
         /// <summary>
+        /// Start master which has previously been registered at the specified
+        /// host and port.
+        /// </summary>
+        /// <param name="hostPort">Host and port of the master to start back.</param>
+        public Task StartMasterAsync(HostAndPort hostPort)
+        {
+            return _miniCluster.StartMasterServerAsync(hostPort);
+        }
+
+        /// <summary>
         /// Helper method to easily kill a tablet server that serves the given table's
         /// only tablet's leader. The currently running test case will be failed if
         /// there's more than one tablet, if the tablet has no leader after some retries,
