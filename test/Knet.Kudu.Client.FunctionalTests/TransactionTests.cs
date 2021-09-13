@@ -1,7 +1,5 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
@@ -183,6 +181,7 @@ namespace Knet.Kudu.Client.FunctionalTests
 
                 var scanner = client.NewScanBuilder(table)
                     .SetReadMode(ReadMode.ReadYourWrites)
+                    .SetReplicaSelection(ReplicaSelection.LeaderOnly)
                     .Build();
 
                 Assert.Equal(0, await ClientTestUtil.CountRowsInScanAsync(scanner));
@@ -662,6 +661,255 @@ namespace Knet.Kudu.Client.FunctionalTests
                 // 1 row should be there from earlier, plus the one we just committed.
                 Assert.Equal(2, await ClientTestUtil.CountRowsInScanAsync(scanner));
             }
+        }
+
+        /// <summary>
+        /// Test to verify that Kudu client is able to switch to TxnManager hosted by
+        /// other kudu-master process when the previously used one isn't available,
+        /// even if txn-related calls first are issued when no TxnManager was running.
+        /// </summary>
+        [SkippableFact]
+        public async Task TestSwitchToOtherTxnManagerInFlightCalls()
+        {
+            await using var harness = await new MiniKuduClusterBuilder()
+                .AddMasterServerFlag("--txn_manager_enabled")
+                // Set Raft heartbeat interval short for faster test runtime: speed up
+                // leader failure detection and new leader election.
+                .AddMasterServerFlag("--raft_heartbeat_interval_ms=100")
+                .AddTabletServerFlag("--enable_txn_system_client_init=true")
+                .BuildHarnessAsync();
+
+            await using var client = harness.CreateClient();
+
+            var builder = ClientTestUtil.GetBasicSchema()
+                .SetTableName(nameof(TestSwitchToOtherTxnManagerInFlightCalls))
+                .AddHashPartitions(2, "key");
+
+            var table = await client.CreateTableAsync(builder);
+
+            using var transaction = await client.NewTransactionAsync();
+            var insert = ClientTestUtil.CreateBasicSchemaInsert(table, 0);
+            await transaction.WriteAsync(new[] { insert });
+
+            await harness.KillAllMasterServersAsync();
+
+            var startMastersTask = Task.Run(async () =>
+            {
+                // Sleep for some time to allow the commit call
+                // below issue RPCs to non-running TxnManangers.
+                await Task.Delay(1000);
+                await harness.StartAllMasterServersAsync();
+            });
+
+            // It should be possible to commit the transaction.
+            await transaction.CommitAsync();
+            await transaction.WaitForCommitAsync();
+
+            await startMastersTask;
+
+            // An extra sanity check: read back the rows written into the table in the
+            // context of the transaction.
+            var scanner = client.NewScanBuilder(table)
+                .SetReadMode(ReadMode.ReadYourWrites)
+                .SetReplicaSelection(ReplicaSelection.LeaderOnly)
+                .Build();
+
+            Assert.Equal(1, await ClientTestUtil.CountRowsInScanAsync(scanner));
+        }
+
+        /// <summary>
+        /// Test to verify that Kudu client is able to switch to another TxnManager
+        /// instance when the kudu-master process which hosts currently used TxnManager
+        /// becomes temporarily unavailable (e.g. shut down, restarted, stopped, etc.).
+        /// 
+        /// The essence of this scenario is to make sure that the client connects
+        /// to a different TxnManager instance and starts sending txn keepalive
+        /// messages there in a timely manner, keeping the transaction alive even if
+        /// the originally used TxnManager instance isn't available.
+        /// </summary>
+        [SkippableFact]
+        public async Task TestTxnKeepaliveSwitchesToOtherTxnManager()
+        {
+            await using var harness = await new MiniKuduClusterBuilder()
+                .AddMasterServerFlag("--txn_manager_enabled")
+                // Set Raft heartbeat interval short for faster test runtime: speed up
+                // leader failure detection and new leader election.
+                .AddMasterServerFlag("--raft_heartbeat_interval_ms=100")
+                // The txn keepalive interval should be long enough to accommodate Raft
+                // leader failure detection and election.
+                .AddTabletServerFlag("--txn_keepalive_interval_ms=1000")
+                .AddTabletServerFlag("--txn_staleness_tracker_interval_ms=250")
+                .AddTabletServerFlag("--enable_txn_system_client_init=true")
+                .BuildHarnessAsync();
+
+            await using var client = harness.CreateClient();
+
+            var builder = ClientTestUtil.GetBasicSchema()
+                .SetTableName(nameof(TestTxnKeepaliveSwitchesToOtherTxnManager))
+                .AddHashPartitions(2, "key");
+
+            var table = await client.CreateTableAsync(builder);
+
+            using var transaction = await client.NewTransactionAsync();
+            var insert = ClientTestUtil.CreateBasicSchemaInsert(table, 0);
+            await transaction.WriteAsync(new[] { insert });
+
+            await harness.KillLeaderMasterServerAsync();
+
+            // Wait for two keepalive intervals to make sure the backend got a chance
+            // to automatically abort the transaction if not receiving txn keepalive
+            // messages.
+            await Task.Delay(2 * 1000);
+
+            // It should be possible to commit the transaction. This is to verify that
+            //
+            //   * the client eventually starts sending txn keepalive messages to other
+            //     TxnManager instance (the original was hosted by former leader master
+            //     which is no longer available), so the backend doesn't abort the
+            //     transaction automatically due to not receiving keepalive messages
+            //
+            //   * the client switches to the new TxnManager for other txn-related
+            //     operations as well
+            await transaction.CommitAsync();
+            await transaction.WaitForCommitAsync();
+
+            // An extra sanity check: read back the rows written into the table in the
+            // context of the transaction.
+            var scanner = client.NewScanBuilder(table)
+                .SetReadMode(ReadMode.ReadYourWrites)
+                .SetReplicaSelection(ReplicaSelection.LeaderOnly)
+                .Build();
+
+            Assert.Equal(1, await ClientTestUtil.CountRowsInScanAsync(scanner));
+        }
+
+        /// <summary>
+        /// Similar to <see cref="TestTxnKeepaliveSwitchesToOtherTxnManager()"/> above,
+        /// but with additional twist of "rolling" unavailability of leader masters.
+        /// In addition, make sure the errors sent from TxnManager are processed
+        /// accordingly when TxnStatusManager is not around.
+        /// </summary>
+        [SkippableFact]
+        public async Task TestTxnKeepaliveRollingSwitchToOtherTxnManager()
+        {
+            await using var harness = await new MiniKuduClusterBuilder()
+                .AddMasterServerFlag("--txn_manager_enabled")
+                // Set Raft heartbeat interval short for faster test runtime: speed up
+                // leader failure detection and new leader election.
+                .AddMasterServerFlag("--raft_heartbeat_interval_ms=100")
+                // The txn keepalive interval should be long enough to accommodate Raft
+                // leader failure detection and election.
+                .AddTabletServerFlag("--txn_keepalive_interval_ms=1000")
+                .AddTabletServerFlag("--txn_staleness_tracker_interval_ms=250")
+                .AddTabletServerFlag("--enable_txn_system_client_init=true")
+                .BuildHarnessAsync();
+
+            await using var client = harness.CreateClient();
+
+            var builder = ClientTestUtil.GetBasicSchema()
+                .SetTableName(nameof(TestTxnKeepaliveRollingSwitchToOtherTxnManager))
+                .AddHashPartitions(2, "key");
+
+            var table = await client.CreateTableAsync(builder);
+
+            using var transaction = await client.NewTransactionAsync();
+
+            // Cycle the leadership among masters, making sure the client successfully
+            // switches to every newly elected leader master to send keepalive messages.
+            int numMasters = harness.GetMasterServers().Count;
+            for (int i = 0; i < numMasters; i++)
+            {
+                // Shutdown the leader master.
+                var hostPort = await harness.KillLeaderMasterServerAsync();
+
+                // Wait for two keepalive intervals to give the backend a chance
+                // to automatically abort the transaction if not receiving txn keepalive
+                // messages.
+                await Task.Delay(2 * 1000);
+
+                // The transaction should be still alive.
+                var exception = await Assert.ThrowsAsync<NonRecoverableException>(
+                    async () => await transaction.WaitForCommitAsync());
+
+                Assert.True(exception.Status.IsIllegalState);
+                Assert.Equal("transaction is still open", exception.Message);
+
+                // In addition, it should be possible to insert rows in the context
+                // of the transaction.
+                var insert = ClientTestUtil.CreateBasicSchemaInsert(table, i);
+                await transaction.WriteAsync(new[] { insert });
+
+                // Start the master back.
+                await harness.StartMasterAsync(hostPort);
+            }
+
+            // Make sure the client properly processes error responses sent back by
+            // TxnManager when the TxnStatusManager isn't available. So, shutdown all
+            // tablet servers: this is to make sure TxnStatusManager isn't there.
+            await harness.KillAllTabletServersAsync();
+
+            var startTabletServersTask = Task.Run(async () =>
+            {
+                // Sleep for some time to allow the commit call below issue RPCs when
+                // TxnStatusManager is not yet around.
+                await Task.Delay(2 * 1000);
+
+                // Start all the tablet servers back so the TxnStatusManager is back.
+                await harness.StartAllTabletServersAsync();
+            });
+
+            // The transaction should be still alive, and it should be possible to
+            // commit it.
+            await transaction.CommitAsync();
+            await transaction.WaitForCommitAsync();
+
+            await startTabletServersTask;
+
+            // An extra sanity check: read back the rows written into the table in the
+            // context of the transaction.
+            var scanner = client.NewScanBuilder(table)
+                .SetReadMode(ReadMode.ReadYourWrites)
+                .SetReplicaSelection(ReplicaSelection.LeaderOnly)
+                .Build();
+
+            Assert.Equal(numMasters, await ClientTestUtil.CountRowsInScanAsync(scanner));
+        }
+
+        /// <summary>
+        /// A test scenario to verify the behavior of the client API when a write
+        /// operation submitted into a transaction session after the transaction
+        /// has already been committed.
+        /// </summary>
+        [SkippableFact]
+        public async Task TestSubmitWriteOpAfterCommit()
+        {
+            await using var harness = await new MiniKuduClusterBuilder()
+                .AddMasterServerFlag("--txn_manager_enabled")
+                .AddTabletServerFlag("--enable_txn_system_client_init=true")
+                .BuildHarnessAsync();
+
+            await using var client = harness.CreateClient();
+
+            var builder = ClientTestUtil.GetBasicSchema()
+                .SetTableName(nameof(TestSubmitWriteOpAfterCommit))
+                .AddHashPartitions(2, "key");
+
+            var table = await client.CreateTableAsync(builder);
+
+            using var transaction = await client.NewTransactionAsync();
+
+            int key = 0;
+            var insert1 = ClientTestUtil.CreateBasicSchemaInsert(table, key++);
+            await transaction.WriteAsync(new[] { insert1 });
+
+            await transaction.CommitAsync();
+            await transaction.WaitForCommitAsync();
+
+            var insert2 = ClientTestUtil.CreateBasicSchemaInsert(table, key);
+            var exception = await Assert.ThrowsAsync<NonRecoverableException>(
+                async () => await transaction.WriteAsync(new[] { insert2 }));
+
+            Assert.Matches(".* transaction ID .* not open: COMMITTED", exception.Message);
         }
 
         private static async Task CommitAndVerifyTransactionAsync(
