@@ -14,7 +14,7 @@ namespace Knet.Kudu.Client.Requests
             _request = request;
         }
 
-        public override string MethodName => "CommitTransaction";
+        public override string MethodName => "KeepTransactionAlive";
 
         public override int CalculateSize() => _request.CalculateSize();
 
