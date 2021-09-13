@@ -224,11 +224,11 @@ namespace Knet.Kudu.Client.FunctionalTests
             await client.WriteAsync(rows);
 
             var scanner = client.NewScanBuilder(table)
-                .SetReplicaSelection(ReplicaSelection.ClosestReplica)
+                .SetReadMode(ReadMode.ReadYourWrites)
+                .SetReplicaSelection(ReplicaSelection.LeaderOnly)
                 .SetBatchSizeBytes(100) // Use a small batch size so we get many batches.
                 .Build();
 
-            await ClientTestUtil.WaitUntilRowCountAsync(client, table, numRows);
             await using var scanEnumerator = scanner.GetAsyncEnumerator();
 
             // KeepAlive on uninitialized scanner should be ok.
