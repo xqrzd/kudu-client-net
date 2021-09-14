@@ -10,7 +10,11 @@ namespace Knet.Kudu.Client.Requests
     {
         private readonly WriteRequestPB _request;
 
-        public WriteRequest(WriteRequestPB request, string tableId, byte[] partitionKey)
+        public WriteRequest(
+            WriteRequestPB request,
+            string tableId,
+            byte[] partitionKey,
+            ExternalConsistencyMode externalConsistencyMode)
         {
             _request = request;
             MethodName = "Write";
@@ -18,6 +22,7 @@ namespace Knet.Kudu.Client.Requests
             PartitionKey = partitionKey;
             NeedsAuthzToken = true;
             IsRequestTracked = true;
+            ExternalConsistencyMode = externalConsistencyMode;
         }
 
         public override int CalculateSize()

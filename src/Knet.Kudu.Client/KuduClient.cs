@@ -569,7 +569,8 @@ namespace Knet.Kudu.Client
             var rpc = new WriteRequest(
                 request,
                 table.TableId,
-                tablet.Partition.PartitionKeyStart);
+                tablet.Partition.PartitionKeyStart,
+                externalConsistencyMode);
 
             var response = await SendRpcAsync(rpc, cancellationToken)
                 .ConfigureAwait(false);
