@@ -5,16 +5,15 @@ using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client.Requests
 {
-    internal class GetTransactionStateRequest : KuduTxnRpc<GetTransactionStateResponsePB>
+    internal sealed class GetTransactionStateRequest : KuduTxnRpc<GetTransactionStateResponsePB>
     {
         private readonly GetTransactionStateRequestPB _request;
 
         public GetTransactionStateRequest(GetTransactionStateRequestPB request)
         {
+            MethodName = "GetTransactionState";
             _request = request;
         }
-
-        public override string MethodName => "GetTransactionState";
 
         public override int CalculateSize() => _request.CalculateSize();
 

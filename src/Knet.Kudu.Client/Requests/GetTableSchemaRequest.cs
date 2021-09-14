@@ -6,7 +6,7 @@ using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client.Requests
 {
-    internal class GetTableSchemaRequest : KuduMasterRpc<GetTableSchemaResponsePB>
+    internal sealed class GetTableSchemaRequest : KuduMasterRpc<GetTableSchemaResponsePB>
     {
         private static readonly RepeatedField<uint> _requiredFeatures = new()
         {
@@ -15,12 +15,11 @@ namespace Knet.Kudu.Client.Requests
 
         private readonly GetTableSchemaRequestPB _request;
 
-        public override string MethodName => "GetTableSchema";
-
         public GetTableSchemaRequest(
             GetTableSchemaRequestPB request,
             bool requiresAuthzTokenSupport)
         {
+            MethodName = "GetTableSchema";
             _request = request;
 
             if (requiresAuthzTokenSupport)

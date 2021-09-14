@@ -1,15 +1,19 @@
 using System.Buffers;
-using Google.Protobuf;
 using Knet.Kudu.Client.Protobuf.Transactions;
 using Knet.Kudu.Client.Protocol;
+using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Requests
 {
-    internal class BeginTransactionRequest : KuduTxnRpc<BeginTransactionResponsePB>
+    internal sealed class BeginTransactionRequest : KuduTxnRpc<BeginTransactionResponsePB>
     {
-        private static readonly byte[] _requestBytes = new BeginTransactionRequestPB().ToByteArray();
+        private static readonly byte[] _requestBytes = ProtobufHelper.ToByteArray(
+            new BeginTransactionRequestPB());
 
-        public override string MethodName => "BeginTransaction";
+        public BeginTransactionRequest()
+        {
+            MethodName = "BeginTransaction";
+        }
 
         public override int CalculateSize() => _requestBytes.Length;
 

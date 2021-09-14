@@ -6,7 +6,7 @@ using Knet.Kudu.Client.Tablet;
 
 namespace Knet.Kudu.Client.Requests
 {
-    internal class KeepAliveRequest : KuduTabletRpc<ScannerKeepAliveResponsePB>
+    internal sealed class KeepAliveRequest : KuduTabletRpc<ScannerKeepAliveResponsePB>
     {
         private readonly ScannerKeepAliveRequestPB _request;
 
@@ -22,15 +22,12 @@ namespace Knet.Kudu.Client.Requests
                 ScannerId = UnsafeByteOperations.UnsafeWrap(scannerId),
             };
 
+            MethodName = "ScannerKeepAlive";
             ReplicaSelection = replicaSelection;
             TableId = tableId;
             Tablet = tablet;
             PartitionKey = partitionKey;
         }
-
-        public override string MethodName => "ScannerKeepAlive";
-
-        public override ReplicaSelection ReplicaSelection { get; }
 
         public override int CalculateSize() => _request.CalculateSize();
 

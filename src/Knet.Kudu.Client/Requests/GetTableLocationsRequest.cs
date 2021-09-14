@@ -5,14 +5,13 @@ using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client.Requests
 {
-    internal class GetTableLocationsRequest : KuduMasterRpc<GetTableLocationsResponsePB>
+    internal sealed class GetTableLocationsRequest : KuduMasterRpc<GetTableLocationsResponsePB>
     {
         private readonly GetTableLocationsRequestPB _request;
 
-        public override string MethodName => "GetTableLocations";
-
         public GetTableLocationsRequest(GetTableLocationsRequestPB request)
         {
+            MethodName = "GetTableLocations";
             _request = request;
         }
 

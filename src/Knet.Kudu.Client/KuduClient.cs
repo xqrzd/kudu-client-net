@@ -255,7 +255,8 @@ namespace Knet.Kudu.Client
         private async Task<IsCreateTableDoneResponsePB> WaitForCreateTableDoneAsync(
             TableIdentifierPB tableId, CancellationToken cancellationToken)
         {
-            var rpc = new IsCreateTableDoneRequest(tableId);
+            var request = new IsCreateTableDoneRequestPB { Table = tableId };
+            var rpc = new IsCreateTableDoneRequest(request);
 
             while (true)
             {
@@ -273,7 +274,8 @@ namespace Knet.Kudu.Client
         private async Task<IsAlterTableDoneResponsePB> WaitForAlterTableDoneAsync(
             TableIdentifierPB tableId, CancellationToken cancellationToken)
         {
-            var rpc = new IsAlterTableDoneRequest(tableId);
+            var request = new IsAlterTableDoneRequestPB { Table = tableId };
+            var rpc = new IsAlterTableDoneRequest(request);
 
             while (true)
             {
@@ -370,7 +372,8 @@ namespace Knet.Kudu.Client
             string tableName, CancellationToken cancellationToken = default)
         {
             var table = new TableIdentifierPB { TableName = tableName };
-            var rpc = new GetTableStatisticsRequest(table);
+            var request = new GetTableStatisticsRequestPB { Table = table };
+            var rpc = new GetTableStatisticsRequest(request);
             var response = await SendRpcAsync(rpc, cancellationToken)
                 .ConfigureAwait(false);
 

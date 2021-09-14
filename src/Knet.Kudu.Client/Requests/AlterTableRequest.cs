@@ -5,14 +5,13 @@ using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client.Requests
 {
-    internal class AlterTableRequest : KuduMasterRpc<AlterTableResponse>
+    internal sealed class AlterTableRequest : KuduMasterRpc<AlterTableResponse>
     {
         private readonly AlterTableRequestPB _request;
 
-        public override string MethodName => "AlterTable";
-
         public AlterTableRequest(AlterTableRequestPB request)
         {
+            MethodName = "AlterTable";
             _request = request;
 
             // We don't need to set required feature ADD_DROP_RANGE_PARTITIONS here,

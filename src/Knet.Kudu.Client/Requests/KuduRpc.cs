@@ -19,20 +19,19 @@ namespace Knet.Kudu.Client.Requests
         protected const string TabletServerServiceName = "kudu.tserver.TabletServerService";
         protected const string TxnManagerServiceName = "kudu.transactions.TxnManagerService";
 
-        public abstract string ServiceName { get; }
+        public string ServiceName { get; init; }
 
-        public abstract string MethodName { get; }
+        public string MethodName { get; init; }
 
         /// <summary>
         /// Returns the set of application-specific feature flags required to service the RPC.
         /// </summary>
-        public RepeatedField<uint> RequiredFeatures { get; protected set; }
+        public RepeatedField<uint> RequiredFeatures { get; init; }
 
         /// <summary>
         /// The external consistency mode for this RPC.
-        /// TODO make this cover most if not all RPCs (right now only scans and writes use this).
         /// </summary>
-        public ExternalConsistencyMode ExternalConsistencyMode { get; set; } =
+        public ExternalConsistencyMode ExternalConsistencyMode { get; init; } =
             ExternalConsistencyMode.ClientPropagated;
 
         /// <summary>
@@ -49,7 +48,7 @@ namespace Knet.Kudu.Client.Requests
         /// If this RPC needs to be tracked on the client and server-side.
         /// Some RPCs require exactly-once semantics which is enabled by tracking them.
         /// </summary>
-        public bool IsRequestTracked { get; protected set; }
+        public bool IsRequestTracked { get; init; }
 
         internal long SequenceId { get; set; } = RequestTracker.NoSeqNo;
 
@@ -67,42 +66,51 @@ namespace Knet.Kudu.Client.Requests
 
     internal abstract class KuduMasterRpc<T> : KuduRpc<T>
     {
-        public override string ServiceName => MasterServiceName;
-
         public MasterErrorPB Error { get; protected set; }
+
+        public KuduMasterRpc()
+        {
+            ServiceName = MasterServiceName;
+        }
     }
 
     internal abstract class KuduTxnRpc<T> : KuduRpc<T>
     {
-        public override string ServiceName => TxnManagerServiceName;
-
         public TxnManagerErrorPB Error { get; protected set; }
+
+        public KuduTxnRpc()
+        {
+            ServiceName = TxnManagerServiceName;
+        }
     }
 
     internal abstract class KuduTabletRpc<T> : KuduRpc<T>
     {
-        public override string ServiceName => TabletServerServiceName;
-
         public long PropagatedTimestamp { get; set; } = KuduClient.NoTimestamp;
 
         /// <summary>
         /// Returns the partition key this RPC is for.
         /// </summary>
-        public byte[] PartitionKey { get; protected set; }
+        public byte[] PartitionKey { get; init; }
 
         public RemoteTablet Tablet { get; internal set; }
 
-        public virtual ReplicaSelection ReplicaSelection => ReplicaSelection.LeaderOnly;
+        public ReplicaSelection ReplicaSelection { get; init; } = ReplicaSelection.LeaderOnly;
 
-        public bool NeedsAuthzToken { get; protected set; }
+        public bool NeedsAuthzToken { get; init; }
 
         internal SignedTokenPB AuthzToken { get; set; }
 
         /// <summary>
         /// The table this RPC is for.
         /// </summary>
-        public string TableId { get; protected set; }
+        public string TableId { get; init; }
 
         public TabletServerErrorPB Error { get; protected set; }
+
+        public KuduTabletRpc()
+        {
+            ServiceName = TabletServerServiceName;
+        }
     }
 }

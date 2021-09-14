@@ -5,16 +5,15 @@ using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client.Requests
 {
-    internal class KeepTransactionAliveRequest : KuduTxnRpc<KeepTransactionAliveResponsePB>
+    internal sealed class KeepTransactionAliveRequest : KuduTxnRpc<KeepTransactionAliveResponsePB>
     {
         private readonly KeepTransactionAliveRequestPB _request;
 
         public KeepTransactionAliveRequest(KeepTransactionAliveRequestPB request)
         {
+            MethodName = "KeepTransactionAlive";
             _request = request;
         }
-
-        public override string MethodName => "KeepTransactionAlive";
 
         public override int CalculateSize() => _request.CalculateSize();
 
