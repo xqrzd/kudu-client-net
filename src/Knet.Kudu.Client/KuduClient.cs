@@ -77,7 +77,7 @@ namespace Knet.Kudu.Client
             _scanLogger = loggerFactory.CreateLogger("Knet.Kudu.Client.Scanner");
             _connectionCache = new ConnectionCache(_connectionFactory, loggerFactory);
             _tableLocations = new ConcurrentDictionary<string, TableLocationsCache>();
-            _requestTracker = new RequestTracker(SecurityUtil.NewGuid().ToString("N"));
+            _requestTracker = new RequestTracker(Guid.NewGuid().ToString("N"));
             _authzTokenCache = new AuthzTokenCache();
             _singleClusterConnect = new SemaphoreSlim(1, 1);
             _defaultOperationTimeoutMs = (int)options.DefaultOperationTimeout.TotalMilliseconds;
