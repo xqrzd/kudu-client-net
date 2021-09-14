@@ -61,11 +61,7 @@ namespace Knet.Kudu.Client.Connection
                 }
             }
 
-            var messageSize = tokenPb.CalculateSize();
-            var buffer = new byte[messageSize];
-            tokenPb.WriteTo(buffer);
-
-            return buffer;
+            return ProtobufHelper.ToByteArray(tokenPb);
         }
 
         public void ImportAuthenticationCredentials(ReadOnlyMemory<byte> token)

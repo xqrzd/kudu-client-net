@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using Google.Protobuf;
 using Knet.Kudu.Client.Protobuf;
 using Knet.Kudu.Client.Protobuf.Client;
 using Knet.Kudu.Client.Tablet;
+using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client
 {
@@ -51,13 +51,7 @@ namespace Knet.Kudu.Client
 
         internal ScanTokenPB Message => _message;
 
-        public byte[] Serialize()
-        {
-            var messageSize = _message.CalculateSize();
-            var buffer = new byte[messageSize];
-            _message.WriteTo(buffer);
-            return buffer;
-        }
+        public byte[] Serialize() => ProtobufHelper.ToByteArray(_message);
 
         // TODO: Use ScanTokenPB to generate ToString()
         public override string ToString() => _keyRange.ToString();

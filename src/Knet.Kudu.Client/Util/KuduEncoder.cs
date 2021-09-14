@@ -405,7 +405,8 @@ namespace Knet.Kudu.Client.Util
         /// correctly.
         /// </summary>
         /// <param name="buffer">Buffer whose left most bit will be xor'd.</param>
-        public static byte XorLeftMostBit(Span<byte> buffer) => buffer[0] ^= 1 << 7;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void XorLeftMostBit(Span<byte> buffer) => buffer[0] ^= 1 << 7;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static T ReadUnsafe<T>(byte[] source, int offset)
