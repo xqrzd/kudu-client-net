@@ -1515,11 +1515,12 @@ namespace Knet.Kudu.Client
         {
             // Set the propagated timestamp so that the next time we send a message to
             // the server the message includes the last propagated timestamp.
-            long lastPropagatedTimestamp = LastPropagatedTimestamp;
-            if (rpc.ExternalConsistencyMode == ExternalConsistencyMode.ClientPropagated &&
-                lastPropagatedTimestamp != NoTimestamp)
+            if (rpc.ExternalConsistencyMode == ExternalConsistencyMode.ClientPropagated)
             {
-                rpc.PropagatedTimestamp = lastPropagatedTimestamp;
+                long lastPropagatedTimestamp = LastPropagatedTimestamp;
+
+                if (lastPropagatedTimestamp != NoTimestamp)
+                    rpc.PropagatedTimestamp = lastPropagatedTimestamp;
             }
 
             string tableId = rpc.TableId;
