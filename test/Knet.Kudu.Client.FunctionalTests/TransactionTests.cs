@@ -89,7 +89,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             // constructed using serialize/deserialize sequence: it should be fine
             // since aborting a transaction has idempotent semantics for the back-end.
             var buffer = transaction.Serialize();
-            var serdesTxn = client.NewTransactionFromToken(buffer);
+            using var serdesTxn = client.NewTransactionFromToken(buffer);
             await serdesTxn.RollbackAsync();
         }
 
@@ -115,7 +115,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             // constructed using serialize/deserialize sequence: it should be fine
             // since committing a transaction has idempotent semantics for the back-end.
             var buffer = transaction.Serialize();
-            var serdesTxn = client.NewTransactionFromToken(buffer);
+            using var serdesTxn = client.NewTransactionFromToken(buffer);
             await serdesTxn.CommitAsync();
         }
 
@@ -162,15 +162,15 @@ namespace Knet.Kudu.Client.FunctionalTests
             var table = await client.CreateTableAsync(builder);
 
             // Open and close an empty transaction session.
+            using (var transaction = await client.NewTransactionAsync())
             {
-                using var transaction = await client.NewTransactionAsync();
                 await using var session = transaction.NewSession();
             }
 
             // Open new transaction, insert one row for a session, close the session
             // and then rollback the transaction. No rows should be persisted.
+            using (var transaction = await client.NewTransactionAsync())
             {
-                using var transaction = await client.NewTransactionAsync();
                 await using var session = transaction.NewSession();
 
                 var insert = ClientTestUtil.CreateBasicSchemaInsert(table, 1);
@@ -446,39 +446,37 @@ namespace Knet.Kudu.Client.FunctionalTests
 
             // Check the keepalive behavior when serializing/deserializing with default
             // settings for KuduTransactionSerializationOptions.
-            using (var transaction = await client.NewTransactionAsync())
-            {
-                var buffer = transaction.Serialize();
-                var txnPb = TxnTokenPB.Parser.ParseFrom(buffer);
-                Assert.True(txnPb.HasKeepaliveMillis);
-                var keepaliveMillis = (int)txnPb.KeepaliveMillis;
-                Assert.True(keepaliveMillis > 0);
+            using var transaction = await client.NewTransactionAsync();
+            var buffer = transaction.Serialize();
+            var txnPb = TxnTokenPB.Parser.ParseFrom(buffer);
+            Assert.True(txnPb.HasKeepaliveMillis);
+            var keepaliveMillis = (int)txnPb.KeepaliveMillis;
+            Assert.True(keepaliveMillis > 0);
 
-                var serdesTxn = client.NewTransactionFromToken(buffer);
+            using var serdesTxn = client.NewTransactionFromToken(buffer);
 
-                // Stop sending automatic keepalive messages from 'transaction' handle.
-                transaction.Dispose();
+            // Stop sending automatic keepalive messages from 'transaction' handle.
+            transaction.Dispose();
 
-                // Keep the handle around without any activity for longer than the
-                // keepalive timeout interval.
-                await Task.Delay(3 * keepaliveMillis);
+            // Keep the handle around without any activity for longer than the
+            // keepalive timeout interval.
+            await Task.Delay(3 * keepaliveMillis);
 
-                // At this point, the underlying transaction should be automatically
-                // aborted by the backend: the 'transaction' handle should not send any
-                // heartbeats anymore since it's closed, and the 'serdesTxn' handle
-                // should not be sending any heartbeats.
-                var exception = await Assert.ThrowsAsync<NonRecoverableException>(
-                    async () => await serdesTxn.CommitAsync());
+            // At this point, the underlying transaction should be automatically
+            // aborted by the backend: the 'transaction' handle should not send any
+            // heartbeats anymore since it's closed, and the 'serdesTxn' handle
+            // should not be sending any heartbeats.
+            var exception = await Assert.ThrowsAsync<NonRecoverableException>(
+                async () => await serdesTxn.CommitAsync());
 
-                Assert.Matches(".* transaction ID .* is not open: state: ABORT.*",
-                    exception.Message);
+            Assert.Matches(".* transaction ID .* is not open: state: ABORT.*",
+                exception.Message);
 
-                // Verify that KuduTransaction.RollbackAsync() successfully runs on both
-                // transaction handles if the underlying transaction is already aborted
-                // automatically by the backend.
-                await transaction.RollbackAsync();
-                await serdesTxn.RollbackAsync();
-            }
+            // Verify that KuduTransaction.RollbackAsync() successfully runs on both
+            // transaction handles if the underlying transaction is already aborted
+            // automatically by the backend.
+            await transaction.RollbackAsync();
+            await serdesTxn.RollbackAsync();
         }
 
         /// <summary>
