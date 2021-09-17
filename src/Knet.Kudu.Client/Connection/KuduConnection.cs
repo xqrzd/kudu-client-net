@@ -64,7 +64,7 @@ namespace Knet.Kudu.Client.Connection
                 {
                     // Guarantee the disconnected callback is invoked if
                     // the connection is already closed.
-                    InvokeDisconnectedCallback();
+                    InvokeDisconnectedCallback(_closedException);
                 }
             }
         }
@@ -331,8 +331,7 @@ namespace Knet.Kudu.Client.Connection
             lock (_inflightRpcs)
             {
                 _closedException = closedException;
-
-                InvokeDisconnectedCallback();
+                InvokeDisconnectedCallback(closedException);
 
                 foreach (var inflightMessage in _inflightRpcs.Values)
                     inflightMessage.TrySetException(closedException);
@@ -349,11 +348,11 @@ namespace Knet.Kudu.Client.Connection
         /// <summary>
         /// The caller must hold the _inflightMessages lock.
         /// </summary>
-        private void InvokeDisconnectedCallback()
+        private void InvokeDisconnectedCallback(RecoverableException exception)
         {
             try
             {
-                _disconnectedCallback.Invoke(_closedException.InnerException);
+                _disconnectedCallback.Invoke(exception.InnerException);
             }
             catch { }
         }
