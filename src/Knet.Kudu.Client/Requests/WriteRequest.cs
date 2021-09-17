@@ -6,19 +6,23 @@ using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Requests
 {
-    internal class WriteRequest : KuduTabletRpc<WriteResponsePB>
+    internal sealed class WriteRequest : KuduTabletRpc<WriteResponsePB>
     {
         private readonly WriteRequestPB _request;
 
-        public override string MethodName => "Write";
-
-        public WriteRequest(WriteRequestPB request, string tableId, byte[] partitionKey)
+        public WriteRequest(
+            WriteRequestPB request,
+            string tableId,
+            byte[] partitionKey,
+            ExternalConsistencyMode externalConsistencyMode)
         {
             _request = request;
+            MethodName = "Write";
             TableId = tableId;
             PartitionKey = partitionKey;
             NeedsAuthzToken = true;
             IsRequestTracked = true;
+            ExternalConsistencyMode = externalConsistencyMode;
         }
 
         public override int CalculateSize()

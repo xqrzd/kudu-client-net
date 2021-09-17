@@ -5,15 +5,14 @@ using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client.Requests
 {
-    internal class IsCreateTableDoneRequest : KuduMasterRpc<IsCreateTableDoneResponsePB>
+    internal sealed class IsCreateTableDoneRequest : KuduMasterRpc<IsCreateTableDoneResponsePB>
     {
         private readonly IsCreateTableDoneRequestPB _request;
 
-        public override string MethodName => "IsCreateTableDone";
-
-        public IsCreateTableDoneRequest(TableIdentifierPB tableId)
+        public IsCreateTableDoneRequest(IsCreateTableDoneRequestPB request)
         {
-            _request = new IsCreateTableDoneRequestPB { Table = tableId };
+            MethodName = "IsCreateTableDone";
+            _request = request;
         }
 
         public override int CalculateSize() => _request.CalculateSize();

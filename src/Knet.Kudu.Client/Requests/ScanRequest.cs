@@ -11,7 +11,7 @@ using Knet.Kudu.Client.Tablet;
 
 namespace Knet.Kudu.Client.Requests
 {
-    internal class ScanRequest : KuduTabletRpc<ScanResponse>, IDisposable
+    internal sealed class ScanRequest : KuduTabletRpc<ScanResponse>, IDisposable
     {
         private static readonly RepeatedField<uint> _columnPredicateRequiredFeature = new()
         {
@@ -38,6 +38,7 @@ namespace Knet.Kudu.Client.Requests
             _schema = schema;
             _isFaultTolerant = isFaultTolerant;
 
+            MethodName = "Scan";
             ReplicaSelection = replicaSelection;
             TableId = tableId;
             Tablet = tablet;
@@ -50,10 +51,6 @@ namespace Knet.Kudu.Client.Requests
                 RequiredFeatures = _columnPredicateRequiredFeature;
             }
         }
-
-        public override string MethodName => "Scan";
-
-        public override ReplicaSelection ReplicaSelection { get; }
 
         public void Dispose()
         {

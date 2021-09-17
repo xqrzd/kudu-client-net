@@ -5,16 +5,15 @@ using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client.Requests
 {
-    internal class CommitTransactionRequest : KuduTxnRpc<CommitTransactionResponsePB>
+    internal sealed class CommitTransactionRequest : KuduTxnRpc<CommitTransactionResponsePB>
     {
         private readonly CommitTransactionRequestPB _request;
 
         public CommitTransactionRequest(CommitTransactionRequestPB request)
         {
+            MethodName = "CommitTransaction";
             _request = request;
         }
-
-        public override string MethodName => "CommitTransaction";
 
         public override int CalculateSize() => _request.CalculateSize();
 

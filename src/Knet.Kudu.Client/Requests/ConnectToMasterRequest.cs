@@ -1,26 +1,26 @@
 using System.Buffers;
-using Google.Protobuf;
 using Google.Protobuf.Collections;
 using Knet.Kudu.Client.Protobuf.Master;
 using Knet.Kudu.Client.Protocol;
+using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Requests
 {
-    internal class ConnectToMasterRequest : KuduMasterRpc<ConnectToMasterResponsePB>
+    internal sealed class ConnectToMasterRequest : KuduMasterRpc<ConnectToMasterResponsePB>
     {
         private static readonly RepeatedField<uint> _requiredFeatures = new()
         {
             (uint)MasterFeatures.ConnectToMaster
         };
 
-        private static readonly byte[] _requestBytes = new ConnectToMasterRequestPB().ToByteArray();
+        private static readonly byte[] _requestBytes = ProtobufHelper.ToByteArray(
+            new ConnectToMasterRequestPB());
 
         public ConnectToMasterRequest()
         {
+            MethodName = "ConnectToMaster";
             RequiredFeatures = _requiredFeatures;
         }
-
-        public override string MethodName => "ConnectToMaster";
 
         public override int CalculateSize() => _requestBytes.Length;
 

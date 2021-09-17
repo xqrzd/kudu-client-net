@@ -1,15 +1,19 @@
 using System.Buffers;
-using Google.Protobuf;
 using Knet.Kudu.Client.Protobuf.Master;
 using Knet.Kudu.Client.Protocol;
+using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Requests
 {
-    internal class ListTabletServersRequest : KuduMasterRpc<ListTabletServersResponsePB>
+    internal sealed class ListTabletServersRequest : KuduMasterRpc<ListTabletServersResponsePB>
     {
-        private static readonly byte[] _requestBytes = new ListTabletServersRequestPB().ToByteArray();
+        private static readonly byte[] _requestBytes = ProtobufHelper.ToByteArray(
+            new ListTabletServersRequestPB());
 
-        public override string MethodName => "ListTabletServers";
+        public ListTabletServersRequest()
+        {
+            MethodName = "ListTabletServers";
+        }
 
         public override int CalculateSize() => _requestBytes.Length;
 

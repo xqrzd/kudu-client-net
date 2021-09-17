@@ -5,7 +5,7 @@ using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client.Requests
 {
-    internal class SplitKeyRangeRequest : KuduTabletRpc<SplitKeyRangeResponsePB>
+    internal sealed class SplitKeyRangeRequest : KuduTabletRpc<SplitKeyRangeResponsePB>
     {
         private readonly SplitKeyRangeRequestPB _request;
 
@@ -27,12 +27,11 @@ namespace Knet.Kudu.Client.Requests
             if (endPrimaryKey != null && endPrimaryKey.Length > 0)
                 _request.StopPrimaryKey = UnsafeByteOperations.UnsafeWrap(endPrimaryKey);
 
+            MethodName = "SplitKeyRange";
             TableId = tableId;
             PartitionKey = partitionKey;
             NeedsAuthzToken = true;
         }
-
-        public override string MethodName => "SplitKeyRange";
 
         public override int CalculateSize()
         {

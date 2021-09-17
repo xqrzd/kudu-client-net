@@ -5,16 +5,15 @@ using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client.Requests
 {
-    internal class AbortTransactionRequest : KuduTxnRpc<AbortTransactionResponsePB>
+    internal sealed class AbortTransactionRequest : KuduTxnRpc<AbortTransactionResponsePB>
     {
         private readonly AbortTransactionRequestPB _request;
 
         public AbortTransactionRequest(AbortTransactionRequestPB request)
         {
+            MethodName = "AbortTransaction";
             _request = request;
         }
-
-        public override string MethodName => "AbortTransaction";
 
         public override int CalculateSize() => _request.CalculateSize();
 

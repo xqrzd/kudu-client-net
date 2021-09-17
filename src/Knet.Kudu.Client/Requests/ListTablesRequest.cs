@@ -5,18 +5,19 @@ using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client.Requests
 {
-    internal class ListTablesRequest : KuduMasterRpc<ListTablesResponsePB>
+    internal sealed class ListTablesRequest : KuduMasterRpc<ListTablesResponsePB>
     {
-        private readonly ListTablesRequestPB _request;
+        private static readonly ListTablesRequestPB _noFilterRequest = new();
 
-        public override string MethodName => "ListTables";
+        private readonly ListTablesRequestPB _request;
 
         public ListTablesRequest(string nameFilter = null)
         {
-            _request = new ListTablesRequestPB
-            {
-                NameFilter = nameFilter
-            };
+            MethodName = "ListTables";
+
+            _request = nameFilter is null
+                ? _noFilterRequest
+                : new ListTablesRequestPB { NameFilter = nameFilter };
         }
 
         public override int CalculateSize() => _request.CalculateSize();

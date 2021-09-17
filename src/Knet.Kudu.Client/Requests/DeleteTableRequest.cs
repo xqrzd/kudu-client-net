@@ -5,14 +5,13 @@ using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client.Requests
 {
-    internal class DeleteTableRequest : KuduMasterRpc<DeleteTableResponsePB>
+    internal sealed class DeleteTableRequest : KuduMasterRpc<DeleteTableResponsePB>
     {
         private readonly DeleteTableRequestPB _request;
 
-        public override string MethodName => "DeleteTable";
-
         public DeleteTableRequest(DeleteTableRequestPB request)
         {
+            MethodName = "DeleteTable";
             _request = request;
         }
 
