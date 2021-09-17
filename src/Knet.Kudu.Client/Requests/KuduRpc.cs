@@ -2,12 +2,7 @@ using System;
 using System.Buffers;
 using Google.Protobuf.Collections;
 using Knet.Kudu.Client.Connection;
-using Knet.Kudu.Client.Protobuf.Master;
-using Knet.Kudu.Client.Protobuf.Security;
-using Knet.Kudu.Client.Protobuf.Transactions;
-using Knet.Kudu.Client.Protobuf.Tserver;
 using Knet.Kudu.Client.Protocol;
-using Knet.Kudu.Client.Tablet;
 
 namespace Knet.Kudu.Client.Requests
 {
@@ -62,55 +57,5 @@ namespace Knet.Kudu.Client.Requests
     public abstract class KuduRpc<T> : KuduRpc
     {
         public T Output { get; protected set; }
-    }
-
-    internal abstract class KuduMasterRpc<T> : KuduRpc<T>
-    {
-        public MasterErrorPB Error { get; protected set; }
-
-        public KuduMasterRpc()
-        {
-            ServiceName = MasterServiceName;
-        }
-    }
-
-    internal abstract class KuduTxnRpc<T> : KuduRpc<T>
-    {
-        public TxnManagerErrorPB Error { get; protected set; }
-
-        public KuduTxnRpc()
-        {
-            ServiceName = TxnManagerServiceName;
-        }
-    }
-
-    internal abstract class KuduTabletRpc<T> : KuduRpc<T>
-    {
-        public long PropagatedTimestamp { get; set; } = KuduClient.NoTimestamp;
-
-        /// <summary>
-        /// Returns the partition key this RPC is for.
-        /// </summary>
-        public byte[] PartitionKey { get; init; }
-
-        public RemoteTablet Tablet { get; internal set; }
-
-        public ReplicaSelection ReplicaSelection { get; init; } = ReplicaSelection.LeaderOnly;
-
-        public bool NeedsAuthzToken { get; init; }
-
-        internal SignedTokenPB AuthzToken { get; set; }
-
-        /// <summary>
-        /// The table this RPC is for.
-        /// </summary>
-        public string TableId { get; init; }
-
-        public TabletServerErrorPB Error { get; protected set; }
-
-        public KuduTabletRpc()
-        {
-            ServiceName = TabletServerServiceName;
-        }
     }
 }
