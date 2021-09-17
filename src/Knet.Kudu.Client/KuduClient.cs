@@ -848,10 +848,15 @@ namespace Knet.Kudu.Client
             var schema = await SendRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
 
             var authzToken = schema.AuthzToken;
-            if (authzToken != null)
+            if (authzToken is not null)
             {
                 _authzTokenCache.SetAuthzToken(
                     schema.TableId.ToStringUtf8(), authzToken);
+            }
+            else if (requiresAuthzTokenSupport)
+            {
+                throw new NonRecoverableException(KuduStatus.InvalidArgument(
+                    $"No authz token retrieved for {schema.TableName}"));
             }
 
             return schema;
@@ -1587,17 +1592,19 @@ namespace Knet.Kudu.Client
             await SendRpcToServerGenericAsync(rpc, serverInfo, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (rpc.Error is not null)
+            var error = rpc.Error;
+            if (error is not null)
             {
-                var code = rpc.Error.Status.Code;
-                var status = KuduStatus.FromMasterErrorPB(rpc.Error);
+                var errCode = error.Code;
+                var errStatusCode = error.Status.Code;
+                var status = KuduStatus.FromMasterErrorPB(error);
 
-                if (rpc.Error.Code == MasterErrorPB.Types.Code.NotTheLeader)
+                if (errCode == MasterErrorPB.Types.Code.NotTheLeader)
                 {
                     InvalidateMasterServerCache();
                     throw new RecoverableException(status);
                 }
-                else if (code == AppStatusPB.Types.ErrorCode.ServiceUnavailable)
+                else if (errStatusCode == AppStatusPB.Types.ErrorCode.ServiceUnavailable)
                 {
                     throw new RecoverableException(status);
                 }
@@ -1618,12 +1625,13 @@ namespace Knet.Kudu.Client
             await SendRpcToServerGenericAsync(rpc, serverInfo, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (rpc.Error is not null)
+            var error = rpc.Error;
+            if (error is not null)
             {
-                var code = rpc.Error.Status.Code;
-                var status = KuduStatus.FromTxnManagerErrorPB(rpc.Error);
+                var errStatusCode = error.Status.Code;
+                var status = KuduStatus.FromTxnManagerErrorPB(error);
 
-                if (code == AppStatusPB.Types.ErrorCode.ServiceUnavailable)
+                if (errStatusCode == AppStatusPB.Types.ErrorCode.ServiceUnavailable)
                 {
                     throw new RecoverableException(status);
                 }
@@ -1644,11 +1652,12 @@ namespace Knet.Kudu.Client
             await SendRpcToServerGenericAsync(rpc, serverInfo, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (rpc.Error is not null)
+            var error = rpc.Error;
+            if (error is not null)
             {
-                var errCode = rpc.Error.Code;
-                var errStatusCode = rpc.Error.Status.Code;
-                var status = KuduStatus.FromTabletServerErrorPB(rpc.Error);
+                var errCode = error.Code;
+                var errStatusCode = error.Status.Code;
+                var status = KuduStatus.FromTabletServerErrorPB(error);
 
                 if (errCode == TabletServerErrorPB.Types.Code.TabletNotFound ||
                     errCode == TabletServerErrorPB.Types.Code.TabletNotRunning)
@@ -1701,19 +1710,14 @@ namespace Knet.Kudu.Client
                 // This connection can't be used anymore.
                 // Close the connection and rethrow the exception so we
                 // can retry in the hopes the user imported a new token.
-
-                // TODO: Here we just want to invoke the disconnected callback,
-                // and close just the writing side of the pipe (leave the read
-                // side open to allow pending RPCs to finish, instead of forcing
-                // them to retry on a new connection).
-                if (connection != null)
+                if (connection is not null)
                     await connection.CloseAsync().ConfigureAwait(false);
 
                 throw;
             }
-            catch (InvalidAuthzTokenException)
+            catch (InvalidAuthzTokenException) when (rpc is KuduTabletRpc<T> tabletRpc)
             {
-                await HandleInvalidAuthzTokenAsync(rpc, cancellationToken)
+                await RefreshAuthzTokenAsync(tabletRpc.TableId, cancellationToken)
                     .ConfigureAwait(false);
 
                 throw;
@@ -1725,12 +1729,11 @@ namespace Knet.Kudu.Client
                     // If we don't really know anything about the exception, invalidate
                     // the location for the tablet, opening the possibility of retrying
                     // on a different server.
-
                     if (rpc is KuduTabletRpc<T> tabletRpc)
                     {
                         RemoveTabletFromCache(tabletRpc);
                     }
-                    else if (rpc is KuduMasterRpc<T> or KuduTxnRpc<T>)
+                    else
                     {
                         InvalidateMasterServerCache();
                     }
@@ -1745,28 +1748,6 @@ namespace Knet.Kudu.Client
             _masterLeaderInfo = null;
         }
 
-        private async Task HandleInvalidAuthzTokenAsync<T>(
-            KuduRpc<T> rpc, CancellationToken cancellationToken)
-        {
-            if (rpc is KuduTabletRpc<T> tabletRpc)
-            {
-                var tableId = tabletRpc.TableId;
-                if (tableId == null)
-                {
-                    throw new NonRecoverableException(
-                        KuduStatus.InvalidArgument("Rpc did not set TableId"));
-                }
-
-                await RefreshAuthzTokenAsync(tableId, cancellationToken)
-                    .ConfigureAwait(false);
-            }
-            else
-            {
-                throw new NonRecoverableException(KuduStatus.InvalidArgument(
-                    "Expected InvalidAuthzTokenException on tablet RPCs"));
-            }
-        }
-
         private async Task RefreshAuthzTokenAsync(
             string tableId, CancellationToken cancellationToken)
         {
@@ -1775,17 +1756,11 @@ namespace Knet.Kudu.Client
                 TableId = ByteString.CopyFromUtf8(tableId)
             };
 
-            // This call will also cache the authz token.
-            var schema = await GetTableSchemaAsync(
+            // This call will cache the authz token.
+            await GetTableSchemaAsync(
                 tableIdPb,
                 requiresAuthzTokenSupport: true,
                 cancellationToken).ConfigureAwait(false);
-
-            if (schema.AuthzToken == null)
-            {
-                throw new NonRecoverableException(KuduStatus.InvalidArgument(
-                    $"No authz token retrieved for {tableId}"));
-            }
         }
 
         private RequestHeader CreateRequestHeader(KuduRpc rpc)
