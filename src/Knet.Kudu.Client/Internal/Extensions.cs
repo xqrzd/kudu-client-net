@@ -29,8 +29,9 @@ namespace Knet.Kudu.Client.Internal
         public static bool SequenceEqual<T>(this T[] array, ReadOnlySpan<T> other)
             where T : IEquatable<T> => MemoryExtensions.SequenceEqual(array, other);
 
+#if !NET6_0_OR_GREATER
         // https://github.com/dotnet/runtime/blob/master/src/libraries/Common/src/System/Threading/Tasks/TaskTimeoutExtensions.cs
-        public static Task WithCancellation(this Task task, CancellationToken cancellationToken)
+        public static Task WaitAsync(this Task task, CancellationToken cancellationToken)
         {
             if (task.IsCompleted || !cancellationToken.CanBeCanceled)
             {
@@ -62,6 +63,7 @@ namespace Knet.Kudu.Client.Internal
                 task.GetAwaiter().GetResult(); // Already completed; propagate any exception.
             }
         }
+#endif
 
         public static int NextClearBit(this BitArray array, int from)
         {
