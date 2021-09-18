@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Tablet;
 using Knet.Kudu.Client.Util;
 

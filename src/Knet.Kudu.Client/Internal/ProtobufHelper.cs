@@ -9,9 +9,9 @@ using Knet.Kudu.Client.Protobuf.Client;
 using Knet.Kudu.Client.Protobuf.Master;
 using Knet.Kudu.Client.Tablet;
 
-namespace Knet.Kudu.Client.Util
+namespace Knet.Kudu.Client.Internal
 {
-    public static class ProtobufHelper
+    internal static class ProtobufHelper
     {
         public static RowOperationsPB EncodeRowOperations(params PartialRowOperation[] rows)
         {
@@ -280,7 +280,7 @@ namespace Knet.Kudu.Client.Util
 
             while (value > 127)
             {
-                buffer[position++] = (byte)((value & 0x7F) | 0x80);
+                buffer[position++] = (byte)(value & 0x7F | 0x80);
                 value >>= 7;
             }
 

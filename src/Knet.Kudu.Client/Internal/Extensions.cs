@@ -10,9 +10,9 @@ using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protobuf;
 
-namespace Knet.Kudu.Client.Util
+namespace Knet.Kudu.Client.Internal
 {
-    public static class Extensions
+    internal static class Extensions
     {
         public static string ToStringUtf8(this byte[] source) =>
             Encoding.UTF8.GetString(source);
@@ -105,20 +105,15 @@ namespace Knet.Kudu.Client.Util
 
         public static bool GetBit(this byte[] input, int offset, int index)
         {
-            return (input[(int)((uint)offset + ((uint)index / 8))] & (1 << (int)((uint)index % 8))) != 0;
-        }
-
-        public static bool GetBit(this ReadOnlySpan<byte> input, int offset, int index)
-        {
-            return (input[(int)((uint)offset + ((uint)index / 8))] & (1 << (int)((uint)index % 8))) != 0;
+            return (input[(int)((uint)offset + (uint)index / 8)] & 1 << (int)((uint)index % 8)) != 0;
         }
 
         public static void SetBit(this byte[] input, int offset, int index)
         {
-            input[(int)((uint)offset + ((uint)index / 8))] |= (byte)(1 << (int)((uint)index % 8));
+            input[(int)((uint)offset + (uint)index / 8)] |= (byte)(1 << (int)((uint)index % 8));
         }
 
-        internal static ArrayBufferWriter<T> Clone<T>(this ArrayBufferWriter<T> writer)
+        public static ArrayBufferWriter<T> Clone<T>(this ArrayBufferWriter<T> writer)
         {
             var newWriter = new ArrayBufferWriter<T>(writer.Capacity);
             newWriter.Write(writer.WrittenSpan);
@@ -132,7 +127,7 @@ namespace Knet.Kudu.Client.Util
         /// <typeparam name="T">The type of element in the list.</typeparam>
         /// <param name="source">The enumerable to return as a list.</param>
         public static List<T> AsList<T>(this IEnumerable<T> source) =>
-            (source == null || source is List<T>) ? (List<T>)source : source.ToList();
+            source == null || source is List<T> ? (List<T>)source : source.ToList();
 
         public static int GetContentHashCode(this byte[] source)
         {

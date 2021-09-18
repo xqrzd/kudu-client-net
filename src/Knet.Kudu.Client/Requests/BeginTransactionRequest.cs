@@ -1,7 +1,7 @@
 using System.Buffers;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protobuf.Transactions;
 using Knet.Kudu.Client.Protocol;
-using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Requests
 {

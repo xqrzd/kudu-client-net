@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Knet.Kudu.Client.Util
+namespace Knet.Kudu.Client.Internal
 {
     internal static class Netstandard2Extensions
     {

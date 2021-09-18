@@ -3,7 +3,7 @@ using System;
 namespace Knet.Kudu.Client.Internal
 {
     [Flags]
-    public enum KuduTypeFlags
+    internal enum KuduTypeFlags
     {
         Int8 = 1 << KuduType.Int8,
         Int16 = 1 << KuduType.Int16,

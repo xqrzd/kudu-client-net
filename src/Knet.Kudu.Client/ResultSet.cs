@@ -5,7 +5,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protocol;
-using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client
 {

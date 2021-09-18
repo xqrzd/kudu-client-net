@@ -2,8 +2,8 @@ using System;
 using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Tablet;
-using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Scanner
 {

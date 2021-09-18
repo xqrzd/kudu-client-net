@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
 using Knet.Kudu.Client.FunctionalTests.Util;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protobuf.Transactions;
-using Knet.Kudu.Client.Util;
 using McMaster.Extensions.Xunit;
 using Xunit;
 

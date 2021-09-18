@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Internal
 {

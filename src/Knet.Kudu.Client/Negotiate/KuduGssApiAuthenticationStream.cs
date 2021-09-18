@@ -21,8 +21,8 @@ using System.IO;
 using System.Net.Security;
 using System.Threading;
 using System.Threading.Tasks;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protobuf.Rpc;
-using Knet.Kudu.Client.Util;
 using static Knet.Kudu.Client.Protobuf.Rpc.NegotiatePB.Types;
 
 namespace Knet.Kudu.Client.Negotiate

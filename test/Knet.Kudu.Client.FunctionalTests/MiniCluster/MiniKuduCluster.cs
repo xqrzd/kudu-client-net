@@ -10,8 +10,8 @@ using System.Threading.Tasks;
 using Google.Protobuf;
 using Knet.Kudu.Binary;
 using Knet.Kudu.Client.Connection;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protobuf.Tools;
-using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
 {

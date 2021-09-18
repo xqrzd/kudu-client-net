@@ -1,4 +1,4 @@
-namespace Knet.Kudu.Client.Internal
+namespace Knet.Kudu.Client.Util
 {
     public interface ISystemClock
     {

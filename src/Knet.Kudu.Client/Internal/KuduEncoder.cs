@@ -3,8 +3,9 @@ using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using Knet.Kudu.Client.Util;
 
-namespace Knet.Kudu.Client.Util
+namespace Knet.Kudu.Client.Internal
 {
     internal static class KuduEncoder
     {
@@ -293,9 +294,9 @@ namespace Knet.Kudu.Client.Util
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool DecodeBitUnsafe(byte[] source, int startIndex, int index)
         {
-            int offset = (int)((uint)startIndex + ((uint)index / 8));
+            int offset = (int)((uint)startIndex + (uint)index / 8);
             byte value = DecodeUInt8Unsafe(source, offset);
-            return (value & (1 << (int)((uint)index % 8))) != 0;
+            return (value & 1 << (int)((uint)index % 8)) != 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
