@@ -99,9 +99,9 @@ public class Partition : IEquatable<Partition>, IComparable<Partition>
     }
 
     /// <summary>
-    /// Equality only holds for partitions from the same table. Partition equality only takes into
-    /// account the partition keys, since there is a 1 to 1 correspondence between partition keys and
-    /// the hash buckets and range keys.
+    /// Equality only holds for partitions from the same table. Partition equality only takes
+    /// into account the partition keys, since there is a 1 to 1 correspondence between
+    /// partition keys and the hash buckets and range keys.
     /// </summary>
     /// <param name="other">The other partition of the same table.</param>
     public bool Equals(Partition other)
@@ -129,9 +129,9 @@ public class Partition : IEquatable<Partition>, IComparable<Partition>
         PartitionKeyStart.SequenceCompareTo(other.PartitionKeyStart);
 
     /// <summary>
-    /// Equality only holds for partitions from the same table. Partition equality only takes into
-    /// account the partition keys, since there is a 1 to 1 correspondence between partition keys and
-    /// the hash buckets and range keys.
+    /// Equality only holds for partitions from the same table. Partition equality only takes
+    /// into account the partition keys, since there is a 1 to 1 correspondence between
+    /// partition keys and the hash buckets and range keys.
     /// </summary>
     /// <param name="obj">The other partition of the same table.</param>
     public override bool Equals(object obj) => Equals(obj as Partition);

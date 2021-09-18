@@ -117,7 +117,7 @@ public readonly struct KuduInt128 : IEquatable<KuduInt128>, IComparable<KuduInt1
             return a.High >= b.High;
     }
 
-    public static implicit operator KuduInt128(int value) => new KuduInt128(value);
+    public static implicit operator KuduInt128(int value) => new(value);
 
     public static KuduInt128 operator -(KuduInt128 a) => a.Negate();
 
