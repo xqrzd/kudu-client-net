@@ -1223,7 +1223,27 @@ public sealed class KuduClient : IAsyncDisposable
             return new ValueTask<MasterLeaderInfo>(masterLeaderInfo);
         }
 
-        var task = ConnectToClusterAsync(cancellationToken);
+        var task = ConnectAsync(cancellationToken);
+        return new ValueTask<MasterLeaderInfo>(task);
+
+        async Task<MasterLeaderInfo> ConnectAsync(CancellationToken cancellationToken)
+        {
+            var rpc = new ConnectToMasterRequest();
+            await SendRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
+            return _masterLeaderInfo;
+        }
+    }
+
+    private ValueTask<MasterLeaderInfo> TryGetMasterLeaderInfoAsync(
+        CancellationToken cancellationToken)
+    {
+        var masterLeaderInfo = _masterLeaderInfo;
+        if (masterLeaderInfo is not null)
+        {
+            return new ValueTask<MasterLeaderInfo>(masterLeaderInfo);
+        }
+
+        var task = TryConnectToClusterAsync(cancellationToken);
         return new ValueTask<MasterLeaderInfo>(task);
     }
 
@@ -1231,7 +1251,7 @@ public sealed class KuduClient : IAsyncDisposable
     /// Locate the leader master and retrieve the cluster information.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
-    private async Task<MasterLeaderInfo> ConnectToClusterAsync(CancellationToken cancellationToken)
+    private async Task<MasterLeaderInfo> TryConnectToClusterAsync(CancellationToken cancellationToken)
     {
         var masterLeaderInfo = _masterLeaderInfo;
 
@@ -1241,7 +1261,7 @@ public sealed class KuduClient : IAsyncDisposable
             if (ReferenceEquals(masterLeaderInfo, _masterLeaderInfo) ||
                 _masterLeaderInfo is null)
             {
-                var result = await ConnectToClusterWithoutLockAsync(cancellationToken)
+                var result = await TryConnectToClusterWithoutLockAsync(cancellationToken)
                     .ConfigureAwait(false);
 
                 SetMasterLeaderInfo(result);
@@ -1255,7 +1275,7 @@ public sealed class KuduClient : IAsyncDisposable
         return _masterLeaderInfo;
     }
 
-    private async Task<ConnectToClusterResponse> ConnectToClusterWithoutLockAsync(
+    private async Task<ConnectToClusterResponse> TryConnectToClusterWithoutLockAsync(
         CancellationToken cancellationToken)
     {
         var masterAddresses = _options.MasterAddresses;
@@ -1488,7 +1508,7 @@ public sealed class KuduClient : IAsyncDisposable
     private async Task<T> SendRpcToMasterAsync<T>(
         KuduMasterRpc<T> rpc, CancellationToken cancellationToken)
     {
-        var masterLeaderInfo = await GetMasterLeaderInfoAsync(cancellationToken)
+        var masterLeaderInfo = await TryGetMasterLeaderInfoAsync(cancellationToken)
             .ConfigureAwait(false);
 
         var serverInfo = masterLeaderInfo.ServerInfo;
@@ -1500,7 +1520,7 @@ public sealed class KuduClient : IAsyncDisposable
     private async Task<T> SendRpcToTxnAsync<T>(
         KuduTxnRpc<T> rpc, CancellationToken cancellationToken)
     {
-        var masterLeaderInfo = await GetMasterLeaderInfoAsync(cancellationToken)
+        var masterLeaderInfo = await TryGetMasterLeaderInfoAsync(cancellationToken)
             .ConfigureAwait(false);
 
         var serverInfo = masterLeaderInfo.ServerInfo;
