@@ -118,9 +118,12 @@ public class FlexiblePartitioningTests : IAsyncLifetime
         var rows = CreateRows();
         await InsertRowsAsync(table, rows);
 
+        var tableScanner = _client.NewScanBuilder(table)
+            .SetReadMode(ReadMode.ReadYourWrites)
+            .Build();
+
         // Full table scan
-        Assert.Equal(rows, await CollectRowsAsync(
-            _client.NewScanBuilder(table).Build()));
+        Assert.Equal(rows, await CollectRowsAsync(tableScanner));
 
         { // Lower bound
             var minRow = new Row("1", "3", "5");
@@ -132,11 +135,14 @@ public class FlexiblePartitioningTests : IAsyncLifetime
                 .ToHashSet();
 
             var scanner = _client.NewScanBuilder(table)
-                .LowerBound(lowerBound).Build();
+                .SetReadMode(ReadMode.ReadYourWrites)
+                .LowerBound(lowerBound)
+                .Build();
             var results = await CollectRowsAsync(scanner);
             Assert.Equal(expected, results);
 
             var scanTokenBuilder = _client.NewScanTokenBuilder(table)
+                .SetReadMode(ReadMode.ReadYourWrites)
                 .LowerBound(lowerBound);
             var tokenResults = await CollectRowsAsync(scanTokenBuilder);
             Assert.Equal(expected, tokenResults);
@@ -152,11 +158,14 @@ public class FlexiblePartitioningTests : IAsyncLifetime
                 .ToHashSet();
 
             var scanner = _client.NewScanBuilder(table)
-                .ExclusiveUpperBound(upperBound).Build();
+                .SetReadMode(ReadMode.ReadYourWrites)
+                .ExclusiveUpperBound(upperBound)
+                .Build();
             var results = await CollectRowsAsync(scanner);
             Assert.Equal(expected, results);
 
             var scanTokenBuilder = _client.NewScanTokenBuilder(table)
+                .SetReadMode(ReadMode.ReadYourWrites)
                 .ExclusiveUpperBound(upperBound);
             var tokenResults = await CollectRowsAsync(scanTokenBuilder);
             Assert.Equal(expected, tokenResults);
@@ -175,6 +184,7 @@ public class FlexiblePartitioningTests : IAsyncLifetime
                 .ToHashSet();
 
             var scanner = _client.NewScanBuilder(table)
+                .SetReadMode(ReadMode.ReadYourWrites)
                 .LowerBound(lowerBound)
                 .ExclusiveUpperBound(upperBound)
                 .Build();
@@ -183,6 +193,7 @@ public class FlexiblePartitioningTests : IAsyncLifetime
             Assert.Equal(expected, results);
 
             var scanTokenBuilder = _client.NewScanTokenBuilder(table)
+                .SetReadMode(ReadMode.ReadYourWrites)
                 .LowerBound(lowerBound)
                 .ExclusiveUpperBound(upperBound);
             var tokenResults = await CollectRowsAsync(scanTokenBuilder);
@@ -198,6 +209,7 @@ public class FlexiblePartitioningTests : IAsyncLifetime
             foreach (var tablet in tablets)
             {
                 var scanner = _client.NewScanBuilder(table)
+                    .SetReadMode(ReadMode.ReadYourWrites)
                     .LowerBoundPartitionKeyRaw(tablet.Partition.PartitionKeyStart)
                     .ExclusiveUpperBoundPartitionKeyRaw(tablet.Partition.PartitionKeyEnd)
                     .Build();
@@ -227,6 +239,7 @@ public class FlexiblePartitioningTests : IAsyncLifetime
             foreach (var tablet in tablets)
             {
                 var scanner = _client.NewScanBuilder(table)
+                    .SetReadMode(ReadMode.ReadYourWrites)
                     .LowerBound(lowerBound)
                     .ExclusiveUpperBound(upperBound)
                     .LowerBoundPartitionKeyRaw(tablet.Partition.PartitionKeyStart)

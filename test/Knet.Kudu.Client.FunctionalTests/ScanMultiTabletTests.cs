@@ -14,7 +14,7 @@ public class ScanMultiTabletTests : IAsyncLifetime
     private readonly string _tableName = "ScanMultiTabletTests";
     private KuduTestHarness _harness;
     private KuduClient _client;
-    private IKuduSession _session;
+    private KuduClient _newClient;
 
     private KuduTable _table;
     private KuduSchema _schema;
@@ -27,9 +27,8 @@ public class ScanMultiTabletTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         _harness = await new MiniKuduClusterBuilder().BuildHarnessAsync();
-
-        await using var client = _harness.CreateClient();
-        await using var session = client.NewSession();
+        _client = _harness.CreateClient();
+        await using var session = _client.NewSession();
 
         // Create a 4-tablets table for scanning.
         var builder = new TableBuilder(_tableName)
@@ -47,7 +46,7 @@ public class ScanMultiTabletTests : IAsyncLifetime
             });
         }
 
-        var table = await client.CreateTableAsync(builder);
+        var table = await _client.CreateTableAsync(builder);
 
         // The data layout ends up like this:
         // tablet '', '1': no rows
@@ -68,24 +67,23 @@ public class ScanMultiTabletTests : IAsyncLifetime
             }
         }
 
-        _beforeWriteTimestamp = client.LastPropagatedTimestamp;
+        _beforeWriteTimestamp = _client.LastPropagatedTimestamp;
 
         // Reset the client in order to clear the propagated timestamp.
-        _client = _harness.CreateClient();
-        _session = _client.NewSession();
+        _newClient = _harness.CreateClient();
 
         // Reopen the table using the new client.
-        _table = await _client.OpenTableAsync(_tableName);
+        _table = await _newClient.OpenTableAsync(_tableName);
         _schema = _table.Schema;
     }
 
     public async Task DisposeAsync()
     {
-        if (_session != null)
-            await _session.DisposeAsync();
-
-        if (_client != null)
+        if (_client is not null)
             await _client.DisposeAsync();
+
+        if (_newClient is not null)
+            await _newClient.DisposeAsync();
 
         await _harness.DisposeAsync();
     }
@@ -149,7 +147,7 @@ public class ScanMultiTabletTests : IAsyncLifetime
             GetScanner(null, null, null, null))); // Full table scan with empty bounds
 
         // Test that we can close a scanner while in between two tablets. We start on
-        // the second tablet and our first nextRows() will get 3 rows. At that moment
+        // the second tablet and our first ResultSet will get 3 rows. At that moment
         // we want to close the scanner before getting on the 3rd tablet.
         var scanner = GetScanner("1", "", null, null);
         var scanEnumerator = scanner.GetAsyncEnumerator();
@@ -212,33 +210,33 @@ public class ScanMultiTabletTests : IAsyncLifetime
     }
 
     [SkippableFact]
-    public async Task TestProjections()
+    public void TestProjections()
     {
         // Test with column names.
-        var builder = _client.NewScanBuilder(_table)
+        var builder = _newClient.NewScanBuilder(_table)
             .SetProjectedColumns("key1", "key2");
-        await BuildScannerAndCheckColumnsCountAsync(builder, "key1", "key2");
+        BuildScannerAndCheckColumnsCount(builder, "key1", "key2");
 
         // Test with column indexes.
-        builder = _client.NewScanBuilder(_table)
+        builder = _newClient.NewScanBuilder(_table)
             .SetProjectedColumns(0, 1);
-        await BuildScannerAndCheckColumnsCountAsync(builder, "key1", "key2");
+        BuildScannerAndCheckColumnsCount(builder, "key1", "key2");
 
         // Test with column names overriding indexes.
-        builder = _client.NewScanBuilder(_table)
+        builder = _newClient.NewScanBuilder(_table)
            .SetProjectedColumns(0, 1)
            .SetProjectedColumns("key1");
-        await BuildScannerAndCheckColumnsCountAsync(builder, "key1");
+        BuildScannerAndCheckColumnsCount(builder, "key1");
 
         // Test with keys last with indexes.
-        builder = _client.NewScanBuilder(_table)
+        builder = _newClient.NewScanBuilder(_table)
            .SetProjectedColumns(2, 1, 0);
-        await BuildScannerAndCheckColumnsCountAsync(builder, "val", "key2", "key1");
+        BuildScannerAndCheckColumnsCount(builder, "val", "key2", "key1");
 
         // Test with keys last with column names.
-        builder = _client.NewScanBuilder(_table)
+        builder = _newClient.NewScanBuilder(_table)
            .SetProjectedColumns("val", "key1");
-        await BuildScannerAndCheckColumnsCountAsync(builder, "val", "key1");
+        BuildScannerAndCheckColumnsCount(builder, "val", "key1");
     }
 
     [SkippableTheory]
@@ -246,34 +244,39 @@ public class ScanMultiTabletTests : IAsyncLifetime
     [InlineData(ReplicaSelection.ClosestReplica)]
     public async Task TestReplicaSelections(ReplicaSelection replicaSelection)
     {
-        var scanner = _client.NewScanBuilder(_table)
+        var scanner = _newClient.NewScanBuilder(_table)
             .SetReplicaSelection(replicaSelection)
             .Build();
 
-        Assert.Equal(9, await ClientTestUtil.CountRowsInScanAsync(scanner));
+        await ClientTestUtil.WaitUntilRowCountAsync(scanner, 9);
     }
 
     [SkippableFact]
     public async Task TestScanTokenReplicaSelections()
     {
-        var tokens = await _client.NewScanTokenBuilder(_table)
+        var tokens = await _newClient.NewScanTokenBuilder(_table)
             .SetReplicaSelection(ReplicaSelection.ClosestReplica)
             .BuildAsync();
 
-        long totalRows = 0;
-
-        foreach (var token in tokens)
+        var totalRows = await ClientTestUtil.WaitUntilAsync(rows => rows == 9, async () =>
         {
-            var serializedToken = token.Serialize();
+            long rows = 0;
 
-            // Deserialize the scan token into a scanner, and make sure it is using
-            // 'CLOSEST_REPLICA' selection policy.
-            var scanBuilder = await _client.NewScanBuilderFromTokenAsync(serializedToken);
-            var scanner = scanBuilder.Build();
+            foreach (var token in tokens)
+            {
+                var serializedToken = token.Serialize();
 
-            Assert.Equal(ReplicaSelection.ClosestReplica, scanner.ReplicaSelection);
-            totalRows += await ClientTestUtil.CountRowsInScanAsync(scanner);
-        }
+                // Deserialize the scan token into a scanner, and make sure it is using
+                // 'CLOSEST_REPLICA' selection policy.
+                var scanBuilder = await _newClient.NewScanBuilderFromTokenAsync(serializedToken);
+                var scanner = scanBuilder.Build();
+
+                Assert.Equal(ReplicaSelection.ClosestReplica, scanner.ReplicaSelection);
+                rows += await ClientTestUtil.CountRowsInScanAsync(scanner);
+            }
+
+            return rows;
+        });
 
         Assert.Equal(9, totalRows);
     }
@@ -285,7 +288,7 @@ public class ScanMultiTabletTests : IAsyncLifetime
         // specified. Verify that the scanner timestamp is set from the tablet
         // server response.
 
-        var scanner = _client.NewScanBuilder(_table)
+        var scanner = _newClient.NewScanBuilder(_table)
             .SetReadMode(ReadMode.ReadAtSnapshot)
             .Build();
 
@@ -320,14 +323,14 @@ public class ScanMultiTabletTests : IAsyncLifetime
     {
         // Perform scan in READ_YOUR_WRITES mode. Before the scan, verify that the
         // propagated timestamp is unset, since this is a fresh client.
-        var scanner = _client.NewScanBuilder(_table)
+        var scanner = _newClient.NewScanBuilder(_table)
             .SetReadMode(ReadMode.ReadYourWrites)
             .Build();
 
         await using var scanEnumerator = scanner.GetAsyncEnumerator();
 
         Assert.Equal(ReadMode.ReadYourWrites, scanner.ReadMode);
-        Assert.Equal(KuduClient.NoTimestamp, _client.LastPropagatedTimestamp);
+        Assert.Equal(KuduClient.NoTimestamp, _newClient.LastPropagatedTimestamp);
         Assert.Equal(KuduClient.NoTimestamp, scanEnumerator.SnapshotTimestamp);
 
         // Since there isn't any write performed from the client, the count
@@ -341,7 +344,7 @@ public class ScanMultiTabletTests : IAsyncLifetime
         Assert.True(count >= 0);
         Assert.True(count <= 9);
 
-        Assert.NotEqual(KuduClient.NoTimestamp, _client.LastPropagatedTimestamp);
+        Assert.NotEqual(KuduClient.NoTimestamp, _newClient.LastPropagatedTimestamp);
         Assert.NotEqual(KuduClient.NoTimestamp, scanEnumerator.SnapshotTimestamp);
     }
 
@@ -352,12 +355,12 @@ public class ScanMultiTabletTests : IAsyncLifetime
 
         // Update the propagated timestamp to ensure we see the rows written
         // in the constructor.
-        _client.LastPropagatedTimestamp = preTs;
+        _newClient.LastPropagatedTimestamp = preTs;
 
         // Perform scan in READ_YOUR_WRITES mode. Before the scan, verify that the
         // scanner timestamp is not yet set. It will get set only once the scan
         // is opened.
-        var scanner = _client.NewScanBuilder(_table)
+        var scanner = _newClient.NewScanBuilder(_table)
             .SetReadMode(ReadMode.ReadYourWrites)
             .Build();
 
@@ -390,12 +393,12 @@ public class ScanMultiTabletTests : IAsyncLifetime
             return insert;
         });
 
-        await _client.WriteAsync(rows);
+        await _newClient.WriteAsync(rows);
 
         scanEnumerator = scanner.GetAsyncEnumerator();
 
-        Assert.True(preTs < _client.LastPropagatedTimestamp);
-        preTs = _client.LastPropagatedTimestamp;
+        Assert.True(preTs < _newClient.LastPropagatedTimestamp);
+        preTs = _newClient.LastPropagatedTimestamp;
 
         count = 0;
         while (await scanEnumerator.MoveNextAsync())
@@ -416,9 +419,9 @@ public class ScanMultiTabletTests : IAsyncLifetime
     public async Task TestScanPropagatesLatestTimestamp()
     {
         // Initially, the client does not have the timestamp set.
-        Assert.Equal(KuduClient.NoTimestamp, _client.LastPropagatedTimestamp);
+        Assert.Equal(KuduClient.NoTimestamp, _newClient.LastPropagatedTimestamp);
 
-        var scanner = _client.NewScanBuilder(_table).Build();
+        var scanner = _newClient.NewScanBuilder(_table).Build();
         var scanEnumerator = scanner.GetAsyncEnumerator();
 
         Assert.True(await scanEnumerator.MoveNextAsync());
@@ -427,13 +430,13 @@ public class ScanMultiTabletTests : IAsyncLifetime
         // At this point, the call to the first tablet server should have been
         // done already, so the client should have received the propagated timestamp
         // in the scanner response.
-        long tsRef = _client.LastPropagatedTimestamp;
+        long tsRef = _newClient.LastPropagatedTimestamp;
         Assert.NotEqual(KuduClient.NoTimestamp, tsRef);
 
         while (await scanEnumerator.MoveNextAsync())
         {
             rowCount += scanEnumerator.Current.Count;
-            var ts = _client.LastPropagatedTimestamp;
+            var ts = _newClient.LastPropagatedTimestamp;
 
             // Next scan responses from tablet servers should move the propagated
             // timestamp further.
@@ -448,14 +451,14 @@ public class ScanMultiTabletTests : IAsyncLifetime
     public async Task TestScanTokenPropagatesTimestamp()
     {
         // Initially, the client does not have the timestamp set.
-        Assert.Equal(KuduClient.NoTimestamp, _client.LastPropagatedTimestamp);
+        Assert.Equal(KuduClient.NoTimestamp, _newClient.LastPropagatedTimestamp);
 
-        var scanner = _client.NewScanBuilder(_table).Build();
+        var scanner = _newClient.NewScanBuilder(_table).Build();
         await using var scanEnumerator = scanner.GetAsyncEnumerator();
 
         // Let the client receive the propagated timestamp in the scanner response.
         Assert.True(await scanEnumerator.MoveNextAsync());
-        var tsPrev = _client.LastPropagatedTimestamp;
+        var tsPrev = _newClient.LastPropagatedTimestamp;
         var tsPropagated = tsPrev + 1000000;
 
         var tokenPb = new ScanTokenPB
@@ -469,18 +472,18 @@ public class ScanMultiTabletTests : IAsyncLifetime
 
         // Deserialize scan tokens and make sure the client's last propagated
         // timestamp is updated accordingly.
-        Assert.Equal(tsPrev, _client.LastPropagatedTimestamp);
+        Assert.Equal(tsPrev, _newClient.LastPropagatedTimestamp);
 
-        var scanBuilder = await _client.NewScanBuilderFromTokenAsync(serializedToken);
+        var scanBuilder = await _newClient.NewScanBuilderFromTokenAsync(serializedToken);
         var tokenScanner = scanBuilder.Build();
 
-        Assert.Equal(tsPropagated, _client.LastPropagatedTimestamp);
+        Assert.Equal(tsPropagated, _newClient.LastPropagatedTimestamp);
     }
 
     [SkippableFact]
     public async Task TestScanTokenReadMode()
     {
-        var tokens = await _client.NewScanTokenBuilder(_table)
+        var tokens = await _newClient.NewScanTokenBuilder(_table)
             .SetReadMode(ReadMode.ReadYourWrites)
             .BuildAsync();
 
@@ -489,7 +492,7 @@ public class ScanMultiTabletTests : IAsyncLifetime
         // Deserialize scan tokens and make sure the read mode is updated accordingly.
         foreach (var token in tokens)
         {
-            var scanBuilder = await _client.NewScanBuilderFromTokenAsync(token);
+            var scanBuilder = await _newClient.NewScanBuilderFromTokenAsync(token);
             var scanner = scanBuilder.Build();
 
             Assert.Equal(ReadMode.ReadYourWrites, scanner.ReadMode);
@@ -503,7 +506,8 @@ public class ScanMultiTabletTests : IAsyncLifetime
         string exclusiveUpperBoundKeyTwo,
         params KuduPredicate[] predicates)
     {
-        var builder = _client.NewScanBuilder(_table);
+        var builder = _client.NewScanBuilder(_table)
+            .SetReadMode(ReadMode.ReadYourWrites);
 
         if (lowerBoundKeyOne != null)
         {
@@ -527,16 +531,11 @@ public class ScanMultiTabletTests : IAsyncLifetime
         return builder.Build();
     }
 
-    private static async Task BuildScannerAndCheckColumnsCountAsync(
+    private static void BuildScannerAndCheckColumnsCount(
         KuduScannerBuilder builder, params string[] expectedColumnNames)
     {
         var scanner = builder.Build();
-        KuduSchema schema = null;
-
-        await foreach (var resultSet in scanner)
-        {
-            schema = resultSet.Schema;
-        }
+        var schema = scanner.ProjectionSchema;
 
         Assert.Equal(
             expectedColumnNames,

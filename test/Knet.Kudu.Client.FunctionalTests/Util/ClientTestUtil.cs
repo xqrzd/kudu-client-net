@@ -188,7 +188,10 @@ public static class ClientTestUtil
 
     public static Task<long> CountRowsAsync(KuduClient client, KuduTable table)
     {
-        var scanner = client.NewScanBuilder(table).Build();
+        var scanner = client.NewScanBuilder(table)
+            .SetReadMode(ReadMode.ReadYourWrites)
+            .SetReplicaSelection(ReplicaSelection.LeaderOnly)
+            .Build();
         return CountRowsInScanAsync(scanner);
     }
 
@@ -216,7 +219,9 @@ public static class ClientTestUtil
         KuduClient client, KuduTable table, params KuduPredicate[] predicates)
     {
         var rowStrings = new List<string>();
-        var scanBuilder = client.NewScanBuilder(table);
+        var scanBuilder = client.NewScanBuilder(table)
+            .SetReadMode(ReadMode.ReadYourWrites)
+            .SetReplicaSelection(ReplicaSelection.LeaderOnly);
 
         foreach (var predicate in predicates)
             scanBuilder.AddPredicate(predicate);
@@ -241,14 +246,12 @@ public static class ClientTestUtil
         return rowStrings;
     }
 
-    public static async Task WaitUntilRowCountAsync(
-        KuduClient client, KuduTable table, int rowCount)
+    public static async Task WaitUntilRowCountAsync(KuduScanner scanner, int rowCount)
     {
         long readCount = 0;
 
         for (int i = 0; i < 10; i++)
         {
-            var scanner = client.NewScanBuilder(table).Build();
             readCount = await CountRowsInScanAsync(scanner);
 
             if (readCount == rowCount)
@@ -258,5 +261,22 @@ public static class ClientTestUtil
         }
 
         Assert.Equal(rowCount, readCount);
+    }
+
+    public static async Task<T> WaitUntilAsync<T>(Func<T, bool> predicate, Func<Task<T>> action)
+    {
+        T result = default;
+
+        for (int i = 0; i < 10; i++)
+        {
+            result = await action();
+
+            if (predicate(result))
+                return result;
+
+            await Task.Delay(TimeSpan.FromSeconds(1));
+        }
+
+        return result;
     }
 }
