@@ -124,7 +124,10 @@ public class ScannerTests
 
         await session.FlushAsync();
 
-        var scanner = client.NewScanBuilder(table).Build();
+        var scanner = client.NewScanBuilder(table)
+            .SetReadMode(ReadMode.ReadYourWrites)
+            .SetReplicaSelection(ReplicaSelection.LeaderOnly)
+            .Build();
 
         await foreach (var resultSet in scanner)
         {
@@ -174,9 +177,9 @@ public class ScannerTests
             .Select(i => ClientTestUtil.CreateBasicSchemaInsert(table, i));
 
         await client.WriteAsync(rows);
-        await ClientTestUtil.WaitUntilRowCountAsync(client, table, numRows);
 
         var scanner = client.NewScanBuilder(table)
+            .SetReadMode(ReadMode.ReadYourWrites)
             .SetReplicaSelection(ReplicaSelection.ClosestReplica)
             .SetBatchSizeBytes(100) // Use a small batch size so we get many batches.
             .Build();
@@ -311,6 +314,7 @@ public class ScannerTests
         var scanner = client.NewScanBuilder(table)
             // Set a small batch size so the first scan doesn't read all the rows.
             .SetBatchSizeBytes(100)
+            .SetReadMode(ReadMode.ReadYourWrites)
             .Build();
 
         long rowsScanned = 0;

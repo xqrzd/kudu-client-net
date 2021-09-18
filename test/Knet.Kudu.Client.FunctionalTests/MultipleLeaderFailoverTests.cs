@@ -45,7 +45,9 @@ public class MultipleLeaderFailoverTests
         }
 
         await session.FlushAsync();
-        await ClientTestUtil.WaitUntilRowCountAsync(client, table, rowsPerIteration);
+
+        var rowCount = await ClientTestUtil.CountRowsAsync(client, table);
+        Assert.Equal(rowsPerIteration, rowCount);
 
         int currentRows = rowsPerIteration;
         for (int i = 0; i < numIterations; i++)
@@ -71,9 +73,11 @@ public class MultipleLeaderFailoverTests
             if (!restart)
                 await harness.StartAllTabletServersAsync();
 
-            await ClientTestUtil.WaitUntilRowCountAsync(client, table, currentRows);
+            rowCount = await ClientTestUtil.CountRowsAsync(client, table);
+            Assert.Equal(currentRows, rowCount);
         }
 
-        await ClientTestUtil.WaitUntilRowCountAsync(client, table, totalRowsToInsert);
+        rowCount = await ClientTestUtil.CountRowsAsync(client, table);
+        Assert.Equal(totalRowsToInsert, rowCount);
     }
 }

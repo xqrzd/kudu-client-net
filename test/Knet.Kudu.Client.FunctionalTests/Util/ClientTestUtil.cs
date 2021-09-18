@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Xunit;
 
 namespace Knet.Kudu.Client.FunctionalTests.Util;
 
@@ -188,7 +187,10 @@ public static class ClientTestUtil
 
     public static Task<long> CountRowsAsync(KuduClient client, KuduTable table)
     {
-        var scanner = client.NewScanBuilder(table).Build();
+        var scanner = client.NewScanBuilder(table)
+            .SetReadMode(ReadMode.ReadYourWrites)
+            .SetReplicaSelection(ReplicaSelection.LeaderOnly)
+            .Build();
         return CountRowsInScanAsync(scanner);
     }
 
@@ -216,7 +218,9 @@ public static class ClientTestUtil
         KuduClient client, KuduTable table, params KuduPredicate[] predicates)
     {
         var rowStrings = new List<string>();
-        var scanBuilder = client.NewScanBuilder(table);
+        var scanBuilder = client.NewScanBuilder(table)
+            .SetReadMode(ReadMode.ReadYourWrites)
+            .SetReplicaSelection(ReplicaSelection.LeaderOnly);
 
         foreach (var predicate in predicates)
             scanBuilder.AddPredicate(predicate);
@@ -239,24 +243,5 @@ public static class ClientTestUtil
         rowStrings.Sort();
 
         return rowStrings;
-    }
-
-    public static async Task WaitUntilRowCountAsync(
-        KuduClient client, KuduTable table, int rowCount)
-    {
-        long readCount = 0;
-
-        for (int i = 0; i < 10; i++)
-        {
-            var scanner = client.NewScanBuilder(table).Build();
-            readCount = await CountRowsInScanAsync(scanner);
-
-            if (readCount == rowCount)
-                return;
-
-            await Task.Delay(TimeSpan.FromSeconds(1));
-        }
-
-        Assert.Equal(rowCount, readCount);
     }
 }
