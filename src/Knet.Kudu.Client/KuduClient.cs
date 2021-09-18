@@ -1238,7 +1238,7 @@ public sealed class KuduClient : IAsyncDisposable
     /// Locate the leader master and retrieve the cluster information.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
-    private async Task<MasterLeaderInfo> TryConnectToClusterAsync(CancellationToken cancellationToken)
+    private async Task<MasterLeaderInfo> ConnectToClusterAsync(CancellationToken cancellationToken)
     {
         var masterLeaderInfo = _masterLeaderInfo;
 
@@ -1248,7 +1248,7 @@ public sealed class KuduClient : IAsyncDisposable
             if (ReferenceEquals(masterLeaderInfo, _masterLeaderInfo) ||
                 _masterLeaderInfo is null)
             {
-                var result = await TryConnectToClusterWithoutLockAsync(cancellationToken)
+                var result = await ConnectToClusterWithoutLockAsync(cancellationToken)
                     .ConfigureAwait(false);
 
                 SetMasterLeaderInfo(result);
@@ -1262,7 +1262,7 @@ public sealed class KuduClient : IAsyncDisposable
         return _masterLeaderInfo;
     }
 
-    private async Task<ConnectToClusterResponse> TryConnectToClusterWithoutLockAsync(
+    private async Task<ConnectToClusterResponse> ConnectToClusterWithoutLockAsync(
         CancellationToken cancellationToken)
     {
         var masterAddresses = _options.MasterAddresses;
@@ -1492,41 +1492,50 @@ public sealed class KuduClient : IAsyncDisposable
         }
     }
 
-    private ValueTask<MasterLeaderInfo> TryGetMasterLeaderInfoAsync(
-        CancellationToken cancellationToken)
+    private Task<T> SendRpcToMasterAsync<T>(
+        KuduMasterRpc<T> rpc, CancellationToken cancellationToken)
     {
         var masterLeaderInfo = _masterLeaderInfo;
         if (masterLeaderInfo is not null)
         {
-            return new ValueTask<MasterLeaderInfo>(masterLeaderInfo);
+            var serverInfo = masterLeaderInfo.ServerInfo;
+            return SendRpcToMasterAsync(rpc, serverInfo, cancellationToken);
         }
 
-        var task = TryConnectToClusterAsync(cancellationToken);
-        return new ValueTask<MasterLeaderInfo>(task);
+        return SendAsync(rpc, cancellationToken);
+
+        async Task<T> SendAsync(KuduMasterRpc<T> rpc, CancellationToken cancellationToken)
+        {
+            var masterLeaderInfo = await ConnectToClusterAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            var serverInfo = masterLeaderInfo.ServerInfo;
+            return await SendRpcToMasterAsync(rpc, serverInfo, cancellationToken)
+                .ConfigureAwait(false);
+        }
     }
 
-    private async Task<T> SendRpcToMasterAsync<T>(
-        KuduMasterRpc<T> rpc, CancellationToken cancellationToken)
-    {
-        var masterLeaderInfo = await TryGetMasterLeaderInfoAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-        var serverInfo = masterLeaderInfo.ServerInfo;
-
-        return await SendRpcToMasterAsync(rpc, serverInfo, cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    private async Task<T> SendRpcToTxnManagerAsync<T>(
+    private Task<T> SendRpcToTxnManagerAsync<T>(
         KuduTxnRpc<T> rpc, CancellationToken cancellationToken)
     {
-        var masterLeaderInfo = await TryGetMasterLeaderInfoAsync(cancellationToken)
-            .ConfigureAwait(false);
+        var masterLeaderInfo = _masterLeaderInfo;
+        if (masterLeaderInfo is not null)
+        {
+            var serverInfo = masterLeaderInfo.ServerInfo;
+            return SendRpcToTxnManagerAsync(rpc, serverInfo, cancellationToken);
+        }
 
-        var serverInfo = masterLeaderInfo.ServerInfo;
+        return SendAsync(rpc, cancellationToken);
 
-        return await SendRpcToTxnManagerAsync(rpc, serverInfo, cancellationToken)
-            .ConfigureAwait(false);
+        async Task<T> SendAsync(KuduTxnRpc<T> rpc, CancellationToken cancellationToken)
+        {
+            var masterLeaderInfo = await ConnectToClusterAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            var serverInfo = masterLeaderInfo.ServerInfo;
+            return await SendRpcToTxnManagerAsync(rpc, serverInfo, cancellationToken)
+                .ConfigureAwait(false);
+        }
     }
 
     /// <summary>
