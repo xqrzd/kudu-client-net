@@ -4,42 +4,41 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Knet.Kudu.Client.Internal
+namespace Knet.Kudu.Client.Internal;
+
+internal sealed class PeriodicTimer : IDisposable
 {
-    internal sealed class PeriodicTimer : IDisposable
+    private readonly TimeSpan _period;
+    private readonly CancellationTokenSource _stoppingCts;
+
+    public PeriodicTimer(TimeSpan period)
     {
-        private readonly TimeSpan _period;
-        private readonly CancellationTokenSource _stoppingCts;
+        _period = period;
+        _stoppingCts = new CancellationTokenSource();
+    }
 
-        public PeriodicTimer(TimeSpan period)
+    public void Dispose()
+    {
+        _stoppingCts.Cancel();
+    }
+
+    public async ValueTask<bool> WaitForNextTickAsync()
+    {
+        var token = _stoppingCts.Token;
+
+        if (token.IsCancellationRequested)
         {
-            _period = period;
-            _stoppingCts = new CancellationTokenSource();
+            return false;
         }
 
-        public void Dispose()
+        try
         {
-            _stoppingCts.Cancel();
+            await Task.Delay(_period, token).ConfigureAwait(false);
+            return true;
         }
-
-        public async ValueTask<bool> WaitForNextTickAsync()
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
-            var token = _stoppingCts.Token;
-
-            if (token.IsCancellationRequested)
-            {
-                return false;
-            }
-
-            try
-            {
-                await Task.Delay(_period, token).ConfigureAwait(false);
-                return true;
-            }
-            catch (OperationCanceledException) when (token.IsCancellationRequested)
-            {
-                return false;
-            }
+            return false;
         }
     }
 }

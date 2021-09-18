@@ -1,14 +1,13 @@
 using Knet.Kudu.Client.Protobuf.Transactions;
 
-namespace Knet.Kudu.Client.Requests
-{
-    internal abstract class KuduTxnRpc<T> : KuduRpc<T>
-    {
-        public TxnManagerErrorPB Error { get; protected set; }
+namespace Knet.Kudu.Client.Requests;
 
-        public KuduTxnRpc()
-        {
-            ServiceName = TxnManagerServiceName;
-        }
+internal abstract class KuduTxnRpc<T> : KuduRpc<T>
+{
+    public TxnManagerErrorPB Error { get; protected set; }
+
+    public KuduTxnRpc()
+    {
+        ServiceName = TxnManagerServiceName;
     }
 }

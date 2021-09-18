@@ -2,31 +2,30 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Knet.Kudu.Client.Exceptions
+namespace Knet.Kudu.Client.Exceptions;
+
+/// <summary>
+/// An exception that indicates the overall write operation succeeded,
+/// but individual rows failed, such as inserting a row that already
+/// exists, or updating or deleting a row that doesn't exist.
+/// </summary>
+public class KuduWriteException : KuduException
 {
-    /// <summary>
-    /// An exception that indicates the overall write operation succeeded,
-    /// but individual rows failed, such as inserting a row that already
-    /// exists, or updating or deleting a row that doesn't exist.
-    /// </summary>
-    public class KuduWriteException : KuduException
+    public IReadOnlyList<KuduStatus> PerRowErrors { get; }
+
+    public KuduWriteException(List<KuduStatus> errors)
+        : base(GetStatus(errors))
     {
-        public IReadOnlyList<KuduStatus> PerRowErrors { get; }
+        PerRowErrors = errors;
+    }
 
-        public KuduWriteException(List<KuduStatus> errors)
-            : base(GetStatus(errors))
+    private static KuduStatus GetStatus(List<KuduStatus> errors)
+    {
+        var stringBuilder = new StringBuilder("Per row errors:");
+        foreach (var error in errors)
         {
-            PerRowErrors = errors;
+            stringBuilder.Append($"{Environment.NewLine}{error.Message}");
         }
-
-        private static KuduStatus GetStatus(List<KuduStatus> errors)
-        {
-            var stringBuilder = new StringBuilder("Per row errors:");
-            foreach (var error in errors)
-            {
-                stringBuilder.Append($"{Environment.NewLine}{error.Message}");
-            }
-            return KuduStatus.InvalidArgument(stringBuilder.ToString());
-        }
+        return KuduStatus.InvalidArgument(stringBuilder.ToString());
     }
 }

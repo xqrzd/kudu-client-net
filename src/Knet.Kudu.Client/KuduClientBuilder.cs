@@ -7,102 +7,101 @@ using Knet.Kudu.Client.Util;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace Knet.Kudu.Client
+namespace Knet.Kudu.Client;
+
+public class KuduClientBuilder
 {
-    public class KuduClientBuilder
+    private readonly IReadOnlyList<HostAndPort> _masterAddresses;
+    private ILoggerFactory _loggerFactory = NullLoggerFactory.Instance;
+    private TimeSpan _defaultOperationTimeout = TimeSpan.FromSeconds(30);
+    private string _saslProtocolName = "kudu";
+    private PipeOptions _sendPipeOptions;
+    private PipeOptions _receivePipeOptions;
+
+    public KuduClientBuilder(string masterAddresses)
     {
-        private readonly IReadOnlyList<HostAndPort> _masterAddresses;
-        private ILoggerFactory _loggerFactory = NullLoggerFactory.Instance;
-        private TimeSpan _defaultOperationTimeout = TimeSpan.FromSeconds(30);
-        private string _saslProtocolName = "kudu";
-        private PipeOptions _sendPipeOptions;
-        private PipeOptions _receivePipeOptions;
+        var masters = masterAddresses.Split(',');
+        var results = new List<HostAndPort>(masters.Length);
 
-        public KuduClientBuilder(string masterAddresses)
+        foreach (var master in masters)
         {
-            var masters = masterAddresses.Split(',');
-            var results = new List<HostAndPort>(masters.Length);
-
-            foreach (var master in masters)
-            {
-                var hostPort = EndpointParser.TryParse(master.Trim(), 7051);
-                results.Add(hostPort);
-            }
-
-            _masterAddresses = results;
+            var hostPort = EndpointParser.TryParse(master.Trim(), 7051);
+            results.Add(hostPort);
         }
 
-        public KuduClientBuilder(IReadOnlyList<HostAndPort> masterAddresses)
-        {
-            _masterAddresses = masterAddresses;
-        }
+        _masterAddresses = results;
+    }
 
-        public KuduClientBuilder SetLoggerFactory(ILoggerFactory loggerFactory)
-        {
-            _loggerFactory = loggerFactory;
-            return this;
-        }
+    public KuduClientBuilder(IReadOnlyList<HostAndPort> masterAddresses)
+    {
+        _masterAddresses = masterAddresses;
+    }
 
-        public KuduClientBuilder SetDefaultOperationTimeout(TimeSpan timeout)
-        {
-            _defaultOperationTimeout = timeout;
-            return this;
-        }
+    public KuduClientBuilder SetLoggerFactory(ILoggerFactory loggerFactory)
+    {
+        _loggerFactory = loggerFactory;
+        return this;
+    }
 
-        /// <summary>
-        /// <para>
-        /// Set the SASL protocol name. SASL protocol name is used when connecting
-        /// to a secure (Kerberos-enabled) cluster. It must match the servers'
-        /// service principal name (SPN).
-        /// </para>
-        /// <para>
-        /// If not provided, it will use the default SASL protocol name ("kudu").
-        /// </para>
-        /// </summary>
-        public KuduClientBuilder SetSaslProtocolName(string saslProtocolName)
-        {
-            _saslProtocolName = saslProtocolName;
-            return this;
-        }
+    public KuduClientBuilder SetDefaultOperationTimeout(TimeSpan timeout)
+    {
+        _defaultOperationTimeout = timeout;
+        return this;
+    }
 
-        public KuduClientBuilder SetSendPipeOptions(PipeOptions options)
-        {
-            _sendPipeOptions = options;
-            return this;
-        }
+    /// <summary>
+    /// <para>
+    /// Set the SASL protocol name. SASL protocol name is used when connecting
+    /// to a secure (Kerberos-enabled) cluster. It must match the servers'
+    /// service principal name (SPN).
+    /// </para>
+    /// <para>
+    /// If not provided, it will use the default SASL protocol name ("kudu").
+    /// </para>
+    /// </summary>
+    public KuduClientBuilder SetSaslProtocolName(string saslProtocolName)
+    {
+        _saslProtocolName = saslProtocolName;
+        return this;
+    }
 
-        public KuduClientBuilder SetReceivePipeOptions(PipeOptions options)
-        {
-            _receivePipeOptions = options;
-            return this;
-        }
+    public KuduClientBuilder SetSendPipeOptions(PipeOptions options)
+    {
+        _sendPipeOptions = options;
+        return this;
+    }
 
-        public KuduClientOptions BuildOptions()
-        {
-            var options = new KuduClientOptions(
-                _masterAddresses,
-                _defaultOperationTimeout,
-                _saslProtocolName,
-                _sendPipeOptions,
-                _receivePipeOptions);
+    public KuduClientBuilder SetReceivePipeOptions(PipeOptions options)
+    {
+        _receivePipeOptions = options;
+        return this;
+    }
 
-            return options;
-        }
+    public KuduClientOptions BuildOptions()
+    {
+        var options = new KuduClientOptions(
+            _masterAddresses,
+            _defaultOperationTimeout,
+            _saslProtocolName,
+            _sendPipeOptions,
+            _receivePipeOptions);
 
-        public KuduClient Build()
-        {
-            var options = BuildOptions();
-            var securityContext = new SecurityContext();
-            var systemClock = new SystemClock();
-            var connectionFactory = new KuduConnectionFactory(
-                options, securityContext, _loggerFactory);
+        return options;
+    }
 
-            return new KuduClient(
-                options,
-                securityContext,
-                connectionFactory,
-                systemClock,
-                _loggerFactory);
-        }
+    public KuduClient Build()
+    {
+        var options = BuildOptions();
+        var securityContext = new SecurityContext();
+        var systemClock = new SystemClock();
+        var connectionFactory = new KuduConnectionFactory(
+            options, securityContext, _loggerFactory);
+
+        return new KuduClient(
+            options,
+            securityContext,
+            connectionFactory,
+            systemClock,
+            _loggerFactory);
     }
 }

@@ -13,294 +13,293 @@ using McMaster.Extensions.Xunit;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
-namespace Knet.Kudu.Client.FunctionalTests
+namespace Knet.Kudu.Client.FunctionalTests;
+
+[MiniKuduClusterTest]
+public class ClientStressTests : IAsyncLifetime
 {
-    [MiniKuduClusterTest]
-    public class ClientStressTests : IAsyncLifetime
+    private KuduTestHarness _harness;
+    private KuduClient _client;
+    private TestConnectionFactory _testConnectionFactory;
+    private KuduTable _table;
+
+    public async Task InitializeAsync()
     {
-        private KuduTestHarness _harness;
-        private KuduClient _client;
-        private TestConnectionFactory _testConnectionFactory;
-        private KuduTable _table;
+        _harness = await new MiniKuduClusterBuilder().BuildHarnessAsync();
 
-        public async Task InitializeAsync()
+        var options = _harness.CreateClientBuilder().BuildOptions();
+        var securityContext = new SecurityContext();
+        var systemClock = new SystemClock();
+        var connectionFactory = new KuduConnectionFactory(
+            options, securityContext, NullLoggerFactory.Instance);
+        _testConnectionFactory = new TestConnectionFactory(connectionFactory);
+
+        _client = new KuduClient(
+            options,
+            securityContext,
+            _testConnectionFactory,
+            systemClock,
+            NullLoggerFactory.Instance);
+
+        var builder = ClientTestUtil.GetBasicSchema()
+            .SetTableName("chaos_test_table")
+            .SetNumReplicas(3)
+            .CreateBasicRangePartition();
+
+        _table = await _client.CreateTableAsync(builder);
+    }
+
+    public async Task DisposeAsync()
+    {
+        await _client.DisposeAsync();
+        await _harness.DisposeAsync();
+    }
+
+    [SkippableFact]
+    public async Task Test()
+    {
+        var testRuntime = TimeSpan.FromMinutes(1);
+
+        using var cts = new CancellationTokenSource(testRuntime);
+        var token = cts.Token;
+
+        var chaosTask = RunTaskAsync(() => DoChaosAsync(token), cts);
+        var writeTask = RunTaskAsync(() => WriteAsync(token), cts);
+        var scanTask = RunTaskAsync(() => ScanAsync(token), cts);
+
+        await Task.WhenAll(chaosTask, writeTask, scanTask);
+
+        // If the test passed, do some extra validation at the end.
+        var rowCount = await ClientTestUtil.CountRowsAsync(_client, _table);
+        Assert.True(rowCount > 0);
+    }
+
+    private static async Task RunTaskAsync(Func<Task> task, CancellationTokenSource cts)
+    {
+        try
         {
-            _harness = await new MiniKuduClusterBuilder().BuildHarnessAsync();
-
-            var options = _harness.CreateClientBuilder().BuildOptions();
-            var securityContext = new SecurityContext();
-            var systemClock = new SystemClock();
-            var connectionFactory = new KuduConnectionFactory(
-                options, securityContext, NullLoggerFactory.Instance);
-            _testConnectionFactory = new TestConnectionFactory(connectionFactory);
-
-            _client = new KuduClient(
-                options,
-                securityContext,
-                _testConnectionFactory,
-                systemClock,
-                NullLoggerFactory.Instance);
-
-            var builder = ClientTestUtil.GetBasicSchema()
-                .SetTableName("chaos_test_table")
-                .SetNumReplicas(3)
-                .CreateBasicRangePartition();
-
-            _table = await _client.CreateTableAsync(builder);
+            await task();
         }
-
-        public async Task DisposeAsync()
+        catch
         {
-            await _client.DisposeAsync();
-            await _harness.DisposeAsync();
+            // Unexpected exception. Stop running the test.
+            cts.Cancel();
+            throw;
         }
+    }
 
-        [SkippableFact]
-        public async Task Test()
+    private async Task DoChaosAsync(CancellationToken cancellationToken)
+    {
+        await Task.Delay(2000, CancellationToken.None);
+
+        while (!cancellationToken.IsCancellationRequested)
         {
-            var testRuntime = TimeSpan.FromMinutes(1);
+            int randomInt = ThreadSafeRandom.Instance.Next(3);
 
-            using var cts = new CancellationTokenSource(testRuntime);
-            var token = cts.Token;
-
-            var chaosTask = RunTaskAsync(() => DoChaosAsync(token), cts);
-            var writeTask = RunTaskAsync(() => WriteAsync(token), cts);
-            var scanTask = RunTaskAsync(() => ScanAsync(token), cts);
-
-            await Task.WhenAll(chaosTask, writeTask, scanTask);
-
-            // If the test passed, do some extra validation at the end.
-            var rowCount = await ClientTestUtil.CountRowsAsync(_client, _table);
-            Assert.True(rowCount > 0);
-        }
-
-        private static async Task RunTaskAsync(Func<Task> task, CancellationTokenSource cts)
-        {
-            try
+            if (randomInt == 0)
             {
-                await task();
+                await RestartTabletServerAsync();
             }
-            catch
+            else if (randomInt == 1)
             {
-                // Unexpected exception. Stop running the test.
-                cts.Cancel();
-                throw;
+                await _testConnectionFactory.DisconnectRandomConnectionAsync();
             }
-        }
-
-        private async Task DoChaosAsync(CancellationToken cancellationToken)
-        {
-            await Task.Delay(2000, CancellationToken.None);
-
-            while (!cancellationToken.IsCancellationRequested)
+            else
             {
-                int randomInt = ThreadSafeRandom.Instance.Next(3);
-
-                if (randomInt == 0)
-                {
-                    await RestartTabletServerAsync();
-                }
-                else if (randomInt == 1)
-                {
-                    await _testConnectionFactory.DisconnectRandomConnectionAsync();
-                }
-                else
-                {
-                    await _harness.RestartLeaderMasterAsync();
-                }
-
-                await Task.Delay(5000, CancellationToken.None);
-            }
-        }
-
-        private async Task WriteAsync(CancellationToken cancellationToken)
-        {
-            Exception sessionException = null;
-            Exception exception;
-
-            ValueTask HandleSessionExceptionAsync(SessionExceptionContext context)
-            {
-                Volatile.Write(ref sessionException, context.Exception);
-                return new ValueTask();
+                await _harness.RestartLeaderMasterAsync();
             }
 
-            var options = new KuduSessionOptions
-            {
-                ExceptionHandler = HandleSessionExceptionAsync
-            };
-            await using var session = _client.NewSession(options);
+            await Task.Delay(5000, CancellationToken.None);
+        }
+    }
 
-            int currentRowKey = 0;
-            bool flush = false;
+    private async Task WriteAsync(CancellationToken cancellationToken)
+    {
+        Exception sessionException = null;
+        Exception exception;
 
-            while (true)
-            {
-                if (cancellationToken.IsCancellationRequested)
-                    break;
+        ValueTask HandleSessionExceptionAsync(SessionExceptionContext context)
+        {
+            Volatile.Write(ref sessionException, context.Exception);
+            return new ValueTask();
+        }
 
-                exception = Volatile.Read(ref sessionException);
-                if (exception != null)
-                    throw exception;
+        var options = new KuduSessionOptions
+        {
+            ExceptionHandler = HandleSessionExceptionAsync
+        };
+        await using var session = _client.NewSession(options);
 
-                var row = ClientTestUtil.CreateBasicSchemaInsert(_table, currentRowKey);
-                await session.EnqueueAsync(row, CancellationToken.None);
+        int currentRowKey = 0;
+        bool flush = false;
 
-                if (flush)
-                    await session.FlushAsync(CancellationToken.None);
-
-                // Every 10 rows we flush and change the flush mode randomly.
-                if (currentRowKey % 10 == 0)
-                    flush = ThreadSafeRandom.Instance.NextBool();
-
-                currentRowKey++;
-            }
-
-            await session.FlushAsync(CancellationToken.None);
+        while (true)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                break;
 
             exception = Volatile.Read(ref sessionException);
             if (exception != null)
                 throw exception;
+
+            var row = ClientTestUtil.CreateBasicSchemaInsert(_table, currentRowKey);
+            await session.EnqueueAsync(row, CancellationToken.None);
+
+            if (flush)
+                await session.FlushAsync(CancellationToken.None);
+
+            // Every 10 rows we flush and change the flush mode randomly.
+            if (currentRowKey % 10 == 0)
+                flush = ThreadSafeRandom.Instance.NextBool();
+
+            currentRowKey++;
         }
 
-        private async Task ScanAsync(CancellationToken cancellationToken)
-        {
-            int lastRowCount = 0;
+        await session.FlushAsync(CancellationToken.None);
 
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                var timestamp = _client.LastPropagatedTimestamp;
+        exception = Volatile.Read(ref sessionException);
+        if (exception != null)
+            throw exception;
+    }
 
-                if (timestamp == 0)
-                {
-                    // Nothing has been written yet.
-                }
-                else if (
-                    lastRowCount == 0 || // Need to full scan once before random reading.
-                    ThreadSafeRandom.Instance.NextBool())
-                {
-                    lastRowCount = await FullScanAsync(lastRowCount);
-                }
-                else
-                {
-                    await RandomGetAsync(lastRowCount);
-                }
+    private async Task ScanAsync(CancellationToken cancellationToken)
+    {
+        int lastRowCount = 0;
 
-                if (lastRowCount == 0)
-                    await Task.Delay(50, CancellationToken.None);
-            }
-        }
-
-        private async Task<int> FullScanAsync(int previousRows)
-        {
-            var scanner = GetScannerBuilder().Build();
-            var numRows = await ClientTestUtil.CountRowsInScanAsync(scanner);
-
-            if (numRows < previousRows)
-                throw new Exception($"Row count unexpectedly decreased from {previousRows} to {numRows}");
-
-            return (int)numRows;
-        }
-
-        private async Task RandomGetAsync(int lastRowCount)
-        {
-            // Read a row at random that should exist (smaller than lastRowCount).
-            int key = ThreadSafeRandom.Instance.Next(lastRowCount);
-            var columnName = _table.Schema.GetColumn(0).Name;
-
-            var scanner = GetScannerBuilder()
-                .AddComparisonPredicate(columnName, ComparisonOp.Equal, key)
-                .Build();
-
-            var results = new List<int>();
-
-            await foreach (var resultSet in scanner)
-            {
-                foreach (var row in resultSet)
-                {
-                    results.Add(row.GetInt32(0));
-                }
-            }
-
-            var result = Assert.Single(results);
-            Assert.Equal(key, result);
-        }
-
-        private KuduScannerBuilder GetScannerBuilder()
+        while (!cancellationToken.IsCancellationRequested)
         {
             var timestamp = _client.LastPropagatedTimestamp;
 
-            return _client.NewScanBuilder(_table)
-                .SetReadMode(ReadMode.ReadAtSnapshot)
-                .SnapshotTimestampRaw(timestamp)
-                .SetFaultTolerant(true);
+            if (timestamp == 0)
+            {
+                // Nothing has been written yet.
+            }
+            else if (
+                lastRowCount == 0 || // Need to full scan once before random reading.
+                ThreadSafeRandom.Instance.NextBool())
+            {
+                lastRowCount = await FullScanAsync(lastRowCount);
+            }
+            else
+            {
+                await RandomGetAsync(lastRowCount);
+            }
+
+            if (lastRowCount == 0)
+                await Task.Delay(50, CancellationToken.None);
+        }
+    }
+
+    private async Task<int> FullScanAsync(int previousRows)
+    {
+        var scanner = GetScannerBuilder().Build();
+        var numRows = await ClientTestUtil.CountRowsInScanAsync(scanner);
+
+        if (numRows < previousRows)
+            throw new Exception($"Row count unexpectedly decreased from {previousRows} to {numRows}");
+
+        return (int)numRows;
+    }
+
+    private async Task RandomGetAsync(int lastRowCount)
+    {
+        // Read a row at random that should exist (smaller than lastRowCount).
+        int key = ThreadSafeRandom.Instance.Next(lastRowCount);
+        var columnName = _table.Schema.GetColumn(0).Name;
+
+        var scanner = GetScannerBuilder()
+            .AddComparisonPredicate(columnName, ComparisonOp.Equal, key)
+            .Build();
+
+        var results = new List<int>();
+
+        await foreach (var resultSet in scanner)
+        {
+            foreach (var row in resultSet)
+            {
+                results.Add(row.GetInt32(0));
+            }
         }
 
-        private async ValueTask RestartTabletServerAsync()
+        var result = Assert.Single(results);
+        Assert.Equal(key, result);
+    }
+
+    private KuduScannerBuilder GetScannerBuilder()
+    {
+        var timestamp = _client.LastPropagatedTimestamp;
+
+        return _client.NewScanBuilder(_table)
+            .SetReadMode(ReadMode.ReadAtSnapshot)
+            .SnapshotTimestampRaw(timestamp)
+            .SetFaultTolerant(true);
+    }
+
+    private async ValueTask RestartTabletServerAsync()
+    {
+        var tablets = await _client.GetTableLocationsAsync(_table.TableId, null, 100);
+        Assert.NotEmpty(tablets);
+
+        var random = ThreadSafeRandom.Instance;
+
+        // Pick a random tablet from the table.
+        var tablet = tablets[random.Next(tablets.Count)];
+
+        // Pick a random replica from the tablet.
+        var replica = tablet.Replicas[random.Next(tablet.Replicas.Count)];
+
+        await _harness.KillTabletServerAsync(replica.HostPort);
+        await _harness.StartTabletServerAsync(replica.HostPort);
+    }
+
+    private class TestConnectionFactory : IKuduConnectionFactory
+    {
+        private readonly IKuduConnectionFactory _realConnectionFactory;
+        private readonly ConcurrentDictionary<IPEndPoint, Task<KuduConnection>> _cache;
+
+        public TestConnectionFactory(IKuduConnectionFactory realConnectionFactory)
         {
-            var tablets = await _client.GetTableLocationsAsync(_table.TableId, null, 100);
-            Assert.NotEmpty(tablets);
-
-            var random = ThreadSafeRandom.Instance;
-
-            // Pick a random tablet from the table.
-            var tablet = tablets[random.Next(tablets.Count)];
-
-            // Pick a random replica from the tablet.
-            var replica = tablet.Replicas[random.Next(tablet.Replicas.Count)];
-
-            await _harness.KillTabletServerAsync(replica.HostPort);
-            await _harness.StartTabletServerAsync(replica.HostPort);
+            _realConnectionFactory = realConnectionFactory;
+            _cache = new ConcurrentDictionary<IPEndPoint, Task<KuduConnection>>();
         }
 
-        private class TestConnectionFactory : IKuduConnectionFactory
+        public Task<KuduConnection> ConnectAsync(
+            ServerInfo serverInfo, CancellationToken cancellationToken = default)
         {
-            private readonly IKuduConnectionFactory _realConnectionFactory;
-            private readonly ConcurrentDictionary<IPEndPoint, Task<KuduConnection>> _cache;
+            var connectionTask = _realConnectionFactory.ConnectAsync(serverInfo, cancellationToken);
+            _cache[serverInfo.Endpoint] = connectionTask;
+            return connectionTask;
+        }
 
-            public TestConnectionFactory(IKuduConnectionFactory realConnectionFactory)
+        public Task<List<ServerInfo>> GetMasterServerInfoAsync(
+            HostAndPort hostPort, CancellationToken cancellationToken = default)
+        {
+            return _realConnectionFactory.GetMasterServerInfoAsync(hostPort, cancellationToken);
+        }
+
+        public Task<ServerInfo> GetTabletServerInfoAsync(
+            HostAndPort hostPort, string uuid, string location, CancellationToken cancellationToken = default)
+        {
+            return _realConnectionFactory.GetTabletServerInfoAsync(hostPort, uuid, location, cancellationToken);
+        }
+
+        public async Task DisconnectRandomConnectionAsync()
+        {
+            var connections = _cache.Values.ToList();
+            var numConnections = connections.Count;
+
+            if (numConnections == 0)
+                return;
+
+            var randomIndex = ThreadSafeRandom.Instance.Next(numConnections);
+            var connectionTask = connections[randomIndex];
+
+            try
             {
-                _realConnectionFactory = realConnectionFactory;
-                _cache = new ConcurrentDictionary<IPEndPoint, Task<KuduConnection>>();
+                var connection = await connectionTask;
+                await connection.CloseAsync();
             }
-
-            public Task<KuduConnection> ConnectAsync(
-                ServerInfo serverInfo, CancellationToken cancellationToken = default)
-            {
-                var connectionTask = _realConnectionFactory.ConnectAsync(serverInfo, cancellationToken);
-                _cache[serverInfo.Endpoint] = connectionTask;
-                return connectionTask;
-            }
-
-            public Task<List<ServerInfo>> GetMasterServerInfoAsync(
-                HostAndPort hostPort, CancellationToken cancellationToken = default)
-            {
-                return _realConnectionFactory.GetMasterServerInfoAsync(hostPort, cancellationToken);
-            }
-
-            public Task<ServerInfo> GetTabletServerInfoAsync(
-                HostAndPort hostPort, string uuid, string location, CancellationToken cancellationToken = default)
-            {
-                return _realConnectionFactory.GetTabletServerInfoAsync(hostPort, uuid, location, cancellationToken);
-            }
-
-            public async Task DisconnectRandomConnectionAsync()
-            {
-                var connections = _cache.Values.ToList();
-                var numConnections = connections.Count;
-
-                if (numConnections == 0)
-                    return;
-
-                var randomIndex = ThreadSafeRandom.Instance.Next(numConnections);
-                var connectionTask = connections[randomIndex];
-
-                try
-                {
-                    var connection = await connectionTask;
-                    await connection.CloseAsync();
-                }
-                catch { }
-            }
+            catch { }
         }
     }
 }

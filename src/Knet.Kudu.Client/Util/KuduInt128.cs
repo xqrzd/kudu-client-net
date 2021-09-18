@@ -24,198 +24,198 @@ using System;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace Knet.Kudu.Client.Util
+namespace Knet.Kudu.Client.Util;
+
+/// <summary>
+/// Represents a signed 128-bit integer in two's complement.
+/// Calculations wrap around and overflow is ignored.
+/// </summary>
+[StructLayout(LayoutKind.Explicit)]
+public readonly struct KuduInt128 : IEquatable<KuduInt128>, IComparable<KuduInt128>
 {
-    /// <summary>
-    /// Represents a signed 128-bit integer in two's complement.
-    /// Calculations wrap around and overflow is ignored.
-    /// </summary>
-    [StructLayout(LayoutKind.Explicit)]
-    public readonly struct KuduInt128 : IEquatable<KuduInt128>, IComparable<KuduInt128>
+    [FieldOffset(0)]
+    public readonly long High;
+    [FieldOffset(8)]
+    public readonly ulong Low;
+
+    public KuduInt128(long high, ulong low)
     {
-        [FieldOffset(0)]
-        public readonly long High;
-        [FieldOffset(8)]
-        public readonly ulong Low;
+        Low = low;
+        High = high;
+    }
 
-        public KuduInt128(long high, ulong low)
+    public KuduInt128(long value)
+    {
+        if (value >= 0)
+            High = 0;
+        else
+            High = -1;
+
+        Low = (ulong)value;
+    }
+
+    public KuduInt128(uint part1, uint part2, uint part3, int part4)
+    {
+        Low = ((ulong)part2 << 32) | part1;
+        High = ((long)part4 << 32) | part3;
+    }
+
+    public KuduInt128 Negate()
+    {
+        var low = ~Low + 1;
+        var high = ~High;
+
+        if (low == 0)
+            high++;
+
+        return new KuduInt128(high, low);
+    }
+
+    public KuduInt128 Abs()
+    {
+        if (High < 0)
+            return Negate();
+
+        return this;
+    }
+
+    public static bool operator ==(KuduInt128 a, KuduInt128 b) =>
+        a.High == b.High && a.Low == b.Low;
+
+    public static bool operator !=(KuduInt128 a, KuduInt128 b) =>
+        a.High != b.High || a.Low != b.Low;
+
+    public static bool operator <(KuduInt128 a, KuduInt128 b)
+    {
+        if (a.High == b.High)
+            return a.Low < b.Low;
+        else
+            return a.High < b.High;
+    }
+
+    public static bool operator <=(KuduInt128 a, KuduInt128 b)
+    {
+        if (a.High == b.High)
+            return a.Low <= b.Low;
+        else
+            return a.High <= b.High;
+    }
+
+    public static bool operator >(KuduInt128 a, KuduInt128 b)
+    {
+        if (a.High == b.High)
+            return a.Low > b.Low;
+        else
+            return a.High > b.High;
+    }
+
+    public static bool operator >=(KuduInt128 a, KuduInt128 b)
+    {
+        if (a.High == b.High)
+            return a.Low >= b.Low;
+        else
+            return a.High >= b.High;
+    }
+
+    public static implicit operator KuduInt128(int value) => new KuduInt128(value);
+
+    public static KuduInt128 operator -(KuduInt128 a) => a.Negate();
+
+    public static KuduInt128 operator -(KuduInt128 a, KuduInt128 b)
+    {
+        var diff = a.Low - b.Low;
+        var high = a.High - b.High;
+
+        if (diff > a.Low)
+            high--;
+
+        return new KuduInt128(high, diff);
+    }
+
+    public static KuduInt128 operator +(KuduInt128 a, KuduInt128 b)
+    {
+        var sum = a.Low + b.Low;
+        var high = a.High + b.High;
+
+        if (sum < a.Low)
+            high++;
+
+        return new KuduInt128(high, sum);
+    }
+
+    public static KuduInt128 operator *(KuduInt128 a, KuduInt128 b)
+    {
+        const long intMask = 0xffffffff;
+        const long carryBit = intMask + 1;
+
+        // Break the left and right numbers into 32 bit chunks
+        // so that we can multiply them without overflow.
+        ulong L0 = (ulong)a.High >> 32;
+        ulong L1 = (ulong)(a.High) & intMask;
+        ulong L2 = a.Low >> 32;
+        ulong L3 = a.Low & intMask;
+        ulong R0 = (ulong)b.High >> 32;
+        ulong R1 = (ulong)b.High & intMask;
+        ulong R2 = b.Low >> 32;
+        ulong R3 = b.Low & intMask;
+
+        ulong product = L3 * R3;
+        ulong lowbits = product & intMask;
+        ulong sum = product >> 32;
+        product = L2 * R3;
+        sum += product;
+        long highbits = sum < product ? carryBit : 0;
+        product = L3 * R2;
+        sum += product;
+        if (sum < product)
         {
-            Low = low;
-            High = high;
+            highbits += carryBit;
         }
+        lowbits += sum << 32;
+        highbits += (long)sum >> 32;
+        highbits += (long)(L1 * R3 + L2 * R2 + L3 * R1);
+        highbits += (long)(L0 * R3 + L1 * R2 + L2 * R1 + L3 * R0) << 32;
 
-        public KuduInt128(long value)
+        return new KuduInt128(highbits, lowbits);
+    }
+
+    public int CompareTo(KuduInt128 other)
+    {
+        if (this < other) return -1;
+        if (this > other) return 1;
+        return 0;
+    }
+
+    public bool Equals(KuduInt128 other) => this == other;
+
+    public override bool Equals(object obj)
+    {
+        if (obj is KuduInt128 other)
+            return Equals(other);
+
+        return false;
+    }
+
+    public override int GetHashCode() => HashCode.Combine(High, Low);
+
+    public override string ToString()
+    {
+        var sb = new StringBuilder(40);
+        sb.Append("0x");
+        sb.Append(High.ToString("x16"));
+        sb.Append(Low.ToString("x16"));
+        return sb.ToString();
+    }
+
+    public static KuduInt128 PowerOf10(int exponent)
+    {
+        return Pow10Cache.PowerOf10(exponent);
+    }
+
+    private static class Pow10Cache
+    {
+        private static readonly KuduInt128[] _cache = new KuduInt128[]
         {
-            if (value >= 0)
-                High = 0;
-            else
-                High = -1;
-
-            Low = (ulong)value;
-        }
-
-        public KuduInt128(uint part1, uint part2, uint part3, int part4)
-        {
-            Low = ((ulong)part2 << 32) | part1;
-            High = ((long)part4 << 32) | part3;
-        }
-
-        public KuduInt128 Negate()
-        {
-            var low = ~Low + 1;
-            var high = ~High;
-
-            if (low == 0)
-                high++;
-
-            return new KuduInt128(high, low);
-        }
-
-        public KuduInt128 Abs()
-        {
-            if (High < 0)
-                return Negate();
-
-            return this;
-        }
-
-        public static bool operator ==(KuduInt128 a, KuduInt128 b) =>
-            a.High == b.High && a.Low == b.Low;
-
-        public static bool operator !=(KuduInt128 a, KuduInt128 b) =>
-            a.High != b.High || a.Low != b.Low;
-
-        public static bool operator <(KuduInt128 a, KuduInt128 b)
-        {
-            if (a.High == b.High)
-                return a.Low < b.Low;
-            else
-                return a.High < b.High;
-        }
-
-        public static bool operator <=(KuduInt128 a, KuduInt128 b)
-        {
-            if (a.High == b.High)
-                return a.Low <= b.Low;
-            else
-                return a.High <= b.High;
-        }
-
-        public static bool operator >(KuduInt128 a, KuduInt128 b)
-        {
-            if (a.High == b.High)
-                return a.Low > b.Low;
-            else
-                return a.High > b.High;
-        }
-
-        public static bool operator >=(KuduInt128 a, KuduInt128 b)
-        {
-            if (a.High == b.High)
-                return a.Low >= b.Low;
-            else
-                return a.High >= b.High;
-        }
-
-        public static implicit operator KuduInt128(int value) => new KuduInt128(value);
-
-        public static KuduInt128 operator -(KuduInt128 a) => a.Negate();
-
-        public static KuduInt128 operator -(KuduInt128 a, KuduInt128 b)
-        {
-            var diff = a.Low - b.Low;
-            var high = a.High - b.High;
-
-            if (diff > a.Low)
-                high--;
-
-            return new KuduInt128(high, diff);
-        }
-
-        public static KuduInt128 operator +(KuduInt128 a, KuduInt128 b)
-        {
-            var sum = a.Low + b.Low;
-            var high = a.High + b.High;
-
-            if (sum < a.Low)
-                high++;
-
-            return new KuduInt128(high, sum);
-        }
-
-        public static KuduInt128 operator *(KuduInt128 a, KuduInt128 b)
-        {
-            const long intMask = 0xffffffff;
-            const long carryBit = intMask + 1;
-
-            // Break the left and right numbers into 32 bit chunks
-            // so that we can multiply them without overflow.
-            ulong L0 = (ulong)a.High >> 32;
-            ulong L1 = (ulong)(a.High) & intMask;
-            ulong L2 = a.Low >> 32;
-            ulong L3 = a.Low & intMask;
-            ulong R0 = (ulong)b.High >> 32;
-            ulong R1 = (ulong)b.High & intMask;
-            ulong R2 = b.Low >> 32;
-            ulong R3 = b.Low & intMask;
-
-            ulong product = L3 * R3;
-            ulong lowbits = product & intMask;
-            ulong sum = product >> 32;
-            product = L2 * R3;
-            sum += product;
-            long highbits = sum < product ? carryBit : 0;
-            product = L3 * R2;
-            sum += product;
-            if (sum < product)
-            {
-                highbits += carryBit;
-            }
-            lowbits += sum << 32;
-            highbits += (long)sum >> 32;
-            highbits += (long)(L1 * R3 + L2 * R2 + L3 * R1);
-            highbits += (long)(L0 * R3 + L1 * R2 + L2 * R1 + L3 * R0) << 32;
-
-            return new KuduInt128(highbits, lowbits);
-        }
-
-        public int CompareTo(KuduInt128 other)
-        {
-            if (this < other) return -1;
-            if (this > other) return 1;
-            return 0;
-        }
-
-        public bool Equals(KuduInt128 other) => this == other;
-
-        public override bool Equals(object obj)
-        {
-            if (obj is KuduInt128 other)
-                return Equals(other);
-
-            return false;
-        }
-
-        public override int GetHashCode() => HashCode.Combine(High, Low);
-
-        public override string ToString()
-        {
-            var sb = new StringBuilder(40);
-            sb.Append("0x");
-            sb.Append(High.ToString("x16"));
-            sb.Append(Low.ToString("x16"));
-            return sb.ToString();
-        }
-
-        public static KuduInt128 PowerOf10(int exponent)
-        {
-            return Pow10Cache.PowerOf10(exponent);
-        }
-
-        private static class Pow10Cache
-        {
-            private static readonly KuduInt128[] _cache = new KuduInt128[]
-            {
                 Init(0x0000000000000000, 0x0000000000000001), // 1
                 Init(0x0000000000000000, 0x000000000000000a), // 10
                 Init(0x0000000000000000, 0x0000000000000064), // 100
@@ -255,17 +255,16 @@ namespace Knet.Kudu.Client.Util
                 Init(0x00c097ce7bc90715, 0xb34b9f1000000000), // 1000000000000000000000000000000000000
                 Init(0x0785ee10d5da46d9, 0x00f436a000000000), // 10000000000000000000000000000000000000
                 Init(0x4b3b4ca85a86c47a, 0x098a224000000000), // 100000000000000000000000000000000000000
-            };
+        };
 
-            private static KuduInt128 Init(ulong high, ulong low)
-            {
-                return new KuduInt128((long)high, low);
-            }
+        private static KuduInt128 Init(ulong high, ulong low)
+        {
+            return new KuduInt128((long)high, low);
+        }
 
-            public static KuduInt128 PowerOf10(int power)
-            {
-                return _cache[power];
-            }
+        public static KuduInt128 PowerOf10(int power)
+        {
+            return _cache[power];
         }
     }
 }

@@ -15,380 +15,379 @@ using Knet.Kudu.Client.Requests;
 using Microsoft.Extensions.Logging;
 using static Knet.Kudu.Client.Protobuf.Rpc.ErrorStatusPB.Types;
 
-namespace Knet.Kudu.Client.Connection
+namespace Knet.Kudu.Client.Connection;
+
+public class KuduConnection
 {
-    public class KuduConnection
+    private const int ReadAtLeastThreshold = 1024 * 32; // 32KB
+    private const int MaximumReadSize = 1024 * 512; // 512KB
+
+    private readonly IDuplexPipe _ioPipe;
+    private readonly ILogger _logger;
+    private readonly SemaphoreSlim _singleWriter;
+    private readonly Dictionary<int, InflightRpc> _inflightRpcs;
+    private readonly Task _receiveTask;
+
+    private int _nextCallId;
+    private RecoverableException _closedException;
+    private DisconnectedCallback _disconnectedCallback;
+
+    public KuduConnection(IDuplexPipe ioPipe, ILoggerFactory loggerFactory)
     {
-        private const int ReadAtLeastThreshold = 1024 * 32; // 32KB
-        private const int MaximumReadSize = 1024 * 512; // 512KB
+        _ioPipe = ioPipe;
+        _logger = loggerFactory.CreateLogger<KuduConnection>();
+        _singleWriter = new SemaphoreSlim(1, 1);
+        _inflightRpcs = new Dictionary<int, InflightRpc>();
+        _receiveTask = ReceiveAsync(ioPipe.Input);
+    }
 
-        private readonly IDuplexPipe _ioPipe;
-        private readonly ILogger _logger;
-        private readonly SemaphoreSlim _singleWriter;
-        private readonly Dictionary<int, InflightRpc> _inflightRpcs;
-        private readonly Task _receiveTask;
+    /// <summary>
+    /// Stops accepting RPCs and completes any outstanding RPCs with exceptions.
+    /// </summary>
+    public Task CloseAsync()
+    {
+        _ioPipe.Output.CancelPendingFlush();
+        _ioPipe.Input.CancelPendingRead();
 
-        private int _nextCallId;
-        private RecoverableException _closedException;
-        private DisconnectedCallback _disconnectedCallback;
+        // Wait for the reader loop to finish.
+        return _receiveTask;
+    }
 
-        public KuduConnection(IDuplexPipe ioPipe, ILoggerFactory loggerFactory)
+    public void OnDisconnected(Action<Exception, object> callback, object state)
+    {
+        lock (_inflightRpcs)
         {
-            _ioPipe = ioPipe;
-            _logger = loggerFactory.CreateLogger<KuduConnection>();
-            _singleWriter = new SemaphoreSlim(1, 1);
-            _inflightRpcs = new Dictionary<int, InflightRpc>();
-            _receiveTask = ReceiveAsync(ioPipe.Input);
-        }
+            _disconnectedCallback = new DisconnectedCallback(callback, state);
 
-        /// <summary>
-        /// Stops accepting RPCs and completes any outstanding RPCs with exceptions.
-        /// </summary>
-        public Task CloseAsync()
-        {
-            _ioPipe.Output.CancelPendingFlush();
-            _ioPipe.Input.CancelPendingRead();
-
-            // Wait for the reader loop to finish.
-            return _receiveTask;
-        }
-
-        public void OnDisconnected(Action<Exception, object> callback, object state)
-        {
-            lock (_inflightRpcs)
+            if (_closedException is not null)
             {
-                _disconnectedCallback = new DisconnectedCallback(callback, state);
-
-                if (_closedException is not null)
-                {
-                    // Guarantee the disconnected callback is invoked if
-                    // the connection is already closed.
-                    InvokeDisconnectedCallback(_closedException);
-                }
+                // Guarantee the disconnected callback is invoked if
+                // the connection is already closed.
+                InvokeDisconnectedCallback(_closedException);
             }
         }
+    }
 
-        public async Task SendReceiveAsync(
-            RequestHeader header,
-            KuduRpc rpc,
-            CancellationToken cancellationToken)
+    public async Task SendReceiveAsync(
+        RequestHeader header,
+        KuduRpc rpc,
+        CancellationToken cancellationToken)
+    {
+        var inflightRpc = new InflightRpc(rpc);
+
+        var callId = AddInflightRpc(inflightRpc);
+        header.CallId = callId;
+
+        using var _ = cancellationToken.UnsafeRegister(
+            static (state, token) => ((InflightRpc)state).TrySetCanceled(token),
+            inflightRpc);
+
+        try
         {
-            var inflightRpc = new InflightRpc(rpc);
-
-            var callId = AddInflightRpc(inflightRpc);
-            header.CallId = callId;
-
-            using var _ = cancellationToken.UnsafeRegister(
-                static (state, token) => ((InflightRpc)state).TrySetCanceled(token),
-                inflightRpc);
-
-            try
-            {
-                await SendAsync(header, rpc, cancellationToken).ConfigureAwait(false);
-                await inflightRpc.Task.ConfigureAwait(false);
-            }
-            finally
-            {
-                RemoveInflightRpc(callId);
-            }
+            await SendAsync(header, rpc, cancellationToken).ConfigureAwait(false);
+            await inflightRpc.Task.ConfigureAwait(false);
         }
-
-        private async ValueTask SendAsync(
-            RequestHeader header,
-            KuduRpc rpc,
-            CancellationToken cancellationToken)
+        finally
         {
-            PipeWriter output = _ioPipe.Output;
-            await _singleWriter.WaitAsync(cancellationToken).ConfigureAwait(false);
-            try
-            {
-                Write(output, header, rpc);
+            RemoveInflightRpc(callId);
+        }
+    }
 
-                var result = await output.FlushAsync(cancellationToken).ConfigureAwait(false);
+    private async ValueTask SendAsync(
+        RequestHeader header,
+        KuduRpc rpc,
+        CancellationToken cancellationToken)
+    {
+        PipeWriter output = _ioPipe.Output;
+        await _singleWriter.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            Write(output, header, rpc);
+
+            var result = await output.FlushAsync(cancellationToken).ConfigureAwait(false);
+
+            if (result.IsCanceled)
+                await output.CompleteAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            throw new RecoverableException(
+                KuduStatus.NetworkError(ex.Message), ex);
+        }
+        finally
+        {
+            _singleWriter.Release();
+        }
+    }
+
+    private static void Write(PipeWriter output, RequestHeader header, KuduRpc rpc)
+    {
+        // +------------------------------------------------+
+        // | Total message length (4 bytes)                 |
+        // +------------------------------------------------+
+        // | RPC Header protobuf length (variable encoding) |
+        // +------------------------------------------------+
+        // | RPC Header protobuf                            |
+        // +------------------------------------------------+
+        // | Main message length (variable encoding)        |
+        // +------------------------------------------------+
+        // | Main message protobuf                          |
+        // +------------------------------------------------+
+
+        var headerSize = header.CalculateSize();
+        var messageSize = rpc.CalculateSize();
+
+        var headerSizeLength = CodedOutputStream.ComputeLengthSize(headerSize);
+        var messageSizeLength = CodedOutputStream.ComputeLengthSize(messageSize);
+
+        var totalSize = 4 +
+            headerSizeLength + headerSize +
+            messageSizeLength + messageSize;
+
+        var totalSizeWithoutMessage = totalSize - messageSize;
+        var buffer = output.GetSpan(totalSizeWithoutMessage);
+
+        BinaryPrimitives.WriteInt32BigEndian(buffer, totalSize - 4);
+        buffer = buffer.Slice(4);
+
+        ProtobufHelper.WriteRawVarint32(buffer, (uint)headerSize);
+        buffer = buffer.Slice(headerSizeLength);
+
+        header.WriteTo(buffer.Slice(0, headerSize));
+        buffer = buffer.Slice(headerSize);
+
+        ProtobufHelper.WriteRawVarint32(buffer, (uint)messageSize);
+
+        output.Advance(totalSizeWithoutMessage);
+        rpc.WriteTo(output);
+    }
+
+    private async Task ReceiveAsync(PipeReader reader)
+    {
+        Exception exception = null;
+        using var parserContext = new ParserContext();
+
+        try
+        {
+            while (true)
+            {
+                var result = await ReadAsync(reader, parserContext).ConfigureAwait(false);
 
                 if (result.IsCanceled)
-                    await output.CompleteAsync().ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                throw new RecoverableException(
-                    KuduStatus.NetworkError(ex.Message), ex);
-            }
-            finally
-            {
-                _singleWriter.Release();
-            }
-        }
-
-        private static void Write(PipeWriter output, RequestHeader header, KuduRpc rpc)
-        {
-            // +------------------------------------------------+
-            // | Total message length (4 bytes)                 |
-            // +------------------------------------------------+
-            // | RPC Header protobuf length (variable encoding) |
-            // +------------------------------------------------+
-            // | RPC Header protobuf                            |
-            // +------------------------------------------------+
-            // | Main message length (variable encoding)        |
-            // +------------------------------------------------+
-            // | Main message protobuf                          |
-            // +------------------------------------------------+
-
-            var headerSize = header.CalculateSize();
-            var messageSize = rpc.CalculateSize();
-
-            var headerSizeLength = CodedOutputStream.ComputeLengthSize(headerSize);
-            var messageSizeLength = CodedOutputStream.ComputeLengthSize(messageSize);
-
-            var totalSize = 4 +
-                headerSizeLength + headerSize +
-                messageSizeLength + messageSize;
-
-            var totalSizeWithoutMessage = totalSize - messageSize;
-            var buffer = output.GetSpan(totalSizeWithoutMessage);
-
-            BinaryPrimitives.WriteInt32BigEndian(buffer, totalSize - 4);
-            buffer = buffer.Slice(4);
-
-            ProtobufHelper.WriteRawVarint32(buffer, (uint)headerSize);
-            buffer = buffer.Slice(headerSizeLength);
-
-            header.WriteTo(buffer.Slice(0, headerSize));
-            buffer = buffer.Slice(headerSize);
-
-            ProtobufHelper.WriteRawVarint32(buffer, (uint)messageSize);
-
-            output.Advance(totalSizeWithoutMessage);
-            rpc.WriteTo(output);
-        }
-
-        private async Task ReceiveAsync(PipeReader reader)
-        {
-            Exception exception = null;
-            using var parserContext = new ParserContext();
-
-            try
-            {
-                while (true)
                 {
-                    var result = await ReadAsync(reader, parserContext).ConfigureAwait(false);
+                    break;
+                }
 
-                    if (result.IsCanceled)
-                    {
-                        break;
-                    }
+                var buffer = result.Buffer;
+                var position = ProcessMessages(buffer, parserContext);
 
-                    var buffer = result.Buffer;
-                    var position = ProcessMessages(buffer, parserContext);
+                reader.AdvanceTo(position, buffer.End);
 
-                    reader.AdvanceTo(position, buffer.End);
-
-                    if (result.IsCompleted)
-                    {
-                        break;
-                    }
+                if (result.IsCompleted)
+                {
+                    break;
                 }
             }
-            catch (Exception ex)
-            {
-                exception = ex;
-            }
-            finally
-            {
-                await ShutdownAsync(exception).ConfigureAwait(false);
-            }
+        }
+        catch (Exception ex)
+        {
+            exception = ex;
+        }
+        finally
+        {
+            await ShutdownAsync(exception).ConfigureAwait(false);
+        }
+    }
+
+    private SequencePosition ProcessMessages(ReadOnlySequence<byte> buffer, ParserContext parserContext)
+    {
+        var reader = new SequenceReader<byte>(buffer);
+
+        while (KuduMessageParser.TryParse(ref reader, parserContext))
+        {
+            HandleRpc(parserContext);
+            parserContext.Reset();
         }
 
-        private SequencePosition ProcessMessages(ReadOnlySequence<byte> buffer, ParserContext parserContext)
+        return reader.Position;
+    }
+
+    private void HandleRpc(ParserContext parserContext)
+    {
+        var header = parserContext.Header;
+
+        if (TryGetInflightRpc(header, out var inflightRpc))
         {
-            var reader = new SequenceReader<byte>(buffer);
+            var message = parserContext.Message;
 
-            while (KuduMessageParser.TryParse(ref reader, parserContext))
+            if (header.IsError)
             {
-                HandleRpc(parserContext);
-                parserContext.Reset();
-            }
+                var error = ErrorStatusPB.Parser.ParseFrom(message.MessageProtobuf);
+                var exception = GetException(error);
 
-            return reader.Position;
-        }
-
-        private void HandleRpc(ParserContext parserContext)
-        {
-            var header = parserContext.Header;
-
-            if (TryGetInflightRpc(header, out var inflightRpc))
-            {
-                var message = parserContext.Message;
-
-                if (header.IsError)
-                {
-                    var error = ErrorStatusPB.Parser.ParseFrom(message.MessageProtobuf);
-                    var exception = GetException(error);
-
-                    inflightRpc.TrySetException(exception);
-                }
-                else
-                {
-                    try
-                    {
-                        inflightRpc.Rpc.ParseResponse(message);
-                        inflightRpc.TrySetResult();
-                    }
-                    catch (Exception ex)
-                    {
-                        inflightRpc.TrySetException(ex);
-                    }
-                }
-            }
-            // Else: We couldn't match the incoming CallId to an inflight RPC,
-            // probably because the RPC timed out (on our side) and was removed.
-            // TODO: Log this event.
-        }
-
-        private Exception GetException(ErrorStatusPB error)
-        {
-            var code = error.Code;
-            KuduException exception;
-
-            if (code == RpcErrorCodePB.ErrorServerTooBusy ||
-                code == RpcErrorCodePB.ErrorUnavailable)
-            {
-                exception = new RecoverableException(
-                    KuduStatus.ServiceUnavailable(error.Message));
-            }
-            else if (code == RpcErrorCodePB.FatalInvalidAuthenticationToken)
-            {
-                exception = new InvalidAuthnTokenException(
-                    KuduStatus.NotAuthorized(error.Message));
-            }
-            else if (code == RpcErrorCodePB.ErrorInvalidAuthorizationToken)
-            {
-                exception = new InvalidAuthzTokenException(
-                    KuduStatus.NotAuthorized(error.Message));
+                inflightRpc.TrySetException(exception);
             }
             else
             {
-                var message = $"[peer {_ioPipe}] server sent error {error.Message}";
-                exception = new RpcRemoteException(KuduStatus.RemoteError(message), error);
+                try
+                {
+                    inflightRpc.Rpc.ParseResponse(message);
+                    inflightRpc.TrySetResult();
+                }
+                catch (Exception ex)
+                {
+                    inflightRpc.TrySetException(ex);
+                }
             }
-
-            return exception;
         }
+        // Else: We couldn't match the incoming CallId to an inflight RPC,
+        // probably because the RPC timed out (on our side) and was removed.
+        // TODO: Log this event.
+    }
 
-        private int AddInflightRpc(InflightRpc inflightRpc)
+    private Exception GetException(ErrorStatusPB error)
+    {
+        var code = error.Code;
+        KuduException exception;
+
+        if (code == RpcErrorCodePB.ErrorServerTooBusy ||
+            code == RpcErrorCodePB.ErrorUnavailable)
         {
-            int callId;
-
-            lock (_inflightRpcs)
-            {
-                callId = _nextCallId++;
-                _inflightRpcs.Add(callId, inflightRpc);
-            }
-
-            return callId;
+            exception = new RecoverableException(
+                KuduStatus.ServiceUnavailable(error.Message));
         }
-
-        private void RemoveInflightRpc(int callId)
+        else if (code == RpcErrorCodePB.FatalInvalidAuthenticationToken)
         {
-            lock (_inflightRpcs)
-            {
-                _inflightRpcs.Remove(callId);
-            }
+            exception = new InvalidAuthnTokenException(
+                KuduStatus.NotAuthorized(error.Message));
         }
-
-        private bool TryGetInflightRpc(ResponseHeader header, out InflightRpc rpc)
+        else if (code == RpcErrorCodePB.ErrorInvalidAuthorizationToken)
         {
-            lock (_inflightRpcs)
-            {
-                return _inflightRpcs.TryGetValue(header.CallId, out rpc);
-            }
+            exception = new InvalidAuthzTokenException(
+                KuduStatus.NotAuthorized(error.Message));
         }
-
-        /// <summary>
-        /// Stops accepting new RPCs and completes any outstanding RPCs with exceptions.
-        /// </summary>
-        private async Task ShutdownAsync(Exception exception = null)
+        else
         {
-            await _singleWriter.WaitAsync().ConfigureAwait(false);
-            try
-            {
-                await _ioPipe.Output.CompleteAsync(exception).ConfigureAwait(false);
-                await _ioPipe.Input.CompleteAsync(exception).ConfigureAwait(false);
-            }
-            finally
-            {
-                _singleWriter.Release();
-            }
-
-            if (exception is not null)
-                _logger.ConnectionDisconnected(_ioPipe.ToString(), exception);
-
-            var closedException = new RecoverableException(KuduStatus.IllegalState(
-                $"Connection {_ioPipe} is disconnected."), exception);
-
-            lock (_inflightRpcs)
-            {
-                _closedException = closedException;
-                InvokeDisconnectedCallback(closedException);
-
-                foreach (var inflightMessage in _inflightRpcs.Values)
-                    inflightMessage.TrySetException(closedException);
-
-                _inflightRpcs.Clear();
-            }
-
-            // Don't dispose _singleWriter; there may still be
-            // pending writes.
-
-            (_ioPipe as IDisposable)?.Dispose();
+            var message = $"[peer {_ioPipe}] server sent error {error.Message}";
+            exception = new RpcRemoteException(KuduStatus.RemoteError(message), error);
         }
 
-        /// <summary>
-        /// The caller must hold the _inflightMessages lock.
-        /// </summary>
-        private void InvokeDisconnectedCallback(RecoverableException exception)
+        return exception;
+    }
+
+    private int AddInflightRpc(InflightRpc inflightRpc)
+    {
+        int callId;
+
+        lock (_inflightRpcs)
         {
-            try
-            {
-                _disconnectedCallback.Invoke(exception.InnerException);
-            }
-            catch { }
+            callId = _nextCallId++;
+            _inflightRpcs.Add(callId, inflightRpc);
         }
 
-        public override string ToString() => _ioPipe.ToString();
+        return callId;
+    }
 
-        private static ValueTask<ReadResult> ReadAsync(PipeReader reader, ParserContext context)
+    private void RemoveInflightRpc(int callId)
+    {
+        lock (_inflightRpcs)
         {
-            var readHint = context.ReadHint;
-
-            return readHint > ReadAtLeastThreshold
-                ? reader.ReadAtLeastAsync(Math.Min(readHint, MaximumReadSize))
-                : reader.ReadAsync();
+            _inflightRpcs.Remove(callId);
         }
+    }
 
-        private sealed class InflightRpc : TaskCompletionSource
+    private bool TryGetInflightRpc(ResponseHeader header, out InflightRpc rpc)
+    {
+        lock (_inflightRpcs)
         {
-            public KuduRpc Rpc { get; }
-
-            public InflightRpc(KuduRpc rpc)
-                : base(TaskCreationOptions.RunContinuationsAsynchronously)
-            {
-                Rpc = rpc;
-            }
+            return _inflightRpcs.TryGetValue(header.CallId, out rpc);
         }
+    }
 
-        private readonly struct DisconnectedCallback
+    /// <summary>
+    /// Stops accepting new RPCs and completes any outstanding RPCs with exceptions.
+    /// </summary>
+    private async Task ShutdownAsync(Exception exception = null)
+    {
+        await _singleWriter.WaitAsync().ConfigureAwait(false);
+        try
         {
-            private readonly Action<Exception, object> _callback;
-            private readonly object _state;
-
-            public DisconnectedCallback(Action<Exception, object> callback, object state)
-            {
-                _callback = callback;
-                _state = state;
-            }
-
-            public void Invoke(Exception exception) => _callback?.Invoke(exception, _state);
+            await _ioPipe.Output.CompleteAsync(exception).ConfigureAwait(false);
+            await _ioPipe.Input.CompleteAsync(exception).ConfigureAwait(false);
         }
+        finally
+        {
+            _singleWriter.Release();
+        }
+
+        if (exception is not null)
+            _logger.ConnectionDisconnected(_ioPipe.ToString(), exception);
+
+        var closedException = new RecoverableException(KuduStatus.IllegalState(
+            $"Connection {_ioPipe} is disconnected."), exception);
+
+        lock (_inflightRpcs)
+        {
+            _closedException = closedException;
+            InvokeDisconnectedCallback(closedException);
+
+            foreach (var inflightMessage in _inflightRpcs.Values)
+                inflightMessage.TrySetException(closedException);
+
+            _inflightRpcs.Clear();
+        }
+
+        // Don't dispose _singleWriter; there may still be
+        // pending writes.
+
+        (_ioPipe as IDisposable)?.Dispose();
+    }
+
+    /// <summary>
+    /// The caller must hold the _inflightMessages lock.
+    /// </summary>
+    private void InvokeDisconnectedCallback(RecoverableException exception)
+    {
+        try
+        {
+            _disconnectedCallback.Invoke(exception.InnerException);
+        }
+        catch { }
+    }
+
+    public override string ToString() => _ioPipe.ToString();
+
+    private static ValueTask<ReadResult> ReadAsync(PipeReader reader, ParserContext context)
+    {
+        var readHint = context.ReadHint;
+
+        return readHint > ReadAtLeastThreshold
+            ? reader.ReadAtLeastAsync(Math.Min(readHint, MaximumReadSize))
+            : reader.ReadAsync();
+    }
+
+    private sealed class InflightRpc : TaskCompletionSource
+    {
+        public KuduRpc Rpc { get; }
+
+        public InflightRpc(KuduRpc rpc)
+            : base(TaskCreationOptions.RunContinuationsAsynchronously)
+        {
+            Rpc = rpc;
+        }
+    }
+
+    private readonly struct DisconnectedCallback
+    {
+        private readonly Action<Exception, object> _callback;
+        private readonly object _state;
+
+        public DisconnectedCallback(Action<Exception, object> callback, object state)
+        {
+            _callback = callback;
+            _state = state;
+        }
+
+        public void Invoke(Exception exception) => _callback?.Invoke(exception, _state);
     }
 }

@@ -1,25 +1,24 @@
 using System;
 using System.Buffers;
 
-namespace Knet.Kudu.Client.Internal
+namespace Knet.Kudu.Client.Internal;
+
+internal sealed class ArrayPoolBuffer<T> : IDisposable
 {
-    internal sealed class ArrayPoolBuffer<T> : IDisposable
+    public T[] Buffer { get; private set; }
+
+    public ArrayPoolBuffer(int minimumLength)
     {
-        public T[] Buffer { get; private set; }
+        Buffer = ArrayPool<T>.Shared.Rent(minimumLength);
+    }
 
-        public ArrayPoolBuffer(int minimumLength)
+    public void Dispose()
+    {
+        var buffer = Buffer;
+        if (buffer is not null)
         {
-            Buffer = ArrayPool<T>.Shared.Rent(minimumLength);
-        }
-
-        public void Dispose()
-        {
-            var buffer = Buffer;
-            if (buffer is not null)
-            {
-                Buffer = null;
-                ArrayPool<T>.Shared.Return(buffer);
-            }
+            Buffer = null;
+            ArrayPool<T>.Shared.Return(buffer);
         }
     }
 }
