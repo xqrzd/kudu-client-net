@@ -30,6 +30,17 @@ namespace Knet.Kudu.Client.Internal
             where T : IEquatable<T> => MemoryExtensions.SequenceEqual(array, other);
 
 #if !NET6_0_OR_GREATER
+        public static CancellationTokenRegistration UnsafeRegister(
+            this CancellationToken cancellationToken,
+            Action<object, CancellationToken> callback, object state)
+        {
+#if NETCOREAPP3_1_OR_GREATER
+            return cancellationToken.UnsafeRegister(s => callback(s, cancellationToken), state);
+#else
+            return cancellationToken.Register(s => callback(s, cancellationToken), state);
+#endif
+        }
+
         // https://github.com/dotnet/runtime/blob/master/src/libraries/Common/src/System/Threading/Tasks/TaskTimeoutExtensions.cs
         public static Task WaitAsync(this Task task, CancellationToken cancellationToken)
         {
