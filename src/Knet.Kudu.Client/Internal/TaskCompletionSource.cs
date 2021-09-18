@@ -2,28 +2,27 @@
 
 using System.Threading.Tasks;
 
-namespace Knet.Kudu.Client.Internal
+namespace Knet.Kudu.Client.Internal;
+
+internal class TaskCompletionSource : TaskCompletionSource<object>
 {
-    internal class TaskCompletionSource : TaskCompletionSource<object>
+    public TaskCompletionSource() : base() { }
+
+    public TaskCompletionSource(object state) : base(state) { }
+
+    public TaskCompletionSource(TaskCreationOptions creationOptions) : base(creationOptions) { }
+
+    public TaskCompletionSource(object state, TaskCreationOptions creationOptions)
+        : base(state, creationOptions) { }
+
+    public void SetResult()
     {
-        public TaskCompletionSource() : base() { }
+        SetResult(null);
+    }
 
-        public TaskCompletionSource(object state) : base(state) { }
-
-        public TaskCompletionSource(TaskCreationOptions creationOptions) : base(creationOptions) { }
-
-        public TaskCompletionSource(object state, TaskCreationOptions creationOptions)
-            : base(state, creationOptions) { }
-
-        public void SetResult()
-        {
-            SetResult(null);
-        }
-
-        public bool TrySetResult()
-        {
-            return TrySetResult(null);
-        }
+    public bool TrySetResult()
+    {
+        return TrySetResult(null);
     }
 }
 

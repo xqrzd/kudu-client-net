@@ -9,173 +9,172 @@ using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Scanner;
 using Knet.Kudu.Client.Tablet;
 
-namespace Knet.Kudu.Client.Requests
+namespace Knet.Kudu.Client.Requests;
+
+internal sealed class ScanRequest : KuduTabletRpc<ScanResponse>, IDisposable
 {
-    internal sealed class ScanRequest : KuduTabletRpc<ScanResponse>, IDisposable
+    private static readonly RepeatedField<uint> _columnPredicateRequiredFeature = new()
     {
-        private static readonly RepeatedField<uint> _columnPredicateRequiredFeature = new()
+        (uint)TabletServerFeatures.ColumnPredicates
+    };
+
+    private readonly ScanRequestState _state;
+    private readonly ScanRequestPB _scanRequestPb;
+    private readonly KuduSchema _schema;
+    private readonly bool _isFaultTolerant;
+
+    public ScanRequest(
+        ScanRequestState state,
+        ScanRequestPB scanRequestPb,
+        KuduSchema schema,
+        ReplicaSelection replicaSelection,
+        string tableId,
+        RemoteTablet tablet,
+        byte[] partitionKey,
+        bool isFaultTolerant)
+    {
+        _state = state;
+        _scanRequestPb = scanRequestPb;
+        _schema = schema;
+        _isFaultTolerant = isFaultTolerant;
+
+        MethodName = "Scan";
+        ReplicaSelection = replicaSelection;
+        TableId = tableId;
+        Tablet = tablet;
+        PartitionKey = partitionKey;
+        NeedsAuthzToken = true;
+
+        if (scanRequestPb.NewScanRequest != null &&
+            scanRequestPb.NewScanRequest.ColumnPredicates.Count > 0)
         {
-            (uint)TabletServerFeatures.ColumnPredicates
-        };
+            RequiredFeatures = _columnPredicateRequiredFeature;
+        }
+    }
 
-        private readonly ScanRequestState _state;
-        private readonly ScanRequestPB _scanRequestPb;
-        private readonly KuduSchema _schema;
-        private readonly bool _isFaultTolerant;
+    public void Dispose()
+    {
+        ClearOutput();
+    }
 
-        public ScanRequest(
-            ScanRequestState state,
-            ScanRequestPB scanRequestPb,
-            KuduSchema schema,
-            ReplicaSelection replicaSelection,
-            string tableId,
-            RemoteTablet tablet,
-            byte[] partitionKey,
-            bool isFaultTolerant)
+    public void TakeOutput()
+    {
+        Output = null;
+    }
+
+    public override int CalculateSize()
+    {
+        if (_state == ScanRequestState.Opening)
         {
-            _state = state;
-            _scanRequestPb = scanRequestPb;
-            _schema = schema;
-            _isFaultTolerant = isFaultTolerant;
+            var newRequest = _scanRequestPb.NewScanRequest;
 
-            MethodName = "Scan";
-            ReplicaSelection = replicaSelection;
-            TableId = tableId;
-            Tablet = tablet;
-            PartitionKey = partitionKey;
-            NeedsAuthzToken = true;
+            // Set tabletId here, as we don't know what tablet the request is
+            // going to until GetTabletAsync() is called and that tablet is
+            // set on this RPC.
+            newRequest.TabletId = ByteString.CopyFromUtf8(Tablet.TabletId);
 
-            if (scanRequestPb.NewScanRequest != null &&
-                scanRequestPb.NewScanRequest.ColumnPredicates.Count > 0)
+            if (AuthzToken != null)
+                newRequest.AuthzToken = AuthzToken;
+
+            // If the last propagated timestamp is set, send it with the scan.
+            if (newRequest.ReadMode != ReadModePB.ReadYourWrites &&
+                PropagatedTimestamp != KuduClient.NoTimestamp)
             {
-                RequiredFeatures = _columnPredicateRequiredFeature;
+                newRequest.PropagatedTimestamp = (ulong)PropagatedTimestamp;
             }
         }
 
-        public void Dispose()
+        return _scanRequestPb.CalculateSize();
+    }
+
+    public override void WriteTo(IBufferWriter<byte> output) => _scanRequestPb.WriteTo(output);
+
+    public override void ParseResponse(KuduMessage message)
+    {
+        ClearOutput();
+
+        var response = ScanResponsePB.Parser.ParseFrom(message.MessageProtobuf);
+        var error = response.Error;
+
+        Error = error;
+
+        if (error is null)
         {
-            ClearOutput();
+            Output = GetOutput(response, message);
+            return;
         }
 
-        public void TakeOutput()
+        switch (error.Code)
+        {
+            case TabletServerErrorPB.Types.Code.TabletNotFound:
+            case TabletServerErrorPB.Types.Code.TabletNotRunning:
+                if (_state == ScanRequestState.Opening ||
+                    (_state == ScanRequestState.Next && _isFaultTolerant))
+                {
+                    // Doing this will trigger finding the new location.
+                    return;
+                }
+                else
+                {
+                    var statusIncomplete = KuduStatus.Incomplete("Cannot continue scanning, " +
+                        "the tablet has moved and this isn't a fault tolerant scan");
+                    throw new NonRecoverableException(statusIncomplete);
+                }
+            case TabletServerErrorPB.Types.Code.ScannerExpired:
+                if (_isFaultTolerant)
+                {
+                    var status = KuduStatus.FromTabletServerErrorPB(error);
+                    throw new FaultTolerantScannerExpiredException(status);
+                }
+
+                break;
+        }
+    }
+
+    private ScanResponse GetOutput(ScanResponsePB responsePb, KuduMessage message)
+    {
+        var scannerId = responsePb.HasScannerId
+            ? responsePb.ScannerId.ToByteArray()
+            : null;
+
+        var scanTimestamp = responsePb.HasSnapTimestamp
+            ? (long)responsePb.SnapTimestamp
+            : KuduClient.NoTimestamp;
+
+        var propagatedTimestamp = responsePb.HasPropagatedTimestamp
+            ? (long)responsePb.PropagatedTimestamp
+            : KuduClient.NoTimestamp;
+
+        var lastPrimaryKey = responsePb.HasLastPrimaryKey
+            ? responsePb.LastPrimaryKey.ToByteArray()
+            : null;
+
+        var resultSet = ResultSetFactory.Create(_schema, responsePb, message);
+
+        return new ScanResponse(
+            scannerId,
+            resultSet,
+            responsePb.HasMoreResults,
+            scanTimestamp,
+            propagatedTimestamp,
+            lastPrimaryKey,
+            responsePb.ResourceMetrics);
+    }
+
+    private void ClearOutput()
+    {
+        var output = Output;
+        if (output is not null)
         {
             Output = null;
-        }
-
-        public override int CalculateSize()
-        {
-            if (_state == ScanRequestState.Opening)
-            {
-                var newRequest = _scanRequestPb.NewScanRequest;
-
-                // Set tabletId here, as we don't know what tablet the request is
-                // going to until GetTabletAsync() is called and that tablet is
-                // set on this RPC.
-                newRequest.TabletId = ByteString.CopyFromUtf8(Tablet.TabletId);
-
-                if (AuthzToken != null)
-                    newRequest.AuthzToken = AuthzToken;
-
-                // If the last propagated timestamp is set, send it with the scan.
-                if (newRequest.ReadMode != ReadModePB.ReadYourWrites &&
-                    PropagatedTimestamp != KuduClient.NoTimestamp)
-                {
-                    newRequest.PropagatedTimestamp = (ulong)PropagatedTimestamp;
-                }
-            }
-
-            return _scanRequestPb.CalculateSize();
-        }
-
-        public override void WriteTo(IBufferWriter<byte> output) => _scanRequestPb.WriteTo(output);
-
-        public override void ParseResponse(KuduMessage message)
-        {
-            ClearOutput();
-
-            var response = ScanResponsePB.Parser.ParseFrom(message.MessageProtobuf);
-            var error = response.Error;
-
-            Error = error;
-
-            if (error is null)
-            {
-                Output = GetOutput(response, message);
-                return;
-            }
-
-            switch (error.Code)
-            {
-                case TabletServerErrorPB.Types.Code.TabletNotFound:
-                case TabletServerErrorPB.Types.Code.TabletNotRunning:
-                    if (_state == ScanRequestState.Opening ||
-                        (_state == ScanRequestState.Next && _isFaultTolerant))
-                    {
-                        // Doing this will trigger finding the new location.
-                        return;
-                    }
-                    else
-                    {
-                        var statusIncomplete = KuduStatus.Incomplete("Cannot continue scanning, " +
-                            "the tablet has moved and this isn't a fault tolerant scan");
-                        throw new NonRecoverableException(statusIncomplete);
-                    }
-                case TabletServerErrorPB.Types.Code.ScannerExpired:
-                    if (_isFaultTolerant)
-                    {
-                        var status = KuduStatus.FromTabletServerErrorPB(error);
-                        throw new FaultTolerantScannerExpiredException(status);
-                    }
-
-                    break;
-            }
-        }
-
-        private ScanResponse GetOutput(ScanResponsePB responsePb, KuduMessage message)
-        {
-            var scannerId = responsePb.HasScannerId
-                ? responsePb.ScannerId.ToByteArray()
-                : null;
-
-            var scanTimestamp = responsePb.HasSnapTimestamp
-                ? (long)responsePb.SnapTimestamp
-                : KuduClient.NoTimestamp;
-
-            var propagatedTimestamp = responsePb.HasPropagatedTimestamp
-                ? (long)responsePb.PropagatedTimestamp
-                : KuduClient.NoTimestamp;
-
-            var lastPrimaryKey = responsePb.HasLastPrimaryKey
-                ? responsePb.LastPrimaryKey.ToByteArray()
-                : null;
-
-            var resultSet = ResultSetFactory.Create(_schema, responsePb, message);
-
-            return new ScanResponse(
-                scannerId,
-                resultSet,
-                responsePb.HasMoreResults,
-                scanTimestamp,
-                propagatedTimestamp,
-                lastPrimaryKey,
-                responsePb.ResourceMetrics);
-        }
-
-        private void ClearOutput()
-        {
-            var output = Output;
-            if (output is not null)
-            {
-                Output = null;
-                output.ResultSet.Dispose();
-            }
+            output.ResultSet.Dispose();
         }
     }
+}
 
-    public enum ScanRequestState
-    {
-        Opening,
-        Next,
-        Closing
-    }
+public enum ScanRequestState
+{
+    Opening,
+    Next,
+    Closing
 }

@@ -3,26 +3,25 @@ using Google.Protobuf;
 using Knet.Kudu.Client.Protobuf.Master;
 using Knet.Kudu.Client.Protocol;
 
-namespace Knet.Kudu.Client.Requests
+namespace Knet.Kudu.Client.Requests;
+
+internal sealed class DeleteTableRequest : KuduMasterRpc<DeleteTableResponsePB>
 {
-    internal sealed class DeleteTableRequest : KuduMasterRpc<DeleteTableResponsePB>
+    private readonly DeleteTableRequestPB _request;
+
+    public DeleteTableRequest(DeleteTableRequestPB request)
     {
-        private readonly DeleteTableRequestPB _request;
+        MethodName = "DeleteTable";
+        _request = request;
+    }
 
-        public DeleteTableRequest(DeleteTableRequestPB request)
-        {
-            MethodName = "DeleteTable";
-            _request = request;
-        }
+    public override int CalculateSize() => _request.CalculateSize();
 
-        public override int CalculateSize() => _request.CalculateSize();
+    public override void WriteTo(IBufferWriter<byte> output) => _request.WriteTo(output);
 
-        public override void WriteTo(IBufferWriter<byte> output) => _request.WriteTo(output);
-
-        public override void ParseResponse(KuduMessage message)
-        {
-            Output = DeleteTableResponsePB.Parser.ParseFrom(message.MessageProtobuf);
-            Error = Output.Error;
-        }
+    public override void ParseResponse(KuduMessage message)
+    {
+        Output = DeleteTableResponsePB.Parser.ParseFrom(message.MessageProtobuf);
+        Error = Output.Error;
     }
 }

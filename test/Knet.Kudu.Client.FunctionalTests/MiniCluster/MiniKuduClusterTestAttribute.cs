@@ -3,31 +3,30 @@ using System.Runtime.InteropServices;
 using Knet.Kudu.Binary;
 using McMaster.Extensions.Xunit;
 
-namespace Knet.Kudu.Client.FunctionalTests.MiniCluster
+namespace Knet.Kudu.Client.FunctionalTests.MiniCluster;
+
+[AttributeUsage(AttributeTargets.Method | AttributeTargets.Class | AttributeTargets.Assembly, AllowMultiple = true)]
+public class MiniKuduClusterTestAttribute : Attribute, ITestCondition
 {
-    [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class | AttributeTargets.Assembly, AllowMultiple = true)]
-    public class MiniKuduClusterTestAttribute : Attribute, ITestCondition
+    private static readonly Lazy<bool> _hasKuduMiniCluster = new Lazy<bool>(HasKuduMiniCluster);
+
+    public bool IsMet => _hasKuduMiniCluster.Value;
+
+    public string SkipReason => "This test requires Linux with Kudu installed.";
+
+    private static bool HasKuduMiniCluster()
     {
-        private static readonly Lazy<bool> _hasKuduMiniCluster = new Lazy<bool>(HasKuduMiniCluster);
-
-        public bool IsMet => _hasKuduMiniCluster.Value;
-
-        public string SkipReason => "This test requires Linux with Kudu installed.";
-
-        private static bool HasKuduMiniCluster()
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            try
             {
-                try
-                {
-                    // This method throws an exception if Kudu can't be found.
-                    KuduBinaryLocator.FindBinary("kudu");
-                    return true;
-                }
-                catch { }
+                // This method throws an exception if Kudu can't be found.
+                KuduBinaryLocator.FindBinary("kudu");
+                return true;
             }
-
-            return false;
+            catch { }
         }
+
+        return false;
     }
 }

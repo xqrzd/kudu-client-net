@@ -1,36 +1,35 @@
 using System;
 
-namespace Knet.Kudu.Client.Exceptions
+namespace Knet.Kudu.Client.Exceptions;
+
+/// <summary>
+/// Exception indicating that an operation attempted to access a
+/// non-covered range partition.
+/// </summary>
+public class NonCoveredRangeException : NonRecoverableException
 {
-    /// <summary>
-    /// Exception indicating that an operation attempted to access a
-    /// non-covered range partition.
-    /// </summary>
-    public class NonCoveredRangeException : NonRecoverableException
+    public byte[] NonCoveredRangeStart;
+
+    public byte[] NonCoveredRangeEnd;
+
+    public NonCoveredRangeException(
+        byte[] nonCoveredRangeStart,
+        byte[] nonCoveredRangeEnd)
+        : base(KuduStatus.NotFound(GetMessage(
+            nonCoveredRangeStart, nonCoveredRangeEnd)))
     {
-        public byte[] NonCoveredRangeStart;
+        NonCoveredRangeStart = nonCoveredRangeStart;
+        NonCoveredRangeEnd = nonCoveredRangeEnd;
+    }
 
-        public byte[] NonCoveredRangeEnd;
+    private static string GetMessage(byte[] start, byte[] end)
+    {
+        var startStr = start == null || start.Length == 0 ?
+            "<start>" : BitConverter.ToString(start);
 
-        public NonCoveredRangeException(
-            byte[] nonCoveredRangeStart,
-            byte[] nonCoveredRangeEnd)
-            : base(KuduStatus.NotFound(GetMessage(
-                nonCoveredRangeStart, nonCoveredRangeEnd)))
-        {
-            NonCoveredRangeStart = nonCoveredRangeStart;
-            NonCoveredRangeEnd = nonCoveredRangeEnd;
-        }
+        var endStr = end == null || end.Length == 0 ?
+            "<end>" : BitConverter.ToString(end);
 
-        private static string GetMessage(byte[] start, byte[] end)
-        {
-            var startStr = start == null || start.Length == 0 ?
-                "<start>" : BitConverter.ToString(start);
-
-            var endStr = end == null || end.Length == 0 ?
-                "<end>" : BitConverter.ToString(end);
-
-            return $"[{startStr}, {endStr})";
-        }
+        return $"[{startStr}, {endStr})";
     }
 }
