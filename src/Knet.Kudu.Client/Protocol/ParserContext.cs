@@ -4,7 +4,6 @@ using Google.Protobuf.Collections;
 using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protobuf.Rpc;
-using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Protocol;
 

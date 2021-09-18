@@ -3,9 +3,11 @@
 
 #if NETSTANDARD2_0
 
+using System;
+using System.Buffers;
 using System.Diagnostics;
 
-namespace System.Buffers;
+namespace Knet.Kudu.Client.Internal;
 
 /// <summary>
 /// Represents a heap-based, array-backed output sink into which <typeparam name="T"/> data can be written.

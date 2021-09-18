@@ -1,7 +1,7 @@
 using System;
 using System.Buffers;
 
-namespace Knet.Kudu.Client.Util;
+namespace Knet.Kudu.Client.Internal;
 
 internal static class SequenceReaderExtensions
 {
