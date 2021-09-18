@@ -9,7 +9,7 @@ namespace Knet.Kudu.Client.Internal
     /// cache. A subsequent operation that requires an authz token (e.g. writes,
     /// scans) will fetch it from the cache and attach it to the operation request.
     /// </summary>
-    public class AuthzTokenCache
+    internal sealed class AuthzTokenCache
     {
         // Map from a table ID to an authz token for that table.
         private readonly ConcurrentDictionary<string, SignedTokenPB> _cache;

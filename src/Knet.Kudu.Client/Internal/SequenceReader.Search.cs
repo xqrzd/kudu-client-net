@@ -10,7 +10,7 @@ using System.Runtime.CompilerServices;
 
 namespace Knet.Kudu.Client
 {
-    public ref partial struct SequenceReader<T> where T : unmanaged, IEquatable<T>
+    internal ref partial struct SequenceReader<T> where T : unmanaged, IEquatable<T>
     {
         /// <summary>
         /// Try to read everything up to the given <paramref name="delimiter"/>.

@@ -2,9 +2,9 @@ using System;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
-namespace Knet.Kudu.Client.Util
+namespace Knet.Kudu.Client.Internal
 {
-    public static class SecurityUtil
+    internal static class SecurityUtil
     {
         public static byte[] GetEndpointChannelBindings(this X509Certificate2 certificate)
         {

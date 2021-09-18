@@ -1,3 +1,4 @@
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Util;
 using Xunit;
 

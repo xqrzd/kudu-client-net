@@ -6,7 +6,6 @@ using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protobuf.Transactions;
 using Knet.Kudu.Client.Requests;
-using Knet.Kudu.Client.Util;
 using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client

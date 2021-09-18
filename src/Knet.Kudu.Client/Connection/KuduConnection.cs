@@ -12,7 +12,6 @@ using Knet.Kudu.Client.Logging;
 using Knet.Kudu.Client.Protobuf.Rpc;
 using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Requests;
-using Knet.Kudu.Client.Util;
 using Microsoft.Extensions.Logging;
 using static Knet.Kudu.Client.Protobuf.Rpc.ErrorStatusPB.Types;
 

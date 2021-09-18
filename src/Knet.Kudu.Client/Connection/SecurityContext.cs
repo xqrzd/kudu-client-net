@@ -5,9 +5,9 @@ using System.Linq;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using Google.Protobuf;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protobuf.Client;
 using Knet.Kudu.Client.Protobuf.Security;
-using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Connection
 {

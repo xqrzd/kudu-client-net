@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protobuf;
 using Knet.Kudu.Client.Scanner;
-using Knet.Kudu.Client.Util;
 using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client

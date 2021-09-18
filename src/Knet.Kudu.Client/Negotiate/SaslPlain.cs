@@ -1,7 +1,7 @@
 using System;
 using System.Net;
 using System.Text;
-using Knet.Kudu.Client.Util;
+using Knet.Kudu.Client.Internal;
 
 namespace Knet.Kudu.Client.Negotiate
 {

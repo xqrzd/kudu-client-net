@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 
 namespace Knet.Kudu.Client.Internal
 {
-    public static class KuduTypeValidation
+    internal static class KuduTypeValidation
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsOfType(this KuduType type, KuduTypeFlags types)

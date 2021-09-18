@@ -3,7 +3,7 @@ using System.Buffers;
 
 namespace Knet.Kudu.Client.Util
 {
-    public static class SequenceReaderExtensions
+    internal static class SequenceReaderExtensions
     {
         public static bool TryReadVarint(this ref SequenceReader<byte> reader, out int value)
         {

@@ -11,7 +11,7 @@ using System.Runtime.InteropServices;
 
 namespace Knet.Kudu.Client
 {
-    public static partial class SequenceReaderExtensions
+    internal static partial class SequenceReaderExtensions
     {
         /// <summary>
         /// Try to read the given type out of the buffer if possible. Warning: this is dangerous to use with arbitrary

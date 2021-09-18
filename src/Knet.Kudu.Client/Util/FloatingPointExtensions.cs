@@ -1,4 +1,5 @@
 using System;
+using Knet.Kudu.Client.Internal;
 
 namespace Knet.Kudu.Client.Util
 {

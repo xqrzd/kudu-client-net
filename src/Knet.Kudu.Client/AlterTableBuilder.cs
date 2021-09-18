@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Google.Protobuf;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protobuf;
 using Knet.Kudu.Client.Protobuf.Master;
-using Knet.Kudu.Client.Util;
 using static Knet.Kudu.Client.Protobuf.Master.AlterTableRequestPB.Types;
 
 namespace Knet.Kudu.Client

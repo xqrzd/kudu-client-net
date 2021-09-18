@@ -5,7 +5,6 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Logging;
-using Knet.Kudu.Client.Util;
 using Microsoft.Extensions.Logging;
 
 namespace Knet.Kudu.Client

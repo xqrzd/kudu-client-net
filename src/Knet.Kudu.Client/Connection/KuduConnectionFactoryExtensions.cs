@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protobuf.Master;
 using Knet.Kudu.Client.Tablet;
-using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client.Connection
 {

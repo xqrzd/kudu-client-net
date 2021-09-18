@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protobuf;
 using Knet.Kudu.Client.Protobuf.Client;
 using Knet.Kudu.Client.Tablet;
-using Knet.Kudu.Client.Util;
 
 namespace Knet.Kudu.Client
 {
