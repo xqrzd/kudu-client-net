@@ -1234,19 +1234,6 @@ public sealed class KuduClient : IAsyncDisposable
         }
     }
 
-    private ValueTask<MasterLeaderInfo> TryGetMasterLeaderInfoAsync(
-        CancellationToken cancellationToken)
-    {
-        var masterLeaderInfo = _masterLeaderInfo;
-        if (masterLeaderInfo is not null)
-        {
-            return new ValueTask<MasterLeaderInfo>(masterLeaderInfo);
-        }
-
-        var task = TryConnectToClusterAsync(cancellationToken);
-        return new ValueTask<MasterLeaderInfo>(task);
-    }
-
     /// <summary>
     /// Locate the leader master and retrieve the cluster information.
     /// </summary>
@@ -1451,7 +1438,7 @@ public sealed class KuduClient : IAsyncDisposable
                     {
                         KuduMasterRpc<T> masterRpc => SendRpcToMasterAsync(masterRpc, token),
                         KuduTabletRpc<T> tabletRpc => SendRpcToTabletAsync(tabletRpc, token),
-                        KuduTxnRpc<T> txnRpc => SendRpcToTxnAsync(txnRpc, token),
+                        KuduTxnRpc<T> txnRpc => SendRpcToTxnManagerAsync(txnRpc, token),
                         _ => throw new NotSupportedException()
                     };
 
@@ -1505,6 +1492,19 @@ public sealed class KuduClient : IAsyncDisposable
         }
     }
 
+    private ValueTask<MasterLeaderInfo> TryGetMasterLeaderInfoAsync(
+        CancellationToken cancellationToken)
+    {
+        var masterLeaderInfo = _masterLeaderInfo;
+        if (masterLeaderInfo is not null)
+        {
+            return new ValueTask<MasterLeaderInfo>(masterLeaderInfo);
+        }
+
+        var task = TryConnectToClusterAsync(cancellationToken);
+        return new ValueTask<MasterLeaderInfo>(task);
+    }
+
     private async Task<T> SendRpcToMasterAsync<T>(
         KuduMasterRpc<T> rpc, CancellationToken cancellationToken)
     {
@@ -1517,7 +1517,7 @@ public sealed class KuduClient : IAsyncDisposable
             .ConfigureAwait(false);
     }
 
-    private async Task<T> SendRpcToTxnAsync<T>(
+    private async Task<T> SendRpcToTxnManagerAsync<T>(
         KuduTxnRpc<T> rpc, CancellationToken cancellationToken)
     {
         var masterLeaderInfo = await TryGetMasterLeaderInfoAsync(cancellationToken)
@@ -1525,7 +1525,7 @@ public sealed class KuduClient : IAsyncDisposable
 
         var serverInfo = masterLeaderInfo.ServerInfo;
 
-        return await SendRpcToTxnAsync(rpc, serverInfo, cancellationToken)
+        return await SendRpcToTxnManagerAsync(rpc, serverInfo, cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -1637,7 +1637,7 @@ public sealed class KuduClient : IAsyncDisposable
         return rpc.Output;
     }
 
-    private async Task<T> SendRpcToTxnAsync<T>(
+    private async Task<T> SendRpcToTxnManagerAsync<T>(
         KuduTxnRpc<T> rpc,
         ServerInfo serverInfo,
         CancellationToken cancellationToken)
