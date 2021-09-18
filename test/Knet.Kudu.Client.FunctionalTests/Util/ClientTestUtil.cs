@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Xunit;
 
 namespace Knet.Kudu.Client.FunctionalTests.Util;
 
@@ -243,5 +244,39 @@ public static class ClientTestUtil
         rowStrings.Sort();
 
         return rowStrings;
+    }
+
+    public static async Task WaitUntilRowCountAsync(KuduScanner scanner, int rowCount)
+    {
+        long readCount = 0;
+
+        for (int i = 0; i < 10; i++)
+        {
+            readCount = await CountRowsInScanAsync(scanner);
+
+            if (readCount == rowCount)
+                return;
+
+            await Task.Delay(TimeSpan.FromSeconds(1));
+        }
+
+        Assert.Equal(rowCount, readCount);
+    }
+
+    public static async Task<T> WaitUntilAsync<T>(Func<T, bool> predicate, Func<Task<T>> action)
+    {
+        T result = default;
+
+        for (int i = 0; i < 10; i++)
+        {
+            result = await action();
+
+            if (predicate(result))
+                return result;
+
+            await Task.Delay(TimeSpan.FromSeconds(1));
+        }
+
+        return result;
     }
 }
