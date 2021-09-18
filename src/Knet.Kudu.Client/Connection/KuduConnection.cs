@@ -78,10 +78,9 @@ namespace Knet.Kudu.Client.Connection
             var callId = AddInflightRpc(inflightRpc);
             header.CallId = callId;
 
-            using var _ = cancellationToken.Register(
-                s => ((InflightRpc)s).TrySetCanceled(),
-                state: inflightRpc,
-                useSynchronizationContext: false);
+            using var _ = cancellationToken.UnsafeRegister(
+                static (state, token) => ((InflightRpc)state).TrySetCanceled(token),
+                inflightRpc);
 
             try
             {

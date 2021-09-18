@@ -74,12 +74,12 @@ namespace Knet.Kudu.Client
 
         public Task FlushAsync(CancellationToken cancellationToken = default)
         {
-            return DoFlushAsync().WithCancellation(cancellationToken);
+            return DoFlushAsync(cancellationToken).WaitAsync(cancellationToken);
         }
 
-        private async Task DoFlushAsync()
+        private async Task DoFlushAsync(CancellationToken cancellationToken)
         {
-            await _singleFlush.WaitAsync().ConfigureAwait(false);
+            await _singleFlush.WaitAsync(cancellationToken).ConfigureAwait(false);
 
             try
             {
@@ -119,9 +119,9 @@ namespace Knet.Kudu.Client
 
                 if (batch.Count == 0)
                 {
-                    // It's possible to read 0 items when,
-                    // 1) A flush was triggered when the queue was empty.
-                    // 2) The session was disposed when the queue was empty.
+                    // It's possible to read 0 items when the queue is empty and,
+                    // 1) A flush was triggered
+                    // 2) The session was disposed
 
                     if (flush)
                     {
@@ -215,8 +215,7 @@ namespace Knet.Kudu.Client
 
         private void CompletePendingFlush()
         {
-            // Make a new CancellationToken before releasing the
-            // flush task.
+            // Make a new CancellationToken before releasing the flush task.
             _flushCts.Dispose();
             _flushCts = new CancellationTokenSource();
 
@@ -236,7 +235,7 @@ namespace Knet.Kudu.Client
                 _logger.ExceptionSendingSessionData(ex);
 
                 var exceptionHandler = _options.ExceptionHandler;
-                if (exceptionHandler != null)
+                if (exceptionHandler is not null)
                 {
                     var queueCopy = new List<KuduOperation>(queue);
                     var exceptionContext = new SessionExceptionContext(ex, queueCopy);

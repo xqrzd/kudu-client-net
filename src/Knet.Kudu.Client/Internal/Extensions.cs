@@ -29,8 +29,20 @@ namespace Knet.Kudu.Client.Internal
         public static bool SequenceEqual<T>(this T[] array, ReadOnlySpan<T> other)
             where T : IEquatable<T> => MemoryExtensions.SequenceEqual(array, other);
 
+#if !NET6_0_OR_GREATER
+        public static CancellationTokenRegistration UnsafeRegister(
+            this CancellationToken cancellationToken,
+            Action<object, CancellationToken> callback, object state)
+        {
+#if NETCOREAPP3_1_OR_GREATER
+            return cancellationToken.UnsafeRegister(s => callback(s, cancellationToken), state);
+#else
+            return cancellationToken.Register(s => callback(s, cancellationToken), state);
+#endif
+        }
+
         // https://github.com/dotnet/runtime/blob/master/src/libraries/Common/src/System/Threading/Tasks/TaskTimeoutExtensions.cs
-        public static Task WithCancellation(this Task task, CancellationToken cancellationToken)
+        public static Task WaitAsync(this Task task, CancellationToken cancellationToken)
         {
             if (task.IsCompleted || !cancellationToken.CanBeCanceled)
             {
@@ -47,13 +59,10 @@ namespace Knet.Kudu.Client.Internal
             static async Task WithCancellationCore(Task task, CancellationToken cancellationToken)
             {
                 var tcs = new TaskCompletionSource();
-#if NET5_0_OR_GREATER
-                using var _ = cancellationToken.UnsafeRegister(
-                    static s => ((TaskCompletionSource)s).TrySetResult(), tcs);
-#else
+
                 using var _ = cancellationToken.Register(
-                    static s => ((TaskCompletionSource)s).TrySetResult(), tcs);
-#endif
+                    static state => ((TaskCompletionSource)state).TrySetResult(), tcs);
+
                 if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
                 {
                     throw new TaskCanceledException(Task.FromCanceled(cancellationToken));
@@ -62,6 +71,7 @@ namespace Knet.Kudu.Client.Internal
                 task.GetAwaiter().GetResult(); // Already completed; propagate any exception.
             }
         }
+#endif
 
         public static int NextClearBit(this BitArray array, int from)
         {

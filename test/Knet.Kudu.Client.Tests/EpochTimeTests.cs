@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.InteropServices;
 using Knet.Kudu.Client.Util;
 using Xunit;
 
@@ -28,8 +27,7 @@ namespace Knet.Kudu.Client.Tests
         {
             var dateTime = DateTime.Parse("2016-08-19T12:12:12.1210000");
             var micros = 1471626732121000;
-            var timeZone = TimeZoneInfo.FindSystemTimeZoneById(
-                GetTimeZone("Central Standard Time", "America/Chicago"));
+            var timeZone = TimeZoneInfo.FindSystemTimeZoneById("America/Chicago");
 
             var utcTime = TimeZoneInfo.ConvertTimeToUtc(dateTime, timeZone);
             var localTime = utcTime.ToLocalTime();
@@ -63,9 +61,5 @@ namespace Knet.Kudu.Client.Tests
             var fromDays = EpochTime.FromUnixTimeDays(days);
             Assert.Equal(date, fromDays);
         }
-
-        // https://github.com/dotnet/corefx/issues/11897
-        private string GetTimeZone(string windows, string iana) =>
-            RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? windows : iana;
     }
 }

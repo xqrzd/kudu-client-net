@@ -25,8 +25,7 @@ namespace Knet.Kudu.Client.Util
         /// <summary>
         /// Unix epoch zero-point: January 1, 1970 (midnight UTC/GMT).
         /// </summary>
-        public static readonly DateTime UnixEpoch =
-            new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        public static readonly DateTime UnixEpoch = new(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
         /// <summary>
         /// Converts the given <see cref="DateTime"/> to microseconds since the
