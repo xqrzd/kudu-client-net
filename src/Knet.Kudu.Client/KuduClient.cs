@@ -1223,8 +1223,15 @@ public sealed class KuduClient : IAsyncDisposable
             return new ValueTask<MasterLeaderInfo>(masterLeaderInfo);
         }
 
-        var task = ConnectToClusterAsync(cancellationToken);
+        var task = ConnectAsync(cancellationToken);
         return new ValueTask<MasterLeaderInfo>(task);
+
+        async Task<MasterLeaderInfo> ConnectAsync(CancellationToken cancellationToken)
+        {
+            var rpc = new ConnectToMasterRequest();
+            await SendRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
+            return _masterLeaderInfo;
+        }
     }
 
     /// <summary>
@@ -1431,7 +1438,7 @@ public sealed class KuduClient : IAsyncDisposable
                     {
                         KuduMasterRpc<T> masterRpc => SendRpcToMasterAsync(masterRpc, token),
                         KuduTabletRpc<T> tabletRpc => SendRpcToTabletAsync(tabletRpc, token),
-                        KuduTxnRpc<T> txnRpc => SendRpcToTxnAsync(txnRpc, token),
+                        KuduTxnRpc<T> txnRpc => SendRpcToTxnManagerAsync(txnRpc, token),
                         _ => throw new NotSupportedException()
                     };
 
@@ -1485,28 +1492,50 @@ public sealed class KuduClient : IAsyncDisposable
         }
     }
 
-    private async Task<T> SendRpcToMasterAsync<T>(
+    private Task<T> SendRpcToMasterAsync<T>(
         KuduMasterRpc<T> rpc, CancellationToken cancellationToken)
     {
-        var masterLeaderInfo = await GetMasterLeaderInfoAsync(cancellationToken)
-            .ConfigureAwait(false);
+        var masterLeaderInfo = _masterLeaderInfo;
+        if (masterLeaderInfo is not null)
+        {
+            var serverInfo = masterLeaderInfo.ServerInfo;
+            return SendRpcToMasterAsync(rpc, serverInfo, cancellationToken);
+        }
 
-        var serverInfo = masterLeaderInfo.ServerInfo;
+        return SendAsync(rpc, cancellationToken);
 
-        return await SendRpcToMasterAsync(rpc, serverInfo, cancellationToken)
-            .ConfigureAwait(false);
+        async Task<T> SendAsync(KuduMasterRpc<T> rpc, CancellationToken cancellationToken)
+        {
+            var masterLeaderInfo = await ConnectToClusterAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            var serverInfo = masterLeaderInfo.ServerInfo;
+            return await SendRpcToMasterAsync(rpc, serverInfo, cancellationToken)
+                .ConfigureAwait(false);
+        }
     }
 
-    private async Task<T> SendRpcToTxnAsync<T>(
+    private Task<T> SendRpcToTxnManagerAsync<T>(
         KuduTxnRpc<T> rpc, CancellationToken cancellationToken)
     {
-        var masterLeaderInfo = await GetMasterLeaderInfoAsync(cancellationToken)
-            .ConfigureAwait(false);
+        var masterLeaderInfo = _masterLeaderInfo;
+        if (masterLeaderInfo is not null)
+        {
+            var serverInfo = masterLeaderInfo.ServerInfo;
+            return SendRpcToTxnManagerAsync(rpc, serverInfo, cancellationToken);
+        }
 
-        var serverInfo = masterLeaderInfo.ServerInfo;
+        return SendAsync(rpc, cancellationToken);
 
-        return await SendRpcToTxnAsync(rpc, serverInfo, cancellationToken)
-            .ConfigureAwait(false);
+        async Task<T> SendAsync(KuduTxnRpc<T> rpc, CancellationToken cancellationToken)
+        {
+            var masterLeaderInfo = await ConnectToClusterAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            var serverInfo = masterLeaderInfo.ServerInfo;
+            return await SendRpcToTxnManagerAsync(rpc, serverInfo, cancellationToken)
+                .ConfigureAwait(false);
+        }
     }
 
     /// <summary>
@@ -1617,7 +1646,7 @@ public sealed class KuduClient : IAsyncDisposable
         return rpc.Output;
     }
 
-    private async Task<T> SendRpcToTxnAsync<T>(
+    private async Task<T> SendRpcToTxnManagerAsync<T>(
         KuduTxnRpc<T> rpc,
         ServerInfo serverInfo,
         CancellationToken cancellationToken)
