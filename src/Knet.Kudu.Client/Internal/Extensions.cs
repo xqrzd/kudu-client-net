@@ -59,13 +59,10 @@ namespace Knet.Kudu.Client.Internal
             static async Task WithCancellationCore(Task task, CancellationToken cancellationToken)
             {
                 var tcs = new TaskCompletionSource();
-#if NET5_0_OR_GREATER
-                using var _ = cancellationToken.UnsafeRegister(
-                    static s => ((TaskCompletionSource)s).TrySetResult(), tcs);
-#else
+
                 using var _ = cancellationToken.Register(
-                    static s => ((TaskCompletionSource)s).TrySetResult(), tcs);
-#endif
+                    static state => ((TaskCompletionSource)state).TrySetResult(), tcs);
+
                 if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
                 {
                     throw new TaskCanceledException(Task.FromCanceled(cancellationToken));
