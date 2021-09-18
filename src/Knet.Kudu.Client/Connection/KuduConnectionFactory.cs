@@ -39,7 +39,11 @@ namespace Knet.Kudu.Client.Connection
 
             try
             {
-                await ConnectAsync(socket, endpoint, cancellationToken).ConfigureAwait(false);
+#if NET5_0_OR_GREATER
+                await socket.ConnectAsync(endpoint, cancellationToken).ConfigureAwait(false);
+#else
+                await socket.ConnectAsync(endpoint).ConfigureAwait(false);
+#endif
 
                 var negotiator = new Negotiator(_options, _securityContext, _loggerFactory, serverInfo, socket);
                 return await negotiator.NegotiateAsync(cancellationToken).ConfigureAwait(false);
@@ -85,20 +89,6 @@ namespace Knet.Kudu.Client.Connection
         {
             return IPAddress.IsLoopback(ipAddress) || _localIPs.Contains(ipAddress);
         }
-
-#if NET5_0_OR_GREATER
-        private static ValueTask ConnectAsync(
-            Socket socket, EndPoint endpoint, CancellationToken cancellationToken)
-        {
-            return socket.ConnectAsync(endpoint, cancellationToken);
-        }
-#else
-        private static Task ConnectAsync(
-            Socket socket, EndPoint endpoint, CancellationToken cancellationToken)
-        {
-            return socket.ConnectAsync(endpoint);
-        }
-#endif
 
         private static async Task<IPAddress[]> GetHostAddressesAsync(string hostName)
         {

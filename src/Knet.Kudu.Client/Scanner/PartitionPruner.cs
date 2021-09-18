@@ -19,8 +19,7 @@ namespace Knet.Kudu.Client.Scanner
         /// <summary>
         /// A partition pruner that will prune all partitions.
         /// </summary>
-        private static PartitionPruner Empty =>
-            new PartitionPruner(new Stack<PartitionKeyRange>());
+        private static PartitionPruner Empty => new(new Stack<PartitionKeyRange>());
 
         public static PartitionPruner Create<TBuilder>(
             AbstractKuduScannerBuilder<TBuilder> scanBuilder)

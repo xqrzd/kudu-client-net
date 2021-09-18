@@ -131,7 +131,7 @@ namespace Knet.Kudu.Client.FunctionalTests
             }
         }
 
-        private async ValueTask InsertRowsAsync(
+        private static async ValueTask InsertRowsAsync(
             IKuduSession session, KuduTable table, int startRow, int numRows)
         {
             var end = startRow + numRows;
