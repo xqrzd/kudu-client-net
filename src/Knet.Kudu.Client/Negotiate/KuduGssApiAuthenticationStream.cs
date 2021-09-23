@@ -30,7 +30,6 @@ namespace Knet.Kudu.Client.Negotiate;
 public sealed class KuduGssApiAuthenticationStream : Stream
 {
     private const int HandshakeDoneId = 20;
-    private const int HandshakeErrId = 21;
     private const int HandshakeId = 22;
     private const int DefaultMajorV = 1;
     private const int DefaultMinorV = 0;
