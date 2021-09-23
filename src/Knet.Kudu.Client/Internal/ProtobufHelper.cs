@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using Google.Protobuf;
@@ -265,6 +266,21 @@ internal static class ProtobufHelper
             columnIds.Add(column.Id);
 
         return columnIds;
+    }
+
+    public static void WriteDelimitedTo(IMessage message, IBufferWriter<byte> output)
+    {
+        var messageLength = message.CalculateSize();
+        var messageLengthSize = CodedOutputStream.ComputeLengthSize(messageLength);
+        var totalSize = messageLength + messageLengthSize;
+
+        var buffer = output.GetSpan(totalSize);
+
+        WriteRawVarint32(buffer, (uint)messageLength);
+        buffer = buffer.Slice(messageLengthSize);
+
+        message.WriteTo(buffer.Slice(0, messageLength));
+        output.Advance(totalSize);
     }
 
     public static int WriteRawVarint32(Span<byte> buffer, uint value)
