@@ -94,7 +94,7 @@ public sealed class KuduTlsAuthenticationStream : Stream
         int available = totalLength - _readPosition;
         if (available == 0)
         {
-            _result = await _negotiator.ReceiveTlsHandshakeAsync(cancellationToken)
+            _result = await _negotiator.ReceiveResponseAsync(cancellationToken)
                 .ConfigureAwait(false);
 
             available = _result.TlsHandshake.Length;
