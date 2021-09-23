@@ -1,10 +1,13 @@
-using System;
-using System.Buffers;
-using System.Runtime.CompilerServices;
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+
+// https://github.com/CommunityToolkit/WindowsCommunityToolkit/blob/main/Microsoft.Toolkit.HighPerformance/Buffers/ArrayPoolBufferWriter%7BT%7D.cs
 
 #nullable enable
 
-// https://github.com/CommunityToolkit/WindowsCommunityToolkit/blob/main/Microsoft.Toolkit.HighPerformance/Buffers/ArrayPoolBufferWriter%7BT%7D.cs
+using System;
+using System.Buffers;
+using System.Runtime.CompilerServices;
 
 namespace Knet.Kudu.Client.Internal;
 
