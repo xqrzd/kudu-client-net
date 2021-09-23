@@ -273,27 +273,23 @@ public class Negotiator
 
         gssApiStream.CompleteNegotiate(negotiateStream);
 
-        var tokenResponse = await SendGssApiTokenAsync(
-            NegotiateStep.SaslResponse,
-            Array.Empty<byte>(),
-            cancellationToken).ConfigureAwait(false);
+        var tokenResponse = await SendSaslResponseAsync(Array.Empty<byte>(), cancellationToken)
+            .ConfigureAwait(false);
 
         var token = tokenResponse.Token;
         // NegotiateStream expects a little-endian length header.
         var newToken = new byte[token.Length + 4];
         BinaryPrimitives.WriteInt32LittleEndian(newToken, token.Length);
-        token.Memory.Span.CopyTo(newToken.AsSpan(4));
+        token.Span.CopyTo(newToken.AsSpan(4));
 
         var decryptedToken = gssApiStream.DecryptBuffer(newToken);
-        var encryptedToken = gssApiStream.EncryptBuffer(decryptedToken);
+        var encryptedToken = gssApiStream.EncryptBuffer(decryptedToken.Span);
 
         // Remove the little-endian length header added by NegotiateStream.
         encryptedToken = encryptedToken.Slice(4);
 
-        var response = await SendGssApiTokenAsync(
-            NegotiateStep.SaslResponse,
-            encryptedToken,
-            cancellationToken).ConfigureAwait(false);
+        var response = await SendSaslResponseAsync(encryptedToken, cancellationToken)
+            .ConfigureAwait(false);
 
         AssertStep(NegotiateStep.SaslSuccess, response.Step);
 
@@ -321,18 +317,18 @@ public class Negotiator
             }
         }
 
-        byte[] nonce = null;
-
         if (response.Nonce is not null)
         {
-            nonce = gssApiStream.EncryptBuffer(response.Nonce.Memory).ToArray();
+            var nonce = gssApiStream.EncryptBuffer(response.Nonce.Span);
 
             // NegotiateStream writes a little-endian length header,
             // but Kudu is expecting big-endian.
-            nonce.AsSpan(0, 4).Reverse();
+            nonce.Span.Slice(0, 4).Reverse();
+
+            return new ConnectionContextPB { EncodedNonce = UnsafeByteOperations.UnsafeWrap(nonce) };
         }
 
-        return new ConnectionContextPB { EncodedNonce = UnsafeByteOperations.UnsafeWrap(nonce) };
+        return _defaultConnectionContextPb;
     }
 
     private async Task<ConnectionContextPB> AuthenticateTokenAsync(CancellationToken cancellationToken)
@@ -376,24 +372,30 @@ public class Negotiator
         return SendAsync(request, cancellationToken);
     }
 
-    internal Task<NegotiatePB> ReceiveTlsHandshakeAsync(CancellationToken cancellationToken)
-    {
-        return ReceiveAsync(cancellationToken);
-    }
-
-    internal Task<NegotiatePB> SendGssApiTokenAsync(
-        NegotiateStep step, ReadOnlyMemory<byte> saslToken, CancellationToken cancellationToken)
+    internal Task SendSaslInitiateAsync(
+        ReadOnlyMemory<byte> saslToken,
+        CancellationToken cancellationToken)
     {
         var request = new NegotiatePB
         {
-            Step = step,
+            Step = NegotiateStep.SaslInitiate,
             Token = UnsafeByteOperations.UnsafeWrap(saslToken)
         };
 
-        if (step == NegotiateStep.SaslInitiate)
+        request.SaslMechanisms.Add(new SaslMechanism { Mechanism = "GSSAPI" });
+
+        return SendAsync(request, cancellationToken);
+    }
+
+    internal Task<NegotiatePB> SendSaslResponseAsync(
+        ReadOnlyMemory<byte> saslToken,
+        CancellationToken cancellationToken)
+    {
+        var request = new NegotiatePB
         {
-            request.SaslMechanisms.Add(new SaslMechanism { Mechanism = "GSSAPI" });
-        }
+            Step = NegotiateStep.SaslResponse,
+            Token = UnsafeByteOperations.UnsafeWrap(saslToken)
+        };
 
         return SendReceiveAsync(request, cancellationToken);
     }
@@ -407,7 +409,7 @@ public class Negotiator
     private async Task<NegotiatePB> SendReceiveAsync(NegotiatePB request, CancellationToken cancellationToken)
     {
         await SendAsync(request, cancellationToken).ConfigureAwait(false);
-        var response = await ReceiveAsync(cancellationToken).ConfigureAwait(false);
+        var response = await ReceiveResponseAsync(cancellationToken).ConfigureAwait(false);
         return response;
     }
 
@@ -428,7 +430,7 @@ public class Negotiator
         await _stream.WriteAsync(writer.WrittenMemory, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<NegotiatePB> ReceiveAsync(CancellationToken cancellationToken)
+    internal async Task<NegotiatePB> ReceiveResponseAsync(CancellationToken cancellationToken)
     {
         using var buffer = new ArrayPoolBufferWriter<byte>(4096);
 
