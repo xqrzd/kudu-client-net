@@ -215,8 +215,9 @@ public class KuduConnection
     private void HandleRpc(ParserContext parserContext)
     {
         var header = parserContext.Header;
+        var callId = header.CallId;
 
-        if (TryGetInflightRpc(header, out var inflightRpc))
+        if (TryGetInflightRpc(callId, out var inflightRpc))
         {
             var message = parserContext.Message;
 
@@ -240,9 +241,12 @@ public class KuduConnection
                 }
             }
         }
-        // Else: We couldn't match the incoming CallId to an inflight RPC,
-        // probably because the RPC timed out (on our side) and was removed.
-        // TODO: Log this event.
+        else
+        {
+            // We couldn't match the incoming CallId to an inflight RPC, probably
+            // because the RPC timed out on our side and was removed from _inflightRpcs.
+            _logger.ReceivedUnknownRpc(callId, _ioPipe.ToString());
+        }
     }
 
     private Exception GetException(ErrorStatusPB error)
@@ -296,11 +300,11 @@ public class KuduConnection
         }
     }
 
-    private bool TryGetInflightRpc(ResponseHeader header, out InflightRpc rpc)
+    private bool TryGetInflightRpc(int callId, out InflightRpc rpc)
     {
         lock (_inflightRpcs)
         {
-            return _inflightRpcs.TryGetValue(header.CallId, out rpc);
+            return _inflightRpcs.TryGetValue(callId, out rpc);
         }
     }
 
