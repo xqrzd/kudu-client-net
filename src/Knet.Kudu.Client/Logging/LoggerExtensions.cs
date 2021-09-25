@@ -92,5 +92,15 @@ namespace Knet.Kudu.Client.Logging
             string ScannerId,
             string Table,
             string TabletId);
+
+        [LoggerMessage(
+            EventId = 8,
+            Level = LogLevel.Warning,
+            EventName = "ReceivedUnknownRpc",
+            Message = "Received unknown RPC call ID {CallId} from {Server}")]
+        public static partial void ReceivedUnknownRpc(
+            this ILogger logger,
+            int CallId,
+            string Server);
     }
 }
