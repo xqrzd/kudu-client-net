@@ -102,5 +102,16 @@ namespace Knet.Kudu.Client.Logging
             this ILogger logger,
             int CallId,
             string Server);
+
+        [LoggerMessage(
+            EventId = 9,
+            Level = LogLevel.Information,
+            EventName = "TransactionKeepaliveTerminated",
+            Message = "Transaction keepalive terminated for TxnId {TxnId}")]
+        public static partial void TransactionKeepaliveTerminated(
+            this ILogger logger,
+            Exception exception,
+            long TxnId,
+            TimeSpan KeepaliveInterval);
     }
 }

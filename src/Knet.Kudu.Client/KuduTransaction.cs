@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Internal;
+using Knet.Kudu.Client.Logging;
 using Knet.Kudu.Client.Protobuf.Transactions;
 using Knet.Kudu.Client.Requests;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,7 @@ public sealed class KuduTransaction : IDisposable
 
     private readonly KuduClient _client;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly ILogger<KuduTransaction> _logger;
     private readonly long _txnId;
     private readonly TimeSpan _keepaliveInterval;
     private readonly PeriodicTimer _keepaliveTimer;
@@ -30,8 +32,9 @@ public sealed class KuduTransaction : IDisposable
             throw new ArgumentException("Invalid transaction id");
 
         _client = client;
-        _loggerFactory = loggerFactory;
         _txnId = txnId;
+        _loggerFactory = loggerFactory;
+        _logger = loggerFactory.CreateLogger<KuduTransaction>();
 
         if (keepaliveInterval > TimeSpan.Zero)
         {
@@ -201,9 +204,13 @@ public sealed class KuduTransaction : IDisposable
             {
                 await KeepTransactionAliveAsync().ConfigureAwait(false);
             }
+            catch (NonRecoverableException ex)
+            {
+                _logger.TransactionKeepaliveTerminated(ex, _txnId, _keepaliveInterval);
+                break;
+            }
             catch
             {
-                // TODO: Log warning
             }
         }
     }
