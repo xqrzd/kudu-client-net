@@ -321,7 +321,7 @@ public class KuduConnection
         }
 
         if (exception is not null)
-            _logger.ConnectionDisconnected(_ioPipe.ToString(), exception);
+            _logger.ConnectionDisconnected(exception, _ioPipe.ToString());
 
         var closedException = new RecoverableException(KuduStatus.IllegalState(
             $"Connection {_ioPipe} is disconnected."), exception);
