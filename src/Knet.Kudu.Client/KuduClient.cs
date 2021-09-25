@@ -1855,10 +1855,9 @@ public sealed class KuduClient : IAsyncDisposable
 
         if (numAttempts > MaxRpcAttempts)
         {
-            // TODO: OperationCanceledException?
-            throw new NonRecoverableException(
-                KuduStatus.TimedOut($"Too many RPC attempts: {numAttempts}"),
-                exception);
+            throw new OperationCanceledException(
+                $"Too many RPC attempts: {numAttempts}",
+                rpc.Exception);
         }
     }
 
