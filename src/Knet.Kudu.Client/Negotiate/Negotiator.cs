@@ -67,8 +67,10 @@ public class Negotiator
 
     private Stream _stream;
     private X509Certificate2 _remoteCertificate;
-    private string _tlsLogInfo = "PLAINTEXT";
-    private string _negotiateLogInfo = "SASL_PLAIN";
+    private string _encryption = "PLAINTEXT";
+    private string _tlsCipher;
+    private string _authentication = "SASL/PLAIN";
+    private string _servicePrincipalName;
 
     public Negotiator(
         KuduClientOptions options,
@@ -127,8 +129,10 @@ public class Negotiator
         _logger.ConnectedToServer(
             _serverInfo.HostPort,
             _serverInfo.Endpoint.Address,
-            _tlsLogInfo,
-            _negotiateLogInfo,
+            _encryption,
+            _authentication,
+            _tlsCipher,
+            _servicePrincipalName,
             _serverInfo.IsLocal);
 
         var pipe = CreateDuplexPipe(useTls);
@@ -208,7 +212,8 @@ public class Negotiator
         await tlsStream.AuthenticateAsClientAsync(tlsHost).ConfigureAwait(false);
 
         _remoteCertificate = new X509Certificate2(tlsStream.RemoteCertificate);
-        _tlsLogInfo = GetTlsInfoLogString(tlsStream);
+        _encryption = tlsStream.SslProtocol.ToString();
+        _tlsCipher = GetNegotiatedCipherSuite(tlsStream);
 
         sslInnerStream.ReplaceStream(stream);
         return tlsStream;
@@ -257,7 +262,8 @@ public class Negotiator
         using var negotiateStream = new NegotiateStream(gssApiStream);
 
         var targetName = $"{_options.SaslProtocolName}/{_serverInfo.HostPort.Host}";
-        _negotiateLogInfo = $"SASL_GSSAPI [{targetName}]";
+        _authentication = "SASL/GSSAPI Kerberos";
+        _servicePrincipalName = targetName;
 
         // Hopefully a temporary hack-fix, until we can figure
         // out why EncryptAndSign doesn't work on Windows.
@@ -342,7 +348,7 @@ public class Negotiator
         var response = await SendReceiveAsync(request, cancellationToken).ConfigureAwait(false);
 
         AssertStep(NegotiateStep.TokenExchange, response.Step);
-        _negotiateLogInfo = "TOKEN_AUTH";
+        _authentication = "TOKEN";
 
         return _defaultConnectionContextPb;
     }
@@ -549,12 +555,12 @@ public class Negotiator
         return response;
     }
 
-    private static string GetTlsInfoLogString(SslStream tlsStream)
+    private static string GetNegotiatedCipherSuite(SslStream tlsStream)
     {
 #if NETCOREAPP3_1_OR_GREATER
-        return $"{tlsStream.SslProtocol.ToString().ToUpperInvariant()} [{tlsStream.NegotiatedCipherSuite}]";
+        return tlsStream.NegotiatedCipherSuite.ToString();
 #else
-            return $"{tlsStream.SslProtocol.ToString().ToUpperInvariant()}";
+        return "NA";
 #endif
     }
 

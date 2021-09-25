@@ -53,7 +53,7 @@ public sealed class ConnectionCache : IAsyncDisposable
             // Failed to negotiate a new connection.
             RemoveFaultedConnection(serverInfo, skipTaskStatusCheck: false);
 
-            _logger.UnableToConnectToServer(serverInfo, ex);
+            _logger.UnableToConnectToServer(ex, serverInfo);
 
             if (ex is NonRecoverableException)
             {

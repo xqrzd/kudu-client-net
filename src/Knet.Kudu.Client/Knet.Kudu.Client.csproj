@@ -4,7 +4,7 @@
     <TargetFrameworks>net6.0;net5.0;netstandard2.0;netstandard2.1;netcoreapp3.1;</TargetFrameworks>
     <LangVersion>latest</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <NoWarn>CS1591</NoWarn>
+    <NoWarn>CS1591;SYSLIB1015</NoWarn>
 
     <PackageId>$(AssemblyName)</PackageId>
     <Version>0.1.0-preview.4</Version>
@@ -24,7 +24,7 @@
 
   <ItemGroup>
     <PackageReference Include="Google.Protobuf" Version="3.18.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="2.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.0-rc.1.21451.13" />
     <PackageReference Include="Pipelines.Sockets.Unofficial" Version="2.2.0" />
     <PackageReference Include="System.IO.Pipelines" Version="6.0.0-rc.1.21451.13" />
   </ItemGroup>

@@ -1849,11 +1849,10 @@ public sealed class KuduClient : IAsyncDisposable
             rpc.Exception = exception;
         }
 
-        rpc.Attempt++;
+        var numAttempts = rpc.Attempt++;
 
-        _logger.RecoverableRpcException(exception);
+        _logger.RecoverableRpcException(exception, numAttempts);
 
-        var numAttempts = rpc.Attempt;
         if (numAttempts > MaxRpcAttempts)
         {
             // TODO: OperationCanceledException?

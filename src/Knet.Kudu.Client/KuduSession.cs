@@ -232,7 +232,7 @@ public sealed class KuduSession : IKuduSession
         }
         catch (Exception ex)
         {
-            _logger.ExceptionSendingSessionData(ex);
+            _logger.ExceptionFlushingSessionData(ex, queue.Count, _txnId);
 
             var exceptionHandler = _options.ExceptionHandler;
             if (exceptionHandler is not null)

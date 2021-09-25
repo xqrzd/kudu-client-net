@@ -127,18 +127,15 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
             // means we were in between tablets.
             if (Tablet != null)
             {
-                using var rpc = GetCloseRequest();
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-
                 try
                 {
+                    using var rpc = GetCloseRequest();
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
                     await _client.SendRpcAsync(rpc, cts.Token)
                         .ConfigureAwait(false);
                 }
-                catch (Exception ex)
-                {
-                    _logger.ExceptionClosingScanner(ex);
-                }
+                catch { }
             }
 
             _closed = true;
@@ -316,7 +313,7 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
         }
         catch (FaultTolerantScannerExpiredException)
         {
-            _logger.ScannerExpired(_scannerId, Tablet);
+            _logger.ScannerExpired(_scannerId, _table.TableName, Tablet);
 
             // If encountered FaultTolerantScannerExpiredException, it means the
             // fault tolerant scanner on the server side expired. Therefore, open
