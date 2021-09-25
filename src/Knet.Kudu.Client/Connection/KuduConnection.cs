@@ -243,8 +243,8 @@ public class KuduConnection
         }
         else
         {
-            // We couldn't match the incoming CallId to an inflight RPC,
-            // probably because the RPC timed out (on our side) and was removed.
+            // We couldn't match the incoming CallId to an inflight RPC, probably
+            // because the RPC timed out on our side and was removed from _inflightRpcs.
             _logger.ReceivedUnknownRpc(callId, _ioPipe.ToString());
         }
     }
