@@ -5,7 +5,7 @@ namespace Knet.Kudu.Client.Internal;
 
 internal static class AvlTreeExtensions
 {
-    public static TableLocationEntry FloorEntry(
+    public static TableLocationEntry? FloorEntry(
         this AvlTree avlTree, ReadOnlySpan<byte> partitionKey)
     {
         avlTree.SearchLeftRight(

@@ -12,7 +12,7 @@ public class RecoverableException : KuduException
     {
     }
 
-    public RecoverableException(KuduStatus status, Exception innerException)
+    public RecoverableException(KuduStatus status, Exception? innerException)
         : base(status, innerException)
     {
     }

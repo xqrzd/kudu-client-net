@@ -3,10 +3,9 @@
 
 // https://github.com/CommunityToolkit/WindowsCommunityToolkit/blob/main/Microsoft.Toolkit.HighPerformance/Buffers/ArrayPoolBufferWriter%7BT%7D.cs
 
-#nullable enable
-
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace Knet.Kudu.Client.Internal;
@@ -197,21 +196,25 @@ internal sealed class ArrayPoolBufferWriter<T> : IBufferWriter<T>, IDisposable
         _array = newArray;
     }
 
+    [DoesNotReturn]
     private static void ThrowArgumentOutOfRangeExceptionForNegativeCount()
     {
         throw new ArgumentOutOfRangeException("count", "The count can't be a negative value");
     }
 
+    [DoesNotReturn]
     private static void ThrowArgumentOutOfRangeExceptionForNegativeSizeHint()
     {
         throw new ArgumentOutOfRangeException("sizeHint", "The size hint can't be a negative value");
     }
 
+    [DoesNotReturn]
     private static void ThrowArgumentExceptionForAdvancedTooFar()
     {
         throw new ArgumentException("The buffer writer has advanced too far");
     }
 
+    [DoesNotReturn]
     private static void ThrowObjectDisposedException()
     {
         throw new ObjectDisposedException("The current buffer has already been disposed");

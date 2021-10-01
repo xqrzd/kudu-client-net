@@ -57,7 +57,7 @@ public class KuduSchema
     public KuduSchema(List<ColumnSchema> columns, int isDeletedIndex = -1)
         : this(columns, null, isDeletedIndex) { }
 
-    public KuduSchema(List<ColumnSchema> columns, List<int> columnIds, int isDeletedIndex = -1)
+    public KuduSchema(List<ColumnSchema> columns, List<int>? columnIds, int isDeletedIndex = -1)
     {
         var hasColumnIds = columnIds != null;
         if (hasColumnIds)
@@ -91,7 +91,7 @@ public class KuduSchema
             _columnsByName.Add(column.Name, i);
 
             if (hasColumnIds)
-                _columnsById.Add(columnIds[i], i);
+                _columnsById.Add(columnIds![i], i);
 
             if (column.IsKey)
                 _primaryKeyColumns.Add(column);

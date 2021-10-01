@@ -24,10 +24,10 @@ public class NonCoveredRangeException : NonRecoverableException
 
     private static string GetMessage(byte[] start, byte[] end)
     {
-        var startStr = start == null || start.Length == 0 ?
+        var startStr = start is null || start.Length == 0 ?
             "<start>" : BitConverter.ToString(start);
 
-        var endStr = end == null || end.Length == 0 ?
+        var endStr = end is null || end.Length == 0 ?
             "<end>" : BitConverter.ToString(end);
 
         return $"[{startStr}, {endStr})";

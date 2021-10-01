@@ -11,12 +11,28 @@ namespace Knet.Kudu.Client;
 
 public class KuduClientBuilder
 {
+    private static readonly PipeOptions _defaultSendOptions = new(
+        readerScheduler: PipeScheduler.ThreadPool,
+        writerScheduler: PipeScheduler.ThreadPool,
+        pauseWriterThreshold: 1024 * 1024 * 4,  // 4MB
+        resumeWriterThreshold: 1024 * 1024 * 2, // 2MB
+        minimumSegmentSize: 4096,
+        useSynchronizationContext: false);
+
+    private static readonly PipeOptions _defaultReceiveOptions = new(
+        readerScheduler: PipeScheduler.ThreadPool,
+        writerScheduler: PipeScheduler.ThreadPool,
+        pauseWriterThreshold: 1024 * 1024 * 128, // 128MB
+        resumeWriterThreshold: 1024 * 1024 * 64, // 64MB
+        minimumSegmentSize: 1024 * 1024, // 1MB
+        useSynchronizationContext: false);
+
     private readonly IReadOnlyList<HostAndPort> _masterAddresses;
     private ILoggerFactory _loggerFactory = NullLoggerFactory.Instance;
     private TimeSpan _defaultOperationTimeout = TimeSpan.FromSeconds(30);
     private string _saslProtocolName = "kudu";
-    private PipeOptions _sendPipeOptions;
-    private PipeOptions _receivePipeOptions;
+    private PipeOptions _sendPipeOptions = _defaultSendOptions;
+    private PipeOptions _receivePipeOptions = _defaultReceiveOptions;
 
     public KuduClientBuilder(string masterAddresses)
     {
@@ -25,7 +41,12 @@ public class KuduClientBuilder
 
         foreach (var master in masters)
         {
-            var hostPort = EndpointParser.TryParse(master.Trim(), 7051);
+            var address = master.Trim();
+            if (!EndpointParser.TryParse(address, 7051, out var hostPort))
+            {
+                throw new ArgumentException($"Failed to parse a master address: {address}");
+            }
+
             results.Add(hostPort);
         }
 
@@ -79,14 +100,12 @@ public class KuduClientBuilder
 
     public KuduClientOptions BuildOptions()
     {
-        var options = new KuduClientOptions(
+        return new KuduClientOptions(
             _masterAddresses,
             _defaultOperationTimeout,
             _saslProtocolName,
             _sendPipeOptions,
             _receivePipeOptions);
-
-        return options;
     }
 
     public KuduClient Build()

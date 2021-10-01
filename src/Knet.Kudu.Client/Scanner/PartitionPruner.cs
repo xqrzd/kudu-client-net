@@ -377,7 +377,7 @@ public class PartitionPruner
         {
             ColumnSchema column = schema.GetColumn(idx);
 
-            if (!predicates.TryGetValue(column.Name, out KuduPredicate predicate))
+            if (!predicates.TryGetValue(column.Name, out var predicate))
                 break;
 
             PredicateType predicateType = predicate.Type;
@@ -391,12 +391,12 @@ public class PartitionPruner
             if (predicateType == PredicateType.Range ||
                 predicateType == PredicateType.Equality)
             {
-                row.SetRaw(idx, predicate.Lower);
+                row.SetRaw(idx, predicate.Lower!);
                 pushedPredicates++;
             }
             else if (predicateType == PredicateType.InList)
             {
-                row.SetRaw(idx, predicate.InListValues.Min);
+                row.SetRaw(idx, predicate.InListValues!.Min!);
                 pushedPredicates++;
             }
             else
@@ -426,7 +426,7 @@ public class PartitionPruner
     {
         var row = new PartialRow(schema);
         int pushedPredicates = 0;
-        KuduPredicate finalPredicate = null;
+        KuduPredicate? finalPredicate = null;
 
         List<int> rangePartitionColumnIdxs = IdsToIndexes(schema, rangeSchema.ColumnIds);
 
@@ -436,14 +436,14 @@ public class PartitionPruner
         {
             ColumnSchema column = schema.GetColumn(idx);
 
-            if (!predicates.TryGetValue(column.Name, out KuduPredicate predicate))
+            if (!predicates.TryGetValue(column.Name, out var predicate))
                 break;
 
             PredicateType predicateType = predicate.Type;
 
             if (predicateType == PredicateType.Equality)
             {
-                row.SetRaw(idx, predicate.Lower);
+                row.SetRaw(idx, predicate.Lower!);
                 pushedPredicates++;
                 finalPredicate = predicate;
             }
@@ -468,7 +468,7 @@ public class PartitionPruner
             }
             else if (predicateType == PredicateType.InList)
             {
-                row.SetRaw(idx, predicate.InListValues.Max);
+                row.SetRaw(idx, predicate.InListValues!.Max!);
                 pushedPredicates++;
                 finalPredicate = predicate;
             }
@@ -487,8 +487,8 @@ public class PartitionPruner
 
         // Step 2: If the final predicate is an equality or IN-list predicate, increment the
         // key to convert it to an exclusive upper bound.
-        if (finalPredicate.Type == PredicateType.Equality ||
-            finalPredicate.Type == PredicateType.InList)
+        if (finalPredicate!.Type == PredicateType.Equality ||
+            finalPredicate!.Type == PredicateType.InList)
         {
             // If the increment fails then this bound is is not constraining the keyspace.
             if (!IncrementKey(row, rangePartitionColumnIdxs.GetRange(0, pushedPredicates)))
@@ -522,7 +522,7 @@ public class PartitionPruner
         {
             ColumnSchema column = schema.GetColumn(idx);
 
-            if (!predicates.TryGetValue(column.Name, out KuduPredicate predicate) ||
+            if (!predicates.TryGetValue(column.Name, out var predicate) ||
                 predicate.Type != PredicateType.Equality &&
                 predicate.Type != PredicateType.InList)
             {
@@ -542,11 +542,11 @@ public class PartitionPruner
 
             if (predicate.Type == PredicateType.Equality)
             {
-                predicateValues = new SortedSet<byte[]> { predicate.Lower };
+                predicateValues = new SortedSet<byte[]> { predicate.Lower! };
             }
             else
             {
-                predicateValues = predicate.InListValues;
+                predicateValues = predicate.InListValues!;
             }
 
             // For each of the encoded string, replicate it by the number of values in

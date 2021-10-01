@@ -49,18 +49,18 @@ public class RemoteTablet : IEquatable<RemoteTablet>
 
     public IReadOnlyList<KuduReplica> Replicas => _cache.Replicas;
 
-    public ServerInfo GetServerInfo(
-        ReplicaSelection replicaSelection, string location = null)
+    public ServerInfo? GetServerInfo(
+        ReplicaSelection replicaSelection, string? location = null)
     {
         return _cache.GetServerInfo(replicaSelection, location);
     }
 
-    public ServerInfo GetLeaderServerInfo() => _cache.GetLeaderServerInfo();
+    public ServerInfo? GetLeaderServerInfo() => _cache.GetLeaderServerInfo();
 
     /// <summary>
     /// Return the current leader, or null if there is none.
     /// </summary>
-    public KuduReplica GetLeaderReplica() => _cache.GetLeaderReplica();
+    public KuduReplica? GetLeaderReplica() => _cache.GetLeaderReplica();
 
     public RemoteTablet DemoteLeader(string uuid)
     {
@@ -74,9 +74,15 @@ public class RemoteTablet : IEquatable<RemoteTablet>
         return new RemoteTablet(TableId, TabletId, Partition, cache);
     }
 
-    public bool Equals(RemoteTablet other) => TabletId == other.TabletId;
+    public bool Equals(RemoteTablet? other)
+    {
+        if (other is null)
+            return false;
 
-    public override bool Equals(object obj) => Equals(obj as RemoteTablet);
+        return TabletId == other.TabletId;
+    }
+
+    public override bool Equals(object? obj) => Equals(obj as RemoteTablet);
 
     public override int GetHashCode() => TabletId.GetHashCode();
 

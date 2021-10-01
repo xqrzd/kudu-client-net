@@ -6,12 +6,12 @@ public class ColumnBuilder
     private readonly KuduType _type;
     private bool _isKey;
     private bool _isNullable;
-    private object _defaultValue;
+    private object? _defaultValue;
     private int _desiredBlockSize;
     private EncodingType _encoding;
     private CompressionType _compression;
-    private ColumnTypeAttributes _typeAttributes;
-    private string _comment;
+    private ColumnTypeAttributes? _typeAttributes;
+    private string? _comment;
 
     public ColumnBuilder(string name, KuduType type)
     {

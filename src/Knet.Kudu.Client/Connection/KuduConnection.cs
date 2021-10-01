@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO.Pipelines;
 using System.Threading;
 using System.Threading.Tasks;
@@ -29,7 +30,7 @@ public class KuduConnection
     private readonly Task _receiveTask;
 
     private int _nextCallId;
-    private RecoverableException _closedException;
+    private RecoverableException? _closedException;
     private DisconnectedCallback _disconnectedCallback;
 
     public KuduConnection(IDuplexPipe ioPipe, ILoggerFactory loggerFactory)
@@ -53,7 +54,7 @@ public class KuduConnection
         return _receiveTask;
     }
 
-    public void OnDisconnected(Action<Exception, object> callback, object state)
+    public void OnDisconnected(Action<Exception, object?> callback, object? state)
     {
         lock (_inflightRpcs)
         {
@@ -79,7 +80,7 @@ public class KuduConnection
         header.CallId = callId;
 
         using var _ = cancellationToken.UnsafeRegister(
-            static (state, token) => ((InflightRpc)state).TrySetCanceled(token),
+            static (state, token) => ((InflightRpc)state!).TrySetCanceled(token),
             inflightRpc);
 
         try
@@ -164,7 +165,7 @@ public class KuduConnection
 
     private async Task ReceiveAsync(PipeReader reader)
     {
-        Exception exception = null;
+        Exception? exception = null;
         using var parserContext = new ParserContext();
 
         try
@@ -214,7 +215,7 @@ public class KuduConnection
 
     private void HandleRpc(ParserContext parserContext)
     {
-        var header = parserContext.Header;
+        var header = parserContext.Header!;
         var callId = header.CallId;
 
         if (TryGetInflightRpc(callId, out var inflightRpc))
@@ -245,7 +246,7 @@ public class KuduConnection
         {
             // We couldn't match the incoming CallId to an inflight RPC, probably
             // because the RPC timed out on our side and was removed from _inflightRpcs.
-            _logger.ReceivedUnknownRpc(callId, _ioPipe.ToString());
+            _logger.ReceivedUnknownRpc(callId, _ioPipe.ToString()!);
         }
     }
 
@@ -300,7 +301,7 @@ public class KuduConnection
         }
     }
 
-    private bool TryGetInflightRpc(int callId, out InflightRpc rpc)
+    private bool TryGetInflightRpc(int callId, [MaybeNullWhen(false)] out InflightRpc rpc)
     {
         lock (_inflightRpcs)
         {
@@ -311,7 +312,7 @@ public class KuduConnection
     /// <summary>
     /// Stops accepting new RPCs and completes any outstanding RPCs with exceptions.
     /// </summary>
-    private async Task ShutdownAsync(Exception exception = null)
+    private async Task ShutdownAsync(Exception? exception)
     {
         await _singleWriter.WaitAsync().ConfigureAwait(false);
         try
@@ -325,7 +326,7 @@ public class KuduConnection
         }
 
         if (exception is not null)
-            _logger.ConnectionDisconnected(exception, _ioPipe.ToString());
+            _logger.ConnectionDisconnected(exception, _ioPipe.ToString()!);
 
         var closedException = new RecoverableException(KuduStatus.IllegalState(
             $"Connection {_ioPipe} is disconnected."), exception);
@@ -354,12 +355,12 @@ public class KuduConnection
     {
         try
         {
-            _disconnectedCallback.Invoke(exception.InnerException);
+            _disconnectedCallback.Invoke(exception);
         }
         catch { }
     }
 
-    public override string ToString() => _ioPipe.ToString();
+    public override string? ToString() => _ioPipe.ToString();
 
     private static ValueTask<ReadResult> ReadAsync(PipeReader reader, ParserContext context)
     {
@@ -383,10 +384,10 @@ public class KuduConnection
 
     private readonly struct DisconnectedCallback
     {
-        private readonly Action<Exception, object> _callback;
-        private readonly object _state;
+        private readonly Action<Exception, object?> _callback;
+        private readonly object? _state;
 
-        public DisconnectedCallback(Action<Exception, object> callback, object state)
+        public DisconnectedCallback(Action<Exception, object?> callback, object? state)
         {
             _callback = callback;
             _state = state;

@@ -65,7 +65,7 @@ public sealed class KuduConnectionFactory : IKuduConnectionFactory
         {
             var endpoint = new IPEndPoint(ipAddress, hostPort.Port);
             var isLocal = IsLocal(ipAddress);
-            var serverInfo = new ServerInfo("master", hostPort, endpoint, null, isLocal);
+            var serverInfo = new ServerInfo("master", hostPort, endpoint, location: null, isLocal);
 
             servers.Add(serverInfo);
         }
@@ -74,7 +74,7 @@ public sealed class KuduConnectionFactory : IKuduConnectionFactory
     }
 
     public async Task<ServerInfo> GetTabletServerInfoAsync(
-        HostAndPort hostPort, string uuid, string location, CancellationToken cancellationToken = default)
+        HostAndPort hostPort, string uuid, string? location, CancellationToken cancellationToken = default)
     {
         var ipAddresses = await GetHostAddressesAsync(hostPort.Host).ConfigureAwait(false);
         var ipAddress = ipAddresses[0];
@@ -92,13 +92,13 @@ public sealed class KuduConnectionFactory : IKuduConnectionFactory
 
     private static async Task<IPAddress[]> GetHostAddressesAsync(string hostName)
     {
-        Exception exception = null;
+        Exception? exception = null;
 
         try
         {
             var ipAddresses = await Dns.GetHostAddressesAsync(hostName).ConfigureAwait(false);
 
-            if (ipAddresses is not null && ipAddresses.Length > 0)
+            if (ipAddresses.Length > 0)
             {
                 return ipAddresses;
             }

@@ -1,5 +1,3 @@
-using System;
-
 namespace Knet.Kudu.Client.Exceptions;
 
 /// <summary>
@@ -9,11 +7,6 @@ public class FaultTolerantScannerExpiredException : NonRecoverableException
 {
     public FaultTolerantScannerExpiredException(KuduStatus status)
         : base(status)
-    {
-    }
-
-    public FaultTolerantScannerExpiredException(KuduStatus status, Exception innerException)
-        : base(status, innerException)
     {
     }
 }

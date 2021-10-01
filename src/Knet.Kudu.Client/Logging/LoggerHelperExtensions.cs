@@ -41,9 +41,9 @@ internal static class LoggerHelperExtensions
 
     public static void ScannerExpired(
         this ILogger logger,
-        byte[] scannerId,
+        byte[]? scannerId,
         string tableName,
-        RemoteTablet tablet)
+        RemoteTablet? tablet)
     {
         var scannerIdStr = scannerId?.ToStringUtf8();
         var tabletId = tablet?.TabletId;

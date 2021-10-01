@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Pipelines;
 using System.Net;
@@ -63,14 +64,14 @@ public class Negotiator
     /// This is fetched from <see cref="ISecurityContext"/> in the constructor to
     /// ensure that it doesn't change over the course of a negotiation attempt.
     /// </summary>
-    private readonly SignedTokenPB _authnToken;
+    private readonly SignedTokenPB? _authnToken;
 
     private Stream _stream;
-    private X509Certificate2 _remoteCertificate;
+    private X509Certificate2? _remoteCertificate;
     private string _encryption = "PLAINTEXT";
-    private string _tlsCipher;
+    private string? _tlsCipher;
     private string _authentication = "SASL/PLAIN";
-    private string _servicePrincipalName;
+    private string? _servicePrincipalName;
 
     public Negotiator(
         KuduClientOptions options,
@@ -85,6 +86,7 @@ public class Negotiator
         _securityContext = securityContext;
         _serverInfo = serverInfo;
         _socket = socket;
+        _stream = new NetworkStream(_socket, ownsSocket: false);
 
         if (securityContext.IsAuthenticationTokenImported)
         {
@@ -95,8 +97,6 @@ public class Negotiator
 
     public async Task<KuduConnection> NegotiateAsync(CancellationToken cancellationToken = default)
     {
-        _stream = new NetworkStream(_socket, ownsSocket: false);
-
         await SendConnectionHeaderAsync(cancellationToken).ConfigureAwait(false);
         var features = await NegotiateFeaturesAsync(cancellationToken).ConfigureAwait(false);
 
@@ -211,7 +211,7 @@ public class Negotiator
 
         await tlsStream.AuthenticateAsClientAsync(tlsHost).ConfigureAwait(false);
 
-        _remoteCertificate = new X509Certificate2(tlsStream.RemoteCertificate);
+        _remoteCertificate = new X509Certificate2(tlsStream.RemoteCertificate!);
         _encryption = tlsStream.SslProtocol.ToString();
         _tlsCipher = GetNegotiatedCipherSuite(tlsStream);
 
@@ -573,12 +573,14 @@ public class Negotiator
         }
     }
 
+    [DoesNotReturn]
     private static void ThrowInvalidCallIdException(int callId)
     {
         throw new NonRecoverableException(KuduStatus.IllegalState(
             $"Expected CallId {SaslNegotiationCallId}, got {callId}"));
     }
 
+    [DoesNotReturn]
     private static void ThrowRpcException(ErrorStatusPB error)
     {
         var code = error.Code;

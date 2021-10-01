@@ -9,7 +9,7 @@ namespace Knet.Kudu.Client.Connection;
 
 public static class KuduConnectionFactoryExtensions
 {
-    public static Task<ServerInfo> GetServerInfoAsync(
+    public static Task<ServerInfo?> GetServerInfoAsync(
         this IKuduConnectionFactory connectionFactory,
         TSInfoPB tsInfo)
     {
@@ -19,14 +19,15 @@ public static class KuduConnectionFactoryExtensions
 
         if (addresses.Count == 0)
         {
-            return Task.FromResult<ServerInfo>(null);
+            // Received a tablet server with no addresses.
+            return Task.FromResult<ServerInfo?>(null);
         }
 
         // TODO: if the TS advertises multiple host/ports, pick the right one
         // based on some kind of policy. For now just use the first always.
         var hostPort = addresses[0].ToHostAndPort();
 
-        return connectionFactory.GetTabletServerInfoAsync(hostPort, uuid, location);
+        return connectionFactory.GetTabletServerInfoAsync(hostPort, uuid, location)!;
     }
 
     public static async Task<List<RemoteTablet>> GetTabletsAsync(
@@ -43,7 +44,10 @@ public static class KuduConnectionFactoryExtensions
             var serverInfo = await GetServerInfoAsync(connectionFactory, tsInfo)
                 .ConfigureAwait(false);
 
-            internedServers.Add(serverInfo);
+            if (serverInfo is not null)
+            {
+                internedServers.Add(serverInfo);
+            }
         }
 
         foreach (var tabletInfo in locations.TabletLocations)

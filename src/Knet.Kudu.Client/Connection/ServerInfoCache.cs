@@ -46,7 +46,7 @@ public class ServerInfoCache
     /// leader replica for this tablet. Returns null if we don't know who
     /// the leader is.
     /// </summary>
-    public ServerInfo GetLeaderServerInfo()
+    public ServerInfo? GetLeaderServerInfo()
     {
         // Check if we have a leader.
         if (_leaderIndex == -1)
@@ -67,7 +67,7 @@ public class ServerInfoCache
     /// </list>
     /// </summary>
     /// <param name="location">The location of the client.</param>
-    public ServerInfo GetClosestServerInfo(string location = null)
+    public ServerInfo? GetClosestServerInfo(string? location = null)
     {
         // This method returns
         // 1. a randomly picked server among local servers, if there is one based
@@ -78,7 +78,7 @@ public class ServerInfoCache
 
         var servers = _servers;
         int numServers = servers.Count;
-        ServerInfo result = null;
+        ServerInfo? result = null;
         Span<byte> localServers = stackalloc byte[numServers];
         Span<byte> serversInSameLocation = stackalloc byte[numServers];
         int randomIndex = _randomIndex;
@@ -129,7 +129,7 @@ public class ServerInfoCache
     /// </summary>
     /// <param name="replicaSelection">Replica selection mechanism to use.</param>
     /// <param name="location">The location of the client.</param>
-    public ServerInfo GetServerInfo(ReplicaSelection replicaSelection, string location = null)
+    public ServerInfo? GetServerInfo(ReplicaSelection replicaSelection, string? location = null)
     {
         if (replicaSelection == ReplicaSelection.LeaderOnly)
             return GetLeaderServerInfo();
@@ -142,7 +142,7 @@ public class ServerInfoCache
     /// leader replica for this tablet. Returns null if we don't know who
     /// the leader is.
     /// </summary>
-    public KuduReplica GetLeaderReplica()
+    public KuduReplica? GetLeaderReplica()
     {
         // Check if we have a leader.
         if (_leaderIndex == -1)

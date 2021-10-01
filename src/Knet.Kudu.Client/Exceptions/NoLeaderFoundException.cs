@@ -10,7 +10,7 @@ namespace Knet.Kudu.Client.Exceptions;
 /// </summary>
 public class NoLeaderFoundException : RecoverableException
 {
-    public NoLeaderFoundException(IEnumerable<string> results, Exception innerException)
+    public NoLeaderFoundException(IEnumerable<string> results, Exception? innerException)
         : base(KuduStatus.NetworkError(GetMessage(results)), innerException)
     {
     }

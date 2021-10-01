@@ -16,17 +16,17 @@ public class KuduPredicate : IEquatable<KuduPredicate>
     /// The inclusive lower bound value if this is a Range predicate, or
     /// the createEquality value if this is an Equality predicate.
     /// </summary>
-    internal byte[] Lower { get; }
+    internal byte[]? Lower { get; }
 
     /// <summary>
     /// The exclusive upper bound value if this is a Range predicate.
     /// </summary>
-    internal byte[] Upper { get; }
+    internal byte[]? Upper { get; }
 
     /// <summary>
     /// In-list values.
     /// </summary>
-    internal SortedSet<byte[]> InListValues { get; }
+    internal SortedSet<byte[]>? InListValues { get; }
 
     public PredicateType Type { get; }
 
@@ -42,7 +42,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
     /// or the equality value if this is an Equality predicate.
     /// </param>
     /// <param name="upper">The upper bound serialized value if this is a Range predicate.</param>
-    public KuduPredicate(PredicateType type, ColumnSchema column, byte[] lower, byte[] upper)
+    public KuduPredicate(PredicateType type, ColumnSchema column, byte[]? lower, byte[]? upper)
     {
         Type = type;
         Column = column;
@@ -62,7 +62,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
         InListValues = inListValues;
     }
 
-    public bool Equals(KuduPredicate other)
+    public bool Equals(KuduPredicate? other)
     {
         if (other is null)
             return false;
@@ -77,7 +77,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
             InListEquals(other.InListValues);
     }
 
-    private bool InListEquals(SortedSet<byte[]> other)
+    private bool InListEquals(SortedSet<byte[]>? other)
     {
         if (InListValues is null && other is null)
             return true;
@@ -88,7 +88,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
         return InListValues.SetEquals(other);
     }
 
-    public override bool Equals(object obj) => Equals(obj as KuduPredicate);
+    public override bool Equals(object? obj) => Equals(obj as KuduPredicate);
 
     public override int GetHashCode() => HashCode.Combine(Type, Column);
 
@@ -127,7 +127,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
                 {
                     if (other.Type == PredicateType.Equality)
                     {
-                        if (Compare(Column, Lower, other.Lower) != 0)
+                        if (Compare(Column, Lower!, other.Lower!) != 0)
                         {
                             return None(Column);
                         }
@@ -138,7 +138,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
                     }
                     else if (other.Type == PredicateType.Range)
                     {
-                        if (other.RangeContains(Lower))
+                        if (other.RangeContains(Lower!))
                         {
                             return this;
                         }
@@ -162,9 +162,9 @@ public class KuduPredicate : IEquatable<KuduPredicate>
                     else
                     {
                         CheckPredicateType(other.Type, PredicateType.Range);
-                        byte[] newLower = other.Lower == null ||
+                        byte[]? newLower = other.Lower == null ||
                             (Lower != null && Compare(Column, Lower, other.Lower) >= 0) ? Lower : other.Lower;
-                        byte[] newUpper = other.Upper == null ||
+                        byte[]? newUpper = other.Upper == null ||
                             (Upper != null && Compare(Column, Upper, other.Upper) <= 0) ? Upper : other.Upper;
                         if (newLower != null && newUpper != null && Compare(Column, newLower, newUpper) >= 0)
                         {
@@ -187,7 +187,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
                 {
                     if (other.Type == PredicateType.Equality)
                     {
-                        if (InListValues.Contains(other.Lower))
+                        if (InListValues!.Contains(other.Lower!))
                         {
                             return other;
                         }
@@ -200,7 +200,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
                     {
                         var comparer = new PredicateComparer(Column);
                         var values = new SortedSet<byte[]>(comparer);
-                        foreach (var value in InListValues)
+                        foreach (var value in InListValues!)
                         {
                             if (other.RangeContains(value))
                             {
@@ -214,9 +214,9 @@ public class KuduPredicate : IEquatable<KuduPredicate>
                         CheckPredicateType(other.Type, PredicateType.InList);
                         var comparer = new PredicateComparer(Column);
                         var values = new SortedSet<byte[]>(comparer);
-                        foreach (var value in InListValues)
+                        foreach (var value in InListValues!)
                         {
-                            if (other.InListValues.Contains(value))
+                            if (other.InListValues!.Contains(value))
                             {
                                 values.Add(value);
                             }
@@ -266,7 +266,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
                 predicate.InList = new ColumnPredicatePB.Types.InList();
 
                 var values = predicate.InList.Values;
-                values.Capacity = InListValues.Count;
+                values.Capacity = InListValues!.Count;
 
                 foreach (var value in InListValues)
                 {
@@ -291,12 +291,12 @@ public class KuduPredicate : IEquatable<KuduPredicate>
 
         switch (Type)
         {
-            case PredicateType.Equality: return $"`{name}` = {ValueToString(Lower)}";
+            case PredicateType.Equality: return $"`{name}` = {ValueToString(Lower!)}";
             case PredicateType.Range:
                 {
                     if (Lower is null)
                     {
-                        return $"`{name}` < {ValueToString(Upper)}";
+                        return $"`{name}` < {ValueToString(Upper!)}";
                     }
                     else if (Upper is null)
                     {
@@ -309,7 +309,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
                 }
             case PredicateType.InList:
                 {
-                    var strings = new List<string>(InListValues.Count);
+                    var strings = new List<string>(InListValues!.Count);
                     foreach (var value in InListValues)
                         strings.Add(ValueToString(value));
                     return $"`{name}` IN ({string.Join(", ", strings)})";
@@ -351,7 +351,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
 
     private decimal DecodeDecimal(ReadOnlySpan<byte> value)
     {
-        int scale = Column.TypeAttributes.Scale.GetValueOrDefault();
+        int scale = Column.TypeAttributes!.Scale.GetValueOrDefault();
 
         return KuduEncoder.DecodeDecimal(value, Column.Type, scale);
     }
@@ -636,7 +636,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
             KuduTypeFlags.Decimal64 |
             KuduTypeFlags.Decimal128);
 
-        var typeAttributes = column.TypeAttributes;
+        var typeAttributes = column.TypeAttributes!;
         int precision = typeAttributes.Precision.GetValueOrDefault();
         int scale = typeAttributes.Scale.GetValueOrDefault();
 
@@ -854,14 +854,14 @@ public class KuduPredicate : IEquatable<KuduPredicate>
             {
                 foreach (var value in values)
                 {
-                    encoded.Add(KuduEncoder.EncodeDateTime((DateTime)(object)value));
+                    encoded.Add(KuduEncoder.EncodeDateTime((DateTime)(object)value!));
                 }
             }
             else if (type == KuduType.Date)
             {
                 foreach (var value in values)
                 {
-                    encoded.Add(KuduEncoder.EncodeDate((DateTime)(object)value));
+                    encoded.Add(KuduEncoder.EncodeDate((DateTime)(object)value!));
                 }
             }
             else
@@ -873,15 +873,16 @@ public class KuduPredicate : IEquatable<KuduPredicate>
         else if (typeof(T) == typeof(decimal))
         {
             var type = column.Type;
-            var precision = column.TypeAttributes.Precision.GetValueOrDefault();
-            var scale = column.TypeAttributes.Scale.GetValueOrDefault();
+            var typeAttributes = column.TypeAttributes!;
+            var precision = typeAttributes.Precision.GetValueOrDefault();
+            var scale = typeAttributes.Scale.GetValueOrDefault();
 
             if (type == KuduType.Decimal32)
             {
                 foreach (var value in values)
                 {
                     encoded.Add(KuduEncoder.EncodeDecimal32(
-                        (decimal)(object)value, precision, scale));
+                        (decimal)(object)value!, precision, scale));
                 }
             }
             else if (type == KuduType.Decimal64)
@@ -889,7 +890,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
                 foreach (var value in values)
                 {
                     encoded.Add(KuduEncoder.EncodeDecimal64(
-                        (decimal)(object)value, precision, scale));
+                        (decimal)(object)value!, precision, scale));
                 }
             }
             else if (type == KuduType.Decimal128)
@@ -897,7 +898,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
                 foreach (var value in values)
                 {
                     encoded.Add(KuduEncoder.EncodeDecimal128(
-                        (decimal)(object)value, precision, scale));
+                        (decimal)(object)value!, precision, scale));
                 }
             }
             else
@@ -915,44 +916,44 @@ public class KuduPredicate : IEquatable<KuduPredicate>
                 if (typeof(T) == typeof(bool))
                 {
                     KuduTypeValidation.ValidateColumnType(column, KuduType.Bool);
-                    encoded.Add(KuduEncoder.EncodeBool((bool)(object)value));
+                    encoded.Add(KuduEncoder.EncodeBool((bool)(object)value!));
                 }
                 else if (typeof(T) == typeof(sbyte))
                 {
                     KuduTypeValidation.ValidateColumnType(column, KuduType.Int8);
-                    encoded.Add(KuduEncoder.EncodeInt8((sbyte)(object)value));
+                    encoded.Add(KuduEncoder.EncodeInt8((sbyte)(object)value!));
                 }
                 else if (typeof(T) == typeof(byte))
                 {
                     KuduTypeValidation.ValidateColumnType(column, KuduType.Int8);
-                    encoded.Add(KuduEncoder.EncodeUInt8((byte)(object)value));
+                    encoded.Add(KuduEncoder.EncodeUInt8((byte)(object)value!));
                 }
                 else if (typeof(T) == typeof(short))
                 {
                     KuduTypeValidation.ValidateColumnType(column, KuduType.Int16);
-                    encoded.Add(KuduEncoder.EncodeInt16((short)(object)value));
+                    encoded.Add(KuduEncoder.EncodeInt16((short)(object)value!));
                 }
                 else if (typeof(T) == typeof(int))
                 {
                     KuduTypeValidation.ValidateColumnType(column,
                         KuduTypeFlags.Int32 | KuduTypeFlags.Date);
-                    encoded.Add(KuduEncoder.EncodeInt32((int)(object)value));
+                    encoded.Add(KuduEncoder.EncodeInt32((int)(object)value!));
                 }
                 else if (typeof(T) == typeof(long))
                 {
                     KuduTypeValidation.ValidateColumnType(column,
                         KuduTypeFlags.Int64 | KuduTypeFlags.UnixtimeMicros);
-                    encoded.Add(KuduEncoder.EncodeInt64((long)(object)value));
+                    encoded.Add(KuduEncoder.EncodeInt64((long)(object)value!));
                 }
                 else if (typeof(T) == typeof(float))
                 {
                     KuduTypeValidation.ValidateColumnType(column, KuduType.Float);
-                    encoded.Add(KuduEncoder.EncodeFloat((float)(object)value));
+                    encoded.Add(KuduEncoder.EncodeFloat((float)(object)value!));
                 }
                 else if (typeof(T) == typeof(double))
                 {
                     KuduTypeValidation.ValidateColumnType(column, KuduType.Double);
-                    encoded.Add(KuduEncoder.EncodeDouble((double)(object)value));
+                    encoded.Add(KuduEncoder.EncodeDouble((double)(object)value!));
                 }
                 else
                 {
@@ -1140,7 +1141,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
         return numPredicates switch
         {
             0 => None(column),
-            1 => EqualPredicate(column, values.Min),
+            1 => EqualPredicate(column, values.Min!),
             _ => new KuduPredicate(column, values)
         };
     }
@@ -1210,9 +1211,9 @@ public class KuduPredicate : IEquatable<KuduPredicate>
             _column = column;
         }
 
-        public int Compare(byte[] x, byte[] y)
+        public int Compare(byte[]? x, byte[]? y)
         {
-            return KuduPredicate.Compare(_column, x, y);
+            return KuduPredicate.Compare(_column, x!, y!);
         }
     }
 }

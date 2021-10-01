@@ -164,10 +164,10 @@ public readonly struct RowResult
     public string GetString(int columnIndex) =>
         _resultSet.GetString(columnIndex, _index);
 
-    public string GetNullableString(string columnName) =>
+    public string? GetNullableString(string columnName) =>
         _resultSet.GetNullableString(columnName, _index);
 
-    public string GetNullableString(int columnIndex) =>
+    public string? GetNullableString(int columnIndex) =>
         _resultSet.GetNullableString(columnIndex, _index);
 
     public ReadOnlySpan<byte> GetBinary(string columnName) =>

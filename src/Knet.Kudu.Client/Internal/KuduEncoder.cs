@@ -57,6 +57,28 @@ internal static class KuduEncoder
         EncodeInt64(destination, longValue);
     }
 
+    public static void EncodeDecimal(
+        Span<byte> destination, KuduType kuduType, decimal value, int precision, int scale)
+    {
+        switch (kuduType)
+        {
+            case KuduType.Decimal32:
+                int intVal = DecimalUtil.EncodeDecimal32(value, precision, scale);
+                EncodeInt32(destination, intVal);
+                break;
+
+            case KuduType.Decimal64:
+                long longVal = DecimalUtil.EncodeDecimal64(value, precision, scale);
+                EncodeInt64(destination, longVal);
+                break;
+
+            default:
+                var int128Val = DecimalUtil.EncodeDecimal128(value, precision, scale);
+                EncodeInt128(destination, int128Val);
+                break;
+        }
+    }
+
     public static void EncodeDecimal32(
         Span<byte> destination, decimal value, int precision, int scale)
     {
@@ -182,22 +204,22 @@ internal static class KuduEncoder
             KuduType.Date => EncodeDate((DateTime)value),
             KuduType.Decimal32 => EncodeDecimal32(
                 (decimal)value,
-                columnSchema.TypeAttributes.Precision.GetValueOrDefault(),
+                columnSchema.TypeAttributes!.Precision.GetValueOrDefault(),
                 columnSchema.TypeAttributes.Scale.GetValueOrDefault()),
             KuduType.Decimal64 => EncodeDecimal64(
                 (decimal)value,
-                columnSchema.TypeAttributes.Precision.GetValueOrDefault(),
+                columnSchema.TypeAttributes!.Precision.GetValueOrDefault(),
                 columnSchema.TypeAttributes.Scale.GetValueOrDefault()),
             KuduType.Decimal128 => EncodeDecimal128(
                 (decimal)value,
-                columnSchema.TypeAttributes.Precision.GetValueOrDefault(),
+                columnSchema.TypeAttributes!.Precision.GetValueOrDefault(),
                 columnSchema.TypeAttributes.Scale.GetValueOrDefault()),
             _ => throw new Exception($"Unknown data type {type}"),
         };
     }
 
     public static object DecodeDefaultValue(
-        KuduType type, ColumnTypeAttributes typeAttributes, ReadOnlySpan<byte> value)
+        KuduType type, ColumnTypeAttributes? typeAttributes, ReadOnlySpan<byte> value)
     {
         return type switch
         {
@@ -214,11 +236,11 @@ internal static class KuduEncoder
             KuduType.UnixtimeMicros => DecodeDateTime(value),
             KuduType.Date => DecodeDate(value),
             KuduType.Decimal32 => DecodeDecimal(
-                value, type, typeAttributes.Scale.GetValueOrDefault()),
+                value, type, typeAttributes!.Scale.GetValueOrDefault()),
             KuduType.Decimal64 => DecodeDecimal(
-                value, type, typeAttributes.Scale.GetValueOrDefault()),
+                value, type, typeAttributes!.Scale.GetValueOrDefault()),
             KuduType.Decimal128 => DecodeDecimal(
-                value, type, typeAttributes.Scale.GetValueOrDefault()),
+                value, type, typeAttributes!.Scale.GetValueOrDefault()),
             _ => throw new Exception($"Unknown data type {type}"),
         };
     }

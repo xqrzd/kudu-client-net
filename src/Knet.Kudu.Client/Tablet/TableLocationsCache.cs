@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Util;
@@ -33,11 +34,11 @@ public sealed class TableLocationsCache : IDisposable
     /// a tablet couldn't be found.
     /// </summary>
     /// <param name="partitionKey">The partition key to look up.</param>
-    public TableLocationEntry GetEntry(ReadOnlySpan<byte> partitionKey)
+    public TableLocationEntry? GetEntry(ReadOnlySpan<byte> partitionKey)
     {
-        TableLocationEntry entry = GetFloorEntry(partitionKey);
+        TableLocationEntry? entry = GetFloorEntry(partitionKey);
 
-        if (entry != null)
+        if (entry is not null)
         {
             byte[] upperBoundPartitionKey = entry.UpperBoundPartitionKey;
 
@@ -159,8 +160,8 @@ public sealed class TableLocationsCache : IDisposable
         try
         {
             // Remove all existing overlapping entries, and add the new entries.
-            TableLocationEntry floorEntry = _cache.FloorEntry(discoveredlowerBound);
-            if (floorEntry != null &&
+            TableLocationEntry? floorEntry = _cache.FloorEntry(discoveredlowerBound);
+            if (floorEntry is not null &&
                 requestPartitionKey.SequenceCompareTo(floorEntry.UpperBoundPartitionKey) < 0)
             {
                 discoveredlowerBound = floorEntry.LowerBoundPartitionKey;
@@ -209,7 +210,7 @@ public sealed class TableLocationsCache : IDisposable
         }
     }
 
-    private TableLocationEntry GetFloorEntry(ReadOnlySpan<byte> partitionKey)
+    private TableLocationEntry? GetFloorEntry(ReadOnlySpan<byte> partitionKey)
     {
         _lock.EnterReadLock();
         try
@@ -238,7 +239,7 @@ public class TableLocationEntry
     /// <summary>
     /// The remote tablet, only set if this entry represents a tablet.
     /// </summary>
-    public RemoteTablet Tablet { get; }
+    public RemoteTablet? Tablet { get; }
 
     /// <summary>
     /// When this entry will expire, based on <see cref="ISystemClock"/>.
@@ -246,7 +247,7 @@ public class TableLocationEntry
     public long Expiration { get; }
 
     public TableLocationEntry(
-        RemoteTablet tablet,
+        RemoteTablet? tablet,
         byte[] lowerBoundPartitionKey,
         byte[] upperBoundPartitionKey,
         long expiration)
@@ -260,11 +261,13 @@ public class TableLocationEntry
     /// <summary>
     /// If this entry is a non-covered range.
     /// </summary>
+    [MemberNotNullWhen(false, nameof(Tablet))]
     public bool IsNonCoveredRange => Tablet is null;
 
     /// <summary>
     /// If this entry is a covered range.
     /// </summary>
+    [MemberNotNullWhen(true, nameof(Tablet))]
     public bool IsCoveredRange => Tablet is not null;
 
     public static TableLocationEntry NewNonCoveredRange(

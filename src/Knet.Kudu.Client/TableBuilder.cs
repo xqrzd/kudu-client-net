@@ -18,7 +18,7 @@ public class TableBuilder
     /// Creates a new table builder with the given table name.
     /// </summary>
     /// <param name="tableName">The table's name.</param>
-    public TableBuilder(string tableName = null)
+    public TableBuilder(string? tableName = null)
     {
         _createTableRequest = new CreateTableRequestPB
         {
@@ -30,7 +30,7 @@ public class TableBuilder
             SplitRowsRangeBounds = new RowOperationsPB()
         };
 
-        if (tableName != null)
+        if (tableName is not null)
         {
             _createTableRequest.Name = tableName;
         }
@@ -123,7 +123,7 @@ public class TableBuilder
     /// <param name="type">The column type.</param>
     /// <param name="configure">A delegate to further configure the column.</param>
     public TableBuilder AddColumn(
-        string name, KuduType type, Action<ColumnBuilder> configure = null)
+        string name, KuduType type, Action<ColumnBuilder>? configure = null)
     {
         var builder = new ColumnBuilder(name, type);
         configure?.Invoke(builder);

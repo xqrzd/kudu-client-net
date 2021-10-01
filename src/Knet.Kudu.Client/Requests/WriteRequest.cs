@@ -1,6 +1,5 @@
 using System.Buffers;
 using Google.Protobuf;
-using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protobuf.Tserver;
 using Knet.Kudu.Client.Protocol;
 
@@ -33,7 +32,7 @@ internal sealed class WriteRequest : KuduTabletRpc<WriteResponsePB>
         if (PropagatedTimestamp != KuduClient.NoTimestamp)
             _request.PropagatedTimestamp = (ulong)PropagatedTimestamp;
 
-        _request.TabletId = UnsafeByteOperations.UnsafeWrap(Tablet.TabletId.ToUtf8ByteArray());
+        _request.TabletId = ByteString.CopyFromUtf8(Tablet!.TabletId);
 
         return _request.CalculateSize();
     }

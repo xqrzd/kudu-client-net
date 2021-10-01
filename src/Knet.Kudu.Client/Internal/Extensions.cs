@@ -23,16 +23,16 @@ internal static class Extensions
     public static HostAndPort ToHostAndPort(this HostPortPB hostPort) =>
         new(hostPort.Host, (int)hostPort.Port);
 
-    public static int SequenceCompareTo<T>(this T[] array, ReadOnlySpan<T> other)
+    public static int SequenceCompareTo<T>(this T[]? array, ReadOnlySpan<T> other)
         where T : IComparable<T> => MemoryExtensions.SequenceCompareTo(array, other);
 
-    public static bool SequenceEqual<T>(this T[] array, ReadOnlySpan<T> other)
+    public static bool SequenceEqual<T>(this T[]? array, ReadOnlySpan<T> other)
         where T : IEquatable<T> => MemoryExtensions.SequenceEqual(array, other);
 
 #if !NET6_0_OR_GREATER
     public static CancellationTokenRegistration UnsafeRegister(
         this CancellationToken cancellationToken,
-        Action<object, CancellationToken> callback, object state)
+        Action<object?, CancellationToken> callback, object? state)
     {
 #if NETCOREAPP3_1_OR_GREATER
         return cancellationToken.UnsafeRegister(s => callback(s, cancellationToken), state);
@@ -61,7 +61,7 @@ internal static class Extensions
             var tcs = new TaskCompletionSource();
 
             using var _ = cancellationToken.Register(
-                static state => ((TaskCompletionSource)state).TrySetResult(), tcs);
+                static state => ((TaskCompletionSource)state!).TrySetResult(), tcs);
 
             if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
             {
@@ -136,8 +136,8 @@ internal static class Extensions
     /// </summary>
     /// <typeparam name="T">The type of element in the list.</typeparam>
     /// <param name="source">The enumerable to return as a list.</param>
-    public static List<T> AsList<T>(this IEnumerable<T> source) =>
-        source == null || source is List<T> ? (List<T>)source : source.ToList();
+    public static List<T>? AsList<T>(this IEnumerable<T>? source) =>
+        source == null || source is List<T> ? (List<T>)source! : source.ToList();
 
     public static int GetContentHashCode(this byte[] source)
     {

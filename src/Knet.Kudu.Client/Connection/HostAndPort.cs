@@ -14,7 +14,7 @@ public class HostAndPort : IEquatable<HostAndPort>
         Port = port;
     }
 
-    public bool Equals(HostAndPort other)
+    public bool Equals(HostAndPort? other)
     {
         if (other is null)
             return false;
@@ -26,7 +26,7 @@ public class HostAndPort : IEquatable<HostAndPort>
             Port == other.Port;
     }
 
-    public override bool Equals(object obj) => Equals(obj as HostAndPort);
+    public override bool Equals(object? obj) => Equals(obj as HostAndPort);
 
     public override int GetHashCode() =>
         HashCode.Combine(StringComparer.OrdinalIgnoreCase.GetHashCode(Host), Port);

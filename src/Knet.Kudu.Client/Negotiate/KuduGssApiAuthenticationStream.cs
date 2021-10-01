@@ -36,7 +36,7 @@ public sealed class KuduGssApiAuthenticationStream : Stream
 
     private readonly Negotiator _negotiator;
 
-    private NegotiateStream _negotiateStream;
+    private NegotiateStream? _negotiateStream;
     private Memory<byte> _queue;
     private int _leftToWrite;
 
@@ -168,7 +168,7 @@ public sealed class KuduGssApiAuthenticationStream : Stream
 
     public Memory<byte> EncryptBuffer(ReadOnlySpan<byte> buffer)
     {
-        _negotiateStream.Write(buffer);
+        _negotiateStream!.Write(buffer);
 
         // Capture the value NegotiateStream just wrote and return it.
         var value = _queue;
@@ -186,7 +186,7 @@ public sealed class KuduGssApiAuthenticationStream : Stream
         while (true)
         {
             var span = writer.GetSpan();
-            var read = _negotiateStream.Read(span);
+            var read = _negotiateStream!.Read(span);
 
             if (read > 0)
             {

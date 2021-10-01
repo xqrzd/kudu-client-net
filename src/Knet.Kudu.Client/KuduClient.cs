@@ -53,7 +53,7 @@ public sealed class KuduClient : IAsyncDisposable
     private readonly SemaphoreSlim _singleClusterConnect;
     private readonly int _defaultOperationTimeoutMs;
 
-    private volatile MasterLeaderInfo _masterLeaderInfo;
+    private volatile MasterLeaderInfo? _masterLeaderInfo;
 
     /// <summary>
     /// Timestamp required for HybridTime external consistency through timestamp propagation.
@@ -120,7 +120,7 @@ public sealed class KuduClient : IAsyncDisposable
     /// leader master, or null if the Hive Metastore integration is not enabled.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
-    public async ValueTask<HiveMetastoreConfig> GetHiveMetastoreConfigAsync(
+    public async ValueTask<HiveMetastoreConfig?> GetHiveMetastoreConfigAsync(
         CancellationToken cancellationToken = default)
     {
         var masterLeaderInfo = await GetMasterLeaderInfoAsync(cancellationToken)
@@ -197,10 +197,10 @@ public sealed class KuduClient : IAsyncDisposable
         var response = await SendRpcAsync(rpc, cancellationToken)
             .ConfigureAwait(false);
 
-        var tableId = new TableIdentifierPB { TableId = response.TableId };
-
         if (builder.Wait)
         {
+            var tableId = new TableIdentifierPB { TableId = response.TableId };
+
             await WaitForCreateTableDoneAsync(
                 tableId, cancellationToken).ConfigureAwait(false);
 
@@ -208,7 +208,7 @@ public sealed class KuduClient : IAsyncDisposable
                 tableId, cancellationToken).ConfigureAwait(false);
         }
 
-        return null;
+        return null!;
     }
 
     /// <summary>
@@ -322,7 +322,7 @@ public sealed class KuduClient : IAsyncDisposable
     /// <param name="nameFilter">An optional table name filter.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     public async Task<List<TableInfo>> GetTablesAsync(
-        string nameFilter = null, CancellationToken cancellationToken = default)
+        string? nameFilter = null, CancellationToken cancellationToken = default)
     {
         var rpc = new ListTablesRequest(nameFilter);
         var response = await SendRpcAsync(rpc, cancellationToken)
@@ -381,7 +381,9 @@ public sealed class KuduClient : IAsyncDisposable
     }
 
     internal Task<List<RemoteTablet>> GetTableLocationsAsync(
-        string tableId, byte[] partitionKeyStart, int fetchBatchSize,
+        string tableId,
+        byte[]? partitionKeyStart,
+        int fetchBatchSize,
         CancellationToken cancellationToken = default)
     {
         return GetTableLocationsAsync(
@@ -389,8 +391,11 @@ public sealed class KuduClient : IAsyncDisposable
     }
 
     internal async Task<List<RemoteTablet>> GetTableLocationsAsync(
-        string tableId, byte[] partitionKeyStart, byte[] partitionKeyEnd,
-        int fetchBatchSize, CancellationToken cancellationToken = default)
+        string tableId,
+        byte[]? partitionKeyStart,
+        byte[]? partitionKeyEnd,
+        int fetchBatchSize,
+        CancellationToken cancellationToken = default)
     {
         var request = new GetTableLocationsRequestPB
         {
@@ -497,7 +502,7 @@ public sealed class KuduClient : IAsyncDisposable
     private static WriteResponse CreateWriteResponse(WriteResponsePB[] results)
     {
         long writeTimestamp = NoTimestamp;
-        List<KuduStatus> rowErrors = null;
+        List<KuduStatus>? rowErrors = null;
 
         foreach (var result in results)
         {
@@ -521,7 +526,7 @@ public sealed class KuduClient : IAsyncDisposable
             }
         }
 
-        if (rowErrors != null)
+        if (rowErrors is not null)
         {
             throw new KuduWriteException(rowErrors);
         }
@@ -895,7 +900,7 @@ public sealed class KuduClient : IAsyncDisposable
     {
         var tablet = GetTabletFromCache(tableId, partitionKey);
 
-        if (tablet != null)
+        if (tablet is not null)
             return new ValueTask<RemoteTablet>(tablet);
 
         var task = LookupAndCacheTabletAsync(tableId, partitionKey.ToArray(), cancellationToken);
@@ -908,7 +913,7 @@ public sealed class KuduClient : IAsyncDisposable
     /// <param name="tableId">The table identifier.</param>
     /// <param name="partitionKey">The partition key.</param>
     /// <returns>The requested tablet, or null if the tablet doesn't exist.</returns>
-    private RemoteTablet GetTabletFromCache(string tableId, ReadOnlySpan<byte> partitionKey)
+    private RemoteTablet? GetTabletFromCache(string tableId, ReadOnlySpan<byte> partitionKey)
     {
         var entry = GetTableLocationEntry(tableId, partitionKey);
 
@@ -932,7 +937,7 @@ public sealed class KuduClient : IAsyncDisposable
     /// </summary>
     /// <param name="tableId">The table.</param>
     /// <param name="partitionKey">The partition key of the tablet to find.</param>
-    internal TableLocationEntry GetTableLocationEntry(
+    internal TableLocationEntry? GetTableLocationEntry(
         string tableId, ReadOnlySpan<byte> partitionKey)
     {
         var cache = GetTableLocationsCache(tableId);
@@ -959,7 +964,8 @@ public sealed class KuduClient : IAsyncDisposable
         if (result.IsNonCoveredRange)
         {
             throw new NonCoveredRangeException(
-                result.NonCoveredRangeStart, result.NonCoveredRangeEnd);
+                result.NonCoveredRangeStart,
+                result.NonCoveredRangeEnd);
         }
 
         return result.Tablet;
@@ -993,7 +999,7 @@ public sealed class KuduClient : IAsyncDisposable
 
     private void RemoveTabletFromCache<T>(KuduTabletRpc<T> rpc)
     {
-        RemoteTablet tablet = rpc.Tablet;
+        RemoteTablet tablet = rpc.Tablet!;
         rpc.Tablet = null;
 
         TableLocationsCache cache = GetTableLocationsCache(tablet.TableId);
@@ -1002,7 +1008,7 @@ public sealed class KuduClient : IAsyncDisposable
 
     private void RemoveTabletServerFromCache<T>(KuduTabletRpc<T> rpc, ServerInfo serverInfo)
     {
-        RemoteTablet tablet = rpc.Tablet.RemoveTabletServer(serverInfo.Uuid);
+        RemoteTablet tablet = rpc.Tablet!.RemoveTabletServer(serverInfo.Uuid);
         rpc.Tablet = tablet;
 
         TableLocationsCache cache = GetTableLocationsCache(tablet.TableId);
@@ -1019,8 +1025,8 @@ public sealed class KuduClient : IAsyncDisposable
 
     private async ValueTask<List<RemoteTablet>> LoopLocateTableAsync(
         string tableId,
-        byte[] startPartitionKey,
-        byte[] endPartitionKey,
+        byte[]? startPartitionKey,
+        byte[]? endPartitionKey,
         int fetchBatchSize,
         CancellationToken cancellationToken = default)
     {
@@ -1039,8 +1045,8 @@ public sealed class KuduClient : IAsyncDisposable
 
     private async ValueTask LoopLocateTableAsync(
         string tableId,
-        byte[] startPartitionKey,
-        byte[] endPartitionKey,
+        byte[]? startPartitionKey,
+        byte[]? endPartitionKey,
         int fetchBatchSize,
         List<RemoteTablet> results,
         CancellationToken cancellationToken = default)
@@ -1054,7 +1060,7 @@ public sealed class KuduClient : IAsyncDisposable
 
         // The next partition key to look up. If null, then it represents
         // the minimum partition key, If empty, it represents the maximum key.
-        byte[] partitionKey = startPartitionKey;
+        byte[]? partitionKey = startPartitionKey;
 
         // Continue while the partition key is the minimum, or it is not the maximum
         // and it is less than the end partition key.
@@ -1078,7 +1084,7 @@ public sealed class KuduClient : IAsyncDisposable
             // then kick off a new tablet location lookup and try again when it completes.
             // When lookup completes, the tablet (or non-covered range) for the next
             // partition key will be located and added to the client's cache.
-            byte[] lookupKey = partitionKey;
+            byte[]? lookupKey = partitionKey;
 
             await GetTableLocationsAsync(tableId, key, fetchBatchSize, cancellationToken)
                 .ConfigureAwait(false);
@@ -1136,8 +1142,8 @@ public sealed class KuduClient : IAsyncDisposable
         string tableId,
         byte[] startPrimaryKey,
         byte[] endPrimaryKey,
-        byte[] startPartitionKey,
-        byte[] endPartitionKey,
+        byte[]? startPartitionKey,
+        byte[]? endPartitionKey,
         int fetchBatchSize,
         long splitSizeBytes,
         CancellationToken cancellationToken = default)
@@ -1230,7 +1236,8 @@ public sealed class KuduClient : IAsyncDisposable
         {
             var rpc = new ConnectToMasterRequest();
             await SendRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
-            return _masterLeaderInfo;
+            // TODO: Another failed RPC could have overwritten _masterLeaderInfo with null.
+            return _masterLeaderInfo!;
         }
     }
 
@@ -1259,7 +1266,8 @@ public sealed class KuduClient : IAsyncDisposable
             _singleClusterConnect.Release();
         }
 
-        return _masterLeaderInfo;
+        // TODO: Another failed RPC could have overwritten _masterLeaderInfo with null.
+        return _masterLeaderInfo!;
     }
 
     private async Task<ConnectToClusterResponse> ConnectToClusterWithoutLockAsync(
@@ -1280,9 +1288,9 @@ public sealed class KuduClient : IAsyncDisposable
             tasks.Add(task, address);
         }
 
-        ServerInfo leaderServerInfo = null;
-        ConnectToMasterResponsePB leaderResponsePb = null;
-        IReadOnlyList<HostPortPB> clusterMasterAddresses = null;
+        ServerInfo? leaderServerInfo = null;
+        ConnectToMasterResponsePB? leaderResponsePb = null;
+        IReadOnlyList<HostPortPB>? clusterMasterAddresses = null;
 
         while (tasks.Count > 0)
         {
@@ -1297,7 +1305,7 @@ public sealed class KuduClient : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                builder.AddException(hostPort, ex);
+                builder.AddException(hostPort!, ex);
                 continue;
             }
 
@@ -1320,7 +1328,7 @@ public sealed class KuduClient : IAsyncDisposable
             _logger.MisconfiguredMasterAddresses(masterAddresses, clusterMasterAddresses);
         }
 
-        if (leaderServerInfo is null)
+        if (leaderServerInfo is null || leaderResponsePb is null)
         {
             var exception = builder.CreateException();
             throw exception;
@@ -1343,9 +1351,9 @@ public sealed class KuduClient : IAsyncDisposable
             tasks.Add(task, serverInfo);
         }
 
-        ServerInfo leaderServerInfo = null;
-        ConnectToMasterResponsePB leaderResponsePb = null;
-        IReadOnlyList<HostPortPB> clusterMasterAddresses = null;
+        ServerInfo? leaderServerInfo = null;
+        ConnectToMasterResponsePB? leaderResponsePb = null;
+        IReadOnlyList<HostPortPB>? clusterMasterAddresses = null;
 
         while (tasks.Count > 0)
         {
@@ -1364,7 +1372,7 @@ public sealed class KuduClient : IAsyncDisposable
                 // Failures are fine here, as long as we can
                 // connect to the leader.
 
-                builder.AddException(serverInfo, ex);
+                builder.AddException(serverInfo!, ex);
                 continue;
             }
 
@@ -1379,7 +1387,7 @@ public sealed class KuduClient : IAsyncDisposable
                 break;
             }
 
-            builder.AddNonLeaderMaster(serverInfo);
+            builder.AddNonLeaderMaster(serverInfo!);
         }
 
         return new ConnectToMasterResponse(
@@ -1567,9 +1575,9 @@ public sealed class KuduClient : IAsyncDisposable
             rpc.AuthzToken = _authzTokenCache.GetAuthzToken(tableId);
         }
 
-        RemoteTablet tablet = rpc.Tablet;
+        var tablet = rpc.Tablet;
 
-        if (tablet == null)
+        if (tablet is null)
         {
             tablet = await GetTabletAsync(
                 tableId,
@@ -1579,9 +1587,9 @@ public sealed class KuduClient : IAsyncDisposable
             rpc.Tablet = tablet;
         }
 
-        ServerInfo serverInfo = GetServerInfo(tablet, rpc.ReplicaSelection);
+        var serverInfo = GetServerInfo(tablet, rpc.ReplicaSelection);
 
-        if (serverInfo == null)
+        if (serverInfo is null)
         {
             RemoveTabletFromCache(rpc);
 
@@ -1593,13 +1601,13 @@ public sealed class KuduClient : IAsyncDisposable
             .ConfigureAwait(false);
     }
 
-    private ServerInfo GetServerInfo(RemoteTablet tablet, ReplicaSelection replicaSelection)
+    private ServerInfo? GetServerInfo(RemoteTablet tablet, ReplicaSelection replicaSelection)
     {
         var masterLeaderInfo = _masterLeaderInfo;
         return tablet.GetServerInfo(replicaSelection, masterLeaderInfo?.Location);
     }
 
-    internal SignedTokenPB GetAuthzToken(string tableId)
+    internal SignedTokenPB? GetAuthzToken(string tableId)
     {
         return _authzTokenCache.GetAuthzToken(tableId);
     }
@@ -1643,7 +1651,7 @@ public sealed class KuduClient : IAsyncDisposable
             }
         }
 
-        return rpc.Output;
+        return rpc.Output!;
     }
 
     private async Task<T> SendRpcToTxnManagerAsync<T>(
@@ -1670,7 +1678,7 @@ public sealed class KuduClient : IAsyncDisposable
             }
         }
 
-        return rpc.Output;
+        return rpc.Output!;
     }
 
     private async Task<T> SendRpcToTabletAsync<T>(
@@ -1716,7 +1724,7 @@ public sealed class KuduClient : IAsyncDisposable
             }
         }
 
-        return rpc.Output;
+        return rpc.Output!;
     }
 
     private async Task SendRpcToServerGenericAsync<T>(
@@ -1724,7 +1732,7 @@ public sealed class KuduClient : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         RequestHeader header = CreateRequestHeader(rpc);
-        KuduConnection connection = null;
+        KuduConnection? connection = null;
 
         try
         {
@@ -1890,20 +1898,20 @@ public sealed class KuduClient : IAsyncDisposable
         string Location,
         string ClusterId,
         ServerInfo ServerInfo,
-        HiveMetastoreConfig HiveMetastoreConfig);
+        HiveMetastoreConfig? HiveMetastoreConfig);
 
     private sealed class ConnectToMasterResponse
     {
-        public ConnectToMasterResponsePB LeaderResponsePb { get; }
+        public ConnectToMasterResponsePB? LeaderResponsePb { get; }
 
-        public ServerInfo LeaderServerInfo { get; }
+        public ServerInfo? LeaderServerInfo { get; }
 
-        public IReadOnlyList<HostPortPB> ClusterMasterAddresses { get; }
+        public IReadOnlyList<HostPortPB>? ClusterMasterAddresses { get; }
 
         public ConnectToMasterResponse(
-            ConnectToMasterResponsePB leaderResponsePb,
-            ServerInfo leaderServerInfo,
-            IReadOnlyList<HostPortPB> clusterMasterAddresses)
+            ConnectToMasterResponsePB? leaderResponsePb,
+            ServerInfo? leaderServerInfo,
+            IReadOnlyList<HostPortPB>? clusterMasterAddresses)
         {
             LeaderResponsePb = leaderResponsePb;
             LeaderServerInfo = leaderServerInfo;

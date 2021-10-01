@@ -3,6 +3,7 @@
   <PropertyGroup>
     <TargetFrameworks>net6.0;net5.0;netstandard2.0;netstandard2.1;netcoreapp3.1;</TargetFrameworks>
     <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <NoWarn>CS1591;SYSLIB1015</NoWarn>
 

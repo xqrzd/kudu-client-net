@@ -20,7 +20,7 @@ public sealed class KuduTransaction : IDisposable
     private readonly ILogger<KuduTransaction> _logger;
     private readonly long _txnId;
     private readonly TimeSpan _keepaliveInterval;
-    private readonly PeriodicTimer _keepaliveTimer;
+    private readonly PeriodicTimer? _keepaliveTimer;
 
     internal KuduTransaction(
         KuduClient client,
@@ -40,7 +40,7 @@ public sealed class KuduTransaction : IDisposable
         {
             _keepaliveInterval = keepaliveInterval;
             _keepaliveTimer = new PeriodicTimer(keepaliveInterval);
-            _ = DoKeepaliveAsync();
+            _ = DoKeepaliveAsync(_keepaliveTimer);
         }
     }
 
@@ -194,10 +194,8 @@ public sealed class KuduTransaction : IDisposable
     /// </summary>
     public byte[] Serialize() => Serialize(_defaultSerializationOptions);
 
-    private async Task DoKeepaliveAsync()
+    private async Task DoKeepaliveAsync(PeriodicTimer timer)
     {
-        var timer = _keepaliveTimer;
-
         while (await timer.WaitForNextTickAsync().ConfigureAwait(false))
         {
             try

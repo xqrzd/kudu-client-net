@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Knet.Kudu.Client.Internal;
@@ -10,17 +11,17 @@ namespace Knet.Kudu.Client;
 
 public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
 {
-    private readonly ArrayPoolBuffer<byte> _buffer;
-    private readonly byte[] _data;
+    private readonly ArrayPoolBuffer<byte>? _buffer;
+    private readonly byte[]? _data;
     private readonly SidecarOffset[] _dataSidecarOffsets;
     private readonly SidecarOffset[] _varlenDataSidecarOffsets;
     private readonly SidecarOffset[] _nonNullBitmapSidecarOffsets;
-    private KuduSchema _schema;
+    private KuduSchema? _schema;
 
     public long Count { get; }
 
     internal ResultSet(
-        ArrayPoolBuffer<byte> buffer,
+        ArrayPoolBuffer<byte>? buffer,
         KuduSchema schema,
         long count,
         SidecarOffset[] dataSidecarOffsets,
@@ -86,7 +87,7 @@ public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
     private bool ReadBoolUnsafe(int columnIndex, int rowIndex)
     {
         int offset = GetStartIndexUnsafe(columnIndex, rowIndex, 1);
-        return KuduEncoder.DecodeBoolUnsafe(_data, offset);
+        return KuduEncoder.DecodeBoolUnsafe(_data!, offset);
     }
 
     internal byte GetByte(string columnName, int rowIndex)
@@ -148,7 +149,7 @@ public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
     private byte ReadByteUnsafe(int columnIndex, int rowIndex)
     {
         int offset = GetStartIndexUnsafe(columnIndex, rowIndex, 1);
-        return KuduEncoder.DecodeUInt8Unsafe(_data, offset);
+        return KuduEncoder.DecodeUInt8Unsafe(_data!, offset);
     }
 
     internal short GetInt16(string columnName, int rowIndex)
@@ -182,7 +183,7 @@ public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
     private short ReadInt16Unsafe(int columnIndex, int rowIndex)
     {
         int offset = GetStartIndexUnsafe(columnIndex, rowIndex, 2);
-        return KuduEncoder.DecodeInt16Unsafe(_data, offset);
+        return KuduEncoder.DecodeInt16Unsafe(_data!, offset);
     }
 
     internal int GetInt32(string columnName, int rowIndex)
@@ -216,7 +217,7 @@ public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
     private int ReadInt32Unsafe(int columnIndex, int rowIndex)
     {
         int offset = GetStartIndexUnsafe(columnIndex, rowIndex, 4);
-        return KuduEncoder.DecodeInt32Unsafe(_data, offset);
+        return KuduEncoder.DecodeInt32Unsafe(_data!, offset);
     }
 
     internal long GetInt64(string columnName, int rowIndex)
@@ -255,7 +256,7 @@ public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
     private long ReadInt64Unsafe(int columnIndex, int rowIndex)
     {
         int offset = GetStartIndexUnsafe(columnIndex, rowIndex, 8);
-        return KuduEncoder.DecodeInt64Unsafe(_data, offset);
+        return KuduEncoder.DecodeInt64Unsafe(_data!, offset);
     }
 
     internal DateTime GetDateTime(string columnName, int rowIndex)
@@ -298,13 +299,13 @@ public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
     private DateTime ReadDateTimeUnsafe(int columnIndex, int rowIndex)
     {
         int offset = GetStartIndexUnsafe(columnIndex, rowIndex, 8);
-        return KuduEncoder.DecodeDateTimeUnsafe(_data, offset);
+        return KuduEncoder.DecodeDateTimeUnsafe(_data!, offset);
     }
 
     private DateTime ReadDateUnsafe(int columnIndex, int rowIndex)
     {
         int offset = GetStartIndexUnsafe(columnIndex, rowIndex, 4);
-        return KuduEncoder.DecodeDateUnsafe(_data, offset);
+        return KuduEncoder.DecodeDateUnsafe(_data!, offset);
     }
 
     internal float GetFloat(string columnName, int rowIndex)
@@ -338,7 +339,7 @@ public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
     private float ReadFloatUnsafe(int columnIndex, int rowIndex)
     {
         int offset = GetStartIndexUnsafe(columnIndex, rowIndex, 4);
-        return KuduEncoder.DecodeFloatUnsafe(_data, offset);
+        return KuduEncoder.DecodeFloatUnsafe(_data!, offset);
     }
 
     internal double GetDouble(string columnName, int rowIndex)
@@ -372,7 +373,7 @@ public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
     private double ReadDoubleUnsafe(int columnIndex, int rowIndex)
     {
         int offset = GetStartIndexUnsafe(columnIndex, rowIndex, 8);
-        return KuduEncoder.DecodeDoubleUnsafe(_data, offset);
+        return KuduEncoder.DecodeDoubleUnsafe(_data!, offset);
     }
 
     internal decimal GetDecimal(string columnName, int rowIndex)
@@ -412,9 +413,9 @@ public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
 
     private decimal ReadDecimalUnsafe(ColumnSchema column, int columnIndex, int rowIndex)
     {
-        int scale = column.TypeAttributes.Scale.GetValueOrDefault();
+        int scale = column.TypeAttributes!.Scale.GetValueOrDefault();
         int offset = GetStartIndexUnsafe(columnIndex, rowIndex, column.Size);
-        return KuduEncoder.DecodeDecimalUnsafe(_data, offset, column.Type, scale);
+        return KuduEncoder.DecodeDecimalUnsafe(_data!, offset, column.Type, scale);
     }
 
     internal ReadOnlySpan<byte> GetRawFixed(string columnName, int rowIndex)
@@ -451,13 +452,13 @@ public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
         return ReadStringUnsafe(columnIndex, rowIndex);
     }
 
-    internal string GetNullableString(string columnName, int rowIndex)
+    internal string? GetNullableString(string columnName, int rowIndex)
     {
         int columnIndex = GetColumnIndex(columnName);
         return GetNullableString(columnIndex, rowIndex);
     }
 
-    internal string GetNullableString(int columnIndex, int rowIndex)
+    internal string? GetNullableString(int columnIndex, int rowIndex)
     {
         CheckType(columnIndex, KuduTypeFlags.String | KuduTypeFlags.Varchar);
 
@@ -470,7 +471,7 @@ public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
     private string ReadStringUnsafe(int columnIndex, int rowIndex)
     {
         var (offset, length) = GetVarLenStartIndexUnsafe(columnIndex, rowIndex);
-        return KuduEncoder.DecodeString(_data, offset, length);
+        return KuduEncoder.DecodeString(_data!, offset, length);
     }
 
     internal ReadOnlySpan<byte> GetBinary(string columnName, int rowIndex)
@@ -521,7 +522,7 @@ public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
             return false;
         }
 
-        bool nonNull = KuduEncoder.DecodeBitUnsafe(_data, offset, rowIndex);
+        bool nonNull = KuduEncoder.DecodeBitUnsafe(_data!, offset, rowIndex);
         return !nonNull;
     }
 
@@ -605,6 +606,7 @@ public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
 #endif
     }
 
+    [DoesNotReturn]
     private static void ThrowObjectDisposedException() =>
         throw new ObjectDisposedException(nameof(ResultSet));
 

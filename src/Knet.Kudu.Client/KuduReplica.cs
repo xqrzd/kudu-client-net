@@ -11,9 +11,9 @@ public class KuduReplica
 
     public ReplicaRole Role { get; }
 
-    public string DimensionLabel { get; }
+    public string? DimensionLabel { get; }
 
-    public KuduReplica(HostAndPort hostPort, ReplicaRole role, string dimensionLabel)
+    public KuduReplica(HostAndPort hostPort, ReplicaRole role, string? dimensionLabel)
     {
         HostPort = hostPort;
         Role = role;

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 
 namespace Knet.Kudu.Client.Util;
@@ -245,6 +246,7 @@ public static class DecimalUtil
         }
     }
 
+    [DoesNotReturn]
     private static void ThrowValueTooBig(decimal value, int targetPrecision)
     {
         throw new ArgumentException(

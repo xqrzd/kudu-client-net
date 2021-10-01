@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using Google.Protobuf.Collections;
 using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.Internal;
@@ -17,7 +18,7 @@ internal sealed class ParserContext : IDisposable
 
     public int HeaderLength;
 
-    public ResponseHeader Header;
+    public ResponseHeader? Header;
 
     /// <summary>
     /// Length of the main message, including sidecars.
@@ -117,7 +118,7 @@ internal sealed class ParserContext : IDisposable
 
     private void InitializeMessage()
     {
-        var rawSidecarOffsets = Header.SidecarOffsets;
+        var rawSidecarOffsets = Header!.SidecarOffsets;
         var messageProtobufLength = rawSidecarOffsets.Count == 0
             ? MainMessageLength
             : (int)rawSidecarOffsets[0];
@@ -160,6 +161,7 @@ internal sealed class ParserContext : IDisposable
         return sidecarOffsets;
     }
 
+    [DoesNotReturn]
     private static void ThrowRpcTooLongException(int totalMessageLength)
     {
         var status = KuduStatus.IllegalState(

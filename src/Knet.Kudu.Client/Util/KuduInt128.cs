@@ -188,7 +188,7 @@ public readonly struct KuduInt128 : IEquatable<KuduInt128>, IComparable<KuduInt1
 
     public bool Equals(KuduInt128 other) => this == other;
 
-    public override bool Equals(object obj)
+    public override bool Equals(object? obj)
     {
         if (obj is KuduInt128 other)
             return Equals(other);

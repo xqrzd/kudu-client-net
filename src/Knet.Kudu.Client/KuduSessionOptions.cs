@@ -45,5 +45,5 @@ public record KuduSessionOptions
     /// <summary>
     /// Optional callback to be notified of errors.
     /// </summary>
-    public Func<SessionExceptionContext, ValueTask> ExceptionHandler { get; init; }
+    public Func<SessionExceptionContext, ValueTask>? ExceptionHandler { get; init; }
 }

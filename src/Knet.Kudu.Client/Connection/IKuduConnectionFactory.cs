@@ -13,5 +13,5 @@ public interface IKuduConnectionFactory
         HostAndPort hostPort, CancellationToken cancellationToken = default);
 
     Task<ServerInfo> GetTabletServerInfoAsync(
-        HostAndPort hostPort, string uuid, string location, CancellationToken cancellationToken = default);
+        HostAndPort hostPort, string uuid, string? location, CancellationToken cancellationToken = default);
 }

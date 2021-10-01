@@ -104,7 +104,7 @@ public class Partition : IEquatable<Partition>, IComparable<Partition>
     /// partition keys and the hash buckets and range keys.
     /// </summary>
     /// <param name="other">The other partition of the same table.</param>
-    public bool Equals(Partition other)
+    public bool Equals(Partition? other)
     {
         if (other is null)
             return false;
@@ -125,8 +125,8 @@ public class Partition : IEquatable<Partition>, IComparable<Partition>
     /// the start partition key.
     /// </summary>
     /// <param name="other">The other partition of the same table.</param>
-    public int CompareTo(Partition other) =>
-        PartitionKeyStart.SequenceCompareTo(other.PartitionKeyStart);
+    public int CompareTo(Partition? other) =>
+        PartitionKeyStart.SequenceCompareTo(other?.PartitionKeyStart);
 
     /// <summary>
     /// Equality only holds for partitions from the same table. Partition equality only takes
@@ -134,7 +134,7 @@ public class Partition : IEquatable<Partition>, IComparable<Partition>
     /// partition keys and the hash buckets and range keys.
     /// </summary>
     /// <param name="obj">The other partition of the same table.</param>
-    public override bool Equals(object obj) => Equals(obj as Partition);
+    public override bool Equals(object? obj) => Equals(obj as Partition);
 
     /// <summary>
     /// The hash code only takes into account the partition keys, since there is a 1 to 1

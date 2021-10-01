@@ -29,6 +29,8 @@ using Knet.Kudu.Client.Tablet;
 
 namespace Knet.Kudu.Client.Internal;
 
+#nullable disable
+
 internal sealed class AvlTree : IEnumerable<TableLocationEntry>
 {
     private AvlNode _root;

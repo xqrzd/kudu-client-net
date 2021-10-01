@@ -56,8 +56,8 @@ public class KuduScanner : IAsyncEnumerable<ResultSet>
         ILogger logger,
         KuduClient client,
         KuduTable table,
-        List<string> projectedColumnNames,
-        List<int> projectedColumnIndexes,
+        List<string>? projectedColumnNames,
+        List<int>? projectedColumnIndexes,
         Dictionary<string, KuduPredicate> predicates,
         ReadMode readMode,
         ReplicaSelection replicaSelection,
@@ -211,8 +211,8 @@ public class KuduScanner : IAsyncEnumerable<ResultSet>
 
     private static KuduSchema GenerateProjectionSchema(
         KuduSchema schema,
-        List<string> projectedColumnNames,
-        List<int> projectedColumnIndexes,
+        List<string>? projectedColumnNames,
+        List<int>? projectedColumnIndexes,
         bool includeDeletedColumn)
     {
         var numColumns = projectedColumnNames?.Count
