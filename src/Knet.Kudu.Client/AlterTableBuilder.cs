@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using Google.Protobuf;
 using Knet.Kudu.Client.Internal;
@@ -32,7 +33,7 @@ public class AlterTableBuilder
     /// True if the alter table operation includes an add or drop
     /// partition operation.
     /// </summary>
-    internal bool HasAddDropRangePartitions => _request.Schema != null;
+    internal bool HasAddDropRangePartitions => _request.Schema is not null;
 
     internal string TableId => _table.TableId;
 
@@ -76,7 +77,7 @@ public class AlterTableBuilder
     /// <param name="type">The column type.</param>
     /// <param name="configure">A delegate to further configure the column.</param>
     public AlterTableBuilder AddColumn(
-        string name, KuduType type, Action<ColumnBuilder> configure = null)
+        string name, KuduType type, Action<ColumnBuilder>? configure = null)
     {
         var columnBuilder = new ColumnBuilder(name, type);
         configure?.Invoke(columnBuilder);
@@ -435,7 +436,7 @@ public class AlterTableBuilder
     /// <param name="upperBoundType">The type of the upper bound.</param>
     public AlterTableBuilder AddRangePartition(
         Action<PartialRowOperation, PartialRowOperation> configure,
-        string dimensionLabel,
+        string? dimensionLabel,
         RangePartitionBound lowerBoundType,
         RangePartitionBound upperBoundType)
     {
@@ -470,7 +471,7 @@ public class AlterTableBuilder
             AddRangePartition = addRangePartition
         });
 
-        if (_request.Schema == null)
+        if (_request.Schema is null)
             _request.Schema = _table.SchemaPbNoIds.Schema;
 
         return this;
@@ -520,7 +521,7 @@ public class AlterTableBuilder
             }
         });
 
-        if (_request.Schema == null)
+        if (_request.Schema is null)
             _request.Schema = _table.SchemaPbNoIds.Schema;
 
         return this;
@@ -608,7 +609,7 @@ public class AlterTableBuilder
             }
         });
 
-        if (_request.Schema == null)
+        if (_request.Schema is null)
             _request.Schema = _table.SchemaPbNoIds.Schema;
 
         return this;
@@ -652,7 +653,7 @@ public class AlterTableBuilder
             }
         });
 
-        if (_request.Schema == null)
+        if (_request.Schema is null)
             _request.Schema = _table.SchemaPbNoIds.Schema;
 
         return this;
@@ -688,16 +689,19 @@ public class AlterTableBuilder
 
     public static implicit operator AlterTableRequestPB(AlterTableBuilder builder) => builder._request;
 
+    [DoesNotReturn]
     private static void ThrowAddKeyColumnException()
     {
         throw new ArgumentException("Key columns cannot be added");
     }
 
+    [DoesNotReturn]
     private static void ThrowNewColumnMustHaveDefaultException()
     {
         throw new ArgumentException("A new non-null column must have a default value");
     }
 
+    [DoesNotReturn]
     private static void ThrowDefaultValueNullException()
     {
         throw new ArgumentException(

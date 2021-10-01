@@ -22,8 +22,8 @@ namespace Knet.Kudu.Client.Logging
             IPAddress Ip,
             string Encryption,
             string Authentication,
-            string TlsCipher,
-            string ServicePrincipalName,
+            string? TlsCipher,
+            string? ServicePrincipalName,
             bool IsLocal);
 
         [LoggerMessage(
@@ -89,9 +89,9 @@ namespace Knet.Kudu.Client.Logging
             Message = "Scanner {ScannerId} for {Table} expired, creating a new one")]
         public static partial void ScannerExpired(
             this ILogger logger,
-            string ScannerId,
+            string? ScannerId,
             string Table,
-            string TabletId);
+            string? TabletId);
 
         [LoggerMessage(
             EventId = 8,

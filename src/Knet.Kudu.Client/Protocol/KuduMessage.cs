@@ -5,9 +5,9 @@ namespace Knet.Kudu.Client.Protocol;
 
 public sealed class KuduMessage
 {
-    private ArrayPoolBuffer<byte> _messageBuffer;
+    private ArrayPoolBuffer<byte>? _messageBuffer;
     private int _messageProtobufLength;
-    private SidecarOffset[] _sidecarOffsets;
+    private SidecarOffset[]? _sidecarOffsets;
 
     internal void Init(
         ArrayPoolBuffer<byte> messageBuffer,
@@ -19,18 +19,18 @@ public sealed class KuduMessage
         _sidecarOffsets = sidecarOffsets;
     }
 
-    public byte[] Buffer => _messageBuffer.Buffer;
+    public byte[] Buffer => _messageBuffer!.Buffer;
 
     public ReadOnlySpan<byte> MessageProtobuf =>
         Buffer.AsSpan(0, _messageProtobufLength);
 
-    public SidecarOffset GetSidecarOffset(int sidecar) => _sidecarOffsets[sidecar];
+    public SidecarOffset GetSidecarOffset(int sidecar) => _sidecarOffsets![sidecar];
 
     internal ArrayPoolBuffer<byte> TakeMemory()
     {
         var messageBuffer = _messageBuffer;
         _messageBuffer = null;
-        return messageBuffer;
+        return messageBuffer!;
     }
 
     internal void Reset()

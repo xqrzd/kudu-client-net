@@ -16,8 +16,8 @@ public sealed class SecurityContext : ISecurityContext
 {
     private readonly object _lockObj = new();
 
-    private SignedTokenPB _authnToken;
-    private List<X509Certificate2> _trustedCertificates;
+    private SignedTokenPB? _authnToken;
+    private List<X509Certificate2>? _trustedCertificates;
     private bool _isAuthenticationTokenImported;
 
     public bool IsAuthenticationTokenImported
@@ -39,7 +39,7 @@ public sealed class SecurityContext : ISecurityContext
         }
     }
 
-    public SignedTokenPB GetAuthenticationToken()
+    public SignedTokenPB? GetAuthenticationToken()
     {
         lock (_lockObj)
         {
@@ -53,11 +53,19 @@ public sealed class SecurityContext : ISecurityContext
 
         lock (_lockObj)
         {
-            tokenPb.AuthnToken = _authnToken;
-
-            foreach (var certificate in _trustedCertificates)
+            var authnToken = _authnToken;
+            if (authnToken is not null)
             {
-                tokenPb.CaCertDers.Add(UnsafeByteOperations.UnsafeWrap(certificate.RawData));
+                tokenPb.AuthnToken = authnToken;
+            }
+
+            var trustedCertificates = _trustedCertificates;
+            if (trustedCertificates is not null)
+            {
+                foreach (var certificate in trustedCertificates)
+                {
+                    tokenPb.CaCertDers.Add(UnsafeByteOperations.UnsafeWrap(certificate.RawData));
+                }
             }
         }
 
@@ -71,7 +79,7 @@ public sealed class SecurityContext : ISecurityContext
 
         lock (_lockObj)
         {
-            if (tokenPb.AuthnToken != null)
+            if (tokenPb.AuthnToken is not null)
             {
                 _authnToken = tokenPb.AuthnToken;
             }
@@ -102,7 +110,7 @@ public sealed class SecurityContext : ISecurityContext
     }
 
     public SslStream CreateTlsStream(Stream innerStream) =>
-        new(innerStream, leaveInnerStreamOpen: true, ValidateCertificate);
+        new(innerStream, leaveInnerStreamOpen: true, ValidateCertificate!);
 
     public SslStream CreateTlsStreamTrustAll(Stream innerStream) =>
         new(innerStream, leaveInnerStreamOpen: true, AllowAnyCertificate);
@@ -113,11 +121,16 @@ public sealed class SecurityContext : ISecurityContext
         X509Chain chain,
         SslPolicyErrors sslPolicyErrors)
     {
-        List<X509Certificate2> trustedCertificates;
+        List<X509Certificate2>? trustedCertificates;
 
         lock (_lockObj)
         {
             trustedCertificates = _trustedCertificates;
+        }
+
+        if (trustedCertificates is null)
+        {
+            return false;
         }
 
         chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
@@ -153,7 +166,7 @@ public sealed class SecurityContext : ISecurityContext
     }
 
     private static bool AllowAnyCertificate(object sender,
-        X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors) => true;
+        X509Certificate? certificate, X509Chain? chain, SslPolicyErrors sslPolicyErrors) => true;
 
     // https://stackoverflow.com/questions/6497040/how-do-i-validate-that-a-certificate-was-created-by-a-particular-certification-a
     private static void ValidateCertificate(

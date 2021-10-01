@@ -10,7 +10,7 @@ public class ScanResponse
     /// <summary>
     /// The ID associated with the scanner that issued the request.
     /// </summary>
-    public byte[] ScannerId { get; }
+    public byte[]? ScannerId { get; }
 
     /// <summary>
     /// The actual payload of the response.
@@ -46,17 +46,17 @@ public class ScanResponse
     /// If this is a fault-tolerant scanner, this is set to the encoded primary
     /// key of the last row returned in the response.
     /// </summary>
-    public byte[] LastPrimaryKey { get; }
+    public byte[]? LastPrimaryKey { get; }
 
     public ResourceMetricsPB ResourceMetricsPb { get; }
 
     public ScanResponse(
-        byte[] scannerId,
+        byte[]? scannerId,
         ResultSet resultSet,
         bool hasMoreResults,
         long scanTimestamp,
         long propagatedTimestamp,
-        byte[] lastPrimaryKey,
+        byte[]? lastPrimaryKey,
         ResourceMetricsPB resourceMetricsPb)
     {
         ScannerId = scannerId;

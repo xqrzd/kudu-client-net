@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Util;
@@ -14,7 +15,7 @@ public class PartialRow
     private readonly int _headerSize;
     private readonly int _nullOffset;
 
-    private readonly byte[][] _varLengthData;
+    private readonly byte[]?[] _varLengthData;
 
     public PartialRow(KuduSchema schema)
     {
@@ -485,29 +486,17 @@ public class PartialRow
 
     public void SetDecimal(int columnIndex, decimal value)
     {
-        ColumnSchema column = Schema.GetColumn(columnIndex);
-        int precision = column.TypeAttributes.Precision.GetValueOrDefault();
-        int scale = column.TypeAttributes.Scale.GetValueOrDefault();
+        var column = CheckType(columnIndex,
+            KuduTypeFlags.Decimal32 |
+            KuduTypeFlags.Decimal64 |
+            KuduTypeFlags.Decimal128);
+
+        var typeAttributes = column.TypeAttributes!;
+        int precision = typeAttributes.Precision.GetValueOrDefault();
+        int scale = typeAttributes.Scale.GetValueOrDefault();
         Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, column.Size);
 
-        switch (column.Type)
-        {
-            case KuduType.Decimal32:
-                KuduEncoder.EncodeDecimal32(span, value, precision, scale);
-                break;
-            case KuduType.Decimal64:
-                KuduEncoder.EncodeDecimal64(span, value, precision, scale);
-                break;
-            case KuduType.Decimal128:
-                KuduEncoder.EncodeDecimal128(span, value, precision, scale);
-                break;
-            default:
-                KuduTypeValidation.ThrowException(column,
-                    KuduTypeFlags.Decimal32 |
-                    KuduTypeFlags.Decimal64 |
-                    KuduTypeFlags.Decimal128);
-                break;
-        }
+        KuduEncoder.EncodeDecimal(span, column.Type, value, precision, scale);
     }
 
     public decimal GetDecimal(string columnName)
@@ -523,7 +512,7 @@ public class PartialRow
             KuduTypeFlags.Decimal64 |
             KuduTypeFlags.Decimal128);
 
-        int scale = column.TypeAttributes.Scale.GetValueOrDefault();
+        int scale = column.TypeAttributes!.Scale.GetValueOrDefault();
         ReadOnlySpan<byte> data = GetRowAllocColumn(columnIndex, column.Size);
         return KuduEncoder.DecodeDecimal(data, column.Type, scale);
     }
@@ -544,7 +533,7 @@ public class PartialRow
         }
         else if (type == KuduType.Varchar)
         {
-            int maxLength = column.TypeAttributes.Length.GetValueOrDefault();
+            int maxLength = column.TypeAttributes!.Length.GetValueOrDefault();
 
             if (value.Length > maxLength)
                 value = value.Substring(0, maxLength);
@@ -609,7 +598,7 @@ public class PartialRow
         CheckType(columnIndex, KuduType.Binary);
         CheckValue(columnIndex);
         int varLenColumnIndex = Schema.GetColumnOffset(columnIndex);
-        return _varLengthData[varLenColumnIndex];
+        return _varLengthData[varLenColumnIndex]!;
     }
 
     /// <summary>
@@ -673,16 +662,16 @@ public class PartialRow
                 break;
             case KuduType.Decimal32:
                 WriteInt32(index, DecimalUtil.MinDecimal32(
-                    column.TypeAttributes.Precision.GetValueOrDefault()));
+                    column.TypeAttributes!.Precision.GetValueOrDefault()));
                 break;
             case KuduType.Decimal64:
                 WriteInt64(index, DecimalUtil.MinDecimal64(
-                    column.TypeAttributes.Precision.GetValueOrDefault()));
+                    column.TypeAttributes!.Precision.GetValueOrDefault()));
                 break;
             case KuduType.Decimal128:
                 {
                     KuduInt128 min = DecimalUtil.MinDecimal128(
-                        column.TypeAttributes.Precision.GetValueOrDefault());
+                        column.TypeAttributes!.Precision.GetValueOrDefault());
                     Span<byte> span = GetSpanInRowAllocAndSetBitSet(index, 16);
                     KuduEncoder.EncodeInt128(span, min);
                     break;
@@ -793,7 +782,7 @@ public class PartialRow
                 case KuduType.Decimal32:
                     {
                         int existing = KuduEncoder.DecodeInt32(data);
-                        int precision = column.TypeAttributes.Precision.GetValueOrDefault();
+                        int precision = column.TypeAttributes!.Precision.GetValueOrDefault();
                         if (existing == DecimalUtil.MaxDecimal32(precision))
                             return false;
 
@@ -803,7 +792,7 @@ public class PartialRow
                 case KuduType.Decimal64:
                     {
                         long existing = KuduEncoder.DecodeInt64(data);
-                        int precision = column.TypeAttributes.Precision.GetValueOrDefault();
+                        int precision = column.TypeAttributes!.Precision.GetValueOrDefault();
                         if (existing == DecimalUtil.MaxDecimal64(precision))
                             return false;
 
@@ -813,7 +802,7 @@ public class PartialRow
                 case KuduType.Decimal128:
                     {
                         KuduInt128 existing = KuduEncoder.DecodeInt128(data);
-                        int precision = column.TypeAttributes.Precision.GetValueOrDefault();
+                        int precision = column.TypeAttributes!.Precision.GetValueOrDefault();
                         if (existing == DecimalUtil.MaxDecimal128(precision))
                             return false;
 
@@ -853,7 +842,7 @@ public class PartialRow
                 {
                     int varLenColumnIndex = Schema.GetColumnOffset(i);
                     var data = _varLengthData[varLenColumnIndex];
-                    localIndirectSize += data.Length;
+                    localIndirectSize += data!.Length;
                 }
             }
         }
@@ -876,12 +865,14 @@ public class PartialRow
         return columnSchema;
     }
 
+    [DoesNotReturn]
     private void ThrowNotSetException(int columnIndex)
     {
         var column = Schema.GetColumn(columnIndex);
         throw new Exception($"Column {column} is not set");
     }
 
+    [DoesNotReturn]
     private void ThrowNullException(int columnIndex)
     {
         var column = Schema.GetColumn(columnIndex);
@@ -929,9 +920,10 @@ public class PartialRow
         return _varLengthData[varLenColumnIndex];
     }
 
-    private static byte[] CloneArray(byte[] array)
+    [return: NotNullIfNotNull("array")]
+    private static byte[]? CloneArray(byte[]? array)
     {
-        if (array == null)
+        if (array is null)
             return null;
 
         var newArray = new byte[array.Length];

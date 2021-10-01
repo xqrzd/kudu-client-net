@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace Knet.Kudu.Client.Internal;
@@ -35,6 +36,7 @@ internal static class KuduTypeValidation
             ThrowNotFixedLengthException(column);
     }
 
+    [DoesNotReturn]
     public static void ThrowException(ColumnSchema column, KuduTypeFlags types)
     {
         throw new ArgumentException(
@@ -42,28 +44,33 @@ internal static class KuduTypeValidation
     }
 
     // TODO: Remove this method
+    [DoesNotReturn]
     public static T ThrowException<T>(ColumnSchema column, KuduTypeFlags types)
     {
         throw new ArgumentException(
             $"Expected column {column} to be one of ({types})");
     }
 
+    [DoesNotReturn]
     public static void ThrowException(ColumnSchema column, KuduType type)
     {
         throw new ArgumentException(
             $"Expected column {column} to be of {type}");
     }
 
+    [DoesNotReturn]
     public static void ThrowNullException(ColumnSchema column)
     {
         throw new ArgumentException($"Column {column} is null");
     }
 
+    [DoesNotReturn]
     public static void ThrowNotNullableException(ColumnSchema column)
     {
         throw new ArgumentException($"Column {column} is not nullable");
     }
 
+    [DoesNotReturn]
     public static void ThrowNotFixedLengthException(ColumnSchema column)
     {
         throw new ArgumentException($"Column {column} is not a fixed length type");

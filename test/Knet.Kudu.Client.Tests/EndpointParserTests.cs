@@ -1,4 +1,3 @@
-using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Util;
 using Xunit;
 
@@ -32,8 +31,9 @@ public class EndpointParserTests
     [InlineData("[2001:db7:85a3:8d2:1319:8a2e:370:7348]:1000", "2001:db7:85a3:8d2:1319:8a2e:370:7348", 1000)]
     public void CanParseEndpoint(string endpoint, string expectedHost, int expectedPort)
     {
-        HostAndPort hostPort = EndpointParser.TryParse(endpoint);
+        var success = EndpointParser.TryParse(endpoint, 0, out var hostPort);
 
+        Assert.True(success);
         Assert.Equal(expectedHost, hostPort.Host);
         Assert.Equal(expectedPort, hostPort.Port);
     }
@@ -41,8 +41,9 @@ public class EndpointParserTests
     [Fact]
     public void CanUseDefaultPort()
     {
-        HostAndPort hostPort = EndpointParser.TryParse("127.0.0.1", 7051);
+        var success = EndpointParser.TryParse("127.0.0.1", 7051, out var hostPort);
 
+        Assert.True(success);
         Assert.Equal("127.0.0.1", hostPort.Host);
         Assert.Equal(7051, hostPort.Port);
     }

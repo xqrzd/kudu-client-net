@@ -41,7 +41,7 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
     private bool _closed;
     private long _numRowsReturned;
     private uint _sequenceId;
-    private byte[] _scannerId;
+    private byte[]? _scannerId;
     private byte[] _lastPrimaryKey;
 
     /// <summary>
@@ -50,11 +50,11 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
     /// If == DONE, then we're done scanning.
     /// Otherwise it contains a proper tabletSlice name, and we're currently scanning.
     /// </summary>
-    internal RemoteTablet Tablet { get; private set; }
+    internal RemoteTablet? Tablet { get; private set; }
 
     internal long SnapshotTimestamp { get; private set; }
 
-    public ResultSet Current { get; private set; }
+    public ResultSet Current { get; private set; } = null!;
 
     public ResourceMetrics ResourceMetrics { get; }
 
@@ -454,7 +454,7 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
     private KeepAliveRequest GetKeepAliveRequest()
     {
         return new KeepAliveRequest(
-            _scannerId,
+            _scannerId!,
             _replicaSelection,
             _table.TableId,
             Tablet,
@@ -463,7 +463,7 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
 
     private void ScanFinished()
     {
-        Partition partition = Tablet.Partition;
+        Partition partition = Tablet!.Partition;
         _partitionPruner.RemovePartitionKeyRange(partition.PartitionKeyEnd);
         // Stop scanning if we have scanned until or past the end partition key, or
         // if we have fulfilled the limit.
@@ -495,7 +495,7 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
         var current = Current;
         if (current is not null)
         {
-            Current = default;
+            Current = null!;
             current.Dispose();
         }
     }

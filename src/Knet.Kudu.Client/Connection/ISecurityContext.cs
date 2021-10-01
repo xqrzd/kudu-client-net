@@ -26,7 +26,7 @@ public interface ISecurityContext
     /// <summary>
     /// Get the current authentication token, or null if we have no valid token.
     /// </summary>
-    public SignedTokenPB GetAuthenticationToken();
+    public SignedTokenPB? GetAuthenticationToken();
 
     /// <summary>
     /// Export serialized authentication data that may be passed to a different

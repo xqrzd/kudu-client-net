@@ -6,6 +6,7 @@
 using System;
 using System.Buffers;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Knet.Kudu.Client.Internal;
 
@@ -201,11 +202,13 @@ internal sealed class ArrayBufferWriter<T> : IBufferWriter<T>
         Debug.Assert(FreeCapacity > 0 && FreeCapacity >= sizeHint);
     }
 
+    [DoesNotReturn]
     private static void ThrowInvalidOperationException_AdvancedTooFar(int capacity)
     {
         throw new InvalidOperationException($"Cannot advance past the end of the buffer, which has a size of {capacity}.");
     }
 
+    [DoesNotReturn]
     private static void ThrowOutOfMemoryException(uint capacity)
     {
         throw new OutOfMemoryException($"Cannot allocate a buffer of size {capacity}.");

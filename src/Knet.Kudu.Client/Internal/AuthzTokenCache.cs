@@ -34,7 +34,7 @@ internal sealed class AuthzTokenCache
     /// Returns the cached token for the given 'tableId' if one exists.
     /// </summary>
     /// <param name="tableId">Table ID to get an authz token for.</param>
-    public SignedTokenPB GetAuthzToken(string tableId)
+    public SignedTokenPB? GetAuthzToken(string tableId)
     {
         _cache.TryGetValue(tableId, out var token);
         return token;

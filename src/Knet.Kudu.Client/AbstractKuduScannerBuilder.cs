@@ -33,8 +33,8 @@ public abstract class AbstractKuduScannerBuilder<TBuilder>
     protected internal byte[] UpperBoundPrimaryKey = Array.Empty<byte>();
     protected internal byte[] LowerBoundPartitionKey = Array.Empty<byte>();
     protected internal byte[] UpperBoundPartitionKey = Array.Empty<byte>();
-    protected internal List<string> ProjectedColumnNames;
-    protected internal List<int> ProjectedColumnIndexes;
+    protected internal List<string>? ProjectedColumnNames;
+    protected internal List<int>? ProjectedColumnIndexes;
     protected internal long ScanRequestTimeout; // TODO: Expose this, and expose as TimeSpan?
     protected internal ReplicaSelection ReplicaSelection = ReplicaSelection.LeaderOnly;
 

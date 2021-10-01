@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -33,7 +34,7 @@ public sealed class ConnectionCache : IAsyncDisposable
             ThrowObjectDisposedException();
 
         IPEndPoint endpoint = serverInfo.Endpoint;
-        Task<KuduConnection> connectionTask;
+        Task<KuduConnection>? connectionTask;
 
         lock (_connections)
         {
@@ -75,7 +76,7 @@ public sealed class ConnectionCache : IAsyncDisposable
             .ConnectAsync(serverInfo, cancellationToken).ConfigureAwait(false);
 
         connection.OnDisconnected((exception, state) => RemoveFaultedConnection(
-            (ServerInfo)state, skipTaskStatusCheck: true), serverInfo);
+            (ServerInfo)state!, skipTaskStatusCheck: true), serverInfo);
 
         return connection;
     }
@@ -92,7 +93,7 @@ public sealed class ConnectionCache : IAsyncDisposable
             }
             else
             {
-                if (_connections.TryGetValue(endpoint, out Task<KuduConnection> connectionTask))
+                if (_connections.TryGetValue(endpoint, out var connectionTask))
                 {
                     // Someone else might have already replaced the faulted connection.
                     // Confirm that the connection we're about to remove is faulted.
@@ -129,6 +130,7 @@ public sealed class ConnectionCache : IAsyncDisposable
         }
     }
 
+    [DoesNotReturn]
     private static void ThrowObjectDisposedException() =>
         throw new ObjectDisposedException(nameof(ConnectionCache));
 }

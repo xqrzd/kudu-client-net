@@ -75,8 +75,8 @@ internal static class ProtobufHelper
         return buffer;
     }
 
-    public static ColumnTypeAttributes ToTypeAttributes(
-        this ColumnTypeAttributesPB pb)
+    public static ColumnTypeAttributes? ToTypeAttributes(
+        this ColumnTypeAttributesPB? pb)
     {
         if (pb is null)
             return null;
@@ -87,8 +87,8 @@ internal static class ProtobufHelper
             pb.HasLength ? pb.Length : default);
     }
 
-    public static ColumnTypeAttributesPB ToTypeAttributesPb(
-        this ColumnTypeAttributes attr)
+    public static ColumnTypeAttributesPB? ToTypeAttributesPb(
+        this ColumnTypeAttributes? attr)
     {
         if (attr is null)
             return null;
@@ -162,8 +162,8 @@ internal static class ProtobufHelper
         return partitionPb;
     }
 
-    public static HiveMetastoreConfig ToHiveMetastoreConfig(
-        this Protobuf.Master.HiveMetastoreConfig hmsConfig)
+    public static HiveMetastoreConfig? ToHiveMetastoreConfig(
+        this Protobuf.Master.HiveMetastoreConfig? hmsConfig)
     {
         if (hmsConfig is null)
             return null;

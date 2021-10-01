@@ -13,7 +13,7 @@ public class ServerInfo
 
     public IPEndPoint Endpoint { get; }
 
-    public string Location { get; }
+    public string? Location { get; }
 
     public bool IsLocal { get; }
 
@@ -21,7 +21,7 @@ public class ServerInfo
         string uuid,
         HostAndPort hostPort,
         IPEndPoint endpoint,
-        string location,
+        string? location,
         bool isLocal)
     {
         Uuid = uuid;
@@ -37,8 +37,8 @@ public class ServerInfo
     /// Returns true if the server is in the same location as the given location.
     /// </summary>
     /// <param name="location">The location to check.</param>
-    public bool InSameLocation(string location) =>
-        !string.IsNullOrEmpty(location) && location.Equals(Location);
+    public bool InSameLocation(string? location) =>
+        !string.IsNullOrEmpty(location) && location == Location;
 
     public override string ToString() => $"{Uuid} ({HostPort})";
 }

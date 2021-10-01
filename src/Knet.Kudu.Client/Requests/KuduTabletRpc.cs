@@ -11,22 +11,22 @@ internal abstract class KuduTabletRpc<T> : KuduRpc<T>
     /// <summary>
     /// Returns the partition key this RPC is for.
     /// </summary>
-    public byte[] PartitionKey { get; init; }
+    public byte[] PartitionKey { get; init; } = null!;
 
-    public RemoteTablet Tablet { get; internal set; }
+    public RemoteTablet? Tablet { get; internal set; }
 
     public ReplicaSelection ReplicaSelection { get; init; } = ReplicaSelection.LeaderOnly;
 
     public bool NeedsAuthzToken { get; init; }
 
-    internal SignedTokenPB AuthzToken { get; set; }
+    internal SignedTokenPB? AuthzToken { get; set; }
 
     /// <summary>
     /// The table this RPC is for.
     /// </summary>
-    public string TableId { get; init; }
+    public string TableId { get; init; } = null!;
 
-    public TabletServerErrorPB Error { get; protected set; }
+    public TabletServerErrorPB? Error { get; protected set; }
 
     public KuduTabletRpc()
     {

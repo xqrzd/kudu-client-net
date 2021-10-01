@@ -17,7 +17,7 @@ internal sealed class ArrayPoolBuffer<T> : IDisposable
         var buffer = Buffer;
         if (buffer is not null)
         {
-            Buffer = null;
+            Buffer = null!;
             ArrayPool<T>.Shared.Return(buffer);
         }
     }

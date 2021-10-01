@@ -12,7 +12,7 @@ public abstract class KuduException : Exception
         Status = status;
     }
 
-    public KuduException(KuduStatus status, Exception innerException)
+    public KuduException(KuduStatus status, Exception? innerException)
         : base(status.Message, innerException)
     {
         Status = status;

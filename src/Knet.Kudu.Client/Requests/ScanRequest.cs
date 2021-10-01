@@ -29,7 +29,7 @@ internal sealed class ScanRequest : KuduTabletRpc<ScanResponse>, IDisposable
         KuduSchema schema,
         ReplicaSelection replicaSelection,
         string tableId,
-        RemoteTablet tablet,
+        RemoteTablet? tablet,
         byte[] partitionKey,
         bool isFaultTolerant)
     {
@@ -71,7 +71,7 @@ internal sealed class ScanRequest : KuduTabletRpc<ScanResponse>, IDisposable
             // Set tabletId here, as we don't know what tablet the request is
             // going to until GetTabletAsync() is called and that tablet is
             // set on this RPC.
-            newRequest.TabletId = ByteString.CopyFromUtf8(Tablet.TabletId);
+            newRequest.TabletId = ByteString.CopyFromUtf8(Tablet!.TabletId);
 
             if (AuthzToken != null)
                 newRequest.AuthzToken = AuthzToken;

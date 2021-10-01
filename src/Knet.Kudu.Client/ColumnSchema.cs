@@ -14,7 +14,7 @@ public class ColumnSchema : IEquatable<ColumnSchema>
 
     public bool IsNullable { get; }
 
-    public object DefaultValue { get; }
+    public object? DefaultValue { get; }
 
     public int DesiredBlockSize { get; }
 
@@ -22,7 +22,7 @@ public class ColumnSchema : IEquatable<ColumnSchema>
 
     public CompressionType Compression { get; }
 
-    public ColumnTypeAttributes TypeAttributes { get; }
+    public ColumnTypeAttributes? TypeAttributes { get; }
 
     public int Size { get; }
 
@@ -30,18 +30,18 @@ public class ColumnSchema : IEquatable<ColumnSchema>
 
     public bool IsFixedSize { get; }
 
-    public string Comment { get; }
+    public string? Comment { get; }
 
     public ColumnSchema(
         string name, KuduType type,
         bool isKey = false,
         bool isNullable = false,
-        object defaultValue = null,
+        object? defaultValue = null,
         int desiredBlockSize = 0,
         EncodingType encoding = EncodingType.AutoEncoding,
         CompressionType compression = CompressionType.DefaultCompression,
-        ColumnTypeAttributes typeAttributes = null,
-        string comment = null)
+        ColumnTypeAttributes? typeAttributes = null,
+        string? comment = null)
     {
         Name = name;
         Type = type;
@@ -59,7 +59,7 @@ public class ColumnSchema : IEquatable<ColumnSchema>
         IsFixedSize = IsTypeFixedSize(type);
     }
 
-    public bool Equals(ColumnSchema other)
+    public bool Equals(ColumnSchema? other)
     {
         if (other is null)
             return false;
@@ -74,7 +74,7 @@ public class ColumnSchema : IEquatable<ColumnSchema>
             IsNullable == other.IsNullable;
     }
 
-    public override bool Equals(object obj) => Equals(obj as ColumnSchema);
+    public override bool Equals(object? obj) => Equals(obj as ColumnSchema);
 
     public override int GetHashCode() => HashCode.Combine(Name, Type);
 

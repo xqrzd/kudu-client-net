@@ -13,6 +13,6 @@ internal static class ThreadSafeRandom
     private static readonly ThreadLocal<Random> _random =
         new(() => new Random(Interlocked.Increment(ref _seed)));
 
-    public static Random Instance => _random.Value;
+    public static Random Instance => _random.Value!;
 #endif
 }

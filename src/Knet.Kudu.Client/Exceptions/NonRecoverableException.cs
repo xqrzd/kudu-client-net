@@ -12,7 +12,7 @@ public class NonRecoverableException : KuduException
     {
     }
 
-    public NonRecoverableException(KuduStatus status, Exception innerException)
+    public NonRecoverableException(KuduStatus status, Exception? innerException)
         : base(status, innerException)
     {
     }

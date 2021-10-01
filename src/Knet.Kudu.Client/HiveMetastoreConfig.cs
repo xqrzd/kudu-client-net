@@ -8,7 +8,7 @@ public class HiveMetastoreConfig
     /// For more info see the Kudu master --hive_metastore_uris flag for more info,
     /// or the Hive Metastore hive.metastore.uris configuration.
     /// </summary>
-    public string HiveMetastoreUris { get; }
+    public string? HiveMetastoreUris { get; }
 
     /// <summary>
     /// Whether the Hive Metastore instance uses SASL (Kerberos) security.
@@ -25,12 +25,12 @@ public class HiveMetastoreConfig
     /// versions which Kudu is compatible with include the necessary APIs. See
     /// HIVE-16452 for more info.
     /// </summary>
-    public string HiveMetastoreUuid { get; }
+    public string? HiveMetastoreUuid { get; }
 
     public HiveMetastoreConfig(
-        string hiveMetastoreUris,
+        string? hiveMetastoreUris,
         bool hiveMetastoreSaslEnabled,
-        string hiveMetastoreUuid)
+        string? hiveMetastoreUuid)
     {
         HiveMetastoreUris = hiveMetastoreUris;
         HiveMetastoreSaslEnabled = hiveMetastoreSaslEnabled;

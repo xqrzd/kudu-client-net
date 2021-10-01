@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protobuf;
 using Knet.Kudu.Client.Protobuf.Tserver;
@@ -101,7 +102,7 @@ internal static class ResultSetFactory
         if (data is null || data.NumRows == 0)
         {
             // Empty projection, usually used for quick row counting.
-            return CreateEmptyResultSet(schema, data.NumRows);
+            return CreateEmptyResultSet(schema, numRows: 0);
         }
 
         throw new NotImplementedException("Support for row data will be implemented in a future PR");
@@ -142,17 +143,20 @@ internal static class ResultSetFactory
         }
     }
 
+    [DoesNotReturn]
     private static void ThrowColumnCountMismatchException(int schemaColumns, int sidecarColumns)
     {
         throw new InvalidOperationException(
             $"Projected schema has {schemaColumns} columns, but the server returned {sidecarColumns} columns");
     }
 
+    [DoesNotReturn]
     private static void ThrowMissingDataSidecarException(ColumnSchema column)
     {
         throw new InvalidOperationException($"Server didn't supply a data sidecar for {column}");
     }
 
+    [DoesNotReturn]
     private static void ThrowSidecarOutsideBoundsException(int start, int length, int bufferSize)
     {
         throw new InvalidOperationException(

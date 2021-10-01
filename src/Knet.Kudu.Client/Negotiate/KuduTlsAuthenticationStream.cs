@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Knet.Kudu.Client.Protobuf.Rpc;
 
 namespace Knet.Kudu.Client.Negotiate;
 
@@ -10,8 +9,7 @@ public sealed class KuduTlsAuthenticationStream : Stream
 {
     private readonly Negotiator _negotiator;
 
-    private NegotiatePB _result;
-    private int _readPosition;
+    private ReadOnlyMemory<byte> _tlsHandshake;
 
     public KuduTlsAuthenticationStream(Negotiator negotiator)
     {
@@ -78,32 +76,35 @@ public sealed class KuduTlsAuthenticationStream : Stream
         throw new NotImplementedException();
     }
 
-    private Task SendHandshakeAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+    private Task SendHandshakeAsync(
+        ReadOnlyMemory<byte> buffer,
+        CancellationToken cancellationToken = default)
     {
         return _negotiator.SendTlsHandshakeAsync(buffer, cancellationToken);
     }
 
-    private async Task<int> ReceiveHandshakeAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    private async Task<int> ReceiveHandshakeAsync(
+        Memory<byte> buffer,
+        CancellationToken cancellationToken = default)
     {
         if (buffer.Length == 0)
         {
             return 0;
         }
 
-        int totalLength = _result?.TlsHandshake?.Length ?? 0;
-        int available = totalLength - _readPosition;
-        if (available == 0)
+        var tlsHandshake = _tlsHandshake;
+        if (tlsHandshake.Length == 0)
         {
-            _result = await _negotiator.ReceiveResponseAsync(cancellationToken)
+            var result = await _negotiator.ReceiveResponseAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            available = _result.TlsHandshake.Length;
-            _readPosition = 0;
+            tlsHandshake = result.TlsHandshake.Memory;
         }
 
-        int length = Math.Min(buffer.Length, available);
-        _result.TlsHandshake.Memory.Slice(_readPosition, length).CopyTo(buffer);
-        _readPosition += length;
+        int length = Math.Min(buffer.Length, tlsHandshake.Length);
+        tlsHandshake.Slice(0, length).CopyTo(buffer);
+        _tlsHandshake = tlsHandshake.Slice(length);
+
         return length;
     }
 }

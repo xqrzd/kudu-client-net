@@ -14,14 +14,14 @@ public abstract class KuduRpc
     protected const string TabletServerServiceName = "kudu.tserver.TabletServerService";
     protected const string TxnManagerServiceName = "kudu.transactions.TxnManagerService";
 
-    public string ServiceName { get; init; }
+    public string ServiceName { get; init; } = null!;
 
-    public string MethodName { get; init; }
+    public string MethodName { get; init; } = null!;
 
     /// <summary>
     /// Returns the set of application-specific feature flags required to service the RPC.
     /// </summary>
-    public RepeatedField<uint> RequiredFeatures { get; init; }
+    public RepeatedField<uint>? RequiredFeatures { get; init; }
 
     /// <summary>
     /// The external consistency mode for this RPC.
@@ -37,7 +37,7 @@ public abstract class KuduRpc
     /// <summary>
     /// The last exception when handling this RPC.
     /// </summary>
-    internal Exception Exception { get; set; }
+    internal Exception? Exception { get; set; }
 
     /// <summary>
     /// If this RPC needs to be tracked on the client and server-side.
@@ -56,5 +56,5 @@ public abstract class KuduRpc
 
 public abstract class KuduRpc<T> : KuduRpc
 {
-    public T Output { get; protected set; }
+    public T? Output { get; protected set; }
 }

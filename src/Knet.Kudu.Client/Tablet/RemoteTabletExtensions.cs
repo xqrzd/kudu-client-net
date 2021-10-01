@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
 namespace Knet.Kudu.Client.Tablet;
@@ -80,13 +81,13 @@ public static class RemoteTabletExtensions
 
 public readonly struct FindTabletResult
 {
-    public RemoteTablet Tablet { get; }
+    public RemoteTablet? Tablet { get; }
 
     public int Index { get; }
 
-    public byte[] NonCoveredRangeStart { get; }
+    public byte[]? NonCoveredRangeStart { get; }
 
-    public byte[] NonCoveredRangeEnd { get; }
+    public byte[]? NonCoveredRangeEnd { get; }
 
     public FindTabletResult(RemoteTablet tablet, int index)
     {
@@ -104,7 +105,11 @@ public readonly struct FindTabletResult
         NonCoveredRangeEnd = nonCoveredRangeEnd;
     }
 
+    [MemberNotNullWhen(true, nameof(Tablet))]
+    [MemberNotNullWhen(false, nameof(NonCoveredRangeStart), nameof(NonCoveredRangeEnd))]
     public bool IsCoveredRange => Tablet is not null;
 
+    [MemberNotNullWhen(true, nameof(NonCoveredRangeStart), nameof(NonCoveredRangeEnd))]
+    [MemberNotNullWhen(false, nameof(Tablet))]
     public bool IsNonCoveredRange => Tablet is null;
 }

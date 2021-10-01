@@ -35,7 +35,7 @@ internal sealed class SplitKeyRangeRequest : KuduTabletRpc<SplitKeyRangeResponse
 
     public override int CalculateSize()
     {
-        _request.TabletId = ByteString.CopyFromUtf8(Tablet.TabletId);
+        _request.TabletId = ByteString.CopyFromUtf8(Tablet!.TabletId);
         _request.AuthzToken = AuthzToken;
 
         return _request.CalculateSize();

@@ -14,7 +14,7 @@ internal sealed class KeepAliveRequest : KuduTabletRpc<ScannerKeepAliveResponseP
         byte[] scannerId,
         ReplicaSelection replicaSelection,
         string tableId,
-        RemoteTablet tablet,
+        RemoteTablet? tablet,
         byte[] partitionKey)
     {
         _request = new ScannerKeepAliveRequestPB

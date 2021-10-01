@@ -11,7 +11,7 @@ internal sealed class ListTablesRequest : KuduMasterRpc<ListTablesResponsePB>
 
     private readonly ListTablesRequestPB _request;
 
-    public ListTablesRequest(string nameFilter = null)
+    public ListTablesRequest(string? nameFilter = null)
     {
         MethodName = "ListTables";
 

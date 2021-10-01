@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace Knet.Kudu.Client.Internal;
 
-internal class TaskCompletionSource : TaskCompletionSource<object>
+internal class TaskCompletionSource : TaskCompletionSource<object?>
 {
     public TaskCompletionSource() : base() { }
 
