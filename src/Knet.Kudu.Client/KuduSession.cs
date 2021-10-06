@@ -37,7 +37,7 @@ public sealed class KuduSession : IKuduSession
 
         var channelOptions = new BoundedChannelOptions(options.Capacity)
         {
-            SingleWriter = options.SingleWriter,
+            SingleWriter = false,
             SingleReader = true,
             FullMode = BoundedChannelFullMode.Wait,
             AllowSynchronousContinuations = false

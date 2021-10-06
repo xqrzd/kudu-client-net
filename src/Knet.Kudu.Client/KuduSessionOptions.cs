@@ -22,13 +22,6 @@ public record KuduSessionOptions
     public int Capacity { get; init; } = 40000;
 
     /// <summary>
-    /// True if writers to the session guarantee that there will only ever
-    /// be at most one write operation at a time; false if no such constraint
-    /// is guaranteed. Default: false.
-    /// </summary>
-    public bool SingleWriter { get; init; }
-
-    /// <summary>
     /// The maximum duration of time to wait for new items before flushing.
     /// Hitting this duration will trigger a flush immediately, regardless
     /// of the value of <see cref="BatchSize"/>. Default: 1 second.
