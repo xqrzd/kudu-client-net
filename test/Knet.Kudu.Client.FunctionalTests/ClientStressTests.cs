@@ -9,6 +9,7 @@ using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
 using Knet.Kudu.Client.FunctionalTests.Util;
 using Knet.Kudu.Client.Internal;
+using Knet.Kudu.Client.Util;
 using McMaster.Extensions.Xunit;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;

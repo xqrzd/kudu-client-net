@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO.Pipelines;
 using Knet.Kudu.Client.Connection;
-using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Util;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;

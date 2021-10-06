@@ -41,29 +41,3 @@ public class PartitionSchema
         IsSimpleRangePartitioning = isSimple;
     }
 }
-
-public class RangeSchema
-{
-    public List<int> ColumnIds { get; }
-
-    public RangeSchema(List<int> columnIds)
-    {
-        ColumnIds = columnIds;
-    }
-}
-
-public class HashBucketSchema
-{
-    public List<int> ColumnIds { get; }
-
-    public int NumBuckets { get; }
-
-    public uint Seed { get; }
-
-    public HashBucketSchema(List<int> columnIds, int numBuckets, uint seed)
-    {
-        ColumnIds = columnIds;
-        NumBuckets = numBuckets;
-        Seed = seed;
-    }
-}
