@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using Knet.Kudu.Client.Connection;
-using Knet.Kudu.Client.Protobuf.Master;
 
 namespace Knet.Kudu.Client;
 
@@ -58,21 +57,4 @@ public class TabletServerInfo
         HttpsEnabled = httpsEnabled;
         StartTime = startTime;
     }
-}
-
-public enum TabletServerState
-{
-    /// <summary>
-    /// Default value for backwards compatibility.
-    /// </summary>
-    Unknown = TServerStatePB.UnknownState,
-    /// <summary>
-    /// No state for the tserver.
-    /// </summary>
-    None = TServerStatePB.None,
-    /// <summary>
-    /// New replicas are not added to the tserver, and failed replicas on
-    /// the tserver are not re-replicated.
-    /// </summary>
-    MaintenanceMode = TServerStatePB.MaintenanceMode,
 }
