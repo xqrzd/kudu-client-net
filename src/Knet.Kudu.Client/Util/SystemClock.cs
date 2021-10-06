@@ -1,10 +1,9 @@
 using System;
 using System.Diagnostics;
-using Knet.Kudu.Client.Util;
 
-namespace Knet.Kudu.Client.Internal;
+namespace Knet.Kudu.Client.Util;
 
-internal sealed class SystemClock : ISystemClock
+public sealed class SystemClock : ISystemClock
 {
 #if NETCOREAPP3_1_OR_GREATER
     public long CurrentMilliseconds => Environment.TickCount64;
