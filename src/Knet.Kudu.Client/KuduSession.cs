@@ -117,21 +117,12 @@ public sealed class KuduSession : IKuduSession
         {
             bool flush = await DequeueAsync(batch).ConfigureAwait(false);
 
-            if (batch.Count == 0)
+            // It's possible to read 0 items when the queue is empty and
+            // the session was flushed or disposed.
+            if (batch.Count > 0)
             {
-                // It's possible to read 0 items when the queue is empty and,
-                // 1) A flush was triggered
-                // 2) The session was disposed
-
-                if (flush)
-                {
-                    CompletePendingFlush();
-                }
-
-                continue;
+                await SendAsync(batch).ConfigureAwait(false);
             }
-
-            await SendAsync(batch).ConfigureAwait(false);
 
             if (flush)
             {
