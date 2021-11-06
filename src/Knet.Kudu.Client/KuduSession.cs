@@ -156,7 +156,7 @@ public sealed class KuduSession : IKuduSession
 
         if (flushRequested)
         {
-            Console.WriteLine("Session short-circuit");
+            // Short-circuit if a flush was requested and the queue is empty.
             return true;
         }
 
@@ -190,14 +190,13 @@ public sealed class KuduSession : IKuduSession
             while (batch.Count < capacity &&
                 reader.TryRead(out var operation))
             {
-                Console.WriteLine("Add operation");
                 batch.Add(operation);
             }
         }
         catch (ChannelClosedException)
         {
-            // This session was disposed. The queue is empty and is not
-            // accepting new items.
+            // This session was disposed.
+            // The queue is empty and is not accepting new items.
         }
 
         return flushRequested && batch.Count < capacity;
