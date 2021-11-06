@@ -110,8 +110,7 @@ public sealed class KuduSession : IKuduSession
     private async Task ConsumeAsync()
     {
         var channelCompletionTask = _reader.Completion;
-        int batchSize = _options.BatchSize;
-        var batch = new List<KuduOperation>(batchSize);
+        var batch = new List<KuduOperation>(_options.BatchSize);
 
         while (!channelCompletionTask.IsCompleted)
         {
@@ -140,8 +139,8 @@ public sealed class KuduSession : IKuduSession
         bool flushRequested = flushToken.IsCancellationRequested;
         int capacity = _options.BatchSize;
 
-        // Drain the queue before we asynchronously wait until the capacity
-        // or flush interval is met.
+        // Drain the queue before asynchronously waiting until the batch
+        // is full or the flush interval is met.
         while (reader.TryRead(out var operation))
         {
             batch.Add(operation);
@@ -208,7 +207,8 @@ public sealed class KuduSession : IKuduSession
         _flushCts.Dispose();
         _flushCts = new CancellationTokenSource();
 
-        // Complete the flush.
+        // Complete the flush. FlushAsync() guarantees that _flushCts
+        // won't be cancelled until we have a new _flushTcs.
         _flushTcs.TrySetResult();
     }
 
