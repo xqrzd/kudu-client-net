@@ -140,25 +140,23 @@ public sealed class KuduSession : IKuduSession
         bool flushRequested = flushToken.IsCancellationRequested;
         int capacity = _options.BatchSize;
 
-        // First try to synchronously drain any existing queue items
-        // before we asynchronously wait until we've hit the capacity
-        // or flush interval.
+        // Drain the queue before we asynchronously wait until the capacity
+        // or flush interval is met.
         while (reader.TryRead(out var operation))
         {
             batch.Add(operation);
 
             if (batch.Count >= capacity)
             {
-                // We've filled the batch, but we can't complete a pending
-                // flush here as there may still be more items in the queue.
+                // The batch is full, but we can't complete a pending flush
+                // here as there could still be more items in the queue.
                 return false;
             }
         }
 
         if (flushRequested)
         {
-            // Short-circuit if a flush was requested
-            // and we've completely emptied the queue.
+            Console.WriteLine("Session short-circuit");
             return true;
         }
 
@@ -174,9 +172,9 @@ public sealed class KuduSession : IKuduSession
             }
 
             using var timeout = new CancellationTokenSource(_options.FlushInterval);
-            using var both = CancellationTokenSource.CreateLinkedTokenSource(
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
                 timeout.Token, flushToken);
-            var token = both.Token;
+            var token = linkedCts.Token;
 
             while (batch.Count < capacity)
             {
@@ -192,6 +190,7 @@ public sealed class KuduSession : IKuduSession
             while (batch.Count < capacity &&
                 reader.TryRead(out var operation))
             {
+                Console.WriteLine("Add operation");
                 batch.Add(operation);
             }
         }
