@@ -110,8 +110,7 @@ public sealed class KuduSession : IKuduSession
     private async Task ConsumeAsync()
     {
         var channelCompletionTask = _reader.Completion;
-        int batchSize = _options.BatchSize;
-        var batch = new List<KuduOperation>(batchSize);
+        var batch = new List<KuduOperation>(_options.BatchSize);
 
         while (!channelCompletionTask.IsCompleted)
         {
@@ -140,25 +139,23 @@ public sealed class KuduSession : IKuduSession
         bool flushRequested = flushToken.IsCancellationRequested;
         int capacity = _options.BatchSize;
 
-        // First try to synchronously drain any existing queue items
-        // before we asynchronously wait until we've hit the capacity
-        // or flush interval.
+        // Drain the queue before asynchronously waiting until the batch
+        // is full or the flush interval is met.
         while (reader.TryRead(out var operation))
         {
             batch.Add(operation);
 
             if (batch.Count >= capacity)
             {
-                // We've filled the batch, but we can't complete a pending
-                // flush here as there may still be more items in the queue.
+                // The batch is full, but we can't complete a pending flush
+                // here as there could still be more items in the queue.
                 return false;
             }
         }
 
         if (flushRequested)
         {
-            // Short-circuit if a flush was requested
-            // and we've completely emptied the queue.
+            // Short-circuit if a flush was requested and the queue is empty.
             return true;
         }
 
@@ -174,9 +171,9 @@ public sealed class KuduSession : IKuduSession
             }
 
             using var timeout = new CancellationTokenSource(_options.FlushInterval);
-            using var both = CancellationTokenSource.CreateLinkedTokenSource(
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
                 timeout.Token, flushToken);
-            var token = both.Token;
+            var token = linkedCts.Token;
 
             while (batch.Count < capacity)
             {
@@ -197,8 +194,8 @@ public sealed class KuduSession : IKuduSession
         }
         catch (ChannelClosedException)
         {
-            // This session was disposed. The queue is empty and is not
-            // accepting new items.
+            // This session was disposed.
+            // The queue is empty and is not accepting new items.
         }
 
         return flushRequested && batch.Count < capacity;
@@ -210,7 +207,8 @@ public sealed class KuduSession : IKuduSession
         _flushCts.Dispose();
         _flushCts = new CancellationTokenSource();
 
-        // Complete the flush.
+        // Complete the flush. FlushAsync() guarantees that _flushCts
+        // won't be cancelled until we have a new _flushTcs.
         _flushTcs.TrySetResult();
     }
 
