@@ -19,7 +19,7 @@ internal static class ResultSetFactory
             return CreateResultSet(message, scanSchema, scanResponse.ColumnarData);
         }
 
-        return CreateResultSet(scanSchema, scanResponse.Data);
+        return CreateResultSet(message, scanSchema, scanResponse.Data);
     }
 
     private static ResultSet CreateResultSet(
@@ -96,16 +96,22 @@ internal static class ResultSetFactory
     }
 
     private static ResultSet CreateResultSet(
+        KuduMessage message,
         KuduSchema schema,
         RowwiseRowBlockPB data)
     {
-        if (data is null || data.NumRows == 0)
+        if (data is null)
         {
-            // Empty projection, usually used for quick row counting.
-            return CreateEmptyResultSet(schema, numRows: 0);
+            return CreateEmptyResultSet(schema, 0);
         }
 
-        throw new NotImplementedException("Support for row data will be implemented in a future PR");
+        if (!data.HasRowsSidecar || schema.Columns.Count == 0 || data.NumRows == 0)
+        {
+            // Empty projection, usually used for quick row counting.
+            return CreateEmptyResultSet(schema, data.NumRows);
+        }
+
+        return RowwiseResultSetConverter.Convert(message, schema, data);
     }
 
     private static ResultSet CreateEmptyResultSet(KuduSchema schema, long numRows)
