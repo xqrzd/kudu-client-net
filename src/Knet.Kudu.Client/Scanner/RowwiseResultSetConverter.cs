@@ -7,6 +7,9 @@ namespace Knet.Kudu.Client.Scanner;
 
 internal static class RowwiseResultSetConverter
 {
+    // Used to convert the rowwise data to the newer columnar format,
+    // to avoid virtual calls on ResultSet.
+    // This is only used if the Kudu server is 1.11 or older.
     public static ResultSet Convert(
         KuduMessage message,
         KuduSchema schema,
