@@ -11,16 +11,13 @@ internal sealed class KeepAliveRequest : KuduTabletRpc<ScannerKeepAliveResponseP
     private readonly ScannerKeepAliveRequestPB _request;
 
     public KeepAliveRequest(
-        byte[] scannerId,
+        ByteString scannerId,
         ReplicaSelection replicaSelection,
         string tableId,
         RemoteTablet? tablet,
         byte[] partitionKey)
     {
-        _request = new ScannerKeepAliveRequestPB
-        {
-            ScannerId = UnsafeByteOperations.UnsafeWrap(scannerId),
-        };
+        _request = new ScannerKeepAliveRequestPB { ScannerId = scannerId };
 
         MethodName = "ScannerKeepAlive";
         ReplicaSelection = replicaSelection;

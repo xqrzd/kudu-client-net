@@ -235,7 +235,7 @@ public class RowResultTests
             foreach (var row in resultSet)
             {
                 scannedRows++;
-                resultSet.Dispose();
+                resultSet.Invalidate();
 
                 Assert.Throws<ObjectDisposedException>(() => row.GetInt32("key"));
                 Assert.Throws<ObjectDisposedException>(() => row.GetNullableInt32("key"));
