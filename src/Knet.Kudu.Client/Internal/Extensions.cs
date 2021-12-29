@@ -14,9 +14,6 @@ namespace Knet.Kudu.Client.Internal;
 
 internal static class Extensions
 {
-    public static string ToStringUtf8(this byte[] source) =>
-        Encoding.UTF8.GetString(source);
-
     public static byte[] ToUtf8ByteArray(this string source) =>
         Encoding.UTF8.GetBytes(source);
 

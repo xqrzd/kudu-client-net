@@ -27,24 +27,23 @@ internal static class ResultSetFactory
         KuduSchema schema,
         ColumnarRowBlockPB data)
     {
-        if (data.Columns.Count == 0 || data.NumRows == 0)
-        {
-            // Empty projection, usually used for quick row counting.
-            return CreateEmptyResultSet(schema, data.NumRows);
-        }
-
         var columns = data.Columns;
         var numColumns = columns.Count;
-        var numRows = checked((int)data.NumRows);
-        var bufferLength = message.Buffer.Length;
 
         if (numColumns != schema.Columns.Count)
         {
             ThrowColumnCountMismatchException(schema.Columns.Count, numColumns);
         }
 
-        var nonNullBitmapLength = KuduEncoder.BitsToBytes(numRows);
+        if (data.Columns.Count == 0 || data.NumRows == 0)
+        {
+            // Empty projection, usually used for quick row counting.
+            return CreateEmptyResultSet(schema, data.NumRows);
+        }
 
+        var numRows = checked((int)data.NumRows);
+        var bufferLength = message.Buffer.Length;
+        var nonNullBitmapLength = KuduEncoder.BitsToBytes(numRows);
         var dataSidecarOffsets = new SidecarOffset[numColumns];
         var varlenDataSidecarOffsets = new SidecarOffset[numColumns];
         var nonNullBitmapSidecarOffsets = new SidecarOffset[numColumns];

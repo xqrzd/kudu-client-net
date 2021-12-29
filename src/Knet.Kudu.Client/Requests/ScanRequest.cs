@@ -11,7 +11,7 @@ using Knet.Kudu.Client.Tablet;
 
 namespace Knet.Kudu.Client.Requests;
 
-internal sealed class ScanRequest : KuduTabletRpc<ScanResponse>, IDisposable
+internal sealed class ScanRequest : KuduTabletRpc<ScanResponsePB>, IDisposable
 {
     private static readonly RepeatedField<uint> _columnPredicateRequiredFeature = new()
     {
@@ -22,6 +22,7 @@ internal sealed class ScanRequest : KuduTabletRpc<ScanResponse>, IDisposable
     private readonly ScanRequestPB _scanRequestPb;
     private readonly KuduSchema _schema;
     private readonly bool _isFaultTolerant;
+    private ResultSet? _resultSet;
 
     public ScanRequest(
         ScanRequestState state,
@@ -50,16 +51,6 @@ internal sealed class ScanRequest : KuduTabletRpc<ScanResponse>, IDisposable
         {
             RequiredFeatures = _columnPredicateRequiredFeature;
         }
-    }
-
-    public void Dispose()
-    {
-        ClearOutput();
-    }
-
-    public void TakeOutput()
-    {
-        Output = null;
     }
 
     public override int CalculateSize()
@@ -91,16 +82,17 @@ internal sealed class ScanRequest : KuduTabletRpc<ScanResponse>, IDisposable
 
     public override void ParseResponse(KuduMessage message)
     {
-        ClearOutput();
+        Dispose();
 
         var response = ScanResponsePB.Parser.ParseFrom(message.MessageProtobuf);
         var error = response.Error;
 
+        Output = response;
         Error = error;
 
         if (error is null)
         {
-            Output = GetOutput(response, message);
+            _resultSet = ResultSetFactory.Create(_schema, response, message);
             return;
         }
 
@@ -131,43 +123,20 @@ internal sealed class ScanRequest : KuduTabletRpc<ScanResponse>, IDisposable
         }
     }
 
-    private ScanResponse GetOutput(ScanResponsePB responsePb, KuduMessage message)
+    public ResultSet TakeResultSet()
     {
-        var scannerId = responsePb.HasScannerId
-            ? responsePb.ScannerId.ToByteArray()
-            : null;
-
-        var scanTimestamp = responsePb.HasSnapTimestamp
-            ? (long)responsePb.SnapTimestamp
-            : KuduClient.NoTimestamp;
-
-        var propagatedTimestamp = responsePb.HasPropagatedTimestamp
-            ? (long)responsePb.PropagatedTimestamp
-            : KuduClient.NoTimestamp;
-
-        var lastPrimaryKey = responsePb.HasLastPrimaryKey
-            ? responsePb.LastPrimaryKey.ToByteArray()
-            : null;
-
-        var resultSet = ResultSetFactory.Create(_schema, responsePb, message);
-
-        return new ScanResponse(
-            scannerId,
-            resultSet,
-            responsePb.HasMoreResults,
-            scanTimestamp,
-            propagatedTimestamp,
-            lastPrimaryKey,
-            responsePb.ResourceMetrics);
+        var resultSet = _resultSet;
+        _resultSet = null;
+        return resultSet!;
     }
 
-    private void ClearOutput()
+    public void Dispose()
     {
-        var output = Output;
-        if (output is not null)
+        var resultSet = _resultSet;
+        if (resultSet is not null)
         {
-            Output = null;
-            output.ResultSet.Dispose();
+            _resultSet = null;
+            resultSet.Invalidate();
         }
     }
 }

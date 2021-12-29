@@ -9,7 +9,7 @@ using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client;
 
-public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
+public sealed class ResultSet : IEnumerable<RowResult>
 {
     private readonly ArrayPoolBuffer<byte>? _buffer;
     private readonly byte[]? _data;
@@ -50,7 +50,7 @@ public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
         }
     }
 
-    public void Dispose()
+    internal void Invalidate()
     {
         _schema = null;
         _buffer?.Dispose();
@@ -516,7 +516,7 @@ public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
 
     private bool IsNullOffsetUnsafe(int offset, int rowIndex)
     {
-        if (offset == -1)
+        if (offset < 0)
         {
             // This column isn't nullable.
             return false;
@@ -593,6 +593,7 @@ public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
         int length = ReadInt32Unsafe(columnIndex, rowIndex + 1) - offset;
         int realOffset = sidecarOffset + offset;
 
+        // Bounds are verified later.
         return (realOffset, length);
     }
 
@@ -650,7 +651,7 @@ public sealed class ResultSet : IEnumerable<RowResult>, IDisposable
 
         object IEnumerator.Current => Current;
 
-        public void Reset() { }
+        public void Reset() => _index = -1;
 
         public void Dispose() { }
     }

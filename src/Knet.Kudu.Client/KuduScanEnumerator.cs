@@ -41,8 +41,8 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
     private bool _closed;
     private long _numRowsReturned;
     private uint _sequenceId;
-    private byte[]? _scannerId;
-    private byte[] _lastPrimaryKey;
+    private ByteString _scannerId;
+    private ByteString _lastPrimaryKey;
 
     /// <summary>
     /// The tabletSlice currently being scanned.
@@ -97,7 +97,8 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
         _startTimestamp = startTimestamp;
         SnapshotTimestamp = htTimestamp;
         _batchSizeBytes = batchSizeBytes;
-        _lastPrimaryKey = Array.Empty<byte>();
+        _scannerId = ByteString.Empty;
+        _lastPrimaryKey = ByteString.Empty;
         _cancellationToken = cancellationToken;
         ResourceMetrics = new ResourceMetrics();
 
@@ -125,17 +126,9 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
         {
             // Getting a null tablet here without being in a closed state
             // means we were in between tablets.
-            if (Tablet != null)
+            if (Tablet is not null)
             {
-                try
-                {
-                    using var rpc = GetCloseRequest();
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-
-                    await _client.SendRpcAsync(rpc, cts.Token)
-                        .ConfigureAwait(false);
-                }
-                catch { }
+                await CloseRemoteScannerAsync().ConfigureAwait(false);
             }
 
             _closed = true;
@@ -206,7 +199,7 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
     private async ValueTask<bool> OpenScannerAsync()
     {
         using var rpc = GetOpenRequest();
-        ScanResponse response;
+        ScanResponsePB response;
 
         try
         {
@@ -226,7 +219,7 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
                 return false;
             }
 
-            _scannerId = null;
+            _scannerId = ByteString.Empty;
             _sequenceId = 0;
             return await MoveNextAsync().ConfigureAwait(false);
         }
@@ -238,19 +231,27 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
 
         Tablet = rpc.Tablet;
 
+        var scanTimestamp = response.HasSnapTimestamp
+            ? (long)response.SnapTimestamp
+            : KuduClient.NoTimestamp;
+
+        var propagatedTimestamp = response.HasPropagatedTimestamp
+            ? (long)response.PropagatedTimestamp
+            : KuduClient.NoTimestamp;
+
         if (SnapshotTimestamp == KuduClient.NoTimestamp &&
-            response.ScanTimestamp != KuduClient.NoTimestamp)
+            scanTimestamp != KuduClient.NoTimestamp)
         {
             // If the server-assigned timestamp is present in the tablet
             // server's response, store it in the scanner. The stored value
             // is used for read operations in READ_AT_SNAPSHOT mode at
             // other tablet servers in the context of the same scan.
-            SnapshotTimestamp = response.ScanTimestamp;
+            SnapshotTimestamp = scanTimestamp;
         }
 
         long lastPropagatedTimestamp = KuduClient.NoTimestamp;
         if (_readMode == ReadMode.ReadYourWrites &&
-            response.ScanTimestamp != KuduClient.NoTimestamp)
+            scanTimestamp != KuduClient.NoTimestamp)
         {
             // For READ_YOUR_WRITES mode, update the latest propagated timestamp
             // with the chosen snapshot timestamp sent back from the server, to
@@ -258,53 +259,54 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
             // the chosen snapshot timestamp of the next read is greater than
             // the previous one, the scan does not violate READ_YOUR_WRITES
             // session guarantees.
-            lastPropagatedTimestamp = response.ScanTimestamp;
+            lastPropagatedTimestamp = scanTimestamp;
         }
-        else if (response.PropagatedTimestamp != KuduClient.NoTimestamp)
+        else if (propagatedTimestamp != KuduClient.NoTimestamp)
         {
             // Otherwise we just use the propagated timestamp returned from
             // the server as the latest propagated timestamp.
-            lastPropagatedTimestamp = response.PropagatedTimestamp;
+            lastPropagatedTimestamp = propagatedTimestamp;
         }
         if (lastPropagatedTimestamp != KuduClient.NoTimestamp)
         {
             _client.LastPropagatedTimestamp = lastPropagatedTimestamp;
         }
 
-        if (_isFaultTolerant && response.LastPrimaryKey != null)
+        if (_isFaultTolerant && response.HasLastPrimaryKey)
         {
             _lastPrimaryKey = response.LastPrimaryKey;
         }
 
-        _numRowsReturned += response.ResultSet.Count;
-        Current = response.ResultSet;
-        rpc.TakeOutput();
+        Current = rpc.TakeResultSet();
 
-        if (response.ResourceMetricsPb != null)
-            ResourceMetrics.Update(response.ResourceMetricsPb);
+        var numRows = Current.Count;
+        _numRowsReturned += numRows;
 
-        if (!response.HasMoreResults || response.ScannerId == null)
+        if (response.ResourceMetrics is not null)
+            ResourceMetrics.Update(response.ResourceMetrics);
+
+        if (!response.HasMoreResults || !response.HasScannerId)
         {
             ScanFinished();
 
-            if (response.ResultSet.Count == 0 && _partitionPruner.HasMorePartitionKeyRanges)
+            if (numRows == 0 && _partitionPruner.HasMorePartitionKeyRanges)
             {
                 return await MoveNextAsync().ConfigureAwait(false);
             }
 
-            return response.ResultSet.Count > 0;
+            return numRows > 0;
         }
 
         _scannerId = response.ScannerId;
         _sequenceId++;
 
-        return response.ResultSet.Count > 0;
+        return numRows > 0;
     }
 
     private async ValueTask<bool> ScanNextRowsAsync()
     {
         using var rpc = GetNextRowsRequest();
-        ScanResponse response;
+        ScanResponsePB response;
 
         try
         {
@@ -320,7 +322,7 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
             // a new scanner.
             Invalidate();
 
-            _scannerId = null;
+            _scannerId = ByteString.Empty;
             _sequenceId = 0;
 
             return await MoveNextAsync().ConfigureAwait(false);
@@ -333,23 +335,23 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
         }
 
         Tablet = rpc.Tablet;
+        Current = rpc.TakeResultSet();
 
-        _numRowsReturned += response.ResultSet.Count;
-        Current = response.ResultSet;
-        rpc.TakeOutput();
+        var numRows = Current.Count;
+        _numRowsReturned += numRows;
 
-        if (response.ResourceMetricsPb != null)
-            ResourceMetrics.Update(response.ResourceMetricsPb);
+        if (response.ResourceMetrics is not null)
+            ResourceMetrics.Update(response.ResourceMetrics);
 
         if (!response.HasMoreResults)
         {
             // We're done scanning this tablet.
             ScanFinished();
-            return response.ResultSet.Count > 0;
+            return numRows > 0;
         }
         _sequenceId++;
 
-        return response.ResultSet.Count > 0;
+        return numRows > 0;
     }
 
     private ScanRequest GetOpenRequest()
@@ -387,7 +389,7 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
         }
 
         if (_isFaultTolerant && _lastPrimaryKey.Length > 0)
-            newRequest.LastPrimaryKey = UnsafeByteOperations.UnsafeWrap(_lastPrimaryKey);
+            newRequest.LastPrimaryKey = _lastPrimaryKey;
 
         if (_startPrimaryKey.Length > 0)
             newRequest.StartPrimaryKey = UnsafeByteOperations.UnsafeWrap(_startPrimaryKey);
@@ -415,7 +417,7 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
     {
         var request = new ScanRequestPB
         {
-            ScannerId = UnsafeByteOperations.UnsafeWrap(_scannerId),
+            ScannerId = _scannerId,
             CallSeqId = _sequenceId,
             BatchSizeBytes = (uint)_batchSizeBytes
         };
@@ -435,7 +437,7 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
     {
         var request = new ScanRequestPB
         {
-            ScannerId = UnsafeByteOperations.UnsafeWrap(_scannerId),
+            ScannerId = _scannerId,
             BatchSizeBytes = 0,
             CloseScanner = true
         };
@@ -454,11 +456,24 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
     private KeepAliveRequest GetKeepAliveRequest()
     {
         return new KeepAliveRequest(
-            _scannerId!,
+            _scannerId,
             _replicaSelection,
             _table.TableId,
             Tablet,
             _partitionPruner.NextPartitionKey);
+    }
+
+    private async Task CloseRemoteScannerAsync()
+    {
+        try
+        {
+            using var rpc = GetCloseRequest();
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+            await _client.SendRpcAsync(rpc, cts.Token)
+                .ConfigureAwait(false);
+        }
+        catch { }
     }
 
     private void ScanFinished()
@@ -473,9 +488,9 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
             return;
         }
 
-        _scannerId = null;
+        _scannerId = ByteString.Empty;
         _sequenceId = 0;
-        _lastPrimaryKey = Array.Empty<byte>();
+        _lastPrimaryKey = ByteString.Empty;
         Invalidate();
     }
 
@@ -496,7 +511,7 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
         if (current is not null)
         {
             Current = null!;
-            current.Dispose();
+            current.Invalidate();
         }
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Google.Protobuf;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protobuf;
@@ -41,11 +42,11 @@ internal static class LoggerHelperExtensions
 
     public static void ScannerExpired(
         this ILogger logger,
-        byte[]? scannerId,
+        ByteString scannerId,
         string tableName,
         RemoteTablet? tablet)
     {
-        var scannerIdStr = scannerId?.ToStringUtf8();
+        var scannerIdStr = scannerId.ToStringUtf8();
         var tabletId = tablet?.TabletId;
 
         logger.ScannerExpired(scannerIdStr, tableName, tabletId);
