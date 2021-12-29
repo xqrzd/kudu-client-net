@@ -247,10 +247,6 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
             ? (long)response.PropagatedTimestamp
             : KuduClient.NoTimestamp;
 
-        var lastPrimaryKey = response.HasLastPrimaryKey
-            ? response.LastPrimaryKey.ToByteArray()
-            : null;
-
         if (SnapshotTimestamp == KuduClient.NoTimestamp &&
             scanTimestamp != KuduClient.NoTimestamp)
         {
