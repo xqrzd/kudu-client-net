@@ -27,6 +27,7 @@ public static class FloatingPointExtensions
     /// of a floating-point value according to the IEEE 754 floating-point
     /// "single format" bit layout.
     /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float AsFloat(this int value)
     {
 #if NETSTANDARD2_0
@@ -57,6 +58,7 @@ public static class FloatingPointExtensions
     /// of a floating-point value according to the IEEE 754 floating-point
     /// "double format" bit layout.
     /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static double AsDouble(this long value)
     {
         return BitConverter.Int64BitsToDouble(value);
