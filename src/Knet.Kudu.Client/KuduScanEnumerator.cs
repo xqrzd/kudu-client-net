@@ -297,7 +297,7 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
         if (response.ResourceMetrics is not null)
             ResourceMetrics.Update(response.ResourceMetrics);
 
-        if (!response.HasMoreResults || response.ScannerId == null)
+        if (!response.HasMoreResults || !response.HasScannerId)
         {
             ScanFinished();
 
@@ -309,10 +309,7 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
             return numRows > 0;
         }
 
-        _scannerId = response.HasScannerId
-            ? response.ScannerId
-            : ByteString.Empty;
-
+        _scannerId = response.ScannerId;
         _sequenceId++;
 
         return numRows > 0;

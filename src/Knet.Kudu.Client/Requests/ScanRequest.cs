@@ -87,13 +87,14 @@ internal sealed class ScanRequest : KuduTabletRpc<ScanResponsePB>, IDisposable
         var response = ScanResponsePB.Parser.ParseFrom(message.MessageProtobuf);
         var error = response.Error;
 
+        Output = response;
+        Error = error;
+
         if (error is null)
         {
             _resultSet = ResultSetFactory.Create(_schema, response, message);
             return;
         }
-
-        Error = error;
 
         switch (error.Code)
         {
