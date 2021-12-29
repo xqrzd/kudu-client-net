@@ -126,17 +126,9 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
         {
             // Getting a null tablet here without being in a closed state
             // means we were in between tablets.
-            if (Tablet != null)
+            if (Tablet is not null)
             {
-                try
-                {
-                    using var rpc = GetCloseRequest();
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-
-                    await _client.SendRpcAsync(rpc, cts.Token)
-                        .ConfigureAwait(false);
-                }
-                catch { }
+                await CloseRemoteScannerAsync().ConfigureAwait(false);
             }
 
             _closed = true;
@@ -469,6 +461,19 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
             _table.TableId,
             Tablet,
             _partitionPruner.NextPartitionKey);
+    }
+
+    private async Task CloseRemoteScannerAsync()
+    {
+        try
+        {
+            using var rpc = GetCloseRequest();
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+            await _client.SendRpcAsync(rpc, cts.Token)
+                .ConfigureAwait(false);
+        }
+        catch { }
     }
 
     private void ScanFinished()
