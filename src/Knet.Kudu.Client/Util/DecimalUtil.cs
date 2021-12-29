@@ -86,7 +86,7 @@ public static class DecimalUtil
     public static int EncodeDecimal32(decimal value, int targetPrecision, int targetScale)
     {
         var dec = new DecimalAccessor(value);
-        var scale = (int)dec.Scale;
+        int scale = (int)dec.Scale;
 
         CheckConditions(value, scale, targetPrecision, targetScale);
 
@@ -98,7 +98,7 @@ public static class DecimalUtil
             ThrowValueTooBig(value, targetPrecision);
 
         uint factor = PowerOf10Int32(scaleAdjustment);
-        int result = checked((int)(unscaledValue * factor));
+        int result = (int)(unscaledValue * factor);
 
         return dec.IsNegative ? result * -1 : result;
     }
@@ -106,7 +106,7 @@ public static class DecimalUtil
     public static long EncodeDecimal64(decimal value, int targetPrecision, int targetScale)
     {
         var dec = new DecimalAccessor(value);
-        var scale = (int)dec.Scale;
+        int scale = (int)dec.Scale;
 
         CheckConditions(value, scale, targetPrecision, targetScale);
 
@@ -118,7 +118,7 @@ public static class DecimalUtil
             ThrowValueTooBig(value, targetPrecision);
 
         ulong factor = PowerOf10Int64(scaleAdjustment);
-        long result = checked((long)(unscaledValue * factor));
+        long result = (long)(unscaledValue * factor);
 
         return dec.IsNegative ? result * -1 : result;
     }
@@ -160,29 +160,18 @@ public static class DecimalUtil
     public static decimal DecodeDecimal128(KuduInt128 value, int scale)
     {
         var abs = value.Abs();
-
-        uint low = (uint)(abs.Low & uint.MaxValue);
-        uint mid = (uint)(abs.Low >> 32);
-
-        uint high = (uint)(abs.High & uint.MaxValue);
+        int low = (int)(abs.Low & uint.MaxValue);
+        int mid = (int)(abs.Low >> 32);
+        int high = (int)(abs.High & uint.MaxValue);
         uint extraHigh = (uint)(abs.High >> 32);
 
         if (extraHigh > 0)
         {
-            throw new OverflowException("Kudu decimal is too large for .NET decimal." +
-                " Use GetRawFixed to read the raw value.");
+            throw new OverflowException("Kudu decimal is too large for .NET decimal. " +
+                "Use GetRawFixed to read the raw value.");
         }
 
-        var dec = new DecimalAccessor
-        {
-            Low = low,
-            Mid = mid,
-            High = high,
-            Scale = (uint)scale,
-            IsNegative = value < 0
-        };
-
-        return dec.Decimal;
+        return new decimal(low, mid, high, value < 0, (byte)scale);
     }
 
     public static int MinDecimal32(int precision) =>
@@ -309,7 +298,7 @@ public static class DecimalUtil
         public bool IsNegative
         {
             get => (Flags & SignMask) > 0;
-            set => Flags = value ? Flags | SignMask : Flags & ~SignMask;
+            set => Flags = value ? (Flags | SignMask) : (Flags & ~SignMask);
         }
     }
 }
