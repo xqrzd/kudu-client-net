@@ -21,7 +21,7 @@ public static class DecimalUtil
 
     public const int MaxDecimalPrecision = MaxDecimal128Precision;
 
-    private static readonly uint[] Pow10Cache32 = {
+    private static readonly uint[] _pow10Cache32 = {
             1,
             10,
             100,
@@ -34,7 +34,7 @@ public static class DecimalUtil
             1000000000
         };
 
-    private static readonly ulong[] Pow10Cache64 = {
+    private static readonly ulong[] _pow10Cache64 = {
             1,
             10,
             100,
@@ -210,7 +210,7 @@ public static class DecimalUtil
         return KuduInt128.PowerOf10(precision) - 1;
     }
 
-    public static decimal SetScale(decimal value, int scale)
+    internal static decimal SetScale(decimal value, int scale)
     {
         var dec = new DecimalAccessor(value) { Scale = (uint)scale };
         return dec.Decimal;
@@ -242,9 +242,9 @@ public static class DecimalUtil
             $"Value {value} (after scale coercion) can't be coerced to target precision {targetPrecision}.");
     }
 
-    private static uint PowerOf10Int32(int value) => Pow10Cache32[value];
+    private static uint PowerOf10Int32(int value) => _pow10Cache32[value];
 
-    private static ulong PowerOf10Int64(int value) => Pow10Cache64[value];
+    private static ulong PowerOf10Int64(int value) => _pow10Cache64[value];
 
     /// <summary>
     /// Provides access to the inner fields of a decimal.
