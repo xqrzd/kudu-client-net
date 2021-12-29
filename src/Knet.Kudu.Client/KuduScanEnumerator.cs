@@ -309,10 +309,10 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
             return numRows > 0;
         }
 
-        var scannerId = response.HasScannerId
-            ? response.ScannerId.ToByteArray()
-            : null;
-        _scannerId = response.ScannerId;
+        _scannerId = response.HasScannerId
+            ? response.ScannerId
+            : ByteString.Empty;
+
         _sequenceId++;
 
         return numRows > 0;
