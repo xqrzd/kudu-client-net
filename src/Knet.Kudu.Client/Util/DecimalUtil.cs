@@ -21,7 +21,7 @@ public static class DecimalUtil
 
     public const int MaxDecimalPrecision = MaxDecimal128Precision;
 
-    private static readonly uint[] Pow10Cache32 = {
+    private static readonly uint[] _pow10Cache32 = {
             1,
             10,
             100,
@@ -34,7 +34,7 @@ public static class DecimalUtil
             1000000000
         };
 
-    private static readonly ulong[] Pow10Cache64 = {
+    private static readonly ulong[] _pow10Cache64 = {
             1,
             10,
             100,
@@ -86,7 +86,7 @@ public static class DecimalUtil
     public static int EncodeDecimal32(decimal value, int targetPrecision, int targetScale)
     {
         var dec = new DecimalAccessor(value);
-        var scale = (int)dec.Scale;
+        int scale = (int)dec.Scale;
 
         CheckConditions(value, scale, targetPrecision, targetScale);
 
@@ -98,7 +98,7 @@ public static class DecimalUtil
             ThrowValueTooBig(value, targetPrecision);
 
         uint factor = PowerOf10Int32(scaleAdjustment);
-        int result = checked((int)(unscaledValue * factor));
+        int result = (int)(unscaledValue * factor);
 
         return dec.IsNegative ? result * -1 : result;
     }
@@ -106,7 +106,7 @@ public static class DecimalUtil
     public static long EncodeDecimal64(decimal value, int targetPrecision, int targetScale)
     {
         var dec = new DecimalAccessor(value);
-        var scale = (int)dec.Scale;
+        int scale = (int)dec.Scale;
 
         CheckConditions(value, scale, targetPrecision, targetScale);
 
@@ -118,7 +118,7 @@ public static class DecimalUtil
             ThrowValueTooBig(value, targetPrecision);
 
         ulong factor = PowerOf10Int64(scaleAdjustment);
-        long result = checked((long)(unscaledValue * factor));
+        long result = (long)(unscaledValue * factor);
 
         return dec.IsNegative ? result * -1 : result;
     }
@@ -160,29 +160,18 @@ public static class DecimalUtil
     public static decimal DecodeDecimal128(KuduInt128 value, int scale)
     {
         var abs = value.Abs();
-
-        uint low = (uint)(abs.Low & uint.MaxValue);
-        uint mid = (uint)(abs.Low >> 32);
-
-        uint high = (uint)(abs.High & uint.MaxValue);
+        int low = (int)(abs.Low & uint.MaxValue);
+        int mid = (int)(abs.Low >> 32);
+        int high = (int)(abs.High & uint.MaxValue);
         uint extraHigh = (uint)(abs.High >> 32);
 
         if (extraHigh > 0)
         {
-            throw new OverflowException("Kudu decimal is too large for .NET decimal." +
-                " Use GetRawFixed to read the raw value.");
+            throw new OverflowException("Kudu decimal is too large for .NET decimal. " +
+                "Use GetRawFixed to read the raw value.");
         }
 
-        var dec = new DecimalAccessor
-        {
-            Low = low,
-            Mid = mid,
-            High = high,
-            Scale = (uint)scale,
-            IsNegative = value < 0
-        };
-
-        return dec.Decimal;
+        return new decimal(low, mid, high, value < 0, (byte)scale);
     }
 
     public static int MinDecimal32(int precision) =>
@@ -221,7 +210,7 @@ public static class DecimalUtil
         return KuduInt128.PowerOf10(precision) - 1;
     }
 
-    public static decimal SetScale(decimal value, int scale)
+    internal static decimal SetScale(decimal value, int scale)
     {
         var dec = new DecimalAccessor(value) { Scale = (uint)scale };
         return dec.Decimal;
@@ -253,9 +242,9 @@ public static class DecimalUtil
             $"Value {value} (after scale coercion) can't be coerced to target precision {targetPrecision}.");
     }
 
-    private static uint PowerOf10Int32(int value) => Pow10Cache32[value];
+    private static uint PowerOf10Int32(int value) => _pow10Cache32[value];
 
-    private static ulong PowerOf10Int64(int value) => Pow10Cache64[value];
+    private static ulong PowerOf10Int64(int value) => _pow10Cache64[value];
 
     /// <summary>
     /// Provides access to the inner fields of a decimal.
@@ -309,7 +298,7 @@ public static class DecimalUtil
         public bool IsNegative
         {
             get => (Flags & SignMask) > 0;
-            set => Flags = value ? Flags | SignMask : Flags & ~SignMask;
+            set => Flags = value ? (Flags | SignMask) : (Flags & ~SignMask);
         }
     }
 }
