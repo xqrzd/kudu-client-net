@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using Knet.Kudu.Client.Internal;
 
 namespace Knet.Kudu.Client.Util;
@@ -17,11 +18,7 @@ public static class FloatingPointExtensions
         if (float.IsNaN(value))
             return 0x7fc00000;
 
-#if NETSTANDARD2_0
-        return Netstandard2Extensions.SingleToInt32Bits(value);
-#else
-        return BitConverter.SingleToInt32Bits(value);
-#endif
+        return SingleToInt32Bits(value);
     }
 
     /// <summary>
@@ -30,6 +27,7 @@ public static class FloatingPointExtensions
     /// of a floating-point value according to the IEEE 754 floating-point
     /// "single format" bit layout.
     /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float AsFloat(this int value)
     {
 #if NETSTANDARD2_0
@@ -60,6 +58,7 @@ public static class FloatingPointExtensions
     /// of a floating-point value according to the IEEE 754 floating-point
     /// "double format" bit layout.
     /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static double AsDouble(this long value)
     {
         return BitConverter.Int64BitsToDouble(value);
@@ -72,15 +71,30 @@ public static class FloatingPointExtensions
     /// <param name="value">Starting floating-point value.</param>
     public static float NextUp(this float value)
     {
-        if (!(value < float.PositiveInfinity))
-            return value;
-
-#if NETSTANDARD2_0
-        int bits = Netstandard2Extensions.SingleToInt32Bits(value + 0.0f);
-        return Netstandard2Extensions.Int32BitsToSingle(bits + ((bits >= 0) ? 1 : -1));
+#if NETCOREAPP3_1_OR_GREATER
+        return MathF.BitIncrement(value);
 #else
-        int bits = BitConverter.SingleToInt32Bits(value + 0.0f);
-        return BitConverter.Int32BitsToSingle(bits + ((bits >= 0) ? 1 : -1));
+        int bits = SingleToInt32Bits(value);
+
+        if ((bits & 0x7F800000) >= 0x7F800000)
+        {
+            // NaN returns NaN
+            // -Infinity returns float.MinValue
+            // +Infinity returns +Infinity
+            return (bits == unchecked((int)0xFF800000)) ? float.MinValue : value;
+        }
+
+        if (bits == unchecked((int)0x80000000))
+        {
+            // -0.0 returns float.Epsilon
+            return float.Epsilon;
+        }
+
+        // Negative values need to be decremented
+        // Positive values need to be incremented
+
+        bits += (bits < 0) ? -1 : +1;
+        return bits.AsFloat();
 #endif
     }
 
@@ -91,10 +105,40 @@ public static class FloatingPointExtensions
     /// <param name="value">Starting floating-point value.</param>
     public static double NextUp(this double value)
     {
-        if (!(value < double.PositiveInfinity))
-            return value;
+#if NETCOREAPP3_1_OR_GREATER
+        return Math.BitIncrement(value);
+#else
+        long bits = BitConverter.DoubleToInt64Bits(value);
 
-        long bits = BitConverter.DoubleToInt64Bits(value + 0.0d);
-        return BitConverter.Int64BitsToDouble(bits + ((bits >= 0L) ? 1L : -1L));
+        if (((bits >> 32) & 0x7FF00000) >= 0x7FF00000)
+        {
+            // NaN returns NaN
+            // -Infinity returns double.MinValue
+            // +Infinity returns +Infinity
+            return (bits == unchecked((long)0xFFF00000_00000000)) ? double.MinValue : value;
+        }
+
+        if (bits == unchecked((long)0x80000000_00000000))
+        {
+            // -0.0 returns double.Epsilon
+            return double.Epsilon;
+        }
+
+        // Negative values need to be decremented
+        // Positive values need to be incremented
+
+        bits += ((bits < 0) ? -1 : +1);
+        return BitConverter.Int64BitsToDouble(bits);
+#endif
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int SingleToInt32Bits(float value)
+    {
+#if NETSTANDARD2_0
+        return Netstandard2Extensions.SingleToInt32Bits(value);
+#else
+        return BitConverter.SingleToInt32Bits(value);
+#endif
     }
 }
