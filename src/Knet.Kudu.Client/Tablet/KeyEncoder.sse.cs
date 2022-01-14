@@ -35,23 +35,29 @@ public static partial class KeyEncoder
             var srcCurrent = src;
             var destCurrent = dest;
 
-            var remainder = length % 16;
-            var lastBlockIndex = length - remainder;
-            var blockEnd = src + lastBlockIndex;
             var end = src + length;
+            var simdEnd = end - (length % 16);
 
-            while (srcCurrent < blockEnd)
+            while (srcCurrent < simdEnd)
             {
+                // Load 16 bytes (unaligned) into the XMM register.
                 var data = Sse2.LoadVector128(srcCurrent);
-                var zeros = Vector128<byte>.Zero;
 
-                var zeroBytes = Sse2.CompareEqual(data, zeros);
-                bool allZeros = Sse41.TestZ(zeroBytes, zeroBytes);
+                // Compare each byte of the input with '\0'. This results in a vector
+                // where each byte is either \x00 or \xFF, depending on whether the
+                // input had a '\x00' in the corresponding position.
+                var zeroBytes = Sse2.CompareEqual(data, Vector128<byte>.Zero);
 
-                if (allZeros)
+                // Check whether the resulting vector is all-zero.
+                // If it's all zero, we can just store the entire chunk.
+                if (Sse41.TestZ(zeroBytes, zeroBytes))
+                {
                     Sse2.Store(destCurrent, data);
+                }
                 else
+                {
                     break;
+                }
 
                 srcCurrent += 16;
                 destCurrent += 16;
