@@ -298,7 +298,7 @@ public class ClientStressTests : IAsyncLifetime
             try
             {
                 var connection = await connectionTask;
-                await connection.CloseAsync();
+                await connection.DisposeAsync();
             }
             catch { }
         }

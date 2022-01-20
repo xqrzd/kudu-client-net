@@ -1748,7 +1748,7 @@ public sealed class KuduClient : IAsyncDisposable
             // Close the connection and rethrow the exception so we
             // can retry in the hopes the user imported a new token.
             if (connection is not null)
-                await connection.CloseAsync().ConfigureAwait(false);
+                await connection.DisposeAsync().ConfigureAwait(false);
 
             throw;
         }

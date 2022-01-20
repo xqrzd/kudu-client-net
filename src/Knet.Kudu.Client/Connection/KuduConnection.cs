@@ -18,7 +18,7 @@ using static Knet.Kudu.Client.Protobuf.Rpc.ErrorStatusPB.Types;
 
 namespace Knet.Kudu.Client.Connection;
 
-public class KuduConnection
+public sealed class KuduConnection : IAsyncDisposable
 {
     private const int ReadAtLeastThreshold = 1024 * 32; // 32KB
     private const int MaximumReadSize = 1024 * 512; // 512KB
@@ -45,13 +45,13 @@ public class KuduConnection
     /// <summary>
     /// Stops accepting RPCs and completes any outstanding RPCs with exceptions.
     /// </summary>
-    public Task CloseAsync()
+    public ValueTask DisposeAsync()
     {
         _ioPipe.Output.CancelPendingFlush();
         _ioPipe.Input.CancelPendingRead();
 
         // Wait for the reader loop to finish.
-        return _receiveTask;
+        return new ValueTask(_receiveTask);
     }
 
     public void OnDisconnected(Action<Exception, object?> callback, object? state)
@@ -342,8 +342,7 @@ public class KuduConnection
             _inflightRpcs.Clear();
         }
 
-        // Don't dispose _singleWriter; there may still be
-        // pending writes.
+        // Don't dispose _singleWriter; there may still be pending writes.
 
         (_ioPipe as IDisposable)?.Dispose();
     }

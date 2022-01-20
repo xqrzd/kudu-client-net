@@ -238,7 +238,7 @@ public class ScannerFaultToleranceTests : IAsyncLifetime
                 scanner.ReplicaSelection);
 
                 var connection = await GetConnectionAsync(serverInfo);
-                await connection.CloseAsync();
+                await connection.DisposeAsync();
 
                 shouldClose = false;
             }

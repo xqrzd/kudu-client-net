@@ -124,7 +124,7 @@ public sealed class ConnectionCache : IAsyncDisposable
                 // TODO: Cancellation token support so we can cancel
                 // any connections still in the negotiation phase?
                 KuduConnection connection = await connectionTask.ConfigureAwait(false);
-                await connection.CloseAsync().ConfigureAwait(false);
+                await connection.DisposeAsync().ConfigureAwait(false);
             }
             catch { }
         }
