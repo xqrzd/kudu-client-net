@@ -304,16 +304,8 @@ public sealed class KuduConnection : IAsyncDisposable
     /// </summary>
     private async Task ShutdownAsync(Exception? exception)
     {
-        await _singleWriter.WaitAsync().ConfigureAwait(false);
-        try
-        {
-            await _ioPipe.Output.CompleteAsync(exception).ConfigureAwait(false);
-            await _ioPipe.Input.CompleteAsync(exception).ConfigureAwait(false);
-        }
-        finally
-        {
-            _singleWriter.Release();
-        }
+        await _ioPipe.Output.CompleteAsync(exception).ConfigureAwait(false);
+        await _ioPipe.Input.CompleteAsync(exception).ConfigureAwait(false);
 
         if (exception is not null)
             _logger.ConnectionDisconnected(exception, _ioPipe.ToString()!);
