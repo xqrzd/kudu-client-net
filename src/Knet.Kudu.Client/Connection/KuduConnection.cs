@@ -27,11 +27,10 @@ public sealed class KuduConnection : IAsyncDisposable
     private readonly ILogger _logger;
     private readonly SemaphoreSlim _singleWriter;
     private readonly Dictionary<int, InflightRpc> _inflightRpcs;
+    private readonly CancellationTokenSource _connectionClosedTokenSource;
     private readonly Task _receiveTask;
 
     private int _nextCallId;
-    private RecoverableException? _closedException;
-    private DisconnectedCallback _disconnectedCallback;
 
     public KuduConnection(IDuplexPipe ioPipe, ILoggerFactory loggerFactory)
     {
@@ -39,8 +38,14 @@ public sealed class KuduConnection : IAsyncDisposable
         _logger = loggerFactory.CreateLogger<KuduConnection>();
         _singleWriter = new SemaphoreSlim(1, 1);
         _inflightRpcs = new Dictionary<int, InflightRpc>();
+        _connectionClosedTokenSource = new CancellationTokenSource();
         _receiveTask = ReceiveAsync(ioPipe.Input);
     }
+
+    /// <summary>
+    /// Triggered when the client connection is closed.
+    /// </summary>
+    public CancellationToken ConnectionClosed => _connectionClosedTokenSource.Token;
 
     /// <summary>
     /// Stops accepting RPCs and completes any outstanding RPCs with exceptions.
@@ -52,21 +57,6 @@ public sealed class KuduConnection : IAsyncDisposable
 
         // Wait for the reader loop to finish.
         return new ValueTask(_receiveTask);
-    }
-
-    public void OnDisconnected(Action<Exception, object?> callback, object? state)
-    {
-        lock (_inflightRpcs)
-        {
-            _disconnectedCallback = new DisconnectedCallback(callback, state);
-
-            if (_closedException is not null)
-            {
-                // Guarantee the disconnected callback is invoked if
-                // the connection is already closed.
-                InvokeDisconnectedCallback(_closedException);
-            }
-        }
     }
 
     public async Task SendReceiveAsync(
@@ -333,8 +323,7 @@ public sealed class KuduConnection : IAsyncDisposable
 
         lock (_inflightRpcs)
         {
-            _closedException = closedException;
-            InvokeDisconnectedCallback(closedException);
+            _connectionClosedTokenSource.Cancel();
 
             foreach (var inflightMessage in _inflightRpcs.Values)
                 inflightMessage.TrySetException(closedException);
@@ -345,18 +334,7 @@ public sealed class KuduConnection : IAsyncDisposable
         // Don't dispose _singleWriter; there may still be pending writes.
 
         (_ioPipe as IDisposable)?.Dispose();
-    }
-
-    /// <summary>
-    /// The caller must hold the _inflightMessages lock.
-    /// </summary>
-    private void InvokeDisconnectedCallback(RecoverableException exception)
-    {
-        try
-        {
-            _disconnectedCallback.Invoke(exception);
-        }
-        catch { }
+        _connectionClosedTokenSource.Dispose();
     }
 
     public override string? ToString() => _ioPipe.ToString();
@@ -379,19 +357,5 @@ public sealed class KuduConnection : IAsyncDisposable
         {
             Rpc = rpc;
         }
-    }
-
-    private readonly struct DisconnectedCallback
-    {
-        private readonly Action<Exception, object?> _callback;
-        private readonly object? _state;
-
-        public DisconnectedCallback(Action<Exception, object?> callback, object? state)
-        {
-            _callback = callback;
-            _state = state;
-        }
-
-        public void Invoke(Exception exception) => _callback?.Invoke(exception, _state);
     }
 }
