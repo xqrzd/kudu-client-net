@@ -26,6 +26,14 @@ internal static class Extensions
     public static bool SequenceEqual<T>(this T[]? array, ReadOnlySpan<T> other)
         where T : IEquatable<T> => MemoryExtensions.SequenceEqual(array, other);
 
+#if NETSTANDARD2_0 || NETSTANDARD2_1
+    public static CancellationTokenRegistration UnsafeRegister(
+        this CancellationToken cancellationToken, Action<object?> callback, object? state)
+    {
+        return cancellationToken.Register(s => callback(s), state);
+    }
+#endif
+
 #if !NET6_0_OR_GREATER
     public static CancellationTokenRegistration UnsafeRegister(
         this CancellationToken cancellationToken,

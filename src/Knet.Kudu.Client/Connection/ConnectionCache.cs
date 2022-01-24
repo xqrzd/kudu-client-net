@@ -6,6 +6,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Exceptions;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Logging;
 using Microsoft.Extensions.Logging;
 
@@ -35,24 +36,35 @@ public sealed class ConnectionCache : IAsyncDisposable
 
         IPEndPoint endpoint = serverInfo.Endpoint;
         Task<KuduConnection>? connectionTask;
+        bool newConnection = false;
 
         lock (_connections)
         {
             if (!_connections.TryGetValue(endpoint, out connectionTask))
             {
-                connectionTask = ConnectAsync(serverInfo, cancellationToken);
+                connectionTask = _connectionFactory.ConnectAsync(serverInfo, cancellationToken);
                 _connections.Add(endpoint, connectionTask);
+                newConnection = true;
             }
         }
 
         try
         {
-            return await connectionTask.ConfigureAwait(false);
+            var connection = await connectionTask.ConfigureAwait(false);
+
+            if (newConnection)
+            {
+                connection.ConnectionClosed.UnsafeRegister(
+                    state => RemoveConnection((IPEndPoint)state!),
+                    endpoint);
+            }
+
+            return connection;
         }
         catch (Exception ex)
         {
             // Failed to negotiate a new connection.
-            RemoveFaultedConnection(serverInfo, skipTaskStatusCheck: false);
+            RemoveFaultedConnection(endpoint);
 
             _logger.UnableToConnectToServer(ex, serverInfo);
 
@@ -69,40 +81,27 @@ public sealed class ConnectionCache : IAsyncDisposable
         }
     }
 
-    private async Task<KuduConnection> ConnectAsync(
-        ServerInfo serverInfo, CancellationToken cancellationToken = default)
+    private void RemoveFaultedConnection(IPEndPoint endpoint)
     {
-        KuduConnection connection = await _connectionFactory
-            .ConnectAsync(serverInfo, cancellationToken).ConfigureAwait(false);
-
-        connection.OnDisconnected((exception, state) => RemoveFaultedConnection(
-            (ServerInfo)state!, skipTaskStatusCheck: true), serverInfo);
-
-        return connection;
-    }
-
-    private void RemoveFaultedConnection(ServerInfo serverInfo, bool skipTaskStatusCheck)
-    {
-        IPEndPoint endpoint = serverInfo.Endpoint;
-
         lock (_connections)
         {
-            if (skipTaskStatusCheck)
+            if (_connections.TryGetValue(endpoint, out var connectionTask))
             {
-                _connections.Remove(endpoint);
-            }
-            else
-            {
-                if (_connections.TryGetValue(endpoint, out var connectionTask))
+                // Someone else might have already replaced the faulted connection.
+                // Confirm that the connection we're about to remove is faulted.
+                if (connectionTask.IsFaulted)
                 {
-                    // Someone else might have already replaced the faulted connection.
-                    // Confirm that the connection we're about to remove is faulted.
-                    if (connectionTask.IsFaulted)
-                    {
-                        _connections.Remove(endpoint);
-                    }
+                    _connections.Remove(endpoint);
                 }
             }
+        }
+    }
+
+    private void RemoveConnection(IPEndPoint endpoint)
+    {
+        lock (_connections)
+        {
+            _connections.Remove(endpoint);
         }
     }
 
@@ -124,7 +123,7 @@ public sealed class ConnectionCache : IAsyncDisposable
                 // TODO: Cancellation token support so we can cancel
                 // any connections still in the negotiation phase?
                 KuduConnection connection = await connectionTask.ConfigureAwait(false);
-                await connection.CloseAsync().ConfigureAwait(false);
+                await connection.DisposeAsync().ConfigureAwait(false);
             }
             catch { }
         }

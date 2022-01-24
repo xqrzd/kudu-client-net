@@ -18,7 +18,7 @@ using static Knet.Kudu.Client.Protobuf.Rpc.ErrorStatusPB.Types;
 
 namespace Knet.Kudu.Client.Connection;
 
-public class KuduConnection
+public sealed class KuduConnection : IAsyncDisposable
 {
     private const int ReadAtLeastThreshold = 1024 * 32; // 32KB
     private const int MaximumReadSize = 1024 * 512; // 512KB
@@ -27,11 +27,10 @@ public class KuduConnection
     private readonly ILogger _logger;
     private readonly SemaphoreSlim _singleWriter;
     private readonly Dictionary<int, InflightRpc> _inflightRpcs;
+    private readonly CancellationTokenSource _connectionClosedTokenSource;
     private readonly Task _receiveTask;
 
     private int _nextCallId;
-    private RecoverableException? _closedException;
-    private DisconnectedCallback _disconnectedCallback;
 
     public KuduConnection(IDuplexPipe ioPipe, ILoggerFactory loggerFactory)
     {
@@ -39,34 +38,25 @@ public class KuduConnection
         _logger = loggerFactory.CreateLogger<KuduConnection>();
         _singleWriter = new SemaphoreSlim(1, 1);
         _inflightRpcs = new Dictionary<int, InflightRpc>();
+        _connectionClosedTokenSource = new CancellationTokenSource();
         _receiveTask = ReceiveAsync(ioPipe.Input);
     }
 
     /// <summary>
+    /// Triggered when the client connection is closed.
+    /// </summary>
+    public CancellationToken ConnectionClosed => _connectionClosedTokenSource.Token;
+
+    /// <summary>
     /// Stops accepting RPCs and completes any outstanding RPCs with exceptions.
     /// </summary>
-    public Task CloseAsync()
+    public ValueTask DisposeAsync()
     {
         _ioPipe.Output.CancelPendingFlush();
         _ioPipe.Input.CancelPendingRead();
 
         // Wait for the reader loop to finish.
-        return _receiveTask;
-    }
-
-    public void OnDisconnected(Action<Exception, object?> callback, object? state)
-    {
-        lock (_inflightRpcs)
-        {
-            _disconnectedCallback = new DisconnectedCallback(callback, state);
-
-            if (_closedException is not null)
-            {
-                // Guarantee the disconnected callback is invoked if
-                // the connection is already closed.
-                InvokeDisconnectedCallback(_closedException);
-            }
-        }
+        return new ValueTask(_receiveTask);
     }
 
     public async Task SendReceiveAsync(
@@ -314,16 +304,8 @@ public class KuduConnection
     /// </summary>
     private async Task ShutdownAsync(Exception? exception)
     {
-        await _singleWriter.WaitAsync().ConfigureAwait(false);
-        try
-        {
-            await _ioPipe.Output.CompleteAsync(exception).ConfigureAwait(false);
-            await _ioPipe.Input.CompleteAsync(exception).ConfigureAwait(false);
-        }
-        finally
-        {
-            _singleWriter.Release();
-        }
+        await _ioPipe.Output.CompleteAsync(exception).ConfigureAwait(false);
+        await _ioPipe.Input.CompleteAsync(exception).ConfigureAwait(false);
 
         if (exception is not null)
             _logger.ConnectionDisconnected(exception, _ioPipe.ToString()!);
@@ -333,8 +315,7 @@ public class KuduConnection
 
         lock (_inflightRpcs)
         {
-            _closedException = closedException;
-            InvokeDisconnectedCallback(closedException);
+            _connectionClosedTokenSource.Cancel();
 
             foreach (var inflightMessage in _inflightRpcs.Values)
                 inflightMessage.TrySetException(closedException);
@@ -342,22 +323,10 @@ public class KuduConnection
             _inflightRpcs.Clear();
         }
 
-        // Don't dispose _singleWriter; there may still be
-        // pending writes.
+        // Don't dispose _singleWriter; there may still be pending writes.
 
         (_ioPipe as IDisposable)?.Dispose();
-    }
-
-    /// <summary>
-    /// The caller must hold the _inflightMessages lock.
-    /// </summary>
-    private void InvokeDisconnectedCallback(RecoverableException exception)
-    {
-        try
-        {
-            _disconnectedCallback.Invoke(exception);
-        }
-        catch { }
+        _connectionClosedTokenSource.Dispose();
     }
 
     public override string? ToString() => _ioPipe.ToString();
@@ -380,19 +349,5 @@ public class KuduConnection
         {
             Rpc = rpc;
         }
-    }
-
-    private readonly struct DisconnectedCallback
-    {
-        private readonly Action<Exception, object?> _callback;
-        private readonly object? _state;
-
-        public DisconnectedCallback(Action<Exception, object?> callback, object? state)
-        {
-            _callback = callback;
-            _state = state;
-        }
-
-        public void Invoke(Exception exception) => _callback?.Invoke(exception, _state);
     }
 }
