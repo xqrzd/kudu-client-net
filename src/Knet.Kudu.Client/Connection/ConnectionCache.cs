@@ -6,6 +6,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Exceptions;
+using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Logging;
 using Microsoft.Extensions.Logging;
 
@@ -53,7 +54,9 @@ public sealed class ConnectionCache : IAsyncDisposable
 
             if (newConnection)
             {
-                connection.ConnectionClosed.Register(() => RemoveConnection(endpoint));
+                connection.ConnectionClosed.UnsafeRegister(
+                    state => RemoveConnection((IPEndPoint)state!),
+                    endpoint);
             }
 
             return connection;
