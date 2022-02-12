@@ -5,12 +5,15 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Knet.Kudu.Client.Internal;
+using Knet.Kudu.Client.Mapper;
 using Knet.Kudu.Client.Protocol;
 
 namespace Knet.Kudu.Client;
 
 public sealed class ResultSet : IEnumerable<RowResult>
 {
+    private static readonly ResultSetMapper _mapper = new();
+
     private readonly ArrayPoolBuffer<byte>? _buffer;
     private readonly byte[]? _data;
     private readonly SidecarOffset[] _dataSidecarOffsets;
@@ -48,6 +51,20 @@ public sealed class ResultSet : IEnumerable<RowResult>
 
             return schema;
         }
+    }
+
+    public T[] MapTo<T>()
+    {
+        var func = _mapper.CreateDelegate<T>(Schema);
+        var items = new T[(int)Count];
+
+        for (int i = 0; i < items.Length; i++)
+        {
+            var item = func(this, i);
+            items[i] = item;
+        }
+
+        return items;
     }
 
     internal void Invalidate()
