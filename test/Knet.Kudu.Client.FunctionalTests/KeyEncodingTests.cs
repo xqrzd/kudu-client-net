@@ -83,7 +83,7 @@ public class KeyEncodingTests : IAsyncLifetime
                 Assert.Equal(3, row.GetInt32("int32"));
                 Assert.Equal(4, row.GetInt64("int64"));
                 Assert.Equal("foo", row.GetString("string"));
-                Assert.Equal("bar".ToUtf8ByteArray(), row.GetBinary("binary").ToArray());
+                Assert.Equal("bar".ToUtf8ByteArray(), row.GetBinary("binary"));
                 Assert.Equal(6, row.GetInt64("timestamp"));
                 Assert.Equal(DecimalUtil.MaxUnscaledDecimal32, row.GetDecimal("decimal32"));
                 Assert.Equal(DecimalUtil.MaxUnscaledDecimal64, row.GetDecimal("decimal64"));
