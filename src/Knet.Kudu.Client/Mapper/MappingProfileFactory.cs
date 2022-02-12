@@ -22,7 +22,7 @@ internal static class MappingProfileFactory
         { KuduType.Date, new[] { typeof(int), typeof(DateTime) } },
         { KuduType.String, new[] { typeof(string) } },
         { KuduType.Varchar, new[] { typeof(string) } },
-        { KuduType.Binary, new[] { typeof(byte[]) } },
+        { KuduType.Binary, new[] { typeof(byte[]), typeof(ReadOnlyMemory<byte>) } },
         { KuduType.Decimal32, new[] { typeof(decimal) } },
         { KuduType.Decimal64, new[] { typeof(decimal) } },
         { KuduType.Decimal128, new[] { typeof(decimal) } }
@@ -242,7 +242,8 @@ internal static class MappingProfileFactory
             (KuduType.String, true) => methods[nameof(ResultSet.GetNullableString)],
             (KuduType.Varchar, false) => methods[nameof(ResultSet.GetString)],
             (KuduType.Varchar, true) => methods[nameof(ResultSet.GetNullableString)],
-            // TODO: Binary
+            (KuduType.Binary, false) => methods[nameof(ResultSet.GetBinary)],
+            (KuduType.Binary, true) => methods[nameof(ResultSet.GetNullableBinary)],
             (KuduType.Decimal32, false) => methods[nameof(ResultSet.GetDecimal)],
             (KuduType.Decimal32, true) => methods[nameof(ResultSet.GetNullableDecimal)],
             (KuduType.Decimal64, false) => methods[nameof(ResultSet.GetDecimal)],
