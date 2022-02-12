@@ -418,23 +418,28 @@ public sealed class ResultSet : IEnumerable<RowResult>
         return KuduEncoder.DecodeDecimalUnsafe(_data!, offset, column.Type, scale);
     }
 
-    internal ReadOnlySpan<byte> GetRawFixed(string columnName, int rowIndex)
+    internal ReadOnlySpan<byte> GetSpan(string columnName, int rowIndex)
     {
         int columnIndex = GetColumnIndex(columnName);
-        return GetRawFixed(columnIndex, rowIndex);
+        return GetSpan(columnIndex, rowIndex);
     }
 
-    internal ReadOnlySpan<byte> GetRawFixed(int columnIndex, int rowIndex)
+    internal ReadOnlySpan<byte> GetSpan(int columnIndex, int rowIndex)
     {
-        var column = CheckFixedLengthType(columnIndex);
+        var column = GetColumnSchema(columnIndex);
 
         if (IsNullUnsafe(columnIndex, rowIndex))
             return default;
 
-        int size = column.Size;
-        int offset = GetStartIndexUnsafe(columnIndex, rowIndex, size);
+        if (column.IsFixedSize)
+        {
+            int size = column.Size;
+            int offset = GetStartIndexUnsafe(columnIndex, rowIndex, size);
 
-        return _data.AsSpan(offset, size);
+            return _data.AsSpan(offset, size);
+        }
+
+        return ReadBinaryUnsafe(columnIndex, rowIndex);
     }
 
     internal string GetString(string columnName, int rowIndex)
@@ -474,20 +479,32 @@ public sealed class ResultSet : IEnumerable<RowResult>
         return KuduEncoder.DecodeString(_data!, offset, length);
     }
 
-    internal ReadOnlySpan<byte> GetBinary(string columnName, int rowIndex)
+    internal byte[] GetBinary(string columnName, int rowIndex)
     {
         int columnIndex = GetColumnIndex(columnName);
         return GetBinary(columnIndex, rowIndex);
     }
 
-    internal ReadOnlySpan<byte> GetBinary(int columnIndex, int rowIndex)
+    internal byte[] GetBinary(int columnIndex, int rowIndex)
+    {
+        CheckTypeNotNull(columnIndex, rowIndex, KuduType.Binary);
+        return ReadBinaryUnsafe(columnIndex, rowIndex).ToArray();
+    }
+
+    internal byte[]? GetNullableBinary(string columnName, int rowIndex)
+    {
+        int columnIndex = GetColumnIndex(columnName);
+        return GetNullableBinary(columnIndex, rowIndex);
+    }
+
+    internal byte[]? GetNullableBinary(int columnIndex, int rowIndex)
     {
         CheckType(columnIndex, KuduType.Binary);
 
         if (IsNullUnsafe(columnIndex, rowIndex))
-            return default;
+            return null;
 
-        return ReadBinaryUnsafe(columnIndex, rowIndex);
+        return ReadBinaryUnsafe(columnIndex, rowIndex).ToArray();
     }
 
     private ReadOnlySpan<byte> ReadBinaryUnsafe(int columnIndex, int rowIndex)

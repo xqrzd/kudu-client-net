@@ -145,18 +145,20 @@ public readonly struct RowResult
         _resultSet.GetNullableDecimal(columnIndex, _index);
 
     /// <summary>
-    /// Get the raw value of a fixed length data column.
+    /// Get the raw value of the given column.
     /// </summary>
     /// <param name="columnName">The column name.</param>
-    public ReadOnlySpan<byte> GetRawFixed(string columnName) =>
-        _resultSet.GetRawFixed(columnName, _index);
+    /// <returns>A zero-copy span of the raw value.</returns>
+    public ReadOnlySpan<byte> GetSpan(string columnName) =>
+        _resultSet.GetSpan(columnName, _index);
 
     /// <summary>
-    /// Get the raw value of a fixed length data column.
+    /// Get the raw value of the given column.
     /// </summary>
     /// <param name="columnIndex">The column index.</param>
-    public ReadOnlySpan<byte> GetRawFixed(int columnIndex) =>
-        _resultSet.GetRawFixed(columnIndex, _index);
+    /// <returns>A zero-copy span of the raw value.</returns>
+    public ReadOnlySpan<byte> GetSpan(int columnIndex) =>
+        _resultSet.GetSpan(columnIndex, _index);
 
     public string GetString(string columnName) =>
         _resultSet.GetString(columnName, _index);
@@ -170,11 +172,17 @@ public readonly struct RowResult
     public string? GetNullableString(int columnIndex) =>
         _resultSet.GetNullableString(columnIndex, _index);
 
-    public ReadOnlySpan<byte> GetBinary(string columnName) =>
+    public byte[] GetBinary(string columnName) =>
         _resultSet.GetBinary(columnName, _index);
 
-    public ReadOnlySpan<byte> GetBinary(int columnIndex) =>
+    public byte[] GetBinary(int columnIndex) =>
         _resultSet.GetBinary(columnIndex, _index);
+
+    public byte[]? GetNullableBinary(string columnName) =>
+        _resultSet.GetNullableBinary(columnName, _index);
+
+    public byte[]? GetNullableBinary(int columnIndex) =>
+        _resultSet.GetNullableBinary(columnIndex, _index);
 
     public bool IsNull(string columnName) =>
         _resultSet.IsNull(columnName, _index);
@@ -232,7 +240,7 @@ public readonly struct RowResult
                         stringBuilder.Append(GetString(i));
                         break;
                     case KuduType.Binary:
-                        stringBuilder.Append(BitConverter.ToString(GetBinary(i).ToArray()));
+                        stringBuilder.Append(BitConverter.ToString(GetBinary(i)));
                         break;
                     case KuduType.Float:
                         stringBuilder.Append(GetFloat(i));

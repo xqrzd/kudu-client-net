@@ -44,7 +44,7 @@ public class RowResultTests
             {
                 Assert.Equal(currentRow, row.GetInt32("key"));
                 Assert.Equal(currentRow, row.GetNullableInt32("key"));
-                Assert.Equal(KuduEncoder.EncodeInt32(currentRow), row.GetRawFixed("key").ToArray());
+                Assert.Equal(KuduEncoder.EncodeInt32(currentRow), row.GetSpan("key").ToArray());
                 Assert.Equal(42, row.GetByte("int8"));
                 Assert.Equal((byte?)42, row.GetNullableByte("int8"));
                 Assert.Equal(42, row.GetSByte("int8"));
@@ -65,7 +65,8 @@ public class RowResultTests
                 Assert.Equal("fun with ütf\0", row.GetNullableString("string"));
                 Assert.Equal("árvíztűrő ", row.GetString("varchar"));
                 Assert.Equal("árvíztűrő ", row.GetNullableString("varchar"));
-                Assert.Equal(new byte[] { 0, 1, 2, 3, 4 }, row.GetBinary("binary").ToArray());
+                Assert.Equal(new byte[] { 0, 1, 2, 3, 4 }, row.GetBinary("binary"));
+                Assert.Equal(new byte[] { 0, 1, 2, 3, 4 }, row.GetSpan("binary").ToArray());
                 Assert.Equal(DateTime.Parse("8/19/2020 7:50 PM").ToUniversalTime(), row.GetDateTime("timestamp"));
                 Assert.Equal(DateTime.Parse("8/19/2020 7:50 PM").ToUniversalTime(), row.GetNullableDateTime("timestamp"));
                 Assert.Equal(DateTime.Parse("8/19/2020").ToUniversalTime().Date, row.GetDateTime("date"));
@@ -141,25 +142,28 @@ public class RowResultTests
                 Assert.Null(row.GetNullableDouble("double"));
                 Assert.Null(row.GetNullableString("string"));
                 Assert.Null(row.GetNullableString("varchar"));
-                Assert.Equal(0, row.GetBinary("binary").Length);
+                Assert.Null(row.GetNullableBinary("binary"));
                 Assert.Null(row.GetNullableDateTime("timestamp"));
                 Assert.Null(row.GetNullableDateTime("date"));
                 Assert.Null(row.GetNullableDecimal("decimal32"));
                 Assert.Null(row.GetNullableDecimal("decimal64"));
                 Assert.Null(row.GetNullableDecimal("decimal128"));
 
-                Assert.Equal(0, row.GetRawFixed("int8").Length);
-                Assert.Equal(0, row.GetRawFixed("int16").Length);
-                Assert.Equal(0, row.GetRawFixed("int32").Length);
-                Assert.Equal(0, row.GetRawFixed("int64").Length);
-                Assert.Equal(0, row.GetRawFixed("bool").Length);
-                Assert.Equal(0, row.GetRawFixed("float").Length);
-                Assert.Equal(0, row.GetRawFixed("double").Length);
-                Assert.Equal(0, row.GetRawFixed("timestamp").Length);
-                Assert.Equal(0, row.GetRawFixed("date").Length);
-                Assert.Equal(0, row.GetRawFixed("decimal32").Length);
-                Assert.Equal(0, row.GetRawFixed("decimal64").Length);
-                Assert.Equal(0, row.GetRawFixed("decimal128").Length);
+                Assert.Equal(0, row.GetSpan("int8").Length);
+                Assert.Equal(0, row.GetSpan("int16").Length);
+                Assert.Equal(0, row.GetSpan("int32").Length);
+                Assert.Equal(0, row.GetSpan("int64").Length);
+                Assert.Equal(0, row.GetSpan("bool").Length);
+                Assert.Equal(0, row.GetSpan("float").Length);
+                Assert.Equal(0, row.GetSpan("double").Length);
+                Assert.Equal(0, row.GetSpan("string").Length);
+                Assert.Equal(0, row.GetSpan("varchar").Length);
+                Assert.Equal(0, row.GetSpan("binary").Length);
+                Assert.Equal(0, row.GetSpan("timestamp").Length);
+                Assert.Equal(0, row.GetSpan("date").Length);
+                Assert.Equal(0, row.GetSpan("decimal32").Length);
+                Assert.Equal(0, row.GetSpan("decimal64").Length);
+                Assert.Equal(0, row.GetSpan("decimal128").Length);
                 currentRow++;
             }
         }
@@ -239,7 +243,7 @@ public class RowResultTests
 
                 Assert.Throws<ObjectDisposedException>(() => row.GetInt32("key"));
                 Assert.Throws<ObjectDisposedException>(() => row.GetNullableInt32("key"));
-                Assert.Throws<ObjectDisposedException>(() => row.GetRawFixed("key"));
+                Assert.Throws<ObjectDisposedException>(() => row.GetSpan("key"));
                 Assert.Throws<ObjectDisposedException>(() => row.GetByte("int8"));
                 Assert.Throws<ObjectDisposedException>(() => row.GetNullableByte("int8"));
                 Assert.Throws<ObjectDisposedException>(() => row.GetSByte("int8"));
@@ -260,7 +264,8 @@ public class RowResultTests
                 Assert.Throws<ObjectDisposedException>(() => row.GetNullableString("string"));
                 Assert.Throws<ObjectDisposedException>(() => row.GetString("varchar"));
                 Assert.Throws<ObjectDisposedException>(() => row.GetNullableString("varchar"));
-                Assert.Throws<ObjectDisposedException>(() => row.GetBinary("binary").ToArray());
+                Assert.Throws<ObjectDisposedException>(() => row.GetBinary("binary"));
+                Assert.Throws<ObjectDisposedException>(() => row.GetNullableBinary("binary"));
                 Assert.Throws<ObjectDisposedException>(() => row.GetDateTime("timestamp"));
                 Assert.Throws<ObjectDisposedException>(() => row.GetNullableDateTime("timestamp"));
                 Assert.Throws<ObjectDisposedException>(() => row.GetDateTime("date"));
