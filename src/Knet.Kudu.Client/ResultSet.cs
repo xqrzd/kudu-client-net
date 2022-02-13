@@ -53,18 +53,16 @@ public sealed class ResultSet : IEnumerable<RowResult>
         }
     }
 
-    public T[] MapTo<T>()
+    public IEnumerable<T> MapTo<T>()
     {
         var func = _mapper.CreateDelegate<T>(Schema);
-        var items = new T[(int)Count];
+        var count = (int)Count;
 
-        for (int i = 0; i < items.Length; i++)
+        for (int i = 0; i < count; i++)
         {
             var item = func(this, i);
-            items[i] = item;
+            yield return item;
         }
-
-        return items;
     }
 
     internal void Invalidate()
