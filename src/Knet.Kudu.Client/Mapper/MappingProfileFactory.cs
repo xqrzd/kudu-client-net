@@ -40,8 +40,13 @@ internal static class MappingProfileFactory
 
     private static MatchingConstructor GetConstructor(KuduSchema schema, Type destinationType)
     {
-        var projectedColumns = CreateSchemaLookup(schema);
         var constructors = destinationType.GetConstructors();
+        if (IsValueTuple(destinationType) && constructors.Length == 1)
+        {
+            return GetValueTupleConstructor(schema, constructors[0]);
+        }
+
+        var projectedColumns = CreateSchemaLookup(schema);
         MatchingConstructor matchingConstructor = default;
 
         foreach (var constructor in constructors)
@@ -59,12 +64,51 @@ internal static class MappingProfileFactory
 
         if (matchingConstructor.Constructor is null)
         {
-            // No parameterless constructor was found, or one matching projected types.
-            // TODO: Try to find an exact one (eg. ValueTuple)
-            throw new Exception("No constructor was found");
+            throw new ArgumentException(
+                "No parameterless constructor or one matching projected types was found.");
         }
 
         return matchingConstructor;
+    }
+
+    private static MatchingConstructor GetValueTupleConstructor(KuduSchema schema, ConstructorInfo constructor)
+    {
+        var columns = schema.Columns;
+        var parameters = constructor.GetParameters();
+
+        if (columns.Count != parameters.Length)
+        {
+            throw new ArgumentException(
+                $"ValueTuple has {parameters.Length} properties, " +
+                $"but projection schema has {columns.Count} columns");
+        }
+
+        var results = new MappingConstructorParameter[parameters.Length];
+
+        for (int i = 0; i < parameters.Length; i++)
+        {
+            var column = columns[i];
+            var parameter = parameters[i];
+
+            var parameterType = parameter.ParameterType;
+
+            if (IsValidDestination(column.Type, parameterType))
+            {
+                var method = GetResultSetMethod(
+                    column.Type,
+                    column.IsNullable,
+                    parameterType);
+
+                results[i] = new MappingConstructorParameter(i, parameterType, method);
+            }
+            else
+            {
+                throw new ArgumentException(
+                    $"Column `{column}` cannot be converted to ValueTuple property `{parameter}`");
+            }
+        }
+
+        return new MatchingConstructor(constructor, results);
     }
 
     private static bool TryMatchConstructor(
@@ -207,6 +251,15 @@ internal static class MappingProfileFactory
         }
 
         return type;
+    }
+
+    private static bool IsValueTuple(Type type)
+    {
+        var underlyingType = GetUnderlyingType(type);
+
+        return
+            underlyingType.IsValueType &&
+            underlyingType.FullName?.StartsWith("System.ValueTuple`", StringComparison.Ordinal) == true;
     }
 
     private static MethodInfo GetResultSetMethod(KuduType columnType, bool isNullable, Type destinationType)
