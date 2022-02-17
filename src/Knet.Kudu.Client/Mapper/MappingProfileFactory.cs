@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 
 namespace Knet.Kudu.Client.Mapper;
@@ -30,48 +31,88 @@ internal static class MappingProfileFactory
 
     private static readonly Dictionary<string, MethodInfo> _resultSetMethods = GetResultSetMethods();
 
-    public static MappingProfile Create(KuduSchema schema, Type destinationType)
+    public static Func<ResultSet, int, T> Create<T>(KuduSchema projectionSchema)
     {
-        var constructor = GetConstructor(schema, destinationType);
-        var properties = GetProperties(schema, destinationType, constructor.Parameters);
+        var destinationType = typeof(T);
+        var resultSet = Expression.Parameter(typeof(ResultSet), "resultSet");
+        var rowIndex = Expression.Parameter(typeof(int), "rowIndex");
 
-        return new MappingProfile(constructor.Constructor, constructor.Parameters, properties);
+        var body = CreateMappingExpression(projectionSchema, destinationType, resultSet, rowIndex);
+
+        var lambda = Expression.Lambda<Func<ResultSet, int, T>>(body, resultSet, rowIndex);
+        var func = lambda.Compile();
+
+        return func;
     }
 
-    private static MatchingConstructor GetConstructor(KuduSchema schema, Type destinationType)
+    private static Expression CreateMappingExpression(
+        KuduSchema schema,
+        Type destinationType,
+        ParameterExpression resultSet,
+        ParameterExpression rowIndex)
+    {
+        if (schema.Columns.Count == 1)
+        {
+            var column = schema.Columns[0];
+            if (TryGetResultSetMethod(column.Type, column.IsNullable, destinationType, out var method))
+            {
+                return CreateValueExpression(resultSet, rowIndex, method, 0, destinationType);
+            }
+        }
+
+        var constructor = GetConstructor(schema, destinationType);
+        var properties = GetMappedProperties(schema, destinationType, constructor.Parameters);
+
+        var returnVal = Expression.Variable(destinationType, "result");
+        var constructorExpression = CreateConstructorExpression(constructor, resultSet, rowIndex);
+
+        var expressions = new List<Expression>(properties.Length + 2)
+        {
+            Expression.Assign(returnVal, constructorExpression)
+        };
+
+        CreatePropertyExpressions(properties, resultSet, rowIndex, returnVal, expressions);
+
+        expressions.Add(returnVal);
+
+        return Expression.Block(destinationType, new[] { returnVal }, expressions);
+    }
+
+    private static MappedConstructor GetConstructor(KuduSchema schema, Type destinationType)
     {
         var constructors = destinationType.GetConstructors();
+
         if (IsValueTuple(destinationType) && constructors.Length == 1)
         {
             return GetValueTupleConstructor(schema, constructors[0]);
         }
 
         var projectedColumns = CreateSchemaLookup(schema);
-        MatchingConstructor matchingConstructor = default;
+        MappedConstructor mappedConstructor = default;
 
         foreach (var constructor in constructors)
         {
             if (TryMatchConstructor(constructor, projectedColumns, out var parameters))
             {
                 // Pick the constructor with the most parameters.
-                if (matchingConstructor.Parameters is null ||
-                    parameters.Length > matchingConstructor.Parameters.Length)
+                if (mappedConstructor.Parameters is null ||
+                    parameters.Length > mappedConstructor.Parameters.Length)
                 {
-                    matchingConstructor = new MatchingConstructor(constructor, parameters);
+                    mappedConstructor = new MappedConstructor(constructor, parameters);
                 }
             }
         }
 
-        if (matchingConstructor.Constructor is null)
+        if (mappedConstructor.ConstructorInfo is null)
         {
             throw new ArgumentException(
                 "No parameterless constructor or one matching projected types was found.");
         }
 
-        return matchingConstructor;
+        return mappedConstructor;
     }
 
-    private static MatchingConstructor GetValueTupleConstructor(KuduSchema schema, ConstructorInfo constructor)
+    private static MappedConstructor GetValueTupleConstructor(KuduSchema schema, ConstructorInfo constructor)
     {
         var columns = schema.Columns;
         var parameters = constructor.GetParameters();
@@ -83,23 +124,17 @@ internal static class MappingProfileFactory
                 $"but projection schema has {columns.Count} columns");
         }
 
-        var results = new MappingConstructorParameter[parameters.Length];
+        var results = new ConstructorParameter[parameters.Length];
 
         for (int i = 0; i < parameters.Length; i++)
         {
             var column = columns[i];
             var parameter = parameters[i];
-
             var parameterType = parameter.ParameterType;
 
-            if (IsValidDestination(column.Type, parameterType))
+            if (TryGetResultSetMethod(column.Type, column.IsNullable, parameterType, out var method))
             {
-                var method = GetResultSetMethod(
-                    column.Type,
-                    column.IsNullable,
-                    parameterType);
-
-                results[i] = new MappingConstructorParameter(i, parameterType, method);
+                results[i] = new ConstructorParameter(i, parameterType, method);
             }
             else
             {
@@ -108,16 +143,16 @@ internal static class MappingProfileFactory
             }
         }
 
-        return new MatchingConstructor(constructor, results);
+        return new MappedConstructor(constructor, results);
     }
 
     private static bool TryMatchConstructor(
         ConstructorInfo constructor,
         Dictionary<string, ColumnInfo> projectedColumns,
-        [NotNullWhen(true)] out MappingConstructorParameter[]? mappingParameters)
+        [NotNullWhen(true)] out ConstructorParameter[]? mappedParameters)
     {
         var parameters = constructor.GetParameters();
-        var results = new MappingConstructorParameter[parameters.Length];
+        var results = new ConstructorParameter[parameters.Length];
         int i = 0;
 
         foreach (var parameter in parameters)
@@ -127,34 +162,27 @@ internal static class MappingProfileFactory
 
             if (parameterName is not null &&
                 projectedColumns.TryGetValue(parameterName, out var columnInfo) &&
-                IsValidDestination(columnInfo.KuduType, parameterType))
+                TryGetResultSetMethod(columnInfo.KuduType, columnInfo.IsNullable, parameterType, out var method))
             {
-                var method = GetResultSetMethod(
-                    columnInfo.KuduType,
-                    columnInfo.IsNullable,
-                    parameterType);
-
-                results[i++] = new MappingConstructorParameter(
-                    columnInfo.ColumnIndex,
-                    parameterType,
-                    method);
+                results[i++] = new ConstructorParameter(
+                    columnInfo.ColumnIndex, parameterType, method);
             }
             else
             {
                 // There isn't a projected column to use for this parameter.
-                mappingParameters = null;
+                mappedParameters = null;
                 return false;
             }
         }
 
-        mappingParameters = results;
+        mappedParameters = results;
         return true;
     }
 
-    private static MappingProperty[] GetProperties(
+    private static MappedProperty[] GetMappedProperties(
         KuduSchema schema,
         Type destinationType,
-        MappingConstructorParameter[] constructorParameters)
+        ConstructorParameter[] constructorParameters)
     {
         var constructorColumnIndexes = new HashSet<int>();
         foreach (var parameter in constructorParameters)
@@ -170,7 +198,7 @@ internal static class MappingProfileFactory
         var columns = schema.Columns;
         var numColumns = columns.Count;
 
-        var results = new MappingProperty[numColumns - constructorParameters.Length];
+        var results = new MappedProperty[numColumns - constructorParameters.Length];
         int resultIndex = 0;
 
         for (int columnIndex = 0; columnIndex < numColumns; columnIndex++)
@@ -184,17 +212,9 @@ internal static class MappingProfileFactory
             var column = columns[columnIndex];
 
             if (destinationProperties.TryGetValue(column.Name, out var propertyInfo) &&
-                IsValidDestination(column.Type, propertyInfo.PropertyType))
+                TryGetResultSetMethod(column.Type, column.IsNullable, propertyInfo.PropertyType, out var method))
             {
-                var method = GetResultSetMethod(
-                    column.Type,
-                    column.IsNullable,
-                    propertyInfo.PropertyType);
-
-                results[resultIndex++] = new MappingProperty(
-                    columnIndex,
-                    propertyInfo,
-                    method);
+                results[resultIndex++] = new MappedProperty(columnIndex, propertyInfo, method);
             }
             else
             {
@@ -204,6 +224,79 @@ internal static class MappingProfileFactory
         }
 
         return results;
+    }
+
+    private static Expression CreateConstructorExpression(
+        MappedConstructor constructor,
+        ParameterExpression resultSet,
+        ParameterExpression rowIndex)
+    {
+        var parameters = constructor.Parameters;
+        var arguments = new Expression[parameters.Length];
+
+        for (int i = 0; i < arguments.Length; i++)
+        {
+            var parameter = parameters[i];
+
+            var expression = CreateValueExpression(
+                resultSet,
+                rowIndex,
+                parameter.ResultSetMethod,
+                parameter.ColumnIndex,
+                parameter.DestinationType);
+
+            arguments[i] = expression;
+        }
+
+        return Expression.New(constructor.ConstructorInfo, arguments);
+    }
+
+    private static void CreatePropertyExpressions(
+        MappedProperty[] properties,
+        ParameterExpression resultSet,
+        ParameterExpression rowIndex,
+        ParameterExpression returnVal,
+        List<Expression> output)
+    {
+        foreach (var property in properties)
+        {
+            var propertyInfo = property.PropertyInfo;
+
+            var getValueExpression = CreateValueExpression(
+                resultSet,
+                rowIndex,
+                property.ResultSetMethod,
+                property.ColumnIndex,
+                propertyInfo.PropertyType);
+
+            // returnVal.Property = resultSet.ReadInt32(...);
+            var expression = Expression.Assign(
+                Expression.Property(returnVal, propertyInfo),
+                getValueExpression);
+
+            output.Add(expression);
+        }
+    }
+
+    private static Expression CreateValueExpression(
+        ParameterExpression resultSet,
+        ParameterExpression rowIndex,
+        MethodInfo method,
+        int columnIndex,
+        Type destinationType)
+    {
+        var expression = Expression.Call(
+            resultSet,
+            method,
+            Expression.Constant(columnIndex),
+            rowIndex);
+
+        if (destinationType != method.ReturnType)
+        {
+            return Expression.Convert(expression, destinationType);
+        }
+
+        return expression;
     }
 
     private static Dictionary<string, ColumnInfo> CreateSchemaLookup(KuduSchema schema)
@@ -223,15 +316,22 @@ internal static class MappingProfileFactory
         return lookup;
     }
 
-    private static bool IsValidDestination(KuduType columnType, Type destinationType)
+    private static bool TryGetResultSetMethod(
+        KuduType columnType,
+        bool isNullable,
+        Type destinationType,
+        [NotNullWhen(true)] out MethodInfo? method)
     {
         var underlyingType = GetUnderlyingType(destinationType);
 
-        if (_allowedConversions.TryGetValue(columnType, out var allowedTypes))
+        if (_allowedConversions.TryGetValue(columnType, out var allowedTypes) &&
+            allowedTypes.Contains(underlyingType))
         {
-            return allowedTypes.Contains(underlyingType);
+            method = GetResultSetMethod(columnType, isNullable, underlyingType);
+            return true;
         }
 
+        method = null;
         return false;
     }
 
@@ -262,10 +362,9 @@ internal static class MappingProfileFactory
             underlyingType.FullName?.StartsWith("System.ValueTuple`", StringComparison.Ordinal) == true;
     }
 
-    private static MethodInfo GetResultSetMethod(KuduType columnType, bool isNullable, Type destinationType)
+    private static MethodInfo GetResultSetMethod(KuduType columnType, bool isNullable, Type underlyingType)
     {
         var methods = _resultSetMethods;
-        var underlyingType = GetUnderlyingType(destinationType);
 
         return (columnType, isNullable) switch
         {
@@ -329,9 +428,19 @@ internal static class MappingProfileFactory
         return results;
     }
 
-    private readonly record struct MatchingConstructor(
-        ConstructorInfo Constructor,
-        MappingConstructorParameter[] Parameters);
+    private readonly record struct MappedConstructor(
+        ConstructorInfo ConstructorInfo,
+        ConstructorParameter[] Parameters);
+
+    private readonly record struct ConstructorParameter(
+        int ColumnIndex,
+        Type DestinationType,
+        MethodInfo ResultSetMethod);
+
+    private readonly record struct MappedProperty(
+        int ColumnIndex,
+        PropertyInfo PropertyInfo,
+        MethodInfo ResultSetMethod);
 
     private readonly record struct ColumnInfo(int ColumnIndex, KuduType KuduType, bool IsNullable);
 }

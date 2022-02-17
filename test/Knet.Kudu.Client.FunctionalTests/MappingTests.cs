@@ -39,7 +39,7 @@ public class MappingTests : IAsyncLifetime
         var values = new[]
         {
             new MixedRecord(1, "val-1") { Column2 = 100, Column3 = "val-2" },
-            new MixedRecord(2, "val-3") { Column2 = 200, Column3 = "val-4" },
+            new MixedRecord(2, "val-3") { Column2 = 200, Column3 = "val-4" }
         };
 
         var table = await _client.CreateTableAsync(builder);
@@ -233,6 +233,61 @@ public class MappingTests : IAsyncLifetime
     }
 
     [SkippableFact]
+    public async Task TestScalar()
+    {
+        var builder = new TableBuilder(nameof(TestValueTuple))
+            .AddColumn("key", KuduType.Int32, opt => opt.Key(true));
+
+        var values = new[] { 0, 1, 2, 3, 4, 5 };
+
+        var table = await _client.CreateTableAsync(builder);
+
+        var rowsToInsert = values.Select(value =>
+        {
+            var insert = table.NewInsert();
+            insert.SetInt32("key", value);
+            return insert;
+        });
+
+        await _client.WriteAsync(rowsToInsert);
+
+        var rows = await ScanAsync<int>(table);
+
+        Assert.Equal(values, rows);
+    }
+
+    [SkippableFact]
+    public async Task TestDifferentProjection()
+    {
+        var builder = new TableBuilder(nameof(TestValueTuple))
+            .AddColumn("key", KuduType.Int32, opt => opt.Key(true))
+            .AddColumn("extra_column", KuduType.Int32, opt => opt.Nullable(false));
+
+        var values = new[] { 0, 1, 2, 3, 4, 5 };
+
+        var table = await _client.CreateTableAsync(builder);
+
+        var rowsToInsert = values.Select(value =>
+        {
+            var insert = table.NewInsert();
+            insert.SetInt32("key", value);
+            insert.SetInt32("extra_column", value * 2);
+            return insert;
+        });
+
+        await _client.WriteAsync(rowsToInsert);
+
+        var scanner = _client.NewScanBuilder(table)
+            .SetProjectedColumns("key")
+            .SetReadMode(ReadMode.ReadYourWrites)
+            .Build();
+
+        var rows = await scanner.ScanToListAsync<int>();
+
+        Assert.Equal(values, rows);
+    }
+
+    [SkippableFact]
     public async Task TestValueTuple()
     {
         var builder = new TableBuilder(nameof(TestValueTuple))
@@ -247,7 +302,7 @@ public class MappingTests : IAsyncLifetime
             (0, 1.2d, true, true, "a"),
             (1, 2.2d, true, false, "b"),
             (2, 3.2d, false, true, null),
-            (3, 4.2d, false, false, "c"),
+            (3, 4.2d, false, false, "c")
         };
 
         var table = await _client.CreateTableAsync(builder);
