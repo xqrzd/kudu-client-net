@@ -24,4 +24,18 @@ public static class KuduScannerExtensions
 
         return list;
     }
+
+    public static async ValueTask<long> CountAsync(
+        this KuduScanner scanner,
+        CancellationToken cancellationToken = default)
+    {
+        long count = 0;
+
+        await foreach (var resultSet in scanner.WithCancellation(cancellationToken).ConfigureAwait(false))
+        {
+            count += resultSet.Count;
+        }
+
+        return count;
+    }
 }
