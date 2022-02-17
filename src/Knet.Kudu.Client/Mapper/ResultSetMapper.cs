@@ -2,7 +2,7 @@ using System;
 
 namespace Knet.Kudu.Client.Mapper;
 
-public sealed class ResultSetMapper : IResultSetMapper
+internal sealed class ResultSetMapper
 {
     private readonly DelegateCache _cache = new();
 
