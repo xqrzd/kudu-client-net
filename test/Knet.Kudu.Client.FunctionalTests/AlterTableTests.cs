@@ -61,18 +61,17 @@ public class AlterTableTests : IAsyncLifetime
         await _session.FlushAsync();
 
         // Check defaults applied, and that row key=101
-        var scanner = _client.NewScanBuilder(table).Build();
-        var results = await ScanTableToStrings(table, scanner);
+        var results = await ClientTestUtil.ScanTableToStringsAsync(_client, table);
 
         var expected = new List<string>(101);
         for (int i = 0; i < 100; i++)
         {
-            expected.Add($"Int32 c0={i}, Int32 c1={i}, Int32 addNonNull=100, " +
-                $"Int32 addNullable=NULL, Int32 addNullableDef=200");
+            expected.Add($"INT32 c0={i}, INT32 c1={i}, INT32 addNonNull=100, " +
+                          "INT32 addNullable=NULL, INT32 addNullableDef=200");
         }
 
-        expected.Add("Int32 c0=101, Int32 c1=101, Int32 addNonNull=101, " +
-                "Int32 addNullable=101, Int32 addNullableDef=NULL");
+        expected.Add("INT32 c0=101, INT32 c1=101, INT32 addNonNull=101, " +
+                     "INT32 addNullable=101, INT32 addNullableDef=NULL");
 
         Assert.Equal(
             expected.OrderBy(r => r),
@@ -91,7 +90,6 @@ public class AlterTableTests : IAsyncLifetime
         Assert.Equal(CompressionType.DefaultCompression, col.Compression);
         Assert.Equal(EncodingType.AutoEncoding, col.Encoding);
         Assert.Null(col.DefaultValue);
-        Assert.Empty(table.SchemaPb.Schema.Columns[1].WriteDefaultValue);
 
         // Alter the table.
         await _client.AlterTableAsync(new AlterTableBuilder(table)
@@ -105,7 +103,6 @@ public class AlterTableTests : IAsyncLifetime
         Assert.Equal(CompressionType.Snappy, col.Compression);
         Assert.Equal(EncodingType.Rle, col.Encoding);
         Assert.Equal(0, col.DefaultValue);
-        Assert.Equal(new byte[4], table.SchemaPb.Schema.Columns[1].WriteDefaultValue);
     }
 
     [SkippableFact]
@@ -118,7 +115,7 @@ public class AlterTableTests : IAsyncLifetime
         await _client.AlterTableAsync(new AlterTableBuilder(table)
             .RenameColumn("c0", "c0Key"));
 
-        try
+        var exception = await Assert.ThrowsAsync<NonRecoverableException>(async () =>
         {
             // Scanning with the old schema.
             var scanner = _client.NewScanBuilder(table)
@@ -126,15 +123,12 @@ public class AlterTableTests : IAsyncLifetime
                 .Build();
 
             await foreach (var resultSet in scanner) { }
-            Assert.False(true);
-        }
-        catch (KuduException ex)
-        {
-            Assert.True(ex.Status.IsInvalidArgument);
-            Assert.Contains(
-                "Some columns are not present in the current schema: c0",
-                ex.Status.Message);
-        }
+        });
+
+        Assert.True(exception.Status.IsInvalidArgument);
+        Assert.Contains(
+            "Some columns are not present in the current schema: c0",
+            exception.Status.Message);
 
         // Reopen table for the new schema.
         table = await _client.OpenTableAsync(_tableName);
@@ -152,18 +146,9 @@ public class AlterTableTests : IAsyncLifetime
             .SetProjectedColumns("c0Key", "c1")
             .Build();
 
-        await foreach (var resultSet in scanner2)
-        {
-            CheckResults(resultSet);
-        }
-
-        static void CheckResults(ResultSet resultSet)
-        {
-            foreach (var row in resultSet)
-            {
-                Assert.Equal(row.GetInt32(0), row.GetInt32(1));
-            }
-        }
+        var rows = await scanner2.ScanToListAsync<(int c0Key, int c1)>();
+        Assert.Equal(101, rows.Count);
+        Assert.All(rows, row => Assert.Equal(row.c0Key, row.c1));
     }
 
     [SkippableFact]
@@ -312,7 +297,7 @@ public class AlterTableTests : IAsyncLifetime
         Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
 
         // ADD [0, 100) <- already present (duplicate)
-        try
+        var ex = await Assert.ThrowsAsync<NonRecoverableException>(async () =>
         {
             await _client.AlterTableAsync(new AlterTableBuilder(table)
                 .AddRangePartition((lower, upper) =>
@@ -320,19 +305,15 @@ public class AlterTableTests : IAsyncLifetime
                     lower.SetInt32("c0", 0);
                     upper.SetInt32("c0", 100);
                 }));
+        });
 
-            Assert.True(false);
-        }
-        catch (KuduException e)
-        {
-            Assert.True(e.Status.IsAlreadyPresent);
-            Assert.Contains("range partition already exists", e.Status.Message);
-        }
+        Assert.True(ex.Status.IsAlreadyPresent);
+        Assert.Contains("range partition already exists", ex.Status.Message);
 
         Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
 
         // ADD [50, 150) <- illegal (overlap)
-        try
+        ex = await Assert.ThrowsAsync<NonRecoverableException>(async () =>
         {
             await _client.AlterTableAsync(new AlterTableBuilder(table)
                 .AddRangePartition((lower, upper) =>
@@ -340,19 +321,15 @@ public class AlterTableTests : IAsyncLifetime
                     lower.SetInt32("c0", 50);
                     upper.SetInt32("c0", 150);
                 }));
+        });
 
-            Assert.True(false);
-        }
-        catch (KuduException e)
-        {
-            Assert.True(e.Status.IsInvalidArgument);
-            Assert.Contains("new range partition conflicts with existing one", e.Status.Message);
-        }
+        Assert.True(ex.Status.IsInvalidArgument);
+        Assert.Contains("new range partition conflicts with existing one", ex.Status.Message);
 
         Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
 
         // ADD [-50, 50) <- illegal (overlap)
-        try
+        ex = await Assert.ThrowsAsync<NonRecoverableException>(async () =>
         {
             await _client.AlterTableAsync(new AlterTableBuilder(table)
                 .AddRangePartition((lower, upper) =>
@@ -360,20 +337,16 @@ public class AlterTableTests : IAsyncLifetime
                     lower.SetInt32("c0", -50);
                     upper.SetInt32("c0", 50);
                 }));
+        });
 
-            Assert.True(false);
-        }
-        catch (KuduException e)
-        {
-            Assert.True(e.Status.IsInvalidArgument);
-            Assert.Contains("new range partition conflicts with existing one", e.Status.Message);
-        }
+        Assert.True(ex.Status.IsInvalidArgument);
+        Assert.Contains("new range partition conflicts with existing one", ex.Status.Message);
 
         Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
 
         // ADD [200, 300)
         // ADD [-50, 150) <- illegal (overlap)
-        try
+        ex = await Assert.ThrowsAsync<NonRecoverableException>(async () =>
         {
             await _client.AlterTableAsync(new AlterTableBuilder(table)
                 .AddRangePartition((lower, upper) =>
@@ -386,52 +359,40 @@ public class AlterTableTests : IAsyncLifetime
                     lower.SetInt32("c0", -50);
                     upper.SetInt32("c0", 150);
                 }));
+        });
 
-            Assert.True(false);
-        }
-        catch (KuduException e)
-        {
-            Assert.True(e.Status.IsInvalidArgument);
-            Assert.Contains("new range partition conflicts with existing one", e.Status.Message);
-        }
+        Assert.True(ex.Status.IsInvalidArgument);
+        Assert.Contains("new range partition conflicts with existing one", ex.Status.Message);
 
         Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
 
         // DROP [<start>, <end>)
-        try
+        ex = await Assert.ThrowsAsync<NonRecoverableException>(async () =>
         {
             await _client.AlterTableAsync(new AlterTableBuilder(table)
                 .DropRangePartition((lower, upper) => { }));
+        });
 
-            Assert.True(false);
-        }
-        catch (KuduException e)
-        {
-            Assert.True(e.Status.IsInvalidArgument);
-            Assert.Contains("no range partition to drop", e.Status.Message);
-        }
+        Assert.True(ex.Status.IsInvalidArgument);
+        Assert.Contains("no range partition to drop", ex.Status.Message);
 
         Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
 
         // DROP [50, 150)
         // RENAME foo
-        try
+        ex = await Assert.ThrowsAsync<NonRecoverableException>(async () =>
         {
             await _client.AlterTableAsync(new AlterTableBuilder(table)
-                 .DropRangePartition((lower, upper) =>
-                 {
-                     lower.SetInt32("c0", 50);
-                     upper.SetInt32("c0", 150);
-                 })
-                 .RenameTable("foo"));
+                .DropRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 50);
+                    upper.SetInt32("c0", 150);
+                })
+                .RenameTable("foo"));
+        });
 
-            Assert.True(false);
-        }
-        catch (KuduException e)
-        {
-            Assert.True(e.Status.IsInvalidArgument);
-            Assert.Contains("no range partition to drop", e.Status.Message);
-        }
+        Assert.True(ex.Status.IsInvalidArgument);
+        Assert.Contains("no range partition to drop", ex.Status.Message);
 
         Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
         Assert.Empty(await _client.GetTablesAsync("foo"));
@@ -441,42 +402,38 @@ public class AlterTableTests : IAsyncLifetime
         // DROP [100, 200)
         // ADD  [150, 250)
         // DROP [0, 10)    <- illegal
-        try
+        ex = await Assert.ThrowsAsync<NonRecoverableException>(async () =>
         {
             await _client.AlterTableAsync(new AlterTableBuilder(table)
-                 .DropRangePartition((lower, upper) =>
-                 {
-                     lower.SetInt32("c0", 0);
-                     upper.SetInt32("c0", 100);
-                 })
-                 .AddRangePartition((lower, upper) =>
-                 {
-                     lower.SetInt32("c0", 100);
-                     upper.SetInt32("c0", 200);
-                 })
-                 .DropRangePartition((lower, upper) =>
-                 {
-                     lower.SetInt32("c0", 100);
-                     upper.SetInt32("c0", 200);
-                 })
-                 .AddRangePartition((lower, upper) =>
-                 {
-                     lower.SetInt32("c0", 150);
-                     upper.SetInt32("c0", 250);
-                 })
-                 .DropRangePartition((lower, upper) =>
-                 {
-                     lower.SetInt32("c0", 0);
-                     upper.SetInt32("c0", 10);
-                 }));
+                .DropRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 0);
+                    upper.SetInt32("c0", 100);
+                })
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 100);
+                    upper.SetInt32("c0", 200);
+                })
+                .DropRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 100);
+                    upper.SetInt32("c0", 200);
+                })
+                .AddRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 150);
+                    upper.SetInt32("c0", 250);
+                })
+                .DropRangePartition((lower, upper) =>
+                {
+                    lower.SetInt32("c0", 0);
+                    upper.SetInt32("c0", 10);
+                }));
+        });
 
-            Assert.True(false);
-        }
-        catch (KuduException e)
-        {
-            Assert.True(e.Status.IsInvalidArgument);
-            Assert.Contains("no range partition to drop", e.Status.Message);
-        }
+        Assert.True(ex.Status.IsInvalidArgument);
+        Assert.Contains("no range partition to drop", ex.Status.Message);
 
         Assert.Equal(100, await ClientTestUtil.CountRowsAsync(_client, table));
     }
@@ -612,50 +569,5 @@ public class AlterTableTests : IAsyncLifetime
         });
 
         await _client.WriteAsync(rows);
-    }
-
-    private static async Task<List<string>> ScanTableToStrings(KuduTable table, KuduScanner scanner)
-    {
-        var results = new List<string>();
-
-        await foreach (var resultSet in scanner)
-        {
-            var set = Parse(resultSet);
-            results.AddRange(set);
-        }
-
-        return results;
-
-        List<string> Parse(ResultSet resultSet)
-        {
-            // TODO: Add ToString to ResultSet.
-            var results = new List<string>();
-
-            foreach (var row in resultSet)
-            {
-                var strings = new List<string>();
-
-                foreach (var column in table.Schema.Columns)
-                {
-                    var name = column.Name;
-                    if (column.IsNullable)
-                    {
-                        var value = row.GetNullableInt32(name);
-                        if (value.HasValue)
-                            strings.Add($"{column.Type} {name}={value}");
-                        else
-                            strings.Add($"{column.Type} {name}=NULL");
-                    }
-                    else
-                    {
-                        strings.Add($"{column.Type} {name}={row.GetInt32(name)}");
-                    }
-                }
-
-                results.Add(string.Join(", ", strings));
-            }
-
-            return results;
-        }
     }
 }

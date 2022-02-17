@@ -57,10 +57,8 @@ public class MasterFailoverTests
         var scanner = client.NewScanBuilder(table2)
             .Build();
 
-        await foreach (var resultSet in scanner)
-        {
-            Assert.True(false, "Scanner returned rows, but no rows were written");
-        }
+        var numRows = await scanner.CountAsync();
+        Assert.Equal(0, numRows); // We didn't write any rows.
 
         Task DoActionAsync()
         {

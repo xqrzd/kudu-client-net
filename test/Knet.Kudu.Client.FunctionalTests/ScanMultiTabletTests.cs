@@ -121,30 +121,18 @@ public class ScanMultiTabletTests : IAsyncLifetime
     [SkippableFact]
     public async Task TestKeyStartEnd()
     {
-        Assert.Equal(0, await ClientTestUtil.CountRowsInScanAsync(
-            GetScanner("", "", "1", ""))); // There's nothing in the 1st tablet
-        Assert.Equal(1, await ClientTestUtil.CountRowsInScanAsync(
-            GetScanner("", "", "1", "2"))); // Grab the very first row
-        Assert.Equal(3, await ClientTestUtil.CountRowsInScanAsync(
-            GetScanner("1", "1", "1", "4"))); // Grab the whole 2nd tablet
-        Assert.Equal(3, await ClientTestUtil.CountRowsInScanAsync(
-            GetScanner("1", "1", "2", ""))); // Same, and peek at the 3rd
-        Assert.Equal(3, await ClientTestUtil.CountRowsInScanAsync(
-            GetScanner("1", "1", "2", "0"))); // Same, different peek
-        Assert.Equal(4, await ClientTestUtil.CountRowsInScanAsync(
-            GetScanner("1", "2", "2", "3"))); // Middle of 2nd to middle of 3rd
-        Assert.Equal(3, await ClientTestUtil.CountRowsInScanAsync(
-            GetScanner("1", "4", "2", "4"))); // Peek at the 2nd then whole 3rd
-        Assert.Equal(6, await ClientTestUtil.CountRowsInScanAsync(
-            GetScanner("1", "5", "3", "4"))); // Whole 3rd and 4th
-        Assert.Equal(9, await ClientTestUtil.CountRowsInScanAsync(
-            GetScanner("", "", "4", ""))); // Full table scan
-        Assert.Equal(9, await ClientTestUtil.CountRowsInScanAsync(
-            GetScanner("", "", null, null))); // Full table scan with empty upper
-        Assert.Equal(9, await ClientTestUtil.CountRowsInScanAsync(
-            GetScanner(null, null, "4", ""))); // Full table scan with empty lower
-        Assert.Equal(9, await ClientTestUtil.CountRowsInScanAsync(
-            GetScanner(null, null, null, null))); // Full table scan with empty bounds
+        Assert.Equal(0, await GetScanner("", "", "1", "").CountAsync()); // There's nothing in the 1st tablet
+        Assert.Equal(1, await GetScanner("", "", "1", "2").CountAsync()); // Grab the very first row
+        Assert.Equal(3, await GetScanner("1", "1", "1", "4").CountAsync()); // Grab the whole 2nd tablet
+        Assert.Equal(3, await GetScanner("1", "1", "2", "").CountAsync()); // Same, and peek at the 3rd
+        Assert.Equal(3, await GetScanner("1", "1", "2", "0").CountAsync()); // Same, different peek
+        Assert.Equal(4, await GetScanner("1", "2", "2", "3").CountAsync()); // Middle of 2nd to middle of 3rd
+        Assert.Equal(3, await GetScanner("1", "4", "2", "4").CountAsync()); // Peek at the 2nd then whole 3rd
+        Assert.Equal(6, await GetScanner("1", "5", "3", "4").CountAsync()); // Whole 3rd and 4th
+        Assert.Equal(9, await GetScanner("", "", "4", "").CountAsync()); // Full table scan
+        Assert.Equal(9, await GetScanner("", "", null, null).CountAsync()); // Full table scan with empty upper
+        Assert.Equal(9, await GetScanner(null, null, "4", "").CountAsync()); // Full table scan with empty lower
+        Assert.Equal(9, await GetScanner(null, null, null, null).CountAsync()); // Full table scan with empty bounds
 
         // Test that we can close a scanner while in between two tablets. We start on
         // the second tablet and our first ResultSet will get 3 rows. At that moment
@@ -169,44 +157,43 @@ public class ScanMultiTabletTests : IAsyncLifetime
         // Value that doesn't exist, predicates has primary column.
         upperPredicate = KuduPredicate.NewComparisonPredicate(
             _schema.GetColumn(1), ComparisonOp.LessEqual, "1");
-        Assert.Equal(0, await ClientTestUtil.CountRowsInScanAsync(
-            GetScanner("1", "2", "1", "3", upperPredicate)));
+        Assert.Equal(0, await GetScanner(
+            "1", "2", "1", "3", upperPredicate).CountAsync());
 
         // First row from the 2nd tablet.
         lowerPredicate = KuduPredicate.NewComparisonPredicate(
             _schema.GetColumn(2), ComparisonOp.GreaterEqual, "1");
         upperPredicate = KuduPredicate.NewComparisonPredicate(
             _schema.GetColumn(2), ComparisonOp.LessEqual, "1");
-        Assert.Equal(1, await ClientTestUtil.CountRowsInScanAsync(
-            GetScanner("1", "", "2", "", lowerPredicate, upperPredicate)));
+        Assert.Equal(1, await GetScanner(
+            "1", "", "2", "", lowerPredicate, upperPredicate).CountAsync());
 
         // All the 2nd tablet.
         lowerPredicate = KuduPredicate.NewComparisonPredicate(
             _schema.GetColumn(2), ComparisonOp.GreaterEqual, "1");
         upperPredicate = KuduPredicate.NewComparisonPredicate(
             _schema.GetColumn(2), ComparisonOp.LessEqual, "3");
-        Assert.Equal(3, await ClientTestUtil.CountRowsInScanAsync(
-            GetScanner("1", "", "2", "", lowerPredicate, upperPredicate)));
+        Assert.Equal(3, await GetScanner(
+            "1", "", "2", "", lowerPredicate, upperPredicate).CountAsync());
 
         // Value that doesn't exist.
         lowerPredicate = KuduPredicate.NewComparisonPredicate(
             _schema.GetColumn(2), ComparisonOp.GreaterEqual, "4");
-        Assert.Equal(0, await ClientTestUtil.CountRowsInScanAsync(
-            GetScanner("1", "", "2", "", lowerPredicate)));
+        Assert.Equal(0, await GetScanner(
+            "1", "", "2", "", lowerPredicate).CountAsync());
 
         // First row from every tablet.
         lowerPredicate = KuduPredicate.NewComparisonPredicate(
             _schema.GetColumn(2), ComparisonOp.GreaterEqual, "1");
         upperPredicate = KuduPredicate.NewComparisonPredicate(
             _schema.GetColumn(2), ComparisonOp.LessEqual, "1");
-        Assert.Equal(3, await ClientTestUtil.CountRowsInScanAsync(
-            GetScanner(null, null, null, null, lowerPredicate, upperPredicate)));
+        Assert.Equal(3, await GetScanner(null, null, null, null, lowerPredicate, upperPredicate).CountAsync());
 
         // All the rows.
         lowerPredicate = KuduPredicate.NewComparisonPredicate(
             _schema.GetColumn(2), ComparisonOp.GreaterEqual, "1");
-        Assert.Equal(9, await ClientTestUtil.CountRowsInScanAsync(
-            GetScanner(null, null, null, null, lowerPredicate)));
+        Assert.Equal(9, await GetScanner(
+            null, null, null, null, lowerPredicate).CountAsync());
     }
 
     [SkippableFact]
@@ -272,7 +259,7 @@ public class ScanMultiTabletTests : IAsyncLifetime
                 var scanner = scanBuilder.Build();
 
                 Assert.Equal(ReplicaSelection.ClosestReplica, scanner.ReplicaSelection);
-                rows += await ClientTestUtil.CountRowsInScanAsync(scanner);
+                rows += await scanner.CountAsync();
             }
 
             return rows;
@@ -422,7 +409,7 @@ public class ScanMultiTabletTests : IAsyncLifetime
         Assert.Equal(KuduClient.NoTimestamp, _newClient.LastPropagatedTimestamp);
 
         var scanner = _newClient.NewScanBuilder(_table).Build();
-        var scanEnumerator = scanner.GetAsyncEnumerator();
+        await using var scanEnumerator = scanner.GetAsyncEnumerator();
 
         Assert.True(await scanEnumerator.MoveNextAsync());
         long rowCount = scanEnumerator.Current.Count;

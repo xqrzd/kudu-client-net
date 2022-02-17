@@ -37,15 +37,7 @@ public class LeaderFailoverTests
         await client.WriteAsync(rows);
 
         // Make sure the rows are in there before messing things up.
-        long numRows = 0;
-        var scanner = client.NewScanBuilder(table)
-            .Build();
-
-        await foreach (var resultSet in scanner)
-        {
-            numRows += resultSet.Count;
-        }
-
+        long numRows = await ClientTestUtil.CountRowsAsync(client, table);
         Assert.Equal(3, numRows);
 
         if (restart)
@@ -58,12 +50,7 @@ public class LeaderFailoverTests
 
         await client.WriteAsync(rows2);
 
-        long numRows2 = 0;
-
-        await foreach (var resultSet in scanner)
-        {
-            numRows2 += resultSet.Count;
-        }
+        long numRows2 = await ClientTestUtil.CountRowsAsync(client, table);
 
         Assert.Equal(6, numRows2);
     }

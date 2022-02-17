@@ -186,23 +186,13 @@ public static class ClientTestUtil
         return row;
     }
 
-    public static Task<long> CountRowsAsync(KuduClient client, KuduTable table)
+    public static ValueTask<long> CountRowsAsync(KuduClient client, KuduTable table)
     {
         var scanner = client.NewScanBuilder(table)
             .SetReadMode(ReadMode.ReadYourWrites)
             .SetReplicaSelection(ReplicaSelection.LeaderOnly)
             .Build();
-        return CountRowsInScanAsync(scanner);
-    }
-
-    public static async Task<long> CountRowsInScanAsync(KuduScanner scanner)
-    {
-        long rows = 0;
-
-        await foreach (var resultSet in scanner)
-            rows += resultSet.Count;
-
-        return rows;
+        return scanner.CountAsync();
     }
 
     public static async Task<long> CountRowsInScanAsync(KuduScanEnumerator scanner)
@@ -230,11 +220,6 @@ public static class ClientTestUtil
 
         await foreach (var resultSet in scanner)
         {
-            ParseResults(resultSet);
-        }
-
-        void ParseResults(ResultSet resultSet)
-        {
             foreach (var row in resultSet)
             {
                 rowStrings.Add(row.ToString());
@@ -252,7 +237,7 @@ public static class ClientTestUtil
 
         for (int i = 0; i < 10; i++)
         {
-            readCount = await CountRowsInScanAsync(scanner);
+            readCount = await scanner.CountAsync();
 
             if (readCount == rowCount)
                 return;

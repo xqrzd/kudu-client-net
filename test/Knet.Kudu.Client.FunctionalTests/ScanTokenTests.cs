@@ -164,7 +164,7 @@ public class ScanTokenTests : IAsyncLifetime
         var exception = await Assert.ThrowsAsync<NonRecoverableException>(async () =>
         {
             var scanBuilder = await _client.NewScanBuilderFromTokenAsync(tokenWithMetadata);
-            await ClientTestUtil.CountRowsInScanAsync(scanBuilder.Build());
+            await scanBuilder.Build().CountAsync();
         });
 
         Assert.Contains("Some columns are not present in the current schema: a", exception.Message);
@@ -215,7 +215,7 @@ public class ScanTokenTests : IAsyncLifetime
         // is rehydrated as a scanner and when the scanner first hits a replica.
         // Note that this is almost certainly a very short period of vulnerability.
 
-        Assert.Equal(0, await ClientTestUtil.CountRowsInScanAsync(scanner));
+        Assert.Equal(0, await scanner.CountAsync());
 
         // Test that the old name cannot be used and the new name can be.
         var alteredSchema = scanner.ProjectionSchema;
@@ -246,7 +246,7 @@ public class ScanTokenTests : IAsyncLifetime
         var scanBuilder = await _client.NewScanBuilderFromTokenAsync(token);
         var scanner = scanBuilder.Build();
 
-        Assert.Equal(0, await ClientTestUtil.CountRowsInScanAsync(scanner));
+        Assert.Equal(0, await scanner.CountAsync());
     }
 
     /// <summary>
@@ -325,10 +325,7 @@ public class ScanTokenTests : IAsyncLifetime
         long scannedRows = 0;
         foreach (var scanner in scanners)
         {
-            await foreach (var resultSet in scanner)
-            {
-                scannedRows += resultSet.Count;
-            }
+            scannedRows += await scanner.CountAsync();
         }
 
         Assert.True(scannedRows >= numRows / 3);
@@ -435,7 +432,7 @@ public class ScanTokenTests : IAsyncLifetime
         var scanBuilder = await newClient.NewScanBuilderFromTokenAsync(token.Serialize());
         var scanner = scanBuilder.Build();
 
-        Assert.Equal(1, await ClientTestUtil.CountRowsInScanAsync(scanner));
+        Assert.Equal(1, await scanner.CountAsync());
     }
 
     [SkippableFact]
@@ -593,18 +590,12 @@ public class ScanTokenTests : IAsyncLifetime
         {
             var task = Task.Run(async () =>
             {
-                long count = 0;
                 var tokenBytes = token.Serialize();
 
                 var scanBuilder = await client.NewScanBuilderFromTokenAsync(tokenBytes);
                 var scanner = scanBuilder.Build();
 
-                await foreach (var resultSet in scanner)
-                {
-                    count += resultSet.Count;
-                }
-
-                return count;
+                return await scanner.CountAsync();
             });
 
             tasks.Add(task);

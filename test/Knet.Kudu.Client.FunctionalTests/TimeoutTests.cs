@@ -41,11 +41,7 @@ public class TimeoutTests
 
         // The server will not respond for the lifetime of the test, so we
         // expect the operation to time out.
-        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
-        {
-            await foreach (var resultSet in scanner.WithCancellation(cts.Token))
-            {
-            }
-        });
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await scanner.CountAsync(cts.Token));
     }
 }

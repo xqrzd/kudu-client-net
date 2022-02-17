@@ -35,10 +35,10 @@ public class IgnoreTests : IAsyncLifetime
 
         var rows = new[]
         {
-                ClientTestUtil.CreateBasicSchemaInsert(table, 1),
-                ClientTestUtil.CreateBasicSchemaUpsert(table, 1, 1, false),
-                ClientTestUtil.CreateBasicSchemaInsertIgnore(table, 1)
-            };
+            ClientTestUtil.CreateBasicSchemaInsert(table, 1),
+            ClientTestUtil.CreateBasicSchemaUpsert(table, 1, 1, false),
+            ClientTestUtil.CreateBasicSchemaInsertIgnore(table, 1)
+        };
 
         await _client.WriteAsync(rows);
 
@@ -59,9 +59,9 @@ public class IgnoreTests : IAsyncLifetime
 
         var rows = new[]
         {
-                ClientTestUtil.CreateBasicSchemaInsertIgnore(table, 1),
-                ClientTestUtil.CreateBasicSchemaInsert(table, 1)
-            };
+            ClientTestUtil.CreateBasicSchemaInsertIgnore(table, 1),
+            ClientTestUtil.CreateBasicSchemaInsert(table, 1)
+        };
 
         var exception = await Assert.ThrowsAsync<KuduWriteException>(
             () => _client.WriteAsync(rows));

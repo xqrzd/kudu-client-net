@@ -89,14 +89,14 @@ public class ScannerTests
         // scan request should eventually be routed to a non-quiescing server
         // and complete. We aren't guaranteed to hit the quiescing server, but this
         // test would frequently fail if we didn't handle quiescing servers properly.
-        long foundRows = 0;
+
         var scanner = client.NewScanBuilder(table)
             .SetReplicaSelection(replicaSelection)
+            .SetReadMode(ReadMode.ReadYourWrites)
             .Build();
-        await foreach (var resultSet in scanner)
-        {
-            foundRows += resultSet.Count;
-        }
+
+        long scannedRows = await scanner.CountAsync();
+        Assert.Equal(numRows, scannedRows);
     }
 
     [SkippableFact]
@@ -408,20 +408,22 @@ public class ScannerTests
             var scanBuilder = await client.NewScanBuilderFromTokenAsync(token);
             var scanner = scanBuilder.Build();
 
+            // Verify the IS_DELETED column is appended at the end of the projection.
+            var projection = scanner.ProjectionSchema;
+            int isDeletedIndex = projection.IsDeletedIndex;
+            Assert.Equal(projection.Columns.Count - 1, isDeletedIndex);
+
+            // Verify the IS_DELETED column has the correct types.
+            var isDeletedCol = projection.GetColumn(isDeletedIndex);
+            Assert.Equal(KuduType.Bool, isDeletedCol.Type);
+
+            // Verify the IS_DELETED column is named to avoid collision.
+            Assert.Equal(
+                projection.GetColumn(isDeletedIndex),
+                projection.GetColumn("is_deleted_"));
+
             await foreach (var resultSet in scanner)
             {
-                // TODO: Expose this data on the scanner.
-                // Verify the IS_DELETED column is appended at the end of the projection.
-                var projection = resultSet.Schema;
-                int isDeletedIndex = projection.IsDeletedIndex;
-                Assert.Equal(projection.Columns.Count - 1, isDeletedIndex);
-                // Verify the IS_DELETED column has the correct types.
-                var isDeletedCol = projection.GetColumn(isDeletedIndex);
-                Assert.Equal(KuduType.Bool, isDeletedCol.Type);
-                // Verify the IS_DELETED column is named to avoid collision.
-                Assert.Equal(projection.GetColumn(isDeletedIndex),
-                    projection.GetColumn("is_deleted_"));
-
                 foreach (var row in resultSet)
                 {
                     results.Add(new TestRowResult(row));
@@ -535,11 +537,11 @@ public class ScannerTests
 
         // Generate Operations to initialize all of the row with inserts.
         var changeCounts = new List<(RowOperation type, int count)>
-            {
-                (RowOperation.Insert, numInserts),
-                (RowOperation.Update, numUpdates),
-                (RowOperation.Delete, numDeletes)
-            };
+        {
+            (RowOperation.Insert, numInserts),
+            (RowOperation.Update, numUpdates),
+            (RowOperation.Delete, numDeletes)
+        };
 
         foreach (var (type, count) in changeCounts)
         {

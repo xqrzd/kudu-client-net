@@ -194,7 +194,7 @@ public class ClientStressTests : IAsyncLifetime
     private async Task<int> FullScanAsync(int previousRows)
     {
         var scanner = GetScannerBuilder().Build();
-        var numRows = await ClientTestUtil.CountRowsInScanAsync(scanner);
+        var numRows = await scanner.CountAsync();
 
         if (numRows < previousRows)
             throw new Exception($"Row count unexpectedly decreased from {previousRows} to {numRows}");
