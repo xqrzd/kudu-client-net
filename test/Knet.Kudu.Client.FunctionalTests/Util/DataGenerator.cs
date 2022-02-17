@@ -87,7 +87,7 @@ public class DataGenerator
                     break;
                 case KuduType.Int64:
                 case KuduType.UnixtimeMicros:
-                    row.SetInt64(name, _random.NextLong());
+                    row.SetInt64(name, _random.NextInt64());
                     break;
                 case KuduType.Float:
                     row.SetFloat(name, (float)_random.NextDouble());
@@ -224,7 +224,7 @@ public class DataGenerator
             36 => 79,
             37 => 78,
             38 => 75,
-            _ => throw new ArgumentOutOfRangeException()
+            _ => throw new ArgumentOutOfRangeException(nameof(precision))
         };
     }
 }
@@ -234,7 +234,7 @@ public class DataGenerator
 /// </summary>
 public class DataGeneratorBuilder
 {
-    private Random _random = new Random();
+    private Random _random = new();
     private int _stringLength = 128;
     private int _binaryLength = 128;
     private double _nullRate = 0.1f;

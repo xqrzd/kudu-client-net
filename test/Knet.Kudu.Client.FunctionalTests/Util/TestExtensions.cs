@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -41,13 +40,6 @@ public static class TestExtensions
             var comparer = set.Comparer;
             return new SortedSet<T>(set.Where(v => comparer.Compare(v, end) < 0), comparer);
         }
-    }
-
-    public static long NextLong(this Random random)
-    {
-        Span<byte> buffer = stackalloc byte[8];
-        random.NextBytes(buffer);
-        return BinaryPrimitives.ReadInt64LittleEndian(buffer);
     }
 
     public static bool NextBool(this Random random)
