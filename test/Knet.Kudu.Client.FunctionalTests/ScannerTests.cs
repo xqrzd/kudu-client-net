@@ -30,6 +30,35 @@ public class ScannerTests
             .Build();
     }
 
+    [SkippableFact]
+    public async Task TestCount()
+    {
+        await using var miniCluster = await new MiniKuduClusterBuilder().BuildAsync();
+        await using var client = miniCluster.CreateClient();
+
+        var builder = ClientTestUtil.GetBasicSchema()
+            .SetTableName(nameof(TestCount))
+            .AddHashPartitions(4, "key");
+
+        var table = await client.CreateTableAsync(builder);
+
+        int numRows = 123;
+        var rows = Enumerable.Range(0, numRows)
+            .Select(i => ClientTestUtil.CreateBasicSchemaInsert(table, i));
+
+        await client.WriteAsync(rows);
+
+        var scanner = client.NewScanBuilder(table)
+            .SetEmptyProjection()
+            .SetReadMode(ReadMode.ReadYourWrites)
+            .Build();
+
+        long numScannedRows = await scanner.CountAsync();
+
+        Assert.Empty(scanner.ProjectionSchema.Columns);
+        Assert.Equal(numRows, numScannedRows);
+    }
+
     /// <summary>
     /// Test that scans get retried at other tablet servers when they're quiescing.
     /// </summary>
