@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
-using Knet.Kudu.Client.FunctionalTests.Util;
 using Knet.Kudu.Client.Util;
 using McMaster.Extensions.Xunit;
 using Xunit;
@@ -73,7 +72,7 @@ public class HybridTimeTests : IAsyncLifetime
         var scanner = _client.NewScanBuilder(_table)
             .SetReadMode(ReadMode.ReadLatest)
             .Build();
-        Assert.Equal(1 + keys.Length, await ClientTestUtil.CountRowsInScanAsync(scanner));
+        Assert.Equal(1 + keys.Length, await scanner.CountAsync());
 
         // Now scan at multiple snapshots with READ_AT_SNAPSHOT. The logical timestamp
         // from the 'i'th row (counted from 0) combined with the latest physical timestamp
@@ -99,14 +98,14 @@ public class HybridTimeTests : IAsyncLifetime
         Assert.Equal(1 + keys.Length, numRows2);
     }
 
-    private Task<long> ScanAtSnapshotAsync(long time)
+    private ValueTask<long> ScanAtSnapshotAsync(long time)
     {
         var scanner = _client.NewScanBuilder(_table)
             .SnapshotTimestampRaw(time)
             .SetReadMode(ReadMode.ReadAtSnapshot)
             .Build();
 
-        return ClientTestUtil.CountRowsInScanAsync(scanner);
+        return scanner.CountAsync();
     }
 
     private async Task InsertRowAsync(string key)

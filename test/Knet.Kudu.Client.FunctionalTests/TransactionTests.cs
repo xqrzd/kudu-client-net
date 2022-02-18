@@ -184,7 +184,7 @@ public class TransactionTests
                 .SetReplicaSelection(ReplicaSelection.LeaderOnly)
                 .Build();
 
-            Assert.Equal(0, await ClientTestUtil.CountRowsInScanAsync(scanner));
+            Assert.Equal(0, await scanner.CountAsync());
         }
     }
 
@@ -630,7 +630,7 @@ public class TransactionTests
                 .SetReplicaSelection(ReplicaSelection.LeaderOnly)
                 .Build();
 
-            Assert.Equal(1, await ClientTestUtil.CountRowsInScanAsync(scanner));
+            Assert.Equal(1, await scanner.CountAsync());
         }
 
         // Similar to the above, but run KuduTransaction.commit() when only 2 out
@@ -657,7 +657,7 @@ public class TransactionTests
                 .Build();
 
             // 1 row should be there from earlier, plus the one we just committed.
-            Assert.Equal(2, await ClientTestUtil.CountRowsInScanAsync(scanner));
+            Assert.Equal(2, await scanner.CountAsync());
         }
     }
 
@@ -712,7 +712,7 @@ public class TransactionTests
             .SetReplicaSelection(ReplicaSelection.LeaderOnly)
             .Build();
 
-        Assert.Equal(1, await ClientTestUtil.CountRowsInScanAsync(scanner));
+        Assert.Equal(1, await scanner.CountAsync());
     }
 
     /// <summary>
@@ -778,7 +778,7 @@ public class TransactionTests
             .SetReplicaSelection(ReplicaSelection.LeaderOnly)
             .Build();
 
-        Assert.Equal(1, await ClientTestUtil.CountRowsInScanAsync(scanner));
+        Assert.Equal(1, await scanner.CountAsync());
     }
 
     /// <summary>
@@ -870,7 +870,7 @@ public class TransactionTests
             .SetReplicaSelection(ReplicaSelection.LeaderOnly)
             .Build();
 
-        Assert.Equal(numMasters, await ClientTestUtil.CountRowsInScanAsync(scanner));
+        Assert.Equal(numMasters, await scanner.CountAsync());
     }
 
     /// <summary>

@@ -457,22 +457,16 @@ public class ScanPredicateTests : IAsyncLifetime
             .SetRangePartitionColumns("key");
     }
 
-    private async Task<long> CountRowsAsync(KuduTable table, params KuduPredicate[] predicates)
+    private ValueTask<long> CountRowsAsync(KuduTable table, params KuduPredicate[] predicates)
     {
-        var scanBuilder = _client.NewScanBuilder(table);
+        var scanBuilder = _client.NewScanBuilder(table)
+            .SetReadMode(ReadMode.ReadYourWrites);
 
         foreach (var predicate in predicates)
             scanBuilder.AddPredicate(predicate);
 
         var scanner = scanBuilder.Build();
-        long count = 0;
-
-        await foreach (var resultSet in scanner)
-        {
-            count += resultSet.Count;
-        }
-
-        return count;
+        return scanner.CountAsync();
     }
 
     private static SortedSet<long> CreateIntegerValues(KuduType type)
@@ -492,17 +486,17 @@ public class ScanPredicateTests : IAsyncLifetime
     private static List<long> CreateIntegerTestValues(KuduType type)
     {
         return new List<long>
-            {
-                KuduPredicate.MinIntValue(type),
-                KuduPredicate.MinIntValue(type) + 1,
-                -51L,
-                -50L,
-                0L,
-                49L,
-                50L,
-                KuduPredicate.MaxIntValue(type) - 1,
-                KuduPredicate.MaxIntValue(type)
-            };
+        {
+            KuduPredicate.MinIntValue(type),
+            KuduPredicate.MinIntValue(type) + 1,
+            -51L,
+            -50L,
+            0L,
+            49L,
+            50L,
+            KuduPredicate.MaxIntValue(type) - 1,
+            KuduPredicate.MaxIntValue(type)
+        };
     }
 
     private static SortedSet<DateTime> CreateTimestampValues()
@@ -523,17 +517,17 @@ public class ScanPredicateTests : IAsyncLifetime
     private static List<DateTime> CreateTimestampTestValues()
     {
         return new List<DateTime>
-            {
-                DateTimeOffset.MinValue.UtcDateTime,
-                DateTimeOffset.MinValue.UtcDateTime.AddTicks(10),
-                EpochTime.UnixEpoch.AddTicks(-510),
-                EpochTime.UnixEpoch.AddTicks(-500),
-                EpochTime.UnixEpoch,
-                EpochTime.UnixEpoch.AddTicks(490),
-                EpochTime.UnixEpoch.AddTicks(500),
-                DateTimeOffset.MaxValue.UtcDateTime.AddTicks(-10),
-                DateTimeOffset.MaxValue.UtcDateTime
-            };
+        {
+            DateTimeOffset.MinValue.UtcDateTime,
+            DateTimeOffset.MinValue.UtcDateTime.AddTicks(10),
+            EpochTime.UnixEpoch.AddTicks(-510),
+            EpochTime.UnixEpoch.AddTicks(-500),
+            EpochTime.UnixEpoch,
+            EpochTime.UnixEpoch.AddTicks(490),
+            EpochTime.UnixEpoch.AddTicks(500),
+            DateTimeOffset.MaxValue.UtcDateTime.AddTicks(-10),
+            DateTimeOffset.MaxValue.UtcDateTime
+        };
     }
 
     private static SortedSet<DateTime> CreateDateValues()
@@ -553,17 +547,17 @@ public class ScanPredicateTests : IAsyncLifetime
     private static List<DateTime> CreateDateTestValues()
     {
         return new List<DateTime>
-            {
-                EpochTime.FromUnixTimeDays((int)KuduPredicate.MinIntValue(KuduType.Date)),
-                EpochTime.FromUnixTimeDays((int)KuduPredicate.MinIntValue(KuduType.Date) + 1),
-                EpochTime.UnixEpoch.AddDays(-51),
-                EpochTime.UnixEpoch.AddDays(-50),
-                EpochTime.UnixEpoch,
-                EpochTime.UnixEpoch.AddDays(49),
-                EpochTime.UnixEpoch.AddDays(50),
-                EpochTime.FromUnixTimeDays((int)KuduPredicate.MaxIntValue(KuduType.Date) - 1),
-                EpochTime.FromUnixTimeDays((int)KuduPredicate.MaxIntValue(KuduType.Date))
-            };
+        {
+            EpochTime.FromUnixTimeDays((int)KuduPredicate.MinIntValue(KuduType.Date)),
+            EpochTime.FromUnixTimeDays((int)KuduPredicate.MinIntValue(KuduType.Date) + 1),
+            EpochTime.UnixEpoch.AddDays(-51),
+            EpochTime.UnixEpoch.AddDays(-50),
+            EpochTime.UnixEpoch,
+            EpochTime.UnixEpoch.AddDays(49),
+            EpochTime.UnixEpoch.AddDays(50),
+            EpochTime.FromUnixTimeDays((int)KuduPredicate.MaxIntValue(KuduType.Date) - 1),
+            EpochTime.FromUnixTimeDays((int)KuduPredicate.MaxIntValue(KuduType.Date))
+        };
     }
 
     private static SortedSet<float> CreateFloatValues()
@@ -589,23 +583,23 @@ public class ScanPredicateTests : IAsyncLifetime
     private static List<float> CreateFloatTestValues()
     {
         return new List<float>
-            {
-                float.NegativeInfinity,
-                -float.MaxValue,
-                -100.0F,
-                -1.1F,
-                -1.0F,
-                -float.Epsilon,
-                -float.MinValue,
-                0.0F,
-                float.MinValue,
-                float.Epsilon,
-                1.0F,
-                1.1F,
-                100.0F,
-                float.MaxValue,
-                float.PositiveInfinity
-            };
+        {
+            float.NegativeInfinity,
+            -float.MaxValue,
+            -100.0F,
+            -1.1F,
+            -1.0F,
+            -float.Epsilon,
+            -float.MinValue,
+            0.0F,
+            float.MinValue,
+            float.Epsilon,
+            1.0F,
+            1.1F,
+            100.0F,
+            float.MaxValue,
+            float.PositiveInfinity
+        };
     }
 
     private static SortedSet<double> CreateDoubleValues()
@@ -631,23 +625,23 @@ public class ScanPredicateTests : IAsyncLifetime
     private static List<double> CreateDoubleTestValues()
     {
         return new List<double>
-            {
-                double.NegativeInfinity,
-                -double.MaxValue,
-                -100.0,
-                -1.1,
-                -1.0,
-                -double.Epsilon,
-                -double.MinValue,
-                0.0,
-                double.MinValue,
-                double.Epsilon,
-                1.0,
-                1.1,
-                100.0,
-                double.MaxValue,
-                double.PositiveInfinity
-            };
+        {
+            double.NegativeInfinity,
+            -double.MaxValue,
+            -100.0,
+            -1.1,
+            -1.0,
+            -double.Epsilon,
+            -double.MinValue,
+            0.0,
+            double.MinValue,
+            double.Epsilon,
+            1.0,
+            1.1,
+            100.0,
+            double.MaxValue,
+            double.PositiveInfinity
+        };
     }
 
     // Returns a vector of decimal(4, 2) numbers from -50.50 (inclusive) to 50.50
@@ -672,41 +666,41 @@ public class ScanPredicateTests : IAsyncLifetime
     private static List<decimal> CreateDecimalTestValues()
     {
         return new List<decimal>
-            {
-                -99.99m,
-                -99.98m,
-                -51.00m,
-                -50.00m,
-                0.00m,
-                49.00m,
-                50.00m,
-                99.98m,
-                99.99m
-            };
+        {
+            -99.99m,
+            -99.98m,
+            -51.00m,
+            -50.00m,
+            0.00m,
+            49.00m,
+            50.00m,
+            99.98m,
+            99.99m
+        };
     }
 
     private static SortedSet<string> CreateStringValues()
     {
         return new SortedSet<string>(StringComparer.Ordinal)
-            {
-                "",
-                "\0",
-                "\0\0",
-                "a",
-                "a\0",
-                "a\0a",
-                "aa\0"
-            };
+        {
+            "",
+            "\0",
+            "\0\0",
+            "a",
+            "a\0",
+            "a\0a",
+            "aa\0"
+        };
     }
 
     private static List<string> CreateStringTestValues()
     {
         return new List<string>(CreateStringValues())
-            {
-                "aa",
-                "\u0001",
-                "a\u0001"
-            };
+        {
+            "aa",
+            "\u0001",
+            "a\u0001"
+        };
     }
 
     private async Task CheckPredicatesAsync<T>(
