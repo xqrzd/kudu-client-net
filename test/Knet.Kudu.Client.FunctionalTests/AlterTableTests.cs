@@ -451,9 +451,9 @@ public class AlterTableTests : IAsyncLifetime
 
         // 2. Alter history max age second to 3600
         var alterExtraConfigs = new Dictionary<string, string>
-            {
-                { "kudu.table.history_max_age_sec", "3600" }
-            };
+        {
+            { "kudu.table.history_max_age_sec", "3600" }
+        };
         await _client.AlterTableAsync(new AlterTableBuilder(table)
             .AlterExtraConfigs(alterExtraConfigs));
 
@@ -462,9 +462,9 @@ public class AlterTableTests : IAsyncLifetime
 
         // 3. Alter history max age second to 7200
         alterExtraConfigs = new Dictionary<string, string>
-            {
-                { "kudu.table.history_max_age_sec", "7200" }
-            };
+        {
+            { "kudu.table.history_max_age_sec", "7200" }
+        };
         await _client.AlterTableAsync(new AlterTableBuilder(table)
             .AlterExtraConfigs(alterExtraConfigs));
 
@@ -473,9 +473,9 @@ public class AlterTableTests : IAsyncLifetime
 
         // 4. Reset history max age second to default
         alterExtraConfigs = new Dictionary<string, string>
-            {
-                { "kudu.table.history_max_age_sec", "" }
-            };
+        {
+            { "kudu.table.history_max_age_sec", "" }
+        };
         await _client.AlterTableAsync(new AlterTableBuilder(table)
             .AlterExtraConfigs(alterExtraConfigs));
 
