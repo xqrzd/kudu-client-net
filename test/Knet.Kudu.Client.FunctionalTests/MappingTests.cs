@@ -62,6 +62,64 @@ public class MappingTests : IAsyncLifetime
     }
 
     [SkippableFact]
+    public async Task TestFlexibleColumnNameMatching()
+    {
+        var builder = new TableBuilder(nameof(TestFlexibleColumnNameMatching))
+            .AddColumn("Key_Column1", KuduType.Int32, opt => opt.Key(true))
+            .AddColumn("key_column2", KuduType.String, opt => opt.Key(true))
+            .AddColumn("%Columñ 3^&!@#$*", KuduType.String, opt => opt.Nullable(false))
+            .AddColumn("default.column", KuduType.Double, opt => opt.Nullable(false))
+            .AddColumn("casetest", KuduType.String, opt => opt.Nullable(false))
+            .AddColumn("CASETEST", KuduType.String, opt => opt.Nullable(false))
+            .AddColumn("TakeExact", KuduType.Int32, opt => opt.Nullable(false))
+            .AddColumn("Take_Exact", KuduType.Int32, opt => opt.Nullable(false));
+
+        var values = new[]
+        {
+            new UnderscoresRecord(1, "val-1")
+            {
+                Column_3 = "test",
+                DefaultColumn = 1.33d,
+                CASETEST = "upper-case",
+                casetest = "lower-case",
+                TakeExact = 123,
+                Take_Exact = 456
+            },
+            new UnderscoresRecord(2, "val-2")
+            {
+                Column_3 = "test-2",
+                DefaultColumn = 123456789,
+                CASETEST = "upper-case-2",
+                casetest = "lower-case-2",
+                TakeExact = -123,
+                Take_Exact = -456
+            }
+        };
+
+        var table = await _client.CreateTableAsync(builder);
+
+        var rowsToInsert = values.Select(value =>
+        {
+            var insert = table.NewInsert();
+            insert.SetInt32("Key_Column1", value.KeyColumn1);
+            insert.SetString("key_column2", value.Key_Column_2_);
+            insert.SetString("%Columñ 3^&!@#$*", value.Column_3);
+            insert.SetDouble("default.column", value.DefaultColumn);
+            insert.SetString("casetest", value.casetest);
+            insert.SetString("CASETEST", value.CASETEST);
+            insert.SetInt32("TakeExact", value.TakeExact);
+            insert.SetInt32("Take_Exact", value.Take_Exact);
+            return insert;
+        });
+
+        await _client.WriteAsync(rowsToInsert);
+
+        var rows = await ScanAsync<UnderscoresRecord>(table);
+
+        Assert.Equal(values, rows);
+    }
+
+    [SkippableFact]
     public async Task TestCasting()
     {
         var builder = new TableBuilder(nameof(TestCasting))
@@ -424,17 +482,27 @@ public class MappingTests : IAsyncLifetime
         return scanner.ScanToListAsync<T>().AsTask();
     }
 
-    private enum TestEnum
+    private record UnderscoresRecord(int KeyColumn1, string Key_Column_2_)
     {
-        Value0 = 0,
-        Value1 = 1,
-        Value2 = 2
+        public string Column_3 { get; init; }
+        public double DefaultColumn { get; init; }
+        public string CASETEST { get; init; }
+        public string casetest { get; init; }
+        public int TakeExact { get; init; }
+        public int Take_Exact { get; init; }
     }
 
     private record MixedRecord(int Key, string Column1)
     {
         public int Column2 { get; init; }
         public string Column3 { get; init; }
+    }
+
+    private enum TestEnum
+    {
+        Value0 = 0,
+        Value1 = 1,
+        Value2 = 2
     }
 
     private record CastingRecord(

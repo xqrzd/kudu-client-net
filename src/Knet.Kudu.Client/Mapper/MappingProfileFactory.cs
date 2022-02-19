@@ -87,12 +87,16 @@ internal static class MappingProfileFactory
             return GetValueTupleConstructor(schema, constructors[0]);
         }
 
-        var projectedColumns = CreateSchemaLookup(schema);
+        var projectedColumns = schema.Columns
+            .Select((column, index) => new ColumnInfo(index, column.Name, column.Type, column.IsNullable));
+
+        var columnMatcher = new ColumnNameMatcher<ColumnInfo>(projectedColumns, column => column.ColumnName);
+
         MappedConstructor mappedConstructor = default;
 
         foreach (var constructor in constructors)
         {
-            if (TryMatchConstructor(constructor, projectedColumns, out var parameters))
+            if (TryMatchConstructor(constructor, columnMatcher, out var parameters))
             {
                 // Pick the constructor with the most parameters.
                 if (mappedConstructor.Parameters is null ||
@@ -148,7 +152,7 @@ internal static class MappingProfileFactory
 
     private static bool TryMatchConstructor(
         ConstructorInfo constructor,
-        Dictionary<string, ColumnInfo> projectedColumns,
+        ColumnNameMatcher<ColumnInfo> columnMatcher,
         [NotNullWhen(true)] out ConstructorParameter[]? mappedParameters)
     {
         var parameters = constructor.GetParameters();
@@ -161,7 +165,7 @@ internal static class MappingProfileFactory
             var parameterType = parameter.ParameterType;
 
             if (parameterName is not null &&
-                projectedColumns.TryGetValue(parameterName, out var columnInfo) &&
+                columnMatcher.TryGetColumn(parameterName, out var columnInfo) &&
                 TryGetResultSetMethod(columnInfo.KuduType, columnInfo.IsNullable, parameterType, out var method))
             {
                 results[i++] = new ConstructorParameter(
@@ -192,8 +196,10 @@ internal static class MappingProfileFactory
 
         var destinationProperties = destinationType
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(property => property.SetMethod is not null)
-            .ToDictionary(property => property.Name, StringComparer.OrdinalIgnoreCase);
+            .Where(property => property.SetMethod is not null);
+
+        var columnMatcher = new ColumnNameMatcher<PropertyInfo>(
+            destinationProperties, column => column.Name);
 
         var columns = schema.Columns;
         var numColumns = columns.Count;
@@ -211,7 +217,7 @@ internal static class MappingProfileFactory
 
             var column = columns[columnIndex];
 
-            if (destinationProperties.TryGetValue(column.Name, out var propertyInfo) &&
+            if (columnMatcher.TryGetColumn(column.Name, out var propertyInfo) &&
                 TryGetResultSetMethod(column.Type, column.IsNullable, propertyInfo.PropertyType, out var method))
             {
                 results[resultIndex++] = new MappedProperty(columnIndex, propertyInfo, method);
@@ -297,23 +303,6 @@ internal static class MappingProfileFactory
         }
 
         return expression;
-    }
-
-    private static Dictionary<string, ColumnInfo> CreateSchemaLookup(KuduSchema schema)
-    {
-        var lookup = new Dictionary<string, ColumnInfo>(
-            schema.Columns.Count,
-            StringComparer.OrdinalIgnoreCase);
-
-        int i = 0;
-
-        foreach (var column in schema.Columns)
-        {
-            var columnInfo = new ColumnInfo(i++, column.Type, column.IsNullable);
-            lookup.Add(column.Name, columnInfo);
-        }
-
-        return lookup;
     }
 
     private static bool TryGetResultSetMethod(
@@ -442,5 +431,9 @@ internal static class MappingProfileFactory
         PropertyInfo PropertyInfo,
         MethodInfo ResultSetMethod);
 
-    private readonly record struct ColumnInfo(int ColumnIndex, KuduType KuduType, bool IsNullable);
+    private sealed record ColumnInfo(
+        int ColumnIndex,
+        string ColumnName,
+        KuduType KuduType,
+        bool IsNullable);
 }
