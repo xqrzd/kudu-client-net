@@ -67,9 +67,7 @@ public class Negotiator
     private readonly SignedTokenPB? _authnToken;
 
     private readonly bool _requireAuthentication;
-
     private readonly bool _requireEncryption;
-
     private readonly bool _encryptLoopback;
 
     private Stream _stream;
@@ -186,7 +184,6 @@ public class Negotiator
 
     private async Task<bool> NegotiateTlsAsync(NegotiatePB features, AuthenticationType chosenAuthnType)
     {
-        // Always use TLS if the server supports it.
         var serverFeatures = features.SupportedFeatures;
         var negotiateTls = serverFeatures.Contains(RpcFeatureFlag.Tls);
 
@@ -196,6 +193,7 @@ public class Negotiator
                 "Server does not support required TLS encryption"));
         }
 
+        // Always use TLS if the server supports it.
         if (negotiateTls)
         {
             // If we negotiated TLS, then we want to start the TLS handshake;
