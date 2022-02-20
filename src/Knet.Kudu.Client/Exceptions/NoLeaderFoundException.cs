@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Knet.Kudu.Client.Exceptions;
 
@@ -10,21 +8,8 @@ namespace Knet.Kudu.Client.Exceptions;
 /// </summary>
 public class NoLeaderFoundException : RecoverableException
 {
-    public NoLeaderFoundException(IEnumerable<string> results, Exception? innerException)
-        : base(KuduStatus.NetworkError(GetMessage(results)), innerException)
+    public NoLeaderFoundException(string message, Exception? innerException)
+        : base(KuduStatus.NetworkError(message), innerException)
     {
-    }
-
-    private static string GetMessage(IEnumerable<string> results)
-    {
-        var sb = new StringBuilder("Unable to find master leader:");
-
-        foreach (var result in results)
-        {
-            sb.AppendLine();
-            sb.Append($"\t{result}");
-        }
-
-        return sb.ToString();
     }
 }

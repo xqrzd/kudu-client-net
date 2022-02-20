@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Google.Protobuf;
@@ -1973,7 +1974,7 @@ public sealed class KuduClient : IAsyncDisposable
             }
         }
 
-        public NoLeaderFoundException CreateException()
+        public KuduException CreateException()
         {
             List<string> results;
             List<Exception> exceptions;
@@ -1984,8 +1985,43 @@ public sealed class KuduClient : IAsyncDisposable
                 exceptions = new List<Exception>(_exceptions);
             }
 
+            var message = GetMessage(results);
             var innerException = new AggregateException(exceptions);
-            return new NoLeaderFoundException(results, innerException);
+
+            return IsNonRecoverable(exceptions)
+                ? new NonRecoverableException(KuduStatus.ServiceUnavailable(message), innerException)
+                : new NoLeaderFoundException(message, innerException);
+        }
+
+        private static string GetMessage(List<string> results)
+        {
+            var sb = new StringBuilder("Unable to find master leader:");
+
+            foreach (var result in results)
+            {
+                sb.AppendLine();
+                sb.Append($"\t{result}");
+            }
+
+            return sb.ToString();
+        }
+
+        private static bool IsNonRecoverable(List<Exception> exceptions)
+        {
+            if (exceptions.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var exception in exceptions)
+            {
+                if (exception is not NonRecoverableException)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }
