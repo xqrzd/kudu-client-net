@@ -207,7 +207,10 @@ public class Negotiator
 
             if (!isAuthOnly)
             {
+                _encryption = tlsStream.SslProtocol.ToString();
+                _tlsCipher = GetNegotiatedCipherSuite(tlsStream);
                 _stream = tlsStream;
+
                 return true;
             }
         }
@@ -235,8 +238,6 @@ public class Negotiator
         await tlsStream.AuthenticateAsClientAsync(tlsHost).ConfigureAwait(false);
 
         _remoteCertificate = new X509Certificate2(tlsStream.RemoteCertificate!);
-        _encryption = tlsStream.SslProtocol.ToString();
-        _tlsCipher = GetNegotiatedCipherSuite(tlsStream);
 
         sslInnerStream.ReplaceStream(_stream);
         return tlsStream;
