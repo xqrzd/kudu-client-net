@@ -30,6 +30,8 @@ public class KuduClientBuilder
     private ILoggerFactory _loggerFactory = NullLoggerFactory.Instance;
     private TimeSpan _defaultOperationTimeout = TimeSpan.FromSeconds(30);
     private string _saslProtocolName = "kudu";
+    private bool _requireAuthentication = false;
+    private EncryptionPolicy _encryptionPolicy = EncryptionPolicy.Optional;
     private PipeOptions _sendPipeOptions = _defaultSendOptions;
     private PipeOptions _receivePipeOptions = _defaultReceiveOptions;
 
@@ -85,6 +87,48 @@ public class KuduClientBuilder
         return this;
     }
 
+    /// <summary>
+    /// <para>
+    /// Require authentication for the connection to a remote server.
+    /// </para>
+    /// <para>
+    /// If it's set to true, the client will require mutual authentication between
+    /// the server and the client. If the server doesn't support authentication,
+    /// or it's disabled, the client will fail to connect.
+    /// </para>
+    /// </summary>
+    public KuduClientBuilder RequireAuthentication(bool requireAuthentication)
+    {
+        _requireAuthentication = requireAuthentication;
+        return this;
+    }
+
+    /// <summary>
+    /// <para>
+    /// Require encryption for the connection to a remote server.
+    /// </para>
+    /// <para>
+    /// If it's set to RequiredRemote or Required, the client will
+    /// require encrypting the traffic between the server and the client.
+    /// If the server doesn't support encryption, or if it's disabled, the
+    /// client will fail to connect.
+    /// </para>
+    /// <para>
+    /// Loopback connections are encrypted only if 'encryption_policy' is
+    /// set to Required, or if it's required by the server.
+    /// </para>
+    /// <para>
+    /// The default value is Optional, which allows connecting to servers without
+    /// encryption as well, but it will still attempt to use it if the server
+    /// supports it.
+    /// </para>
+    /// </summary>
+    public KuduClientBuilder SetEncryptionPolicy(EncryptionPolicy encryptionPolicy)
+    {
+        _encryptionPolicy = encryptionPolicy;
+        return this;
+    }
+
     public KuduClientBuilder SetSendPipeOptions(PipeOptions options)
     {
         _sendPipeOptions = options;
@@ -103,6 +147,8 @@ public class KuduClientBuilder
             _masterAddresses,
             _defaultOperationTimeout,
             _saslProtocolName,
+            _requireAuthentication,
+            _encryptionPolicy,
             _sendPipeOptions,
             _receivePipeOptions);
     }

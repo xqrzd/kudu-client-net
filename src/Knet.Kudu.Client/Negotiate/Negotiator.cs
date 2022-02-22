@@ -35,10 +35,10 @@ public class Negotiator
 
     private static readonly ReadOnlyMemory<byte> ConnectionHeader = new byte[]
     {
-            (byte)'h', (byte)'r', (byte)'p', (byte)'c',
-            CurrentRpcVersion,
-            0, // ServiceClass (unused)
-            0  // AuthProtocol (unused)
+        (byte)'h', (byte)'r', (byte)'p', (byte)'c',
+        CurrentRpcVersion,
+        0, // ServiceClass (unused)
+        0  // AuthProtocol (unused)
     };
 
     private static readonly ConnectionContextPB _defaultConnectionContextPb = new();
@@ -66,6 +66,10 @@ public class Negotiator
     /// </summary>
     private readonly SignedTokenPB? _authnToken;
 
+    private readonly bool _requireAuthentication;
+    private readonly bool _requireEncryption;
+    private readonly bool _encryptLoopback;
+
     private Stream _stream;
     private X509Certificate2? _remoteCertificate;
     private string _encryption = "PLAINTEXT";
@@ -86,6 +90,9 @@ public class Negotiator
         _securityContext = securityContext;
         _serverInfo = serverInfo;
         _socket = socket;
+        _requireAuthentication = options.RequireAuthentication;
+        _requireEncryption = options.EncryptionPolicy != EncryptionPolicy.Optional;
+        _encryptLoopback = options.EncryptionPolicy == EncryptionPolicy.Required;
         _stream = new NetworkStream(_socket, ownsSocket: false);
 
         if (securityContext.IsAuthenticationTokenImported)
@@ -103,23 +110,7 @@ public class Negotiator
         // Check the negotiated authentication type sent by the server.
         var chosenAuthnType = ChooseAuthenticationType(features);
 
-        var useTls = false;
-
-        // Always use TLS if the server supports it.
-        if (features.SupportedFeatures.Contains(RpcFeatureFlag.Tls))
-        {
-            // If we negotiated TLS, then we want to start the TLS handshake;
-            // otherwise, we can move directly to the authentication phase.
-            var tlsStream = await NegotiateTlsAsync(_stream, chosenAuthnType)
-                .ConfigureAwait(false);
-
-            // Don't wrap the TLS socket if we are using TLS for authentication only.
-            if (!features.SupportedFeatures.Contains(RpcFeatureFlag.TlsAuthenticationOnly))
-            {
-                useTls = true;
-                _stream = tlsStream;
-            }
-        }
+        var useTls = await NegotiateTlsAsync(features, chosenAuthnType).ConfigureAwait(false);
 
         var context = await AuthenticateAsync(chosenAuthnType, cancellationToken)
             .ConfigureAwait(false);
@@ -172,11 +163,10 @@ public class Negotiator
         request.SupportedFeatures.Add(RpcFeatureFlag.ApplicationFeatureFlags);
         request.SupportedFeatures.Add(RpcFeatureFlag.Tls);
 
-        if (_serverInfo.IsLocal)
+        if (_serverInfo.IsLocal && !_encryptLoopback)
             request.SupportedFeatures.Add(RpcFeatureFlag.TlsAuthenticationOnly);
 
         // Advertise our authentication types.
-
         // We always advertise SASL.
         request.AuthnTypes.Add(_saslAuthnType);
 
@@ -192,7 +182,43 @@ public class Negotiator
         return SendReceiveAsync(request, cancellationToken);
     }
 
-    private async Task<SslStream> NegotiateTlsAsync(Stream stream, AuthenticationType authenticationType)
+    private async Task<bool> NegotiateTlsAsync(NegotiatePB features, AuthenticationType chosenAuthnType)
+    {
+        var serverFeatures = features.SupportedFeatures;
+        var negotiateTls = serverFeatures.Contains(RpcFeatureFlag.Tls);
+
+        if (!negotiateTls && _requireEncryption)
+        {
+            throw new NonRecoverableException(KuduStatus.NotAuthorized(
+                "Server does not support required TLS encryption"));
+        }
+
+        // Always use TLS if the server supports it.
+        if (negotiateTls)
+        {
+            // If we negotiated TLS, then we want to start the TLS handshake;
+            // otherwise, we can move directly to the authentication phase.
+            var tlsStream = await AuthenticateTlsAsync(chosenAuthnType)
+                .ConfigureAwait(false);
+
+            // Don't wrap the TLS socket if we are using TLS for authentication only.
+            var isAuthOnly = serverFeatures.Contains(RpcFeatureFlag.TlsAuthenticationOnly) &&
+                _serverInfo.IsLocal && !_encryptLoopback;
+
+            if (!isAuthOnly)
+            {
+                _encryption = tlsStream.SslProtocol.ToString();
+                _tlsCipher = GetNegotiatedCipherSuite(tlsStream);
+                _stream = tlsStream;
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private async Task<SslStream> AuthenticateTlsAsync(AuthenticationType authenticationType)
     {
         // Step 2: TLS Handshake
         // If both the server and client support the TLS RPC feature flag, the client
@@ -212,10 +238,8 @@ public class Negotiator
         await tlsStream.AuthenticateAsClientAsync(tlsHost).ConfigureAwait(false);
 
         _remoteCertificate = new X509Certificate2(tlsStream.RemoteCertificate!);
-        _encryption = tlsStream.SslProtocol.ToString();
-        _tlsCipher = GetNegotiatedCipherSuite(tlsStream);
 
-        sslInnerStream.ReplaceStream(stream);
+        sslInnerStream.ReplaceStream(_stream);
         return tlsStream;
     }
 
@@ -232,13 +256,19 @@ public class Negotiator
         // its preferred authentication type and supported mechanisms. The server is thus responsible
         // for choosing the authentication type if there are multiple to choose from.
 
+        if (authenticationType == AuthenticationType.SaslPlain && _requireAuthentication)
+        {
+            throw new NonRecoverableException(KuduStatus.NotAuthorized(
+                "Client requires authentication, but server does not have Kerberos enabled"));
+        }
+
         return authenticationType switch
         {
             AuthenticationType.SaslGssApi => AuthenticateSaslGssApiAsync(cancellationToken),
             AuthenticationType.SaslPlain => AuthenticateSaslPlainAsync(cancellationToken),
             AuthenticationType.Token => AuthenticateTokenAsync(cancellationToken),
             _ => throw new NonRecoverableException(KuduStatus.IllegalState(
-                    $"Unsupported authentication type {authenticationType}"))
+                $"Unsupported authentication type {authenticationType}"))
         };
     }
 
