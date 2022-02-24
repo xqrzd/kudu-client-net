@@ -4,7 +4,7 @@ using Knet.Kudu.Client.Protobuf;
 
 namespace Knet.Kudu.Client;
 
-public class ColumnSchema : IEquatable<ColumnSchema>
+public sealed class ColumnSchema : IEquatable<ColumnSchema>
 {
     public string Name { get; }
 
@@ -71,7 +71,8 @@ public class ColumnSchema : IEquatable<ColumnSchema>
             Name == other.Name &&
             Type == other.Type &&
             IsKey == other.IsKey &&
-            IsNullable == other.IsNullable;
+            IsNullable == other.IsNullable &&
+            TypeAttributes == other.TypeAttributes;
     }
 
     public override bool Equals(object? obj) => Equals(obj as ColumnSchema);
@@ -86,6 +87,18 @@ public class ColumnSchema : IEquatable<ColumnSchema>
 
         return $"{Name} {Type}{typeAttributes}{nullable}{key}";
     }
+
+    public static bool operator ==(ColumnSchema? lhs, ColumnSchema? rhs)
+    {
+        if (lhs is null)
+        {
+            return rhs is null;
+        }
+
+        return lhs.Equals(rhs);
+    }
+
+    public static bool operator !=(ColumnSchema? lhs, ColumnSchema? rhs) => !(lhs == rhs);
 
     public static bool IsTypeFixedSize(KuduType type)
     {
