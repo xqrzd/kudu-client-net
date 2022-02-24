@@ -1,6 +1,8 @@
+using System;
+
 namespace Knet.Kudu.Client;
 
-public class ColumnTypeAttributes
+public sealed class ColumnTypeAttributes : IEquatable<ColumnTypeAttributes>
 {
     public int? Precision { get; }
 
@@ -35,6 +37,36 @@ public class ColumnTypeAttributes
                 return "";
         }
     }
+
+    public bool Equals(ColumnTypeAttributes? other)
+    {
+        if (other is null)
+            return false;
+
+        if (ReferenceEquals(this, other))
+            return true;
+
+        return
+            Precision == other.Precision &&
+            Scale == other.Scale &&
+            Length == other.Length;
+    }
+
+    public override bool Equals(object? obj) => Equals(obj as ColumnTypeAttributes);
+
+    public override int GetHashCode() => HashCode.Combine(Precision, Scale, Length);
+
+    public static bool operator ==(ColumnTypeAttributes? lhs, ColumnTypeAttributes? rhs)
+    {
+        if (lhs is null)
+        {
+            return rhs is null;
+        }
+
+        return lhs.Equals(rhs);
+    }
+
+    public static bool operator !=(ColumnTypeAttributes? lhs, ColumnTypeAttributes? rhs) => !(lhs == rhs);
 
     public static ColumnTypeAttributes NewDecimalAttributes(
         int precision, int scale)
