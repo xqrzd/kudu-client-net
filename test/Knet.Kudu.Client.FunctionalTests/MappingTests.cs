@@ -293,7 +293,7 @@ public class MappingTests : IAsyncLifetime
     [SkippableFact]
     public async Task TestScalar()
     {
-        var builder = new TableBuilder(nameof(TestValueTuple))
+        var builder = new TableBuilder(nameof(TestScalar))
             .AddColumn("key", KuduType.Int32, opt => opt.Key(true));
 
         var values = new[] { 0, 1, 2, 3, 4, 5 };
@@ -315,9 +315,37 @@ public class MappingTests : IAsyncLifetime
     }
 
     [SkippableFact]
+    public async Task TestDelegateCaching()
+    {
+        // Create multiple partitions so we have to do multiple scan RPCs.
+        var builder = new TableBuilder(nameof(TestDelegateCaching))
+            .AddColumn("key", KuduType.Int32, opt => opt.Key(true))
+            .AddHashPartitions(5, "key");
+
+        var values = new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+
+        var table = await _client.CreateTableAsync(builder);
+
+        var rowsToInsert = values.Select(value =>
+        {
+            var insert = table.NewInsert();
+            insert.SetInt32("key", value);
+            return insert;
+        });
+
+        await _client.WriteAsync(rowsToInsert);
+
+        var rows1 = await ScanAsync<int>(table);
+        var rows2 = await ScanAsync<int>(table);
+
+        Assert.Equal(values, rows1.OrderBy(v => v));
+        Assert.Equal(values, rows2.OrderBy(v => v));
+    }
+
+    [SkippableFact]
     public async Task TestDifferentProjection()
     {
-        var builder = new TableBuilder(nameof(TestValueTuple))
+        var builder = new TableBuilder(nameof(TestDifferentProjection))
             .AddColumn("key", KuduType.Int32, opt => opt.Key(true))
             .AddColumn("extra_column", KuduType.Int32, opt => opt.Nullable(false));
 
@@ -343,6 +371,55 @@ public class MappingTests : IAsyncLifetime
         var rows = await scanner.ScanToListAsync<int>();
 
         Assert.Equal(values, rows);
+    }
+
+    [SkippableFact]
+    public async Task CacheShouldConsiderColumnName()
+    {
+        var builder = new TableBuilder(nameof(CacheShouldConsiderColumnName))
+            .AddColumn("Column1", KuduType.Int32, opt => opt.Key(true))
+            .AddColumn("Column2", KuduType.Int32, opt => opt.Key(true));
+
+        var values = new[]
+        {
+            new SimpleRecord { Column1 = 1, Column2 = 2 },
+            new SimpleRecord { Column1 = 3, Column2 = 4 },
+            new SimpleRecord { Column1 = 5, Column2 = 6 },
+            new SimpleRecord { Column1 = 7, Column2 = 8 }
+        };
+
+        var table = await _client.CreateTableAsync(builder);
+
+        var rowsToInsert = values.Select(value =>
+        {
+            var insert = table.NewInsert();
+            insert.SetInt32("Column1", value.Column1);
+            insert.SetInt32("Column2", value.Column2);
+            return insert;
+        });
+
+        await _client.WriteAsync(rowsToInsert);
+
+        var column1Scanner = _client.NewScanBuilder(table)
+            .SetProjectedColumns("Column1")
+            .SetReadMode(ReadMode.ReadYourWrites)
+            .Build();
+
+        var column2Scanner = _client.NewScanBuilder(table)
+            .SetProjectedColumns("Column2")
+            .SetReadMode(ReadMode.ReadYourWrites)
+            .Build();
+
+        var column1Rows = await column1Scanner.ScanToListAsync<SimpleRecord>();
+        var column2Rows = await column2Scanner.ScanToListAsync<SimpleRecord>();
+
+        Assert.Equal(
+            values.Select(v => v.Column1),
+            column1Rows.Select(v => v.Column1));
+
+        Assert.Equal(
+            values.Select(v => v.Column2),
+            column2Rows.Select(v => v.Column2));
     }
 
     [SkippableFact]
@@ -490,6 +567,12 @@ public class MappingTests : IAsyncLifetime
         public string casetest { get; init; }
         public int TakeExact { get; init; }
         public int Take_Exact { get; init; }
+    }
+
+    private record SimpleRecord
+    {
+        public int Column1 { get; init; }
+        public int Column2 { get; init; }
     }
 
     private record MixedRecord(int Key, string Column1)

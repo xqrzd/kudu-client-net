@@ -49,8 +49,7 @@ internal sealed class DelegateCache
                 var columnX = columnsX[i];
                 var columnY = columnsY[i];
 
-                if (columnX.Type != columnY.Type ||
-                    columnX.IsNullable != columnY.IsNullable)
+                if (columnX != columnY)
                 {
                     return false;
                 }
@@ -66,8 +65,7 @@ internal sealed class DelegateCache
 
             foreach (var column in obj.Schema.Columns)
             {
-                hashcode.Add(column.Type);
-                hashcode.Add(column.IsNullable);
+                hashcode.Add(column);
             }
 
             return hashcode.ToHashCode();
