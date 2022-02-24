@@ -65,6 +65,23 @@ public sealed class ResultSet : IEnumerable<RowResult>
         }
     }
 
+    internal void MapTo<T>(List<T> results)
+    {
+        var func = _mapper.CreateDelegate<T>(Schema);
+        var count = (int)Count;
+
+        if (results.Capacity == 0)
+        {
+            results.Capacity = count;
+        }
+
+        for (int i = 0; i < count; i++)
+        {
+            var item = func(this, i);
+            results.Add(item);
+        }
+    }
+
     internal void Invalidate()
     {
         _schema = null;
