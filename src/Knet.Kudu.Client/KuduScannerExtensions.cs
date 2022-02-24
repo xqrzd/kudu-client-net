@@ -14,12 +14,7 @@ public static class KuduScannerExtensions
 
         await foreach (var resultSet in scanner.WithCancellation(cancellationToken).ConfigureAwait(false))
         {
-            if (list.Capacity == 0)
-            {
-                list.Capacity = (int)resultSet.Count;
-            }
-
-            list.AddRange(resultSet.MapTo<T>());
+            resultSet.MapTo(list);
         }
 
         return list;
