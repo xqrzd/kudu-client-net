@@ -423,6 +423,38 @@ public class MappingTests : IAsyncLifetime
     }
 
     [SkippableFact]
+    public async Task MapperWithEmptyProjectionShouldThrow()
+    {
+        var builder = new TableBuilder(nameof(MapperWithEmptyProjectionShouldThrow))
+            .AddColumn("key", KuduType.Int32, opt => opt.Key(true));
+
+        var values = new[] { 0, 1, 2, 3, 4, 5 };
+
+        var table = await _client.CreateTableAsync(builder);
+
+        var rowsToInsert = values.Select(value =>
+        {
+            var insert = table.NewInsert();
+            insert.SetInt32("key", value);
+            return insert;
+        });
+
+        await _client.WriteAsync(rowsToInsert);
+
+        var scanner = _client.NewScanBuilder(table)
+            .SetEmptyProjection()
+            .SetReadMode(ReadMode.ReadYourWrites)
+            .Build();
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            async () => await scanner.ScanToListAsync<int>());
+
+        Assert.Equal(
+            "No columns were projected for this scan, use CountAsync() instead",
+            exception.Message);
+    }
+
+    [SkippableFact]
     public async Task TestValueTuple()
     {
         var builder = new TableBuilder(nameof(TestValueTuple))
