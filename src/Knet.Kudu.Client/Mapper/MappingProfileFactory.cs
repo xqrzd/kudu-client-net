@@ -33,6 +33,12 @@ internal static class MappingProfileFactory
 
     public static Func<ResultSet, int, T> Create<T>(KuduSchema projectionSchema)
     {
+        if (projectionSchema.Columns.Count == 0)
+        {
+            throw new ArgumentException(
+                "No columns were projected for this scan, use CountAsync() instead");
+        }
+
         var destinationType = typeof(T);
         var resultSet = Expression.Parameter(typeof(ResultSet), "resultSet");
         var rowIndex = Expression.Parameter(typeof(int), "rowIndex");
