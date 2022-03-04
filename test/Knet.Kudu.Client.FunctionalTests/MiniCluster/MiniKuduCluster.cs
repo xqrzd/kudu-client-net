@@ -46,7 +46,6 @@ public class MiniKuduCluster : IAsyncDisposable
     public async Task StartAsync()
     {
         await _testLimiter.WaitAsync();
-        Directory.CreateDirectory(_createClusterRequestPB.ClusterRoot);
 
         var kuduExe = KuduBinaryLocator.FindBinary("kudu");
         var workingDirectory = Path.GetDirectoryName(kuduExe.ExePath);
@@ -128,12 +127,6 @@ public class MiniKuduCluster : IAsyncDisposable
         await _nativeProcess.WaitForExitAsync();
         _nativeProcess.Dispose();
         _singleRequest.Dispose();
-
-        try
-        {
-            Directory.Delete(_createClusterRequestPB.ClusterRoot, true);
-        }
-        catch { }
     }
 
     public KuduClient CreateClient()
