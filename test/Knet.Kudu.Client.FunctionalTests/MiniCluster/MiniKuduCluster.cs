@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Google.Protobuf;
@@ -28,6 +27,7 @@ public class MiniKuduCluster : IAsyncDisposable
     private readonly SemaphoreSlim _singleRequest;
 
     private Process _nativeProcess;
+    private Task _readStdErrTask;
 
     public MiniKuduCluster(CreateClusterRequestPB createClusterRequestPB)
     {
@@ -74,7 +74,7 @@ public class MiniKuduCluster : IAsyncDisposable
         _nativeProcess.Start();
 
         // Start listening for events.
-        _ = ReadStdErrAsync();
+        _readStdErrTask = ReadStdErrAsync();
 
         var createClusterRequest = new ControlShellRequestPB
         {
@@ -123,6 +123,7 @@ public class MiniKuduCluster : IAsyncDisposable
         await StdIn.DisposeAsync();
         await StdOut.DisposeAsync();
         await StdErr.DisposeAsync();
+        await _readStdErrTask;
 
         await _nativeProcess.WaitForExitAsync();
         _nativeProcess.Dispose();
@@ -346,14 +347,13 @@ public class MiniKuduCluster : IAsyncDisposable
 
     private async Task ReadStdErrAsync()
     {
-        var buffer = new byte[4096];
+        await using var output = Console.OpenStandardError();
 
-        while (true)
+        try
         {
-            int read = await StdErr.ReadAsync(buffer);
-            var text = Encoding.UTF8.GetString(buffer, 0, read);
-            Console.Error.WriteLine(text);
+            await StdErr.CopyToAsync(output);
         }
+        catch { }
     }
 
     private sealed class DaemonInfo
