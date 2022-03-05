@@ -270,8 +270,6 @@ public class MiniKuduCluster : IAsyncDisposable
             await KillTabletServerAsync(hostPort);
     }
 
-    // TODO: Set daemon flags (when Kudu 1.11 proto files are generated).
-
     /// <summary>
     /// Returns a master server identified by an address.
     /// </summary>
@@ -338,10 +336,17 @@ public class MiniKuduCluster : IAsyncDisposable
 
     private async Task ReadExactAsync(Memory<byte> buffer)
     {
+        if (buffer.Length == 0)
+            return;
+
         do
         {
-            var read = await StdOut.ReadAsync(buffer);
-            buffer = buffer.Slice(read);
+            var bytesReceived = await StdOut.ReadAsync(buffer);
+
+            if (bytesReceived <= 0)
+                throw new IOException("StdOut closed");
+
+            buffer = buffer.Slice(bytesReceived);
         } while (buffer.Length > 0);
     }
 
