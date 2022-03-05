@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Google.Protobuf;
@@ -28,6 +27,7 @@ public class MiniKuduCluster : IAsyncDisposable
     private readonly SemaphoreSlim _singleRequest;
 
     private Process _nativeProcess;
+    private Task _readStdErrTask;
 
     public MiniKuduCluster(CreateClusterRequestPB createClusterRequestPB)
     {
@@ -46,7 +46,6 @@ public class MiniKuduCluster : IAsyncDisposable
     public async Task StartAsync()
     {
         await _testLimiter.WaitAsync();
-        Directory.CreateDirectory(_createClusterRequestPB.ClusterRoot);
 
         var kuduExe = KuduBinaryLocator.FindBinary("kudu");
         var workingDirectory = Path.GetDirectoryName(kuduExe.ExePath);
@@ -75,7 +74,7 @@ public class MiniKuduCluster : IAsyncDisposable
         _nativeProcess.Start();
 
         // Start listening for events.
-        _ = ReadStdErrAsync();
+        _readStdErrTask = ReadStdErrAsync();
 
         var createClusterRequest = new ControlShellRequestPB
         {
@@ -124,16 +123,11 @@ public class MiniKuduCluster : IAsyncDisposable
         await StdIn.DisposeAsync();
         await StdOut.DisposeAsync();
         await StdErr.DisposeAsync();
+        await _readStdErrTask;
 
         await _nativeProcess.WaitForExitAsync();
         _nativeProcess.Dispose();
         _singleRequest.Dispose();
-
-        try
-        {
-            Directory.Delete(_createClusterRequestPB.ClusterRoot, true);
-        }
-        catch { }
     }
 
     public KuduClient CreateClient()
@@ -276,8 +270,6 @@ public class MiniKuduCluster : IAsyncDisposable
             await KillTabletServerAsync(hostPort);
     }
 
-    // TODO: Set daemon flags (when Kudu 1.11 proto files are generated).
-
     /// <summary>
     /// Returns a master server identified by an address.
     /// </summary>
@@ -344,23 +336,29 @@ public class MiniKuduCluster : IAsyncDisposable
 
     private async Task ReadExactAsync(Memory<byte> buffer)
     {
+        if (buffer.Length == 0)
+            return;
+
         do
         {
-            var read = await StdOut.ReadAsync(buffer);
-            buffer = buffer.Slice(read);
+            var bytesReceived = await StdOut.ReadAsync(buffer);
+
+            if (bytesReceived <= 0)
+                throw new IOException("StdOut closed");
+
+            buffer = buffer.Slice(bytesReceived);
         } while (buffer.Length > 0);
     }
 
     private async Task ReadStdErrAsync()
     {
-        var buffer = new byte[4096];
+        await using var output = Console.OpenStandardError();
 
-        while (true)
+        try
         {
-            int read = await StdErr.ReadAsync(buffer);
-            var text = Encoding.UTF8.GetString(buffer, 0, read);
-            Console.Error.WriteLine(text);
+            await StdErr.CopyToAsync(output);
         }
+        catch { }
     }
 
     private sealed class DaemonInfo
