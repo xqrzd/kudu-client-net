@@ -22,20 +22,20 @@ jobs:
     - name: Test
       run: dotnet test --no-restore --no-build --configuration Release
 
-  # publish:
-  #   name: Publish nuget package
-  #   needs: linux_build
-  #   runs-on: ubuntu-20.04
+  publish:
+    name: Publish nuget package
+    needs: linux_build
+    runs-on: ubuntu-20.04
 
-  #   if: github.ref == 'refs/heads/main'
-  #   steps:
-  #   - uses: actions/checkout@v2
-  #   - name: Setup dotnet
-  #     uses: actions/setup-dotnet@v1
-  #     with:
-  #       dotnet-version: '6.0.x'
-  #   - name: Publish on version change
-  #     uses: rohith/publish-nuget@v2
-  #     with:
-  #       PROJECT_FILE_PATH: src/Knet.Kudu.Client/Knet.Kudu.Client.csproj
-  #       NUGET_KEY: ${{secrets.KUDU_NUGET_API_KEY}}
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup dotnet
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '6.0.x'
+    - name: Publish on version change
+      uses: alirezanet/publish-nuget@v3
+      with:
+        PROJECT_FILE_PATH: src/Knet.Kudu.Client/Knet.Kudu.Client.csproj
+        NUGET_KEY: ${{secrets.KUDU_NUGET_API_KEY}}
