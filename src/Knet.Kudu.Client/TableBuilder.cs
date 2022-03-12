@@ -329,7 +329,7 @@ public class TableBuilder
     /// </para>
     ///
     /// <para>
-    /// If arange column is missing a value, the logical minimum value for that
+    /// If a range column is missing a value, the logical minimum value for that
     /// column type will be used as the default.
     /// </para>
     ///
