@@ -231,9 +231,6 @@ public class PartitionPruner
             ReadOnlySpan<byte> lower = range.Lower.WrittenSpan;
             ReadOnlySpan<byte> upper = range.Upper.WrittenSpan;
 
-            // Sanity check that the lower bound is less than the upper bound.
-            //assert upper.length == 0 || Bytes.memcmp(lower, upper) < 0;
-
             // Find the intersection of the ranges.
             if (lowerBoundPartitionKey.Length > 0 &&
                 (lower.Length == 0 || lower.SequenceCompareTo(lowerBoundPartitionKey) < 0))
