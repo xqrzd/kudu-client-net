@@ -48,19 +48,23 @@ namespace Knet.Kudu.Client.Protobuf {
     private pb::UnknownFieldSet _unknownFields;
     private int _hasBits0;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pb::MessageParser<BlockBloomFilterPB> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
       get { return global::Knet.Kudu.Client.Protobuf.BlockBloomFilterReflection.Descriptor.MessageTypes[0]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     pbr::MessageDescriptor pb::IMessage.Descriptor {
       get { return Descriptor; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public BlockBloomFilterPB() {
       OnConstruction();
     }
@@ -68,6 +72,7 @@ namespace Knet.Kudu.Client.Protobuf {
     partial void OnConstruction();
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public BlockBloomFilterPB(BlockBloomFilterPB other) : this() {
       _hasBits0 = other._hasBits0;
       logSpaceBytes_ = other.logSpaceBytes_;
@@ -79,6 +84,7 @@ namespace Knet.Kudu.Client.Protobuf {
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public BlockBloomFilterPB Clone() {
       return new BlockBloomFilterPB(this);
     }
@@ -92,6 +98,7 @@ namespace Knet.Kudu.Client.Protobuf {
     /// Log2 of the space required for the BlockBloomFilter.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int LogSpaceBytes {
       get { if ((_hasBits0 & 1) != 0) { return logSpaceBytes_; } else { return LogSpaceBytesDefaultValue; } }
       set {
@@ -101,11 +108,13 @@ namespace Knet.Kudu.Client.Protobuf {
     }
     /// <summary>Gets whether the "log_space_bytes" field is set</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool HasLogSpaceBytes {
       get { return (_hasBits0 & 1) != 0; }
     }
     /// <summary>Clears the value of the "log_space_bytes" field</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public void ClearLogSpaceBytes() {
       _hasBits0 &= ~1;
     }
@@ -119,6 +128,7 @@ namespace Knet.Kudu.Client.Protobuf {
     /// The bloom filter bitmap.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public pb::ByteString BloomData {
       get { return bloomData_ ?? BloomDataDefaultValue; }
       set {
@@ -127,11 +137,13 @@ namespace Knet.Kudu.Client.Protobuf {
     }
     /// <summary>Gets whether the "bloom_data" field is set</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool HasBloomData {
       get { return bloomData_ != null; }
     }
     /// <summary>Clears the value of the "bloom_data" field</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public void ClearBloomData() {
       bloomData_ = null;
     }
@@ -145,6 +157,7 @@ namespace Knet.Kudu.Client.Protobuf {
     /// Whether the BlockBloomFilter is empty and hence always returns false for lookups.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool AlwaysFalse {
       get { if ((_hasBits0 & 2) != 0) { return alwaysFalse_; } else { return AlwaysFalseDefaultValue; } }
       set {
@@ -154,11 +167,13 @@ namespace Knet.Kudu.Client.Protobuf {
     }
     /// <summary>Gets whether the "always_false" field is set</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool HasAlwaysFalse {
       get { return (_hasBits0 & 2) != 0; }
     }
     /// <summary>Clears the value of the "always_false" field</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public void ClearAlwaysFalse() {
       _hasBits0 &= ~2;
     }
@@ -173,6 +188,7 @@ namespace Knet.Kudu.Client.Protobuf {
     /// in the BlockBloomFilter.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public global::Knet.Kudu.Client.Protobuf.HashAlgorithm HashAlgorithm {
       get { if ((_hasBits0 & 4) != 0) { return hashAlgorithm_; } else { return HashAlgorithmDefaultValue; } }
       set {
@@ -182,11 +198,13 @@ namespace Knet.Kudu.Client.Protobuf {
     }
     /// <summary>Gets whether the "hash_algorithm" field is set</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool HasHashAlgorithm {
       get { return (_hasBits0 & 4) != 0; }
     }
     /// <summary>Clears the value of the "hash_algorithm" field</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public void ClearHashAlgorithm() {
       _hasBits0 &= ~4;
     }
@@ -200,6 +218,7 @@ namespace Knet.Kudu.Client.Protobuf {
     /// Seed used to hash the input values in the hash algorithm.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public uint HashSeed {
       get { if ((_hasBits0 & 8) != 0) { return hashSeed_; } else { return HashSeedDefaultValue; } }
       set {
@@ -209,21 +228,25 @@ namespace Knet.Kudu.Client.Protobuf {
     }
     /// <summary>Gets whether the "hash_seed" field is set</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool HasHashSeed {
       get { return (_hasBits0 & 8) != 0; }
     }
     /// <summary>Clears the value of the "hash_seed" field</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public void ClearHashSeed() {
       _hasBits0 &= ~8;
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
       return Equals(other as BlockBloomFilterPB);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool Equals(BlockBloomFilterPB other) {
       if (ReferenceEquals(other, null)) {
         return false;
@@ -240,6 +263,7 @@ namespace Knet.Kudu.Client.Protobuf {
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
       if (HasLogSpaceBytes) hash ^= LogSpaceBytes.GetHashCode();
@@ -254,16 +278,19 @@ namespace Knet.Kudu.Client.Protobuf {
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override string ToString() {
       return pb::JsonFormatter.ToDiagnosticString(this);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public void WriteTo(pb::CodedOutputStream output) {
       output.WriteRawMessage(this);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
       if (HasLogSpaceBytes) {
         output.WriteRawTag(8);
@@ -291,6 +318,7 @@ namespace Knet.Kudu.Client.Protobuf {
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
       if (HasLogSpaceBytes) {
@@ -315,6 +343,7 @@ namespace Knet.Kudu.Client.Protobuf {
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public void MergeFrom(BlockBloomFilterPB other) {
       if (other == null) {
         return;
@@ -338,11 +367,13 @@ namespace Knet.Kudu.Client.Protobuf {
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public void MergeFrom(pb::CodedInputStream input) {
       input.ReadRawMessage(this);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
       uint tag;
       while ((tag = input.ReadTag()) != 0) {

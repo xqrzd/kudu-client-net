@@ -56,19 +56,23 @@ namespace Knet.Kudu.Client.Protobuf {
     private static readonly pb::MessageParser<RowOperationsPB> _parser = new pb::MessageParser<RowOperationsPB>(() => new RowOperationsPB());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pb::MessageParser<RowOperationsPB> Parser { get { return _parser; } }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
       get { return global::Knet.Kudu.Client.Protobuf.RowOperationsReflection.Descriptor.MessageTypes[0]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     pbr::MessageDescriptor pb::IMessage.Descriptor {
       get { return Descriptor; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public RowOperationsPB() {
       OnConstruction();
     }
@@ -76,6 +80,7 @@ namespace Knet.Kudu.Client.Protobuf {
     partial void OnConstruction();
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public RowOperationsPB(RowOperationsPB other) : this() {
       rows_ = other.rows_;
       indirectData_ = other.indirectData_;
@@ -83,6 +88,7 @@ namespace Knet.Kudu.Client.Protobuf {
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public RowOperationsPB Clone() {
       return new RowOperationsPB(this);
     }
@@ -112,6 +118,7 @@ namespace Knet.Kudu.Client.Protobuf {
     /// The rows are concatenated end-to-end with no padding/alignment.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public pb::ByteString Rows {
       get { return rows_ ?? RowsDefaultValue; }
       set {
@@ -120,11 +127,13 @@ namespace Knet.Kudu.Client.Protobuf {
     }
     /// <summary>Gets whether the "rows" field is set</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool HasRows {
       get { return rows_ != null; }
     }
     /// <summary>Clears the value of the "rows" field</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public void ClearRows() {
       rows_ = null;
     }
@@ -135,6 +144,7 @@ namespace Knet.Kudu.Client.Protobuf {
 
     private pb::ByteString indirectData_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public pb::ByteString IndirectData {
       get { return indirectData_ ?? IndirectDataDefaultValue; }
       set {
@@ -143,21 +153,25 @@ namespace Knet.Kudu.Client.Protobuf {
     }
     /// <summary>Gets whether the "indirect_data" field is set</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool HasIndirectData {
       get { return indirectData_ != null; }
     }
     /// <summary>Clears the value of the "indirect_data" field</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public void ClearIndirectData() {
       indirectData_ = null;
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
       return Equals(other as RowOperationsPB);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool Equals(RowOperationsPB other) {
       if (ReferenceEquals(other, null)) {
         return false;
@@ -171,6 +185,7 @@ namespace Knet.Kudu.Client.Protobuf {
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
       if (HasRows) hash ^= Rows.GetHashCode();
@@ -182,16 +197,19 @@ namespace Knet.Kudu.Client.Protobuf {
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override string ToString() {
       return pb::JsonFormatter.ToDiagnosticString(this);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public void WriteTo(pb::CodedOutputStream output) {
       output.WriteRawMessage(this);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
       if (HasRows) {
         output.WriteRawTag(18);
@@ -207,6 +225,7 @@ namespace Knet.Kudu.Client.Protobuf {
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
       if (HasRows) {
@@ -222,6 +241,7 @@ namespace Knet.Kudu.Client.Protobuf {
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public void MergeFrom(RowOperationsPB other) {
       if (other == null) {
         return;
@@ -236,11 +256,13 @@ namespace Knet.Kudu.Client.Protobuf {
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public void MergeFrom(pb::CodedInputStream input) {
       input.ReadRawMessage(this);
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
       uint tag;
       while ((tag = input.ReadTag()) != 0) {
@@ -263,6 +285,7 @@ namespace Knet.Kudu.Client.Protobuf {
     #region Nested types
     /// <summary>Container for nested types declared in the RowOperationsPB message type.</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static partial class Types {
       public enum Type {
         [pbr::OriginalName("UNKNOWN")] Unknown = 0,
