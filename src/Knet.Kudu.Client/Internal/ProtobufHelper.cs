@@ -242,9 +242,9 @@ internal static class ProtobufHelper
             partitionSchemaPb.RangeSchema.Columns));
 
         var hashBucketSchemas = new List<HashBucketSchema>(
-            partitionSchemaPb.HashBucketSchemas.Count);
+            partitionSchemaPb.HashSchema.Count);
 
-        foreach (var hashSchema in partitionSchemaPb.HashBucketSchemas)
+        foreach (var hashSchema in partitionSchemaPb.HashSchema)
         {
             var newSchema = new HashBucketSchema(
                 ToColumnIds(hashSchema.Columns),
