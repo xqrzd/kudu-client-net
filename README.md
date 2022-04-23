@@ -1,18 +1,11 @@
 # .NET Client for Apache Kudu
+
 ![Apache Kudu](https://d3dr9sfxru4sde.cloudfront.net/i/k/apachekudu_logo_0716_345px.png)
 
-## What is Kudu?
-Kudu provides a combination of fast inserts/updates and efficient columnar scans to enable multiple real-time analytic workloads across a single storage layer. As a new complement to HDFS and Apache HBase, Kudu gives architects the flexibility to address a wider variety of use cases without exotic workarounds.
+## Package
+You can get the package on Nuget: https://www.nuget.org/packages/Knet.Kudu.Client
 
-[https://kudu.apache.org](https://kudu.apache.org)
-
-## Project Status
-This client is in preview and isn't quite ready for production use.
-Issue [#17](/../../issues/17) tracks the remaining work for the first stable release.
-
-You can get the preview package on [Nuget](https://www.nuget.org/packages/Knet.Kudu.Client).
-
-## Supported Versions
+## Supported Kudu Versions
 This library supports Apache Kudu 1.3 and newer. The newest version of this library
 should always be used, regardless of the Apache Kudu version.
 This client tries to maintain feature parity with the official C++ and Java clients.
@@ -89,4 +82,12 @@ await foreach (ResultSet resultSet in scanner)
         Console.WriteLine($"tweet_id: {tweetId}, user_name: {userName}, created_at: {createdAtUtc}");
     }
 }
+```
+
+This client includes a simple object mapper,
+
+```csharp
+record Tweet(long TweetId, string Username, DateTime CreatedAt);
+
+var tweets = await scanner.ScanToListAsync<Tweet>();
 ```
