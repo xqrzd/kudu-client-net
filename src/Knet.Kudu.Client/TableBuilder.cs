@@ -199,7 +199,7 @@ public class TableBuilder
                 new PartitionSchemaPB.Types.ColumnIdentifierPB { Name = column });
         }
 
-        _createTableRequest.PartitionSchema.HashBucketSchemas.Add(partition);
+        _createTableRequest.PartitionSchema.HashSchema.Add(partition);
 
         return this;
     }

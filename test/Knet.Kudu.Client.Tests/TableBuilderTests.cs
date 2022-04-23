@@ -72,7 +72,7 @@ public class TableBuilderTests
 
         var request = builder.Build();
 
-        Assert.Collection(request.PartitionSchema.HashBucketSchemas, h =>
+        Assert.Collection(request.PartitionSchema.HashSchema, h =>
         {
             Assert.Equal(5, h.NumBuckets);
             Assert.Equal((uint)0, h.Seed);
