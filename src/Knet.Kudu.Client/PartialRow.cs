@@ -851,7 +851,7 @@ public class PartialRow
         indirectSize = localIndirectSize;
     }
 
-    public ColumnSchema CheckType(int columnIndex, KuduType type)
+    private ColumnSchema CheckType(int columnIndex, KuduType type)
     {
         var columnSchema = Schema.GetColumn(columnIndex);
         KuduTypeValidation.ValidateColumnType(columnSchema, type);
