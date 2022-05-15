@@ -186,7 +186,7 @@ public class PartitionPruner
         // Each hash component simply appends its bucket number to the
         // partition key ranges (possibly incrementing the upper bound by one bucket
         // number if this is the final constraint, see note 2 in the example above).
-        var partitionKeyRanges = new List<PartitionKeyRangeBuilder> { new PartitionKeyRangeBuilder(128) };
+        var partitionKeyRanges = new List<PartitionKeyRangeBuilder> { new PartitionKeyRangeBuilder(32) };
 
         for (int hashIdx = 0; hashIdx < constrainedIndex; hashIdx++)
         {
