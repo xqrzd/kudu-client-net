@@ -35,7 +35,7 @@ jobs:
       with:
         dotnet-version: '6.0.x'
     - name: Publish on version change
-      uses: alirezanet/publish-nuget@v3.0.1
+      uses: alirezanet/publish-nuget@v3.0.4
       with:
         PROJECT_FILE_PATH: src/Knet.Kudu.Client/Knet.Kudu.Client.csproj
         NUGET_KEY: ${{secrets.KUDU_NUGET_API_KEY}}
