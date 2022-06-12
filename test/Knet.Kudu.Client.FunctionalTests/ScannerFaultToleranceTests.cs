@@ -154,7 +154,7 @@ public class ScannerFaultToleranceTests : IAsyncLifetime
         if (await scanEnumerator.MoveNextAsync())
         {
             var resultSet = scanEnumerator.Current;
-            var results = ResultSetToKeys(resultSet);
+            var results = resultSet.MapTo<int>();
 
             keys.AddRange(results);
             previousRow = keys[^1];
@@ -173,7 +173,7 @@ public class ScannerFaultToleranceTests : IAsyncLifetime
         while (await scanEnumerator.MoveNextAsync())
         {
             var resultSet = scanEnumerator.Current;
-            var results = ResultSetToKeys(resultSet);
+            var results = resultSet.MapTo<int>().ToList();
 
             keys.AddRange(results);
 
@@ -241,16 +241,6 @@ public class ScannerFaultToleranceTests : IAsyncLifetime
 
         Assert.True(loopCount > _numTablets);
         Assert.Equal(_numRows, rowCount);
-    }
-
-    private static List<int> ResultSetToKeys(ResultSet resultSet)
-    {
-        var results = new List<int>();
-        foreach (var row in resultSet)
-        {
-            results.Add(row.GetInt32(0));
-        }
-        return results;
     }
 
     private Task<KuduConnection> GetConnectionAsync(ServerInfo serverInfo)
