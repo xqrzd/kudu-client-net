@@ -18,25 +18,16 @@ public class ScannerFaultToleranceTests : IAsyncLifetime
     private readonly int _numTablets = 3;
     private readonly int _numRows = 20000;
 
-    private readonly Random _random;
-
     private KuduTestHarness _harness;
     private KuduClient _client;
-    private IKuduSession _session;
 
     private KuduTable _table;
     private HashSet<int> _keys;
-
-    public ScannerFaultToleranceTests()
-    {
-        _random = new Random();
-    }
 
     public async Task InitializeAsync()
     {
         _harness = await new MiniKuduClusterBuilder().BuildHarnessAsync();
         _client = _harness.CreateClient();
-        _session = _client.NewSession();
 
         var builder = ClientTestUtil.GetBasicSchema()
             .SetTableName("ScannerFaultToleranceTests")
@@ -44,31 +35,35 @@ public class ScannerFaultToleranceTests : IAsyncLifetime
 
         _table = await _client.CreateTableAsync(builder);
 
+        var random = new Random();
         _keys = new HashSet<int>();
         while (_keys.Count < _numRows)
         {
-            _keys.Add(_random.Next());
+            _keys.Add(random.Next());
         }
 
-        int i = 0;
-        foreach (var key in _keys)
+        var rows = _keys
+            .Select((key, i) =>
+            {
+                var insert = _table.NewInsert();
+                insert.SetInt32(0, key);
+                insert.SetInt32(1, i);
+                insert.SetInt32(2, i++);
+                insert.SetString(3, DataGenerator.RandomString(1024, random));
+                insert.SetBool(4, true);
+
+                return insert;
+            })
+            .Chunk(1000);
+
+        foreach (var batch in rows)
         {
-            var insert = _table.NewInsert();
-            insert.SetInt32(0, key);
-            insert.SetInt32(1, i);
-            insert.SetInt32(2, i++);
-            insert.SetString(3, DataGenerator.RandomString(1024, _random));
-            insert.SetBool(4, true);
-
-            await _session.EnqueueAsync(insert);
+            await _client.WriteAsync(batch);
         }
-
-        await _session.FlushAsync();
     }
 
     public async Task DisposeAsync()
     {
-        await _session.DisposeAsync();
         await _client.DisposeAsync();
         await _harness.DisposeAsync();
     }
@@ -123,6 +118,92 @@ public class ScannerFaultToleranceTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// Tests fault tolerant scanner by restarting the tserver in the middle
+    /// of tablet scanning and verifies the scan results are as expected.
+    /// Notice, the fault injection happens at the 2nd ScanRequest or next scan
+    /// request rather than the first scan request.
+    /// </summary>
+    [SkippableFact]
+    public async Task TestFaultTolerantScannerRestartAfterSecondScanRequest()
+    {
+        // In fact, the test has TABLET_COUNT, default is 3.
+        // We check the rows' order, no dup rows and loss rows.
+        // And In the case, we need 2 times or more scan requests,
+        // so set a minimum batchSizeBytes 1.
+        var tokenBuilder = _client.NewScanTokenBuilder(_table)
+            .SetBatchSizeBytes(1)
+            .SetFaultTolerant(true)
+            .SetProjectedColumns(0);
+
+        var tokens = await tokenBuilder.BuildAsync();
+        Assert.Equal(_numTablets, tokens.Count);
+
+        var tabletScannerTasks = tokens
+            .Select((token, i) => ScanTokenAsync(token, i == 0));
+
+        var results = await Task.WhenAll(tabletScannerTasks);
+        var rowCount = results.Sum();
+
+        Assert.Equal(_numRows, rowCount);
+
+        async Task<int> ScanTokenAsync(KuduScanToken token, bool enableFaultInjection)
+        {
+            int rowCount = 0;
+            int previousRow = int.MinValue;
+            bool faultInjected = !enableFaultInjection;
+            int faultInjectionLowBound = (_numRows / _numTablets / 2);
+            //bool firstScanRequest = true;
+
+            // long firstScannedMetric = 0;
+            // long firstPropagatedTimestamp = 0;
+            // long lastScannedMetric = 0;
+            // long lastPropagatedTimestamp = 0;
+
+            var scanBuilder = await _client.NewScanBuilderFromTokenAsync(token);
+            var scanner = scanBuilder.Build();
+            await using var scanEnumerator = scanner.GetAsyncEnumerator();
+
+            while (await scanEnumerator.MoveNextAsync())
+            {
+                foreach (var row in scanEnumerator.Current)
+                {
+                    int key = row.GetInt32(0);
+                    if (previousRow >= key)
+                    {
+                        throw new Exception(
+                            $"Impossible results, previousKey: {previousRow} >= currentKey: {key}");
+                    }
+
+                    if (!faultInjected && rowCount > faultInjectionLowBound)
+                    {
+                        await _harness.RestartTabletServerAsync(scanEnumerator.Tablet);
+                        faultInjected = true;
+                    }
+                    // else
+                    // {
+                    //     if (firstScanRequest)
+                    //     {
+                    //         firstScannedMetric = scanEnumerator.ResourceMetrics.TotalDurationNanos;
+                    //         firstPropagatedTimestamp = _client.LastPropagatedTimestamp;
+                    //         firstScanRequest = false;
+                    //     }
+                    //     lastScannedMetric = scanEnumerator.ResourceMetrics.TotalDurationNanos;
+                    //     lastPropagatedTimestamp = _client.LastPropagatedTimestamp;
+                    // }
+                    previousRow = key;
+                    rowCount++;
+                }
+            }
+
+            // Assert.NotEqual(lastScannedMetric, firstScannedMetric);
+            // Assert.True(lastPropagatedTimestamp > firstPropagatedTimestamp,
+            //     $"Expected {lastPropagatedTimestamp} > {firstPropagatedTimestamp}");
+
+            return rowCount;
+        }
+    }
+
+    /// <summary>
     /// Injecting failures (kill or restart TabletServer) while scanning, to verify:
     /// fault tolerant scanner will continue scan and non-fault tolerant scanner will
     /// throw <see cref="NonRecoverableException"/>. Also makes sure we pass all the
@@ -159,7 +240,7 @@ public class ScannerFaultToleranceTests : IAsyncLifetime
         if (await scanEnumerator.MoveNextAsync())
         {
             var resultSet = scanEnumerator.Current;
-            var results = ResultSetToKeys(resultSet);
+            var results = resultSet.MapTo<int>();
 
             keys.AddRange(results);
             previousRow = keys[^1];
@@ -178,7 +259,7 @@ public class ScannerFaultToleranceTests : IAsyncLifetime
         while (await scanEnumerator.MoveNextAsync())
         {
             var resultSet = scanEnumerator.Current;
-            var results = ResultSetToKeys(resultSet);
+            var results = resultSet.MapTo<int>().ToList();
 
             keys.AddRange(results);
 
@@ -246,16 +327,6 @@ public class ScannerFaultToleranceTests : IAsyncLifetime
 
         Assert.True(loopCount > _numTablets);
         Assert.Equal(_numRows, rowCount);
-    }
-
-    private static List<int> ResultSetToKeys(ResultSet resultSet)
-    {
-        var results = new List<int>();
-        foreach (var row in resultSet)
-        {
-            results.Add(row.GetInt32(0));
-        }
-        return results;
     }
 
     private Task<KuduConnection> GetConnectionAsync(ServerInfo serverInfo)

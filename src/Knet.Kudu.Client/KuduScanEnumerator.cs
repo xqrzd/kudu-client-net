@@ -341,7 +341,14 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
         _numRowsReturned += numRows;
 
         if (response.ResourceMetrics is not null)
+        {
             ResourceMetrics.Update(response.ResourceMetrics);
+        }
+
+        if (_isFaultTolerant && response.HasLastPrimaryKey)
+        {
+            _lastPrimaryKey = response.LastPrimaryKey;
+        }
 
         if (!response.HasMoreResults)
         {
