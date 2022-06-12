@@ -18,25 +18,16 @@ public class ScannerFaultToleranceTests : IAsyncLifetime
     private readonly int _numTablets = 3;
     private readonly int _numRows = 20000;
 
-    private readonly Random _random;
-
     private KuduTestHarness _harness;
     private KuduClient _client;
-    private IKuduSession _session;
 
     private KuduTable _table;
     private HashSet<int> _keys;
-
-    public ScannerFaultToleranceTests()
-    {
-        _random = new Random();
-    }
 
     public async Task InitializeAsync()
     {
         _harness = await new MiniKuduClusterBuilder().BuildHarnessAsync();
         _client = _harness.CreateClient();
-        _session = _client.NewSession();
 
         var builder = ClientTestUtil.GetBasicSchema()
             .SetTableName("ScannerFaultToleranceTests")
@@ -44,31 +35,35 @@ public class ScannerFaultToleranceTests : IAsyncLifetime
 
         _table = await _client.CreateTableAsync(builder);
 
+        var random = new Random();
         _keys = new HashSet<int>();
         while (_keys.Count < _numRows)
         {
-            _keys.Add(_random.Next());
+            _keys.Add(random.Next());
         }
 
-        int i = 0;
-        foreach (var key in _keys)
+        var rows = _keys
+            .Select((key, i) =>
+            {
+                var insert = _table.NewInsert();
+                insert.SetInt32(0, key);
+                insert.SetInt32(1, i);
+                insert.SetInt32(2, i++);
+                insert.SetString(3, DataGenerator.RandomString(1024, random));
+                insert.SetBool(4, true);
+
+                return insert;
+            })
+            .Chunk(1000);
+
+        foreach (var batch in rows)
         {
-            var insert = _table.NewInsert();
-            insert.SetInt32(0, key);
-            insert.SetInt32(1, i);
-            insert.SetInt32(2, i++);
-            insert.SetString(3, DataGenerator.RandomString(1024, _random));
-            insert.SetBool(4, true);
-
-            await _session.EnqueueAsync(insert);
+            await _client.WriteAsync(batch);
         }
-
-        await _session.FlushAsync();
     }
 
     public async Task DisposeAsync()
     {
-        await _session.DisposeAsync();
         await _client.DisposeAsync();
         await _harness.DisposeAsync();
     }
