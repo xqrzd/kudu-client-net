@@ -180,7 +180,8 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
     {
         if (_closed)
         {
-            throw new Exception("Scanner has already been closed");
+            return Task.FromException(
+                new Exception("Scanner has already been closed"));
         }
 
         if (Tablet is null)
