@@ -233,7 +233,6 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
         UpdateScannerFields(rpc, response);
 
         var numRows = Current.Count;
-        _numRowsReturned += numRows;
 
         if (!response.HasMoreResults || !response.HasScannerId)
         {
@@ -287,7 +286,6 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
         UpdateScannerFields(rpc, response);
 
         var numRows = Current.Count;
-        _numRowsReturned += numRows;
 
         if (!response.HasMoreResults)
         {
@@ -356,6 +354,8 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
 
         Tablet = rpc.Tablet;
         Current = rpc.TakeResultSet();
+
+        _numRowsReturned += Current.Count;
     }
 
     private ScanRequest GetOpenRequest()
