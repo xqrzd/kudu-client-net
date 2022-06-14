@@ -180,7 +180,8 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
     {
         if (_closed)
         {
-            throw new Exception("Scanner has already been closed");
+            return Task.FromException(
+                new Exception("Scanner has already been closed"));
         }
 
         if (Tablet is null)
@@ -229,61 +230,9 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
             throw;
         }
 
-        Tablet = rpc.Tablet;
-
-        var scanTimestamp = response.HasSnapTimestamp
-            ? (long)response.SnapTimestamp
-            : KuduClient.NoTimestamp;
-
-        var propagatedTimestamp = response.HasPropagatedTimestamp
-            ? (long)response.PropagatedTimestamp
-            : KuduClient.NoTimestamp;
-
-        if (SnapshotTimestamp == KuduClient.NoTimestamp &&
-            scanTimestamp != KuduClient.NoTimestamp)
-        {
-            // If the server-assigned timestamp is present in the tablet
-            // server's response, store it in the scanner. The stored value
-            // is used for read operations in READ_AT_SNAPSHOT mode at
-            // other tablet servers in the context of the same scan.
-            SnapshotTimestamp = scanTimestamp;
-        }
-
-        long lastPropagatedTimestamp = KuduClient.NoTimestamp;
-        if (_readMode == ReadMode.ReadYourWrites &&
-            scanTimestamp != KuduClient.NoTimestamp)
-        {
-            // For READ_YOUR_WRITES mode, update the latest propagated timestamp
-            // with the chosen snapshot timestamp sent back from the server, to
-            // avoid unnecessarily wait for subsequent reads. Since as long as
-            // the chosen snapshot timestamp of the next read is greater than
-            // the previous one, the scan does not violate READ_YOUR_WRITES
-            // session guarantees.
-            lastPropagatedTimestamp = scanTimestamp;
-        }
-        else if (propagatedTimestamp != KuduClient.NoTimestamp)
-        {
-            // Otherwise we just use the propagated timestamp returned from
-            // the server as the latest propagated timestamp.
-            lastPropagatedTimestamp = propagatedTimestamp;
-        }
-        if (lastPropagatedTimestamp != KuduClient.NoTimestamp)
-        {
-            _client.LastPropagatedTimestamp = lastPropagatedTimestamp;
-        }
-
-        if (_isFaultTolerant && response.HasLastPrimaryKey)
-        {
-            _lastPrimaryKey = response.LastPrimaryKey;
-        }
-
-        Current = rpc.TakeResultSet();
+        UpdateScannerFields(rpc, response);
 
         var numRows = Current.Count;
-        _numRowsReturned += numRows;
-
-        if (response.ResourceMetrics is not null)
-            ResourceMetrics.Update(response.ResourceMetrics);
 
         if (!response.HasMoreResults || !response.HasScannerId)
         {
@@ -334,21 +283,9 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
             throw;
         }
 
-        Tablet = rpc.Tablet;
-        Current = rpc.TakeResultSet();
+        UpdateScannerFields(rpc, response);
 
         var numRows = Current.Count;
-        _numRowsReturned += numRows;
-
-        if (response.ResourceMetrics is not null)
-        {
-            ResourceMetrics.Update(response.ResourceMetrics);
-        }
-
-        if (_isFaultTolerant && response.HasLastPrimaryKey)
-        {
-            _lastPrimaryKey = response.LastPrimaryKey;
-        }
 
         if (!response.HasMoreResults)
         {
@@ -359,6 +296,66 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
         _sequenceId++;
 
         return numRows > 0;
+    }
+
+    private void UpdateScannerFields(ScanRequest rpc, ScanResponsePB response)
+    {
+        var scanTimestamp = response.HasSnapTimestamp
+            ? (long)response.SnapTimestamp
+            : KuduClient.NoTimestamp;
+
+        var propagatedTimestamp = response.HasPropagatedTimestamp
+            ? (long)response.PropagatedTimestamp
+            : KuduClient.NoTimestamp;
+
+        if (SnapshotTimestamp == KuduClient.NoTimestamp &&
+            scanTimestamp != KuduClient.NoTimestamp)
+        {
+            // If the server-assigned timestamp is present in the tablet
+            // server's response, store it in the scanner. The stored value
+            // is used for read operations in READ_AT_SNAPSHOT mode at
+            // other tablet servers in the context of the same scan.
+            SnapshotTimestamp = scanTimestamp;
+        }
+
+        long lastPropagatedTimestamp = KuduClient.NoTimestamp;
+        if (_readMode == ReadMode.ReadYourWrites &&
+            scanTimestamp != KuduClient.NoTimestamp)
+        {
+            // For READ_YOUR_WRITES mode, update the latest propagated timestamp
+            // with the chosen snapshot timestamp sent back from the server, to
+            // avoid unnecessarily wait for subsequent reads. Since as long as
+            // the chosen snapshot timestamp of the next read is greater than
+            // the previous one, the scan does not violate READ_YOUR_WRITES
+            // session guarantees.
+            lastPropagatedTimestamp = scanTimestamp;
+        }
+        else if (propagatedTimestamp != KuduClient.NoTimestamp)
+        {
+            // Otherwise we just use the propagated timestamp returned from
+            // the server as the latest propagated timestamp.
+            lastPropagatedTimestamp = propagatedTimestamp;
+        }
+
+        if (lastPropagatedTimestamp != KuduClient.NoTimestamp)
+        {
+            _client.LastPropagatedTimestamp = lastPropagatedTimestamp;
+        }
+
+        if (_isFaultTolerant && response.HasLastPrimaryKey)
+        {
+            _lastPrimaryKey = response.LastPrimaryKey;
+        }
+
+        if (response.ResourceMetrics is not null)
+        {
+            ResourceMetrics.Update(response.ResourceMetrics);
+        }
+
+        Tablet = rpc.Tablet;
+        Current = rpc.TakeResultSet();
+
+        _numRowsReturned += Current.Count;
     }
 
     private ScanRequest GetOpenRequest()

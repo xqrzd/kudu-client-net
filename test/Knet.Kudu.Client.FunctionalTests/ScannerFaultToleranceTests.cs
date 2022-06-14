@@ -152,12 +152,12 @@ public class ScannerFaultToleranceTests : IAsyncLifetime
             int previousRow = int.MinValue;
             bool faultInjected = !enableFaultInjection;
             int faultInjectionLowBound = (_numRows / _numTablets / 2);
-            //bool firstScanRequest = true;
+            bool firstScanRequest = true;
 
-            // long firstScannedMetric = 0;
-            // long firstPropagatedTimestamp = 0;
-            // long lastScannedMetric = 0;
-            // long lastPropagatedTimestamp = 0;
+            long firstScannedMetric = 0;
+            long firstPropagatedTimestamp = 0;
+            long lastScannedMetric = 0;
+            long lastPropagatedTimestamp = 0;
 
             var scanBuilder = await _client.NewScanBuilderFromTokenAsync(token);
             var scanner = scanBuilder.Build();
@@ -179,25 +179,25 @@ public class ScannerFaultToleranceTests : IAsyncLifetime
                         await _harness.RestartTabletServerAsync(scanEnumerator.Tablet);
                         faultInjected = true;
                     }
-                    // else
-                    // {
-                    //     if (firstScanRequest)
-                    //     {
-                    //         firstScannedMetric = scanEnumerator.ResourceMetrics.TotalDurationNanos;
-                    //         firstPropagatedTimestamp = _client.LastPropagatedTimestamp;
-                    //         firstScanRequest = false;
-                    //     }
-                    //     lastScannedMetric = scanEnumerator.ResourceMetrics.TotalDurationNanos;
-                    //     lastPropagatedTimestamp = _client.LastPropagatedTimestamp;
-                    // }
+                    else
+                    {
+                        if (firstScanRequest)
+                        {
+                            firstScannedMetric = scanEnumerator.ResourceMetrics.TotalDurationNanos;
+                            firstPropagatedTimestamp = _client.LastPropagatedTimestamp;
+                            firstScanRequest = false;
+                        }
+                        lastScannedMetric = scanEnumerator.ResourceMetrics.TotalDurationNanos;
+                        lastPropagatedTimestamp = _client.LastPropagatedTimestamp;
+                    }
                     previousRow = key;
                     rowCount++;
                 }
             }
 
-            // Assert.NotEqual(lastScannedMetric, firstScannedMetric);
-            // Assert.True(lastPropagatedTimestamp > firstPropagatedTimestamp,
-            //     $"Expected {lastPropagatedTimestamp} > {firstPropagatedTimestamp}");
+            Assert.NotEqual(lastScannedMetric, firstScannedMetric);
+            Assert.True(lastPropagatedTimestamp > firstPropagatedTimestamp,
+                $"Expected {lastPropagatedTimestamp} > {firstPropagatedTimestamp}");
 
             return rowCount;
         }
