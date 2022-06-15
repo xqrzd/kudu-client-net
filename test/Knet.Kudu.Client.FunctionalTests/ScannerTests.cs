@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Knet.Kudu.Binary;
 using Knet.Kudu.Client.Exceptions;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
 using Knet.Kudu.Client.FunctionalTests.Util;
@@ -89,30 +86,12 @@ public class ScannerTests
 
         // Quiesce a single tablet server.
         var tservers = miniCluster.GetTabletServers();
-        var kuduExe = KuduBinaryLocator.FindBinary("kudu");
-        var workingDirectory = Path.GetDirectoryName(kuduExe.ExePath);
 
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = kuduExe.ExePath,
-            WorkingDirectory = workingDirectory,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        foreach (var env in kuduExe.EnvironmentVariables)
-        {
-            startInfo.EnvironmentVariables.Add(env.Key, env.Value);
-        }
-
-        startInfo.ArgumentList.Add("tserver");
-        startInfo.ArgumentList.Add("quiesce");
-        startInfo.ArgumentList.Add("start");
-        startInfo.ArgumentList.Add(tservers[0].ToString());
-
-        using var quiesceTserver = new Process { StartInfo = startInfo };
-        quiesceTserver.Start();
-        await quiesceTserver.WaitForExitAsync();
+        await MiniKuduCluster.RunKuduToolAsync(
+            "tserver",
+            "quiesce",
+            "start",
+            tservers[0].ToString());
 
         // Now start a scan. Even if the scan goes to the quiescing server, the
         // scan request should eventually be routed to a non-quiescing server
