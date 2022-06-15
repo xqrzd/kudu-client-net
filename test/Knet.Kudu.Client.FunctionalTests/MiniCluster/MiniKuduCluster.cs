@@ -361,6 +361,34 @@ public class MiniKuduCluster : IAsyncDisposable
         catch { }
     }
 
+    public static async Task RunKuduToolAsync(params string[] arguments)
+    {
+        var kuduExe = KuduBinaryLocator.FindBinary("kudu");
+        var workingDirectory = Path.GetDirectoryName(kuduExe.ExePath);
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = kuduExe.ExePath,
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        foreach (var env in kuduExe.EnvironmentVariables)
+        {
+            startInfo.EnvironmentVariables.Add(env.Key, env.Value);
+        }
+
+        foreach (var arg in arguments)
+        {
+            startInfo.ArgumentList.Add(arg);
+        }
+
+        using var process = new Process { StartInfo = startInfo };
+        process.Start();
+        await process.WaitForExitAsync();
+    }
+
     private sealed class DaemonInfo
     {
         public DaemonIdentifierPB Id { get; }

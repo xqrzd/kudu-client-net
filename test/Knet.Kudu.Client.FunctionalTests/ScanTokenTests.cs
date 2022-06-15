@@ -75,6 +75,97 @@ public class ScanTokenTests : IAsyncLifetime
         Assert.Equal(100, rowCount);
     }
 
+    [SkippableFact]
+    public async Task TestScanTokenWithWrongUuidSerialization()
+    {
+        int buckets = 8;
+        var builder = ClientTestUtil.CreateManyStringsSchema()
+            .SetTableName(_tableName)
+            .AddHashPartitions(buckets, "key");
+
+        var table = await _client.CreateTableAsync(builder);
+
+        int totalRows = 100;
+        var inserts = Enumerable.Range(0, totalRows).Select(i =>
+        {
+            var insert = table.NewInsert();
+            insert.SetString("key", $"key_{i:00}");
+            insert.SetString("c1", $"c1_{i}");
+            insert.SetString("c2", $"c2_{i}");
+            return insert;
+        });
+
+        await _client.WriteAsync(inserts);
+
+        var tokens = await _client.NewScanTokenBuilder(table)
+            .SetEmptyProjection()
+            .IncludeTableMetadata(true)
+            .IncludeTabletMetadata(true)
+            .BuildAsync();
+
+        Assert.Equal(buckets, tokens.Count);
+
+        // Create a new client, open the newly created kudu table, and new scanners.
+        await using var newClient = _harness.CreateClient();
+        var newTable = await newClient.OpenTableAsync(_tableName);
+
+        var tabletIds = new List<string>();
+        var scanners = new List<KuduScanner>();
+
+        foreach (var token in tokens)
+        {
+            tabletIds.Add(token.Tablet.TabletId);
+
+            var scanBuilder = await newClient.NewScanBuilderFromTokenAsync(token);
+            scanners.Add(scanBuilder.Build());
+        }
+
+        // Step down all tablet leaders.
+        var masters = string.Join(',', _harness.GetMasterServers());
+
+        foreach (var tabletId in tabletIds)
+        {
+            await MiniKuduCluster.RunKuduToolAsync(
+                "tablet",
+                "leader_step_down",
+                masters,
+                tabletId);
+
+            await Task.Delay(1000);
+        }
+
+        // Delete all rows first through the new client.
+        var deletes = Enumerable.Range(0, totalRows).Select(i =>
+        {
+            var delete = table.NewDelete();
+            delete.SetString("key", $"key_{i:00}");
+            return delete;
+        });
+
+        await newClient.WriteAsync(deletes);
+
+        // Insert all rows again through the new client.
+        var newInserts = Enumerable.Range(0, totalRows).Select(i =>
+        {
+            var insert = table.NewInsert();
+            insert.SetString("key", $"key_{i:00}");
+            insert.SetString("c1", $"c1_{i}");
+            insert.SetString("c2", $"c2_{i}");
+            return insert;
+        });
+
+        await newClient.WriteAsync(newInserts);
+
+        // Verify all the row count.
+        long rowCount = 0;
+        foreach (var scanner in scanners)
+        {
+            rowCount += await scanner.CountAsync();
+        }
+
+        Assert.Equal(totalRows, rowCount);
+    }
+
     /// <summary>
     /// Tests scan token creation and execution on a table with non-covering
     /// range partitions.
@@ -523,6 +614,31 @@ public class ScanTokenTests : IAsyncLifetime
         }
 
         Assert.Collection(resultKeys, key => Assert.Equal(predicateValue, key));
+    }
+
+    [SkippableFact]
+    public async Task TestScannerBuilderFaultToleranceToggle()
+    {
+        var builder = ClientTestUtil.GetBasicSchema()
+            .SetTableName(_tableName);
+
+        var table = await _client.CreateTableAsync(builder);
+        var scanBuilder = _client.NewScanBuilder(table);
+
+        Assert.False(scanBuilder.IsFaultTolerant);
+        Assert.Equal(ReadMode.ReadLatest, scanBuilder.ReadMode);
+
+        scanBuilder.SetFaultTolerant(true);
+        Assert.True(scanBuilder.IsFaultTolerant);
+        Assert.Equal(ReadMode.ReadAtSnapshot, scanBuilder.ReadMode);
+
+        scanBuilder.SetFaultTolerant(false);
+        Assert.False(scanBuilder.IsFaultTolerant);
+        Assert.Equal(ReadMode.ReadAtSnapshot, scanBuilder.ReadMode);
+
+        scanBuilder.SetReadMode(ReadMode.ReadYourWrites);
+        Assert.False(scanBuilder.IsFaultTolerant);
+        Assert.Equal(ReadMode.ReadYourWrites, scanBuilder.ReadMode);
     }
 
     private async Task<long> SetupTableForDiffScansAsync(KuduTable table, int numRows)
