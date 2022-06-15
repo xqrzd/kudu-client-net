@@ -616,6 +616,31 @@ public class ScanTokenTests : IAsyncLifetime
         Assert.Collection(resultKeys, key => Assert.Equal(predicateValue, key));
     }
 
+    [SkippableFact]
+    public async Task TestScannerBuilderFaultToleranceToggle()
+    {
+        var builder = ClientTestUtil.GetBasicSchema()
+            .SetTableName(_tableName);
+
+        var table = await _client.CreateTableAsync(builder);
+        var scanBuilder = _client.NewScanBuilder(table);
+
+        Assert.False(scanBuilder.IsFaultTolerant);
+        Assert.Equal(ReadMode.ReadLatest, scanBuilder.ReadMode);
+
+        scanBuilder.SetFaultTolerant(true);
+        Assert.True(scanBuilder.IsFaultTolerant);
+        Assert.Equal(ReadMode.ReadAtSnapshot, scanBuilder.ReadMode);
+
+        scanBuilder.SetFaultTolerant(false);
+        Assert.False(scanBuilder.IsFaultTolerant);
+        Assert.Equal(ReadMode.ReadAtSnapshot, scanBuilder.ReadMode);
+
+        scanBuilder.SetReadMode(ReadMode.ReadYourWrites);
+        Assert.False(scanBuilder.IsFaultTolerant);
+        Assert.Equal(ReadMode.ReadYourWrites, scanBuilder.ReadMode);
+    }
+
     private async Task<long> SetupTableForDiffScansAsync(KuduTable table, int numRows)
     {
         for (int i = 0; i < numRows / 2; i++)
