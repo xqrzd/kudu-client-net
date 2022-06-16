@@ -1,0 +1,123 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+syntax = "proto2";
+package kudu;
+
+option java_package = "org.apache.kudu";
+option csharp_namespace = "Knet.Kudu.Client.Protobuf";
+
+// ============================================================================
+//  Local file system metadata
+// ============================================================================
+
+// When any server initializes a new filesystem (eg a new node is created in the
+// cluster), it creates this structure and stores it persistently.
+message InstanceMetadataPB {
+
+  // The UUID which is assigned when the instance is first formatted. This uniquely
+  // identifies the node in the cluster.
+  required bytes uuid = 1;
+
+  // Human-readable string indicating when and where the node was first
+  // initialized.
+  required string format_stamp = 2;
+
+  // TODO: add a "node type" (TS/Master?)
+}
+
+// Describes a collection of filesystem directory instances and the membership
+// of a particular instance in the collection.
+//
+// In a healthy filesystem (see below), a directory instance can be referred to
+// via its UUID's position in all_uuids instead of via the UUID itself. This is
+// useful when there are many such references, as the position is much shorter
+// than the UUID.
+message DirSetPB {
+  // Globally unique identifier for this directory instance.
+  required bytes uuid = 1;
+
+  // All UUIDs in this dir instance set. In a healthy filesystem:
+  // 1. There exists an on-disk DirInstanceMetadataPB for each listed UUID, and
+  // 2. Every DirSetPB contains an identical copy of all_uuids.
+  repeated bytes all_uuids = 2;
+}
+
+// A filesystem instance can contain multiple directories. One of these
+// structures is persisted in each directory when the filesystem instance is
+// created.
+message DirInstanceMetadataPB {
+  // Describes this directory instance as well as all of the other directory
+  // instances that, taken together, describe a complete directory set.
+  required DirSetPB dir_set = 1;
+
+  // Textual representation of the directory type for which this directory was
+  // formatted.
+  required string dir_type = 2;
+
+  // Block size on the filesystem where this instance was created. If the
+  // instance (and its data) are ever copied to another location, the block
+  // size in that location must be the same.
+  // This must be present if this instance belongs to a data directory.
+  optional uint64 filesystem_block_size_bytes = 3;
+}
+
+message BlockIdPB {
+  required fixed64 id = 1;
+}
+
+// The kind of record.
+enum BlockRecordType {
+  UNKNOWN = 0;
+  CREATE = 1;
+  DELETE = 2;
+}
+
+// An element found in a container metadata file of the log-backed block
+// storage implementation.
+//
+// Each one tracks the existence (creation) or non-existence (deletion)
+// of a particular block. They are written sequentially, with subsequent
+// messages taking precedence over earlier ones (e.g. "CREATE foo" followed
+// by "DELETE foo" means that block foo does not exist).
+message BlockRecordPB {
+  // The unique identifier of the block.
+  required BlockIdPB block_id = 1;
+
+  // Whether this is a CREATE or a DELETE.
+  required BlockRecordType op_type = 2;
+
+  // The time at which this block record was created, expressed in terms of
+  // microseconds since the epoch.
+  required uint64 timestamp_us = 3;
+
+  // The offset of the block in the container data file.
+  //
+  // Required for CREATE.
+  optional int64 offset = 4;
+
+  // The length of the block in the container data file.
+  //
+  // Required for CREATE.
+  optional int64 length = 5;
+}
+
+// Tablet data is spread across a specified number of data directories. The
+// group is represented by the UUIDs of the data directories it consists of.
+message DataDirGroupPB {
+  // List of data directory UUIDs that make up the group. Must not be empty.
+  repeated bytes uuids = 1;
+}

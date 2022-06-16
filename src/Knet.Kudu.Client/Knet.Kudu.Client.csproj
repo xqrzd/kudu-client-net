@@ -30,7 +30,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Protobuf Include="Protos/**/*.proto" ProtoRoot="Protos" GrpcServices="None" />
+    <Protobuf Update="Protos/**/tool.proto" CompileOutputs="false" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Google.Protobuf" Version="3.21.1" />
+    <PackageReference Include="Grpc.Tools" Version="2.46.3" PrivateAssets="All" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.1" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
     <PackageReference Include="Pipelines.Sockets.Unofficial" Version="2.2.2" />

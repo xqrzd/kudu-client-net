@@ -1,0 +1,104 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+syntax = "proto2";
+package kudu.transactions;
+
+option java_package = "org.apache.kudu.transactions";
+option csharp_namespace = "Knet.Kudu.Client.Protobuf.Transactions";
+
+// The following state changes are expected:
+//
+//     BeginCommit           FinalizeCommit        CompleteCommit
+//   OPEN --> COMMIT_IN_PROGRESS --> FINALIZE_IN_PROGRESS --> COMMITTED
+//
+//     BeginCommit           BeginAbort            FinalizeAbort
+//   OPEN --> COMMIT_IN_PROGRESS --> ABORT_IN_PROGRESS --> ABORTED
+//
+//     AbortTxn              FinalizeAbort
+//   OPEN --> ABORT_IN_PROGRESS --> ABORTED
+enum TxnStatePB {
+  UNKNOWN = 0;
+  // The transaction is open. Users can write to participants, and register new
+  // participants.
+  OPEN = 1;
+
+  // A user or Kudu's transaction staleness tracker has signaled that the
+  // transaction should be aborted. No further participants can be registered,
+  // and the transaction can only be moved to the ABORTED state after sending
+  // ABORT_TXN ops to all participants.
+  ABORT_IN_PROGRESS = 5;
+
+  // The transaction has been fully aborted -- all participants have
+  // successfully replicated ABORT_TXN ops and cleared the transaction. No
+  // further tasks are required to abort the transaction.
+  ABORTED = 2;
+
+  // The user has signaled that the transaction should be committed. No further
+  // participants can be registered. The transaction may still be aborted if
+  // prompted by a user or if sending any BEGIN_COMMIT op fails.
+  COMMIT_IN_PROGRESS = 3;
+
+  // Kudu has successfully sent BEGIN_COMMIT ops to all participants, and has
+  // started sending FINALIZE_COMMIT ops to participants. The transaction can
+  // only be moved to the COMMITTED state.
+  FINALIZE_IN_PROGRESS = 6;
+
+  // All FINALIZE_COMMIT ops have succeeded. No further tasks are required to
+  // commit the transaction.
+  COMMITTED = 4;
+}
+
+// Metadata encapsulating the status of a transaction.
+message TxnStatusEntryPB {
+  optional TxnStatePB state = 1;
+  optional string user = 2;
+
+  // Commit timestamp associated with this transaction.
+  optional fixed64 commit_timestamp = 3;
+
+  // The timestamp in seconds since the epoch that this transaction was
+  // started.
+  optional int64 start_timestamp = 4;
+
+  // The timestamp in seconds since the epoch that this transaction had a state
+  // change.
+  optional int64 last_transition_timestamp = 5;
+}
+
+// Metadata encapsulating the existence of a transaction participant.
+message TxnParticipantEntryPB {
+  optional TxnStatePB state = 1;
+}
+
+// High-level metadata about a transaction. Serialized messages of this type
+// are used to pass information on an already opened transaction among multiple
+// Kudu clients (even if residing on different nodes), so they can issue write
+// operations in the context of the same multi-row distributed transaction.
+message TxnTokenPB {
+  // Transaction identifier assigned to the transaction.
+  optional int64 txn_id = 1;
+
+  // The keep-alive interval (in milliseconds) to keep the transaction alive.
+  // To avoid auto-aborting the transaction, TxnManager should receive
+  // keep-alive heartbeats spaced by intervals equal or shorter than
+  // 'keepalive_millis' milliseconds in duration.
+  optional uint32 keepalive_millis = 2;
+
+  // Whether the client should automatically send keepalive messages once
+  // this token is deserialized into a runtime transaction handle.
+  optional bool enable_keepalive = 3;
+}
