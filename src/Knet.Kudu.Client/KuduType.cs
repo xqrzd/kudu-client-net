@@ -8,19 +8,19 @@ namespace Knet.Kudu.Client;
 /// </summary>
 public enum KuduType
 {
-    Int8 = DataTypePB.Int8,
-    Int16 = DataTypePB.Int16,
-    Int32 = DataTypePB.Int32,
-    Int64 = DataTypePB.Int64,
-    String = DataTypePB.String,
-    Bool = DataTypePB.Bool,
-    Float = DataTypePB.Float,
-    Double = DataTypePB.Double,
-    Binary = DataTypePB.Binary,
-    UnixtimeMicros = DataTypePB.UnixtimeMicros,
-    Decimal32 = DataTypePB.Decimal32,
-    Decimal64 = DataTypePB.Decimal64,
-    Decimal128 = DataTypePB.Decimal128,
-    Varchar = DataTypePB.Varchar,
-    Date = DataTypePB.Date
+    Int8 = DataType.Int8,
+    Int16 = DataType.Int16,
+    Int32 = DataType.Int32,
+    Int64 = DataType.Int64,
+    String = DataType.String,
+    Bool = DataType.Bool,
+    Float = DataType.Float,
+    Double = DataType.Double,
+    Binary = DataType.Binary,
+    UnixtimeMicros = DataType.UnixtimeMicros,
+    Decimal32 = DataType.Decimal32,
+    Decimal64 = DataType.Decimal64,
+    Decimal128 = DataType.Decimal128,
+    Varchar = DataType.Varchar,
+    Date = DataType.Date
 }

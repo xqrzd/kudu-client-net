@@ -1,5 +1,3 @@
-using Knet.Kudu.Client.Protobuf;
-
 namespace Knet.Kudu.Client;
 
 /// <summary>
@@ -8,9 +6,9 @@ namespace Knet.Kudu.Client;
 /// </summary>
 public enum CompressionType
 {
-    DefaultCompression = CompressionTypePB.DefaultCompression,
-    NoCompression = CompressionTypePB.NoCompression,
-    Snappy = CompressionTypePB.Snappy,
-    Lz4 = CompressionTypePB.Lz4,
-    Zlib = CompressionTypePB.Zlib
+    DefaultCompression = Protobuf.CompressionType.DefaultCompression,
+    NoCompression = Protobuf.CompressionType.NoCompression,
+    Snappy = Protobuf.CompressionType.Snappy,
+    Lz4 = Protobuf.CompressionType.Lz4,
+    Zlib = Protobuf.CompressionType.Zlib
 }

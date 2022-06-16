@@ -101,7 +101,7 @@ public class KuduScanToken
         {
             switch (scanTokenPb.ReadMode)
             {
-                case ReadModePB.ReadAtSnapshot:
+                case Protobuf.ReadMode.ReadAtSnapshot:
                     {
                         builder.SetReadMode(ReadMode.ReadAtSnapshot);
 
@@ -118,12 +118,12 @@ public class KuduScanToken
 
                         break;
                     }
-                case ReadModePB.ReadLatest:
+                case Protobuf.ReadMode.ReadLatest:
                     {
                         builder.SetReadMode(ReadMode.ReadLatest);
                         break;
                     }
-                case ReadModePB.ReadYourWrites:
+                case Protobuf.ReadMode.ReadYourWrites:
                     {
                         builder.SetReadMode(ReadMode.ReadYourWrites);
                         break;
@@ -137,11 +137,11 @@ public class KuduScanToken
         {
             switch (scanTokenPb.ReplicaSelection)
             {
-                case ReplicaSelectionPB.LeaderOnly:
+                case Protobuf.ReplicaSelection.LeaderOnly:
                     builder.SetReplicaSelection(ReplicaSelection.LeaderOnly);
                     break;
 
-                case ReplicaSelectionPB.ClosestReplica:
+                case Protobuf.ReplicaSelection.ClosestReplica:
                     builder.SetReplicaSelection(ReplicaSelection.ClosestReplica);
                     break;
 
@@ -194,7 +194,7 @@ public class KuduScanToken
 
             var colSchema = schema.GetColumn(colIdx);
 
-            if (colSchemaFromPb.Type != (DataTypePB)colSchema.Type)
+            if (colSchemaFromPb.Type != (DataType)colSchema.Type)
             {
                 throw new Exception($"Invalid type {colSchemaFromPb.Type} " +
                     $"for column '{colSchemaFromPb.Name}' in scan token, " +

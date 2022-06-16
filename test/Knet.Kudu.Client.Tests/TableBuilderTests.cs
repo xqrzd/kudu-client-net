@@ -33,18 +33,18 @@ public class TableBuilderTests
         Assert.Collection(request.Schema.Columns, c =>
         {
             Assert.Equal("c1", c.Name);
-            Assert.Equal(DataTypePB.Int32, c.Type);
+            Assert.Equal(DataType.Int32, c.Type);
             Assert.True(c.IsKey);
             Assert.False(c.IsNullable);
-            Assert.Equal(EncodingTypePB.AutoEncoding, c.Encoding);
-            Assert.Equal(CompressionTypePB.DefaultCompression, c.Compression);
+            Assert.Equal(Protobuf.EncodingType.AutoEncoding, c.Encoding);
+            Assert.Equal(Protobuf.CompressionType.DefaultCompression, c.Compression);
             Assert.Null(c.TypeAttributes);
         }, c =>
         {
             Assert.Equal("c2", c.Name);
-            Assert.Equal(DataTypePB.String, c.Type);
-            Assert.Equal(EncodingTypePB.DictEncoding, c.Encoding);
-            Assert.Equal(CompressionTypePB.Snappy, c.Compression);
+            Assert.Equal(DataType.String, c.Type);
+            Assert.Equal(Protobuf.EncodingType.DictEncoding, c.Encoding);
+            Assert.Equal(Protobuf.CompressionType.Snappy, c.Compression);
         });
     }
 

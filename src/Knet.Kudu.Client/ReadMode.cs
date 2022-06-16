@@ -1,5 +1,3 @@
-using Knet.Kudu.Client.Protobuf;
-
 namespace Knet.Kudu.Client;
 
 /// <summary>
@@ -22,7 +20,7 @@ public enum ReadMode
     /// This is the default mode.
     /// </para>
     /// </summary>
-    ReadLatest = ReadModePB.ReadLatest,
+    ReadLatest = Protobuf.ReadMode.ReadLatest,
     /// <summary>
     /// <para>
     /// When READ_AT_SNAPSHOT is specified the server will attempt to perform a read
@@ -39,7 +37,7 @@ public enum ReadMode
     /// then this corresponds to Isolation mode "Strict-Serializable".
     /// </para>
     /// </summary>
-    ReadAtSnapshot = ReadModePB.ReadAtSnapshot,
+    ReadAtSnapshot = Protobuf.ReadMode.ReadAtSnapshot,
     /// <summary>
     /// <para>
     /// When READ_YOUR_WRITES is specified, the client will perform a read
@@ -62,5 +60,5 @@ public enum ReadMode
     /// timestamps and thus may return different results.
     /// </para>
     /// </summary>
-    ReadYourWrites = ReadModePB.ReadYourWrites
+    ReadYourWrites = Protobuf.ReadMode.ReadYourWrites
 }

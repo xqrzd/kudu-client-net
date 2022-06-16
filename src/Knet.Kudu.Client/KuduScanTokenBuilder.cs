@@ -225,8 +225,8 @@ public class KuduScanTokenBuilder : AbstractKuduScannerBuilder<KuduScanTokenBuil
             proto.UpperBoundPrimaryKey = UnsafeByteOperations.UnsafeWrap(UpperBoundPrimaryKey);
 
         proto.Limit = (ulong)Limit;
-        proto.ReadMode = (ReadModePB)ReadMode;
-        proto.ReplicaSelection = (ReplicaSelectionPB)ReplicaSelection;
+        proto.ReadMode = (Protobuf.ReadMode)ReadMode;
+        proto.ReplicaSelection = (Protobuf.ReplicaSelection)ReplicaSelection;
 
         // If the last propagated timestamp is set send it with the scan.
         long lastPropagatedTimestamp = Client.LastPropagatedTimestamp;

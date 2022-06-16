@@ -1,5 +1,3 @@
-using Knet.Kudu.Client.Protobuf;
-
 namespace Knet.Kudu.Client;
 
 /// <summary>
@@ -46,7 +44,7 @@ public enum ExternalConsistencyMode
     /// guarantee under this mode.
     /// </para>
     /// </summary>
-    ClientPropagated = ExternalConsistencyModePB.ClientPropagated,
+    ClientPropagated = Protobuf.ExternalConsistencyMode.ClientPropagated,
 
     /// <summary>
     /// <para>
@@ -67,5 +65,5 @@ public enum ExternalConsistencyMode
     /// which surpasses a pre-configured threshold.
     /// </para>
     /// </summary>
-    CommitWait = ExternalConsistencyModePB.CommitWait
+    CommitWait = Protobuf.ExternalConsistencyMode.CommitWait
 }

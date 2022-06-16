@@ -68,7 +68,7 @@ internal sealed class ScanRequest : KuduTabletRpc<ScanResponsePB>, IDisposable
                 newRequest.AuthzToken = AuthzToken;
 
             // If the last propagated timestamp is set, send it with the scan.
-            if (newRequest.ReadMode != ReadModePB.ReadYourWrites &&
+            if (newRequest.ReadMode != Protobuf.ReadMode.ReadYourWrites &&
                 PropagatedTimestamp != KuduClient.NoTimestamp)
             {
                 newRequest.PropagatedTimestamp = (ulong)PropagatedTimestamp;

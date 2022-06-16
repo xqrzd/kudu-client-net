@@ -1,5 +1,3 @@
-using Knet.Kudu.Client.Protobuf;
-
 namespace Knet.Kudu.Client;
 
 /// <summary>
@@ -10,7 +8,7 @@ public enum ReplicaSelection
     /// <summary>
     /// Select the LEADER replica.
     /// </summary>
-    LeaderOnly = ReplicaSelectionPB.LeaderOnly,
+    LeaderOnly = Protobuf.ReplicaSelection.LeaderOnly,
     /// <summary>
     /// Select the closest replica to the client. Replicas are classified
     /// from closest to furthest as follows:
@@ -22,5 +20,5 @@ public enum ReplicaSelection
     /// <item><description>All other replicas</description></item>
     /// </list>
     /// </summary>
-    ClosestReplica = ReplicaSelectionPB.ClosestReplica
+    ClosestReplica = Protobuf.ReplicaSelection.ClosestReplica
 }

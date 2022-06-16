@@ -25,7 +25,7 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
     private readonly Dictionary<string, KuduPredicate> _predicates;
     private readonly CancellationToken _cancellationToken;
 
-    private readonly OrderModePB _orderMode;
+    private readonly OrderMode _orderMode;
     private readonly ReadMode _readMode;
     private readonly ReplicaSelection _replicaSelection;
     private readonly bool _isFaultTolerant;
@@ -64,7 +64,7 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
         KuduTable table,
         List<ColumnSchemaPB> projectedColumnsPb,
         KuduSchema projectionSchema,
-        OrderModePB orderMode,
+        OrderMode orderMode,
         ReadMode readMode,
         ReplicaSelection replicaSelection,
         bool isFaultTolerant,
@@ -367,7 +367,7 @@ public sealed class KuduScanEnumerator : IAsyncEnumerator<ResultSet>
             Limit = (ulong)(_limit - _numRowsReturned),
             OrderMode = _orderMode,
             CacheBlocks = _cacheBlocks,
-            ReadMode = (ReadModePB)_readMode,
+            ReadMode = (Protobuf.ReadMode)_readMode,
             RowFormatFlags = (ulong)RowFormatFlags.ColumnarLayout
         };
 
