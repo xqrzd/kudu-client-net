@@ -105,15 +105,15 @@ public class KeyEncoderTests
         var rowAEncoded = KeyEncoder.EncodePrimaryKey(rowA);
         Assert.Equal(new byte[]
         {
-                0,
-                0, 0,
-                0, 0, 0, 0,
-                0, 0, 0, 0, 0, 0, 0, 0,
-                0x80, 0, 0, 5,
-                0x80, 0, 0, 0, 0, 0, 0, 6,
-                0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7,
-                0, 0,
-                0, 0
+            0,
+            0, 0,
+            0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0x80, 0, 0, 5,
+            0x80, 0, 0, 0, 0, 0, 0, 6,
+            0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7,
+            0, 0,
+            0, 0
         }, rowAEncoded);
 
         var rowB = new PartialRow(schema);
@@ -133,16 +133,16 @@ public class KeyEncoderTests
         var rowBEncoded = KeyEncoder.EncodePrimaryKey(rowB);
         Assert.Equal(ToByteArray(new int[]
         {
-                0xff,
-                0xff, 0xff,
-                0xff, 0xff, 0xff, 0xff,
-                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-                0x80, 0, 0, 5,
-                0x80, 0, 0, 0, 0, 0, 0, 6,
-                0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7,
-                'a', 'b', 'c', 1, 0, 1, 'd', 'e', 'f', 'g', 'h', 0, 0,
-                'a', 'b', 'c', 1, 0, 1, 'd', 'e', 'f', 0, 0,
-                0, 1, 'b', 'i', 'n', 'a', 'r', 'y'
+            0xff,
+            0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0x80, 0, 0, 5,
+            0x80, 0, 0, 0, 0, 0, 0, 6,
+            0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7,
+            'a', 'b', 'c', 1, 0, 1, 'd', 'e', 'f', 'g', 'h', 0, 0,
+            'a', 'b', 'c', 1, 0, 1, 'd', 'e', 'f', 0, 0,
+            0, 1, 'b', 'i', 'n', 'a', 'r', 'y'
         }), rowBEncoded);
 
         var rowC = new PartialRow(schema);
@@ -160,16 +160,16 @@ public class KeyEncoderTests
         var rowCEncoded = KeyEncoder.EncodePrimaryKey(rowC);
         Assert.Equal(ToByteArray(new int[]
         {
-                0x81,
-                0x80, 2,
-                0x80, 0, 0, 3,
-                0x80, 0, 0, 0, 0, 0, 0, 4,
-                0x80, 0, 0, 5,
-                0x80, 0, 0, 0, 0, 0, 0, 6,
-                0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7,
-                'a', 'b', 'c', '\n', '1', '2', '3', '4', '5', '6', 0, 0,
-                'a', 'b', 'c', '\n', '1', '2', '3', 0, 0,
-                0, 1, 2, 3, 4, 5
+            0x81,
+            0x80, 2,
+            0x80, 0, 0, 3,
+            0x80, 0, 0, 0, 0, 0, 0, 4,
+            0x80, 0, 0, 5,
+            0x80, 0, 0, 0, 0, 0, 0, 6,
+            0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7,
+            'a', 'b', 'c', '\n', '1', '2', '3', '4', '5', '6', 0, 0,
+            'a', 'b', 'c', '\n', '1', '2', '3', 0, 0,
+            0, 1, 2, 3, 4, 5
         }), rowCEncoded);
 
         var rowD = new PartialRow(schema);
@@ -187,16 +187,16 @@ public class KeyEncoderTests
         var rowDEncoded = KeyEncoder.EncodePrimaryKey(rowD);
         Assert.Equal(ToByteArray(new int[]
         {
-                127,
-                127, -2,
-                127, -1, -1, -3,
-                127, -1, -1, -1, -1, -1, -1, -4,
-                127, -1, -1, -5,
-                127, -1, -1, -1, -1, -1, -1, -6,
-                127, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -7,
-                0, 1, 'a', 'b', 'c', '\n', 1, 1, 0, 1, ' ', '1', 0, 0,
-                0, 1, 'a', 'b', 'c', '\n', 1, 1, 0, 1, ' ', '1', '2', '3', 1, 0, 1, 0, 0,
-                0, 1, 2, 3, 4, 5, 0,
+            127,
+            127, -2,
+            127, -1, -1, -3,
+            127, -1, -1, -1, -1, -1, -1, -4,
+            127, -1, -1, -5,
+            127, -1, -1, -1, -1, -1, -1, -6,
+            127, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -7,
+            0, 1, 'a', 'b', 'c', '\n', 1, 1, 0, 1, ' ', '1', 0, 0,
+            0, 1, 'a', 'b', 'c', '\n', 1, 1, 0, 1, ' ', '1', '2', '3', 1, 0, 1, 0, 0,
+            0, 1, 2, 3, 4, 5, 0,
         }), rowDEncoded);
     }
 
@@ -214,8 +214,8 @@ public class KeyEncoderTests
             new RangeSchema(new List<int> { 0, 1, 2 }),
             new List<HashBucketSchema>
             {
-                    new HashBucketSchema(new List<int> { 0, 1 }, 32, 0),
-                    new HashBucketSchema(new List<int> { 2 }, 32, 42)
+                new HashBucketSchema(new List<int> { 0, 1 }, 32, 0),
+                new HashBucketSchema(new List<int> { 2 }, 32, 42)
             },
             schema);
 
@@ -226,10 +226,10 @@ public class KeyEncoderTests
 
         CheckPartitionKey(rowA, partitionSchema, new byte[]
         {
-                0, 0, 0, 0,     // hash(0, "")
-                0, 0, 0, 0x14,  // hash("")
-                0x80, 0, 0, 0,  // a = 0
-                0, 0            // b = ""; c is elided
+            0, 0, 0, 0,     // hash(0, "")
+            0, 0, 0, 0x14,  // hash("")
+            0x80, 0, 0, 0,  // a = 0
+            0, 0            // b = ""; c is elided
         });
 
         var rowB = new PartialRow(schema);
@@ -239,10 +239,10 @@ public class KeyEncoderTests
 
         CheckPartitionKey(rowB, partitionSchema, new byte[]
         {
-                0, 0, 0, 0x5,   // hash(1, "")
-                0, 0, 0, 0x14,  // hash("")
-                0x80, 0, 0, 1,  // a = 1
-                0, 0            // b = ""; c is elided
+            0, 0, 0, 0x5,   // hash(1, "")
+            0, 0, 0, 0x14,  // hash("")
+            0x80, 0, 0, 1,  // a = 1
+            0, 0            // b = ""; c is elided
         });
 
         var rowC = new PartialRow(schema);
@@ -252,11 +252,11 @@ public class KeyEncoderTests
 
         CheckPartitionKey(rowC, partitionSchema, new byte[]
         {
-                0, 0, 0, 0x1A,      // hash(0, "b")
-                0, 0, 0, 0x1D,      // hash("c")
-                0x80, 0, 0, 0,      // a = 0
-                (byte)'b', 0, 0,    // b = "b"
-                (byte)'c'           // c = "c"
+            0, 0, 0, 0x1A,      // hash(0, "b")
+            0, 0, 0, 0x1D,      // hash("c")
+            0x80, 0, 0, 0,      // a = 0
+            (byte)'b', 0, 0,    // b = "b"
+            (byte)'c'           // c = "c"
         });
 
         var rowD = new PartialRow(schema);
@@ -266,11 +266,11 @@ public class KeyEncoderTests
 
         CheckPartitionKey(rowD, partitionSchema, new byte[]
         {
-                0, 0, 0, 0,         // hash(1, "b")
-                0, 0, 0, 0x1D,      // hash("c")
-                0x80, 0, 0, 1,      // a = 1
-                (byte)'b', 0, 0,    // b = "b"
-                (byte)'c'           // c = "c"
+            0, 0, 0, 0,         // hash(1, "b")
+            0, 0, 0, 0x1D,      // hash("c")
+            0x80, 0, 0, 1,      // a = 1
+            (byte)'b', 0, 0,    // b = "b"
+            (byte)'c'           // c = "c"
         });
     }
 

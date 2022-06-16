@@ -210,16 +210,15 @@ public static partial class KeyEncoder
     {
         var schema = row.Schema;
         var primaryKeyColumnCount = schema.PrimaryKeyColumnCount;
-        var size = 0;
+        int size = 0;
 
         for (int i = 0; i < primaryKeyColumnCount; i++)
         {
             var column = schema.GetColumn(i);
-            int length;
 
             if (column.IsFixedSize)
             {
-                length = column.Size;
+                size += column.Size;
             }
             else
             {
@@ -227,12 +226,18 @@ public static partial class KeyEncoder
                 var data = row.GetVarLengthColumn(i);
 
                 if (isLast)
-                    length = data.Length;
+                {
+                    // The last column is copied directly without any special encoding.
+                    size += data.Length;
+                }
                 else
-                    length = data.Length * 2 + 2;
+                {
+                    // For all other columns, the worst case would be a value that
+                    // contained all zeros, as each '0' would have to be encoded as '01'.
+                    // Additionally, each column is terminated by '00'.
+                    size += data.Length * 2 + 2;
+                }
             }
-
-            size += length;
         }
 
         return size;
@@ -242,6 +247,9 @@ public static partial class KeyEncoder
         PartialRow row, PartitionSchema partitionSchema)
     {
         var hashSchemaSize = partitionSchema.HashBucketSchemas.Count * 4;
+
+        // While the final partition key might not include any range columns,
+        // we still need temporary space to encode the data to hash it.
         return CalculateMaxPrimaryKeySize(row) + hashSchemaSize;
     }
 }
