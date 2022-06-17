@@ -50,9 +50,7 @@ public abstract class AbstractKuduScannerBuilder<TBuilder>
     /// Set which columns will be read by the Scanner.
     /// The default is to read all columns.
     /// </summary>
-    /// <param name="columnNames">
-    /// The names of columns to read, or 'null' to read all columns.
-    /// </param>
+    /// <param name="columnNames">The names of columns to read.</param>
     public TBuilder SetProjectedColumns(IEnumerable<string> columnNames)
     {
         ProjectedColumnNames = columnNames.AsList();
@@ -63,9 +61,7 @@ public abstract class AbstractKuduScannerBuilder<TBuilder>
     /// Set which columns will be read by the Scanner.
     /// The default is to read all columns.
     /// </summary>
-    /// <param name="columnNames">
-    /// The names of columns to read, or 'null' to read all columns.
-    /// </param>
+    /// <param name="columnNames">The names of columns to read.</param>
     public TBuilder SetProjectedColumns(params string[] columnNames)
     {
         ProjectedColumnNames = columnNames?.ToList();
@@ -76,11 +72,10 @@ public abstract class AbstractKuduScannerBuilder<TBuilder>
     /// Set which columns will be read by the Scanner.
     /// The default is to read all columns.
     /// </summary>
-    /// <param name="columnIndexes">
-    /// The indexes of columns to read, or 'null' to read all columns.
-    /// </param>
+    /// <param name="columnIndexes">The indexes of columns to read.</param>
     public TBuilder SetProjectedColumns(IEnumerable<int> columnIndexes)
     {
+        ProjectedColumnNames = null;
         ProjectedColumnIndexes = columnIndexes.AsList();
         return (TBuilder)this;
     }
@@ -89,21 +84,30 @@ public abstract class AbstractKuduScannerBuilder<TBuilder>
     /// Set which columns will be read by the Scanner.
     /// The default is to read all columns.
     /// </summary>
-    /// <param name="columnIndexes">
-    /// The indexes of columns to read, or 'null' to read all columns.
-    /// </param>
+    /// <param name="columnIndexes">The indexes of columns to read.</param>
     public TBuilder SetProjectedColumns(params int[] columnIndexes)
     {
+        ProjectedColumnNames = null;
         ProjectedColumnIndexes = columnIndexes?.ToList();
         return (TBuilder)this;
     }
 
     /// <summary>
-    /// Don't read any columns. Useful for counting.
+    /// Don't read any columns. Used for counting.
     /// </summary>
     public TBuilder SetEmptyProjection()
     {
         ProjectedColumnNames = new List<string>();
+        return (TBuilder)this;
+    }
+
+    /// <summary>
+    /// Read every column in the table. This is the default.
+    /// </summary>
+    public TBuilder SetFullProjection()
+    {
+        ProjectedColumnNames = null;
+        ProjectedColumnIndexes = null;
         return (TBuilder)this;
     }
 
@@ -201,7 +205,7 @@ public abstract class AbstractKuduScannerBuilder<TBuilder>
     }
 
     /// <summary>
-    /// Sets a previously encoded HT timestamp as a snapshot timestamp, for tests.
+    /// Sets a previously encoded HT timestamp as a snapshot timestamp.
     /// None is used by default. Requires that the ReadMode is READ_AT_SNAPSHOT.
     /// </summary>
     /// <param name="htTimestamp">A long representing a HybridTime-encoded timestamp.</param>
@@ -280,7 +284,7 @@ public abstract class AbstractKuduScannerBuilder<TBuilder>
     /// If any bound is already added, this bound is intersected with that one.
     /// </summary>
     /// <param name="endPrimaryKey">An encoded end key.</param>
-    public TBuilder ExclusiveUpperBoundRaw(byte[] endPrimaryKey)
+    internal TBuilder ExclusiveUpperBoundRaw(byte[] endPrimaryKey)
     {
         if (UpperBoundPrimaryKey.Length == 0 ||
             endPrimaryKey.SequenceCompareTo(UpperBoundPrimaryKey) < 0)
