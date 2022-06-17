@@ -566,7 +566,7 @@ public sealed class KuduClient : IAsyncDisposable
         {
             Schema = table.SchemaPbNoIds.Schema,
             RowOperations = rowOperations,
-            ExternalConsistencyMode = (ExternalConsistencyModePB)externalConsistencyMode
+            ExternalConsistencyMode = (Protobuf.ExternalConsistencyMode)externalConsistencyMode
         };
 
         if (txnId != InvalidTxnId)

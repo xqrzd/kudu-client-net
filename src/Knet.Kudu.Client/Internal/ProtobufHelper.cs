@@ -112,12 +112,12 @@ internal static class ProtobufHelper
         var result = new ColumnSchemaPB
         {
             Name = columnSchema.Name,
-            Type = (DataTypePB)columnSchema.Type,
+            Type = (DataType)columnSchema.Type,
             IsKey = columnSchema.IsKey,
             IsNullable = columnSchema.IsNullable,
             CfileBlockSize = columnSchema.DesiredBlockSize,
-            Encoding = (EncodingTypePB)columnSchema.Encoding,
-            Compression = (CompressionTypePB)columnSchema.Compression,
+            Encoding = (Protobuf.EncodingType)columnSchema.Encoding,
+            Compression = (Protobuf.CompressionType)columnSchema.Compression,
             TypeAttributes = columnSchema.TypeAttributes.ToTypeAttributesPb()
         };
 

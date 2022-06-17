@@ -233,7 +233,7 @@ public class AlterTableBuilder
                 Delta = new ColumnSchemaDeltaPB
                 {
                     Name = name,
-                    Encoding = (EncodingTypePB)encoding
+                    Encoding = (Protobuf.EncodingType)encoding
                 }
             }
         });
@@ -257,7 +257,7 @@ public class AlterTableBuilder
                 Delta = new ColumnSchemaDeltaPB
                 {
                     Name = name,
-                    Compression = (CompressionTypePB)compressionType
+                    Compression = (Protobuf.CompressionType)compressionType
                 }
             }
         });

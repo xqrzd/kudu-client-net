@@ -1,0 +1,192 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+syntax = "proto2";
+package kudu.consensus;
+
+option java_package = "org.apache.kudu.consensus";
+option csharp_namespace = "Knet.Kudu.Client.Protobuf.Consensus";
+
+import "kudu/common/common.proto";
+
+// ===========================================================================
+//  Consensus Metadata
+// ===========================================================================
+
+// Per-replica attributes.
+message RaftPeerAttrsPB {
+  // Whether to promote a replica when it has caught up with the leader,
+  // changing its membership type from NON_VOTER to VOTER. This field is
+  // applicable only for NON_VOTER replicas.
+  optional bool promote = 1 [ default = false ];
+
+  // If set to 'true', the replica needs to be replaced regardless of
+  // its health report.
+  optional bool replace = 2 [ default = false ];
+}
+
+// Report on a replica's (peer's) health.
+message HealthReportPB {
+  // HealthStatus respresents a fully-connected state machine, where
+  // transitions between any of the states are allowed.
+  enum HealthStatus {
+    // No information on the health status.
+    UNKNOWN = 999;
+
+    // Replica has failed and needs replacement. The failure might be a
+    // transient one, so replica may return to a healthy state soon.
+    FAILED = 0;
+
+    // Replica is functioning properly.
+    HEALTHY = 1;
+
+    // Replica has failed in an irreversible and unrecoverable way and needs
+    // replacement. The failure is permanent and the replica definitely cannot
+    // return to a healthy state.
+    FAILED_UNRECOVERABLE = 2;
+  }
+
+  // Overall health status of a replica. Reflects at least the responsiveness
+  // (i.e. time of last contact) and the lag of the replica's WAL
+  // behind the leader's.
+  optional HealthStatus overall_health = 1;
+}
+
+// A peer in a configuration.
+message RaftPeerPB {
+  // The possible roles for peers.
+  enum Role {
+    UNKNOWN_ROLE = 999;
+
+    // Indicates this node is a follower in the configuration, i.e. that it participates
+    // in majorities and accepts Consensus::Update() calls.
+    FOLLOWER = 0;
+
+    // Indicates this node is the current leader of the configuration, i.e. that it
+    // participates in majorities and accepts Consensus::Append() calls.
+    LEADER = 1;
+
+    // Indicates that this node participates in the configuration in a passive role,
+    // i.e. that it accepts Consensus::Update() calls but does not participate
+    // in elections or majorities.
+    LEARNER = 2;
+
+    // Indicates that this node is not a participant of the configuration, i.e. does
+    // not accept Consensus::Update() or Consensus::Update() and cannot
+    // participate in elections or majorities. This is usually the role of a node
+    // that leaves the configuration.
+    NON_PARTICIPANT = 3;
+  };
+
+  enum MemberType {
+    UNKNOWN_MEMBER_TYPE = 999;
+    NON_VOTER = 0;
+    VOTER = 1;
+  };
+
+  // Permanent uuid is optional: RaftPeerPB/RaftConfigPB instances may
+  // be created before the permanent uuid is known (e.g., when
+  // manually specifying a configuration for Master/CatalogManager);
+  // permanent uuid can be retrieved at a later time through RPC.
+  optional bytes permanent_uuid = 1;
+  optional MemberType member_type = 2;
+  optional HostPortPB last_known_addr = 3;
+
+  // Replica attributes.
+  optional RaftPeerAttrsPB attrs = 4;
+
+  // Replica's health report, as seen by the leader. This is a run-time
+  // only field, it should not be persisted or read from the persistent storage.
+  optional HealthReportPB health_report = 5;
+}
+
+// A set of peers, serving a single tablet.
+message RaftConfigPB {
+  // The index of the operation which serialized this RaftConfigPB through
+  // consensus. It is set when the operation is consensus-committed (replicated
+  // to a majority of voters) and before the consensus metadata is updated.
+  // It is left undefined if the operation isn't committed.
+  optional int64 opid_index = 1;
+
+  // Obsolete. This parameter has been retired.
+  optional bool OBSOLETE_local = 2;
+
+  // Flag to allow unsafe config change operations.
+  optional bool unsafe_config_change = 4 [ default = false ];
+
+  // The set of peers in the configuration.
+  repeated RaftPeerPB peers = 3;
+}
+
+// Represents a snapshot of a configuration at a given moment in time.
+message ConsensusStatePB {
+  // A configuration is always guaranteed to have a known term.
+  required int64 current_term = 1;
+
+  // There may not always be a leader of a configuration at any given time.
+  //
+  // The node that the local peer considers to be leader changes based on rules
+  // defined in the Raft specification. Roughly, this corresponds either to
+  // being elected leader (in the case that the local peer is the leader), or
+  // when an update is accepted from another node, which basically just amounts
+  // to a term check on the UpdateConsensus() RPC request.
+  //
+  // Whenever the local peer sees a new term, the leader flag is cleared until
+  // a new leader is acknowledged based on the above criteria. Simply casting a
+  // vote for a peer is not sufficient to assume that the peer has won the
+  // election, so we do not update this field based on our vote.
+  //
+  // The leader may be a part of the committed or the pending configuration (or both).
+  optional string leader_uuid = 2;
+
+  // The committed peers. Initial peership is set on tablet start, so this
+  // field should always be present.
+  required RaftConfigPB committed_config = 3;
+
+  // The peers in the pending configuration, if there is one.
+  optional RaftConfigPB pending_config = 4;
+}
+
+// This PB is used to serialize all of the persistent state needed for
+// Consensus that is not in the WAL, such as leader election and
+// communication on startup.
+message ConsensusMetadataPB {
+  // Last-committed peership.
+  required RaftConfigPB committed_config = 1;
+
+  // Latest term this server has seen.
+  // When a configuration is first created, initialized to 0.
+  //
+  // Whenever a new election is started, the candidate increments this by one
+  // and requests votes from peers.
+  //
+  // If any RPC request or response is received from another node containing a term higher
+  // than this one, the server should step down to FOLLOWER and set its current_term to
+  // match the caller's term.
+  //
+  // If a follower receives an UpdateConsensus RPC with a term lower than this
+  // term, then that implies that the RPC is coming from a former LEADER who has
+  // not realized yet that its term is over. In that case, we will reject the
+  // UpdateConsensus() call with ConsensusErrorPB::INVALID_TERM.
+  //
+  // If a follower receives a RequestConsensusVote() RPC with an earlier term,
+  // the vote is denied.
+  required int64 current_term = 2;
+
+  // Permanent UUID of the candidate voted for in 'current_term', or not present
+  // if no vote was made in the current term.
+  optional string voted_for = 3;
+}

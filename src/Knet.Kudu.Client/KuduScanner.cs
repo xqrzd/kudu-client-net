@@ -16,7 +16,7 @@ public class KuduScanner : IAsyncEnumerable<ResultSet>
     private readonly List<ColumnSchemaPB> _projectedColumnsPb;
     private readonly Dictionary<string, KuduPredicate> _predicates;
 
-    private readonly OrderModePB _orderMode;
+    private readonly OrderMode _orderMode;
     private readonly bool _isFaultTolerant;
     private readonly long _limit;
     private readonly long _startTimestamp;
@@ -106,10 +106,10 @@ public class KuduScanner : IAsyncEnumerable<ResultSet>
                 throw new ArgumentException("Use of fault tolerance scanner " +
                     "requires the read mode to be set to READ_AT_SNAPSHOT");
 
-            _orderMode = OrderModePB.Ordered;
+            _orderMode = OrderMode.Ordered;
         }
         else
-            _orderMode = OrderModePB.Unordered;
+            _orderMode = OrderMode.Unordered;
 
         _logger = logger;
         _client = client;
@@ -280,8 +280,8 @@ public class KuduScanner : IAsyncEnumerable<ResultSet>
         ColumnSchema columnSchema, bool isDeleted)
     {
         var type = isDeleted
-            ? DataTypePB.IsDeleted
-            : (DataTypePB)columnSchema.Type;
+            ? DataType.IsDeleted
+            : (DataType)columnSchema.Type;
 
         var columnSchemaPb = new ColumnSchemaPB
         {

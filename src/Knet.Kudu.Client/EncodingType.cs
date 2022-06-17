@@ -1,5 +1,3 @@
-using Knet.Kudu.Client.Protobuf;
-
 namespace Knet.Kudu.Client;
 
 /// <summary>
@@ -8,10 +6,10 @@ namespace Knet.Kudu.Client;
 /// </summary>
 public enum EncodingType
 {
-    AutoEncoding = EncodingTypePB.AutoEncoding,
-    PlainEncoding = EncodingTypePB.PlainEncoding,
-    PrefixEncoding = EncodingTypePB.PrefixEncoding,
-    Rle = EncodingTypePB.Rle,
-    DictEncoding = EncodingTypePB.DictEncoding,
-    BitShuffle = EncodingTypePB.BitShuffle
+    AutoEncoding = Protobuf.EncodingType.AutoEncoding,
+    PlainEncoding = Protobuf.EncodingType.PlainEncoding,
+    PrefixEncoding = Protobuf.EncodingType.PrefixEncoding,
+    Rle = Protobuf.EncodingType.Rle,
+    DictEncoding = Protobuf.EncodingType.DictEncoding,
+    BitShuffle = Protobuf.EncodingType.BitShuffle
 }

@@ -120,9 +120,9 @@ public class KuduSchema
         {
             var column = columns[i];
 
-            if (column.Type == DataTypePB.String ||
-                column.Type == DataTypePB.Binary ||
-                column.Type == DataTypePB.Varchar)
+            if (column.Type == DataType.String ||
+                column.Type == DataType.Binary ||
+                column.Type == DataType.Varchar)
             {
                 columnOffsets[i] = varLenCnt;
                 varLenCnt++;
@@ -143,7 +143,7 @@ public class KuduSchema
             if (column.IsKey)
                 primaryKeyColumns.Add(columnsByIndex[i]);
 
-            if (column.Type == DataTypePB.IsDeleted)
+            if (column.Type == DataType.IsDeleted)
                 isDeletedIndex = i;
         }
 
