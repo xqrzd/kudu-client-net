@@ -52,9 +52,8 @@ public sealed class KuduClient : IAsyncDisposable
     private readonly RequestTracker _requestTracker;
     private readonly AuthzTokenCache _authzTokenCache;
     private readonly SemaphoreSlim _singleClusterConnect;
+    private readonly MasterManager _masterManager;
     private readonly int _defaultOperationTimeoutMs;
-
-    private volatile MasterLeaderInfo? _masterLeaderInfo;
 
     /// <summary>
     /// Timestamp required for HybridTime external consistency through timestamp propagation.
@@ -81,6 +80,7 @@ public sealed class KuduClient : IAsyncDisposable
         _requestTracker = new RequestTracker(Guid.NewGuid().ToString("N"));
         _authzTokenCache = new AuthzTokenCache();
         _singleClusterConnect = new SemaphoreSlim(1, 1);
+        _masterManager = new MasterManager();
         _defaultOperationTimeoutMs = (int)options.DefaultOperationTimeout.TotalMilliseconds;
     }
 
@@ -1224,7 +1224,7 @@ public sealed class KuduClient : IAsyncDisposable
     private ValueTask<MasterLeaderInfo> GetMasterLeaderInfoAsync(
         CancellationToken cancellationToken)
     {
-        var masterLeaderInfo = _masterLeaderInfo;
+        var masterLeaderInfo = _masterManager.LeaderInfo;
         if (masterLeaderInfo is not null)
         {
             return new ValueTask<MasterLeaderInfo>(masterLeaderInfo);
@@ -1237,8 +1237,8 @@ public sealed class KuduClient : IAsyncDisposable
         {
             var rpc = new ConnectToMasterRequest();
             await SendRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
-            // TODO: Another failed RPC could have overwritten _masterLeaderInfo with null.
-            return _masterLeaderInfo!;
+
+            return _masterManager.LastKnownLeaderInfo!;
         }
     }
 
@@ -1248,27 +1248,25 @@ public sealed class KuduClient : IAsyncDisposable
     /// <param name="cancellationToken">The cancellation token.</param>
     private async Task<MasterLeaderInfo> ConnectToClusterAsync(CancellationToken cancellationToken)
     {
-        var masterLeaderInfo = _masterLeaderInfo;
-
         await _singleClusterConnect.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (ReferenceEquals(masterLeaderInfo, _masterLeaderInfo) ||
-                _masterLeaderInfo is null)
+            var masterLeaderInfo = _masterManager.LeaderInfo;
+
+            if (masterLeaderInfo is null)
             {
-                var result = await ConnectToClusterWithoutLockAsync(cancellationToken)
+                var clusterResponse = await ConnectToClusterWithoutLockAsync(cancellationToken)
                     .ConfigureAwait(false);
 
-                SetMasterLeaderInfo(result);
+                masterLeaderInfo = SetMasterLeaderInfo(clusterResponse);
             }
+
+            return masterLeaderInfo;
         }
         finally
         {
             _singleClusterConnect.Release();
         }
-
-        // TODO: Another failed RPC could have overwritten _masterLeaderInfo with null.
-        return _masterLeaderInfo!;
     }
 
     private async Task<ConnectToClusterResponse> ConnectToClusterWithoutLockAsync(
@@ -1404,7 +1402,7 @@ public sealed class KuduClient : IAsyncDisposable
         return SendRpcToMasterAsync(rpc, serverInfo, cancellationToken);
     }
 
-    private void SetMasterLeaderInfo(ConnectToClusterResponse clusterResponse)
+    private MasterLeaderInfo SetMasterLeaderInfo(ConnectToClusterResponse clusterResponse)
     {
         var responsePb = clusterResponse.ResponsePb;
         var authnToken = responsePb.AuthnToken;
@@ -1427,7 +1425,9 @@ public sealed class KuduClient : IAsyncDisposable
             clusterResponse.ServerInfo,
             responsePb.HmsConfig.ToHiveMetastoreConfig());
 
-        _masterLeaderInfo = masterLeaderInfo;
+        _masterManager.UpdateLeader(masterLeaderInfo);
+
+        return masterLeaderInfo;
     }
 
     internal async Task<T> SendRpcAsync<T>(
@@ -1504,7 +1504,7 @@ public sealed class KuduClient : IAsyncDisposable
     private Task<T> SendRpcToMasterAsync<T>(
         KuduMasterRpc<T> rpc, CancellationToken cancellationToken)
     {
-        var masterLeaderInfo = _masterLeaderInfo;
+        var masterLeaderInfo = _masterManager.LeaderInfo;
         if (masterLeaderInfo is not null)
         {
             var serverInfo = masterLeaderInfo.ServerInfo;
@@ -1527,7 +1527,7 @@ public sealed class KuduClient : IAsyncDisposable
     private Task<T> SendRpcToTxnManagerAsync<T>(
         KuduTxnRpc<T> rpc, CancellationToken cancellationToken)
     {
-        var masterLeaderInfo = _masterLeaderInfo;
+        var masterLeaderInfo = _masterManager.LeaderInfo;
         if (masterLeaderInfo is not null)
         {
             var serverInfo = masterLeaderInfo.ServerInfo;
@@ -1604,7 +1604,7 @@ public sealed class KuduClient : IAsyncDisposable
 
     private ServerInfo? GetServerInfo(RemoteTablet tablet, ReplicaSelection replicaSelection)
     {
-        var masterLeaderInfo = _masterLeaderInfo;
+        var masterLeaderInfo = _masterManager.LastKnownLeaderInfo;
         return tablet.GetServerInfo(replicaSelection, masterLeaderInfo?.Location);
     }
 
@@ -1639,7 +1639,7 @@ public sealed class KuduClient : IAsyncDisposable
 
             if (errCode == MasterErrorPB.Types.Code.NotTheLeader)
             {
-                InvalidateMasterServerCache();
+                InvalidateMasterServerCache(serverInfo);
                 throw new RecoverableException(status);
             }
             else if (errStatusCode == AppStatusPB.Types.ErrorCode.ServiceUnavailable)
@@ -1773,7 +1773,7 @@ public sealed class KuduClient : IAsyncDisposable
                 }
                 else
                 {
-                    InvalidateMasterServerCache();
+                    InvalidateMasterServerCache(serverInfo);
                 }
             }
 
@@ -1781,9 +1781,9 @@ public sealed class KuduClient : IAsyncDisposable
         }
     }
 
-    private void InvalidateMasterServerCache()
+    private void InvalidateMasterServerCache(ServerInfo serverInfo)
     {
-        _masterLeaderInfo = null;
+        _masterManager.RemoveLeader(serverInfo);
     }
 
     private async Task RefreshAuthzTokenAsync(
@@ -1894,12 +1894,6 @@ public sealed class KuduClient : IAsyncDisposable
             KeyRanges = keyRanges;
         }
     }
-
-    private sealed record MasterLeaderInfo(
-        string Location,
-        string ClusterId,
-        ServerInfo ServerInfo,
-        HiveMetastoreConfig? HiveMetastoreConfig);
 
     private sealed class ConnectToMasterResponse
     {
