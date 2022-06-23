@@ -1235,6 +1235,7 @@ public sealed class KuduClient : IAsyncDisposable
 
         async Task<MasterLeaderInfo> ConnectAsync(CancellationToken cancellationToken)
         {
+            // Use SendRpcAsync instead of ConnectToClusterAsync for retry logic.
             var rpc = new ConnectToMasterRequest();
             await SendRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
 
@@ -1839,7 +1840,7 @@ public sealed class KuduClient : IAsyncDisposable
         return header;
     }
 
-    internal static Task DelayRpcAsync(KuduRpc rpc, CancellationToken cancellationToken)
+    private static Task DelayRpcAsync(KuduRpc rpc, CancellationToken cancellationToken)
     {
         int attemptCount = rpc.Attempt;
 
