@@ -8,7 +8,7 @@
     <NoWarn>CS1591;SYSLIB1015</NoWarn>
 
     <PackageId>$(AssemblyName)</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Authors>xqrzd</Authors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>.NET client for Apache Kudu</Description>
