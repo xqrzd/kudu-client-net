@@ -1,4 +1,4 @@
-#if NETSTANDARD2_0 || NETSTANDARD2_1
+#if !NETCOREAPP3_1_OR_GREATER
 using System;
 
 namespace Knet.Kudu.Client.Tablet;
