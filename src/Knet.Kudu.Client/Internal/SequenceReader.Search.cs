@@ -507,6 +507,32 @@ internal ref partial struct SequenceReader<T> where T : unmanaged, IEquatable<T>
     }
 
     /// <summary>
+    /// Try to read data with given <paramref name="count"/>.
+    /// </summary>
+    /// <param name="count">Read count.</param>
+    /// <param name="sequence">The read data, if successfully read requested <paramref name="count"/> data.</param>
+    /// <returns><c>true</c> if remaining items in current <see cref="SequenceReader{T}" /> is enough for <paramref name="count"/>.</returns>
+    public bool TryReadExact(int count, out ReadOnlySequence<T> sequence)
+    {
+        if (count < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(count));
+        }
+        if (count > Remaining)
+        {
+            sequence = default;
+            return false;
+        }
+
+        sequence = Sequence.Slice(Position, count);
+        if (count != 0)
+        {
+            Advance(count);
+        }
+        return true;
+    }
+
+    /// <summary>
     /// Advance until the given <paramref name="delimiter"/>, if found.
     /// </summary>
     /// <param name="delimiter">The delimiter to search for.</param>
