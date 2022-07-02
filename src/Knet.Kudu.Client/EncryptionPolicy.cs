@@ -2,13 +2,19 @@ namespace Knet.Kudu.Client;
 
 public enum EncryptionPolicy
 {
-    // Optional, it uses encrypted connection if the server supports it,
-    // but it can connect to insecure servers too.
+    /// <summary>
+    /// Optional, it uses encrypted connection if the server supports it,
+    /// but it can connect to insecure servers too.
+    /// </summary>
     Optional,
-    // Only connects to remote servers that support encryption, fails
-    // otherwise. It can connect to insecure servers only locally.
+    /// <summary>
+    /// Only connects to remote servers that support encryption, fails
+    /// otherwise. It can connect to insecure servers only locally.
+    /// </summary>
     RequiredRemote,
-    // Only connects to any server, including on the loopback interface,
-    // that support encryption, fails otherwise.
+    /// <summary>
+    /// Only connects to any server, including on the loopback interface,
+    /// that support encryption, fails otherwise.
+    /// </summary>
     Required
 }
