@@ -110,4 +110,13 @@ internal static partial class LoggerExtensions
         Exception exception,
         long TxnId,
         TimeSpan KeepaliveInterval);
+
+    [LoggerMessage(
+        EventId = 10,
+        Level = LogLevel.Warning,
+        EventName = "SetTcpKeepAliveFailed",
+        Message = "Unable to set TCP keepalive for connection")]
+    public static partial void SetTcpKeepAliveFailed(
+        this ILogger logger,
+        Exception exception);
 }
