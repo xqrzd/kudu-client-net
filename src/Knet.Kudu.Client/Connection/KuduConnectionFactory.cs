@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.Exceptions;
+using Knet.Kudu.Client.Logging;
 using Knet.Kudu.Client.Negotiate;
 using Microsoft.Extensions.Logging;
 using Pipelines.Sockets.Unofficial;
@@ -17,6 +18,7 @@ public sealed class KuduConnectionFactory : IKuduConnectionFactory
     private readonly KuduClientOptions _options;
     private readonly ISecurityContext _securityContext;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly ILogger _logger;
     private readonly HashSet<IPAddress> _localIPs;
 
     public KuduConnectionFactory(
@@ -27,6 +29,7 @@ public sealed class KuduConnectionFactory : IKuduConnectionFactory
         _options = options;
         _securityContext = securityContext;
         _loggerFactory = loggerFactory;
+        _logger = _loggerFactory.CreateLogger<KuduConnectionFactory>();
         _localIPs = GetLocalAddresses();
     }
 
@@ -36,6 +39,7 @@ public sealed class KuduConnectionFactory : IKuduConnectionFactory
         var endpoint = serverInfo.Endpoint;
         var socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         SocketConnection.SetRecommendedClientOptions(socket);
+        SetTcpKeepAlive(socket);
 
         try
         {
@@ -127,5 +131,23 @@ public sealed class KuduConnectionFactory : IKuduConnectionFactory
         }
 
         return addresses;
+    }
+
+    private void SetTcpKeepAlive(Socket socket)
+    {
+        try
+        {
+            socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+
+#if NETCOREAPP3_1_OR_GREATER
+            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, 60);
+            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, 3);
+            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, 10);
+#endif
+        }
+        catch (Exception ex)
+        {
+            _logger.SetTcpKeepAliveFailed(ex);
+        }
     }
 }
