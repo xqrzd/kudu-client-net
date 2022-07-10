@@ -168,7 +168,7 @@ public static class DecimalUtil
         if (extraHigh > 0)
         {
             throw new OverflowException("Kudu decimal is too large for .NET decimal. " +
-                "Use GetRawFixed to read the raw value.");
+                $"Use {nameof(RowResult.GetSpan)} to read the raw value.");
         }
 
         return new decimal(low, mid, high, value < 0, (byte)scale);
