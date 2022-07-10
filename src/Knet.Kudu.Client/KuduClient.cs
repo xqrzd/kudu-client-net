@@ -1871,11 +1871,21 @@ public sealed class KuduClient : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Creates a new builder for a client that will connect to the specified masters.
+    /// </summary>
+    /// <param name="masterAddresses">
+    /// Comma-separated list of "host:port" pairs of the masters. The port defaults to
+    /// 7051 if omitted.
+    /// </param>
     public static KuduClientBuilder NewBuilder(string masterAddresses)
     {
         return new KuduClientBuilder(masterAddresses);
     }
 
+    /// <summary>
+    /// Creates a new builder for a client that will connect to the specified masters.
+    /// </summary>
     public static KuduClientBuilder NewBuilder(IReadOnlyList<HostAndPort> masterAddresses)
     {
         return new KuduClientBuilder(masterAddresses);
