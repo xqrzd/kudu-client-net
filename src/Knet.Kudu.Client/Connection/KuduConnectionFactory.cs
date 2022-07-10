@@ -39,7 +39,6 @@ public sealed class KuduConnectionFactory : IKuduConnectionFactory
         var endpoint = serverInfo.Endpoint;
         var socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         SocketConnection.SetRecommendedClientOptions(socket);
-        SetTcpKeepAlive(socket);
 
         try
         {
@@ -50,7 +49,11 @@ public sealed class KuduConnectionFactory : IKuduConnectionFactory
 #endif
 
             var negotiator = new Negotiator(_options, _securityContext, _loggerFactory, serverInfo, socket);
-            return await negotiator.NegotiateAsync(cancellationToken).ConfigureAwait(false);
+            var connection = await negotiator.NegotiateAsync(cancellationToken).ConfigureAwait(false);
+
+            SetTcpKeepAlive(socket);
+
+            return connection;
         }
         catch
         {
