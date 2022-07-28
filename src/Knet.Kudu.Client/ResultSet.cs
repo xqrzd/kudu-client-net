@@ -21,6 +21,9 @@ public sealed class ResultSet : IEnumerable<RowResult>
     private readonly SidecarOffset[] _nonNullBitmapSidecarOffsets;
     private KuduSchema? _schema;
 
+    /// <summary>
+    /// The number of rows in this <see cref="ResultSet"/>.
+    /// </summary>
     public long Count { get; }
 
     internal ResultSet(
@@ -40,6 +43,9 @@ public sealed class ResultSet : IEnumerable<RowResult>
         Count = count;
     }
 
+    /// <summary>
+    /// The projected schema of the scan.
+    /// </summary>
     public KuduSchema Schema
     {
         get
