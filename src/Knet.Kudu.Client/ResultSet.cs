@@ -53,6 +53,11 @@ public sealed class ResultSet : IEnumerable<RowResult>
         }
     }
 
+    /// <summary>
+    /// Maps the rows of this set to the generic type. The results of this method are
+    /// only valid until <see cref="KuduScanEnumerator.MoveNextAsync"/> is called.
+    /// </summary>
+    /// <typeparam name="T">The type to project a row to.</typeparam>
     public IEnumerable<T> MapTo<T>()
     {
         var func = _mapper.CreateDelegate<T>(Schema);
