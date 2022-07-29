@@ -21,6 +21,9 @@ public sealed class ResultSet : IEnumerable<RowResult>
     private readonly SidecarOffset[] _nonNullBitmapSidecarOffsets;
     private KuduSchema? _schema;
 
+    /// <summary>
+    /// The number of rows in this <see cref="ResultSet"/>.
+    /// </summary>
     public long Count { get; }
 
     internal ResultSet(
@@ -40,6 +43,9 @@ public sealed class ResultSet : IEnumerable<RowResult>
         Count = count;
     }
 
+    /// <summary>
+    /// The projected schema of the scan.
+    /// </summary>
     public KuduSchema Schema
     {
         get
@@ -53,6 +59,11 @@ public sealed class ResultSet : IEnumerable<RowResult>
         }
     }
 
+    /// <summary>
+    /// Maps the rows of this set to the generic type. The results of this method are
+    /// only valid until <see cref="KuduScanEnumerator.MoveNextAsync"/> is called.
+    /// </summary>
+    /// <typeparam name="T">The type to project a row to.</typeparam>
     public IEnumerable<T> MapTo<T>()
     {
         var func = _mapper.CreateDelegate<T>(Schema);
