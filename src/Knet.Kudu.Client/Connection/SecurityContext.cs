@@ -72,9 +72,9 @@ public sealed class SecurityContext : ISecurityContext
         return ProtobufHelper.ToByteArray(tokenPb);
     }
 
-    public void ImportAuthenticationCredentials(ReadOnlyMemory<byte> token)
+    public void ImportAuthenticationCredentials(ReadOnlySpan<byte> token)
     {
-        var tokenPb = AuthenticationCredentialsPB.Parser.ParseFrom(token.Span);
+        var tokenPb = AuthenticationCredentialsPB.Parser.ParseFrom(token);
         var caCertDers = tokenPb.CaCertDers.ToMemoryArray();
 
         lock (_lockObj)

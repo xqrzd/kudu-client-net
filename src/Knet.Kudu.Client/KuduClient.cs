@@ -179,7 +179,7 @@ public sealed class KuduClient : IAsyncDisposable
     /// The authentication token provided by a prior call to
     /// <see cref="ExportAuthenticationCredentialsAsync(CancellationToken)"/>.
     /// </param>
-    public void ImportAuthenticationCredentials(ReadOnlyMemory<byte> token)
+    public void ImportAuthenticationCredentials(ReadOnlySpan<byte> token)
     {
         _securityContext.ImportAuthenticationCredentials(token);
     }
@@ -601,9 +601,9 @@ public sealed class KuduClient : IAsyncDisposable
     /// <param name="scanToken">The scan token to use.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     public ValueTask<KuduScannerBuilder> NewScanBuilderFromTokenAsync(
-        ReadOnlyMemory<byte> scanToken, CancellationToken cancellationToken = default)
+        ReadOnlySpan<byte> scanToken, CancellationToken cancellationToken = default)
     {
-        var scanTokenPb = KuduScanToken.DeserializePb(scanToken.Span);
+        var scanTokenPb = KuduScanToken.DeserializePb(scanToken);
         return NewScanBuilderFromTokenAsync(scanTokenPb, cancellationToken);
     }
 
@@ -728,9 +728,9 @@ public sealed class KuduClient : IAsyncDisposable
     /// </para>
     /// </summary>
     /// <param name="transactionToken">Serialized representation of a KuduTransaction.</param>
-    public KuduTransaction NewTransactionFromToken(ReadOnlyMemory<byte> transactionToken)
+    public KuduTransaction NewTransactionFromToken(ReadOnlySpan<byte> transactionToken)
     {
-        var tokenPb = TxnTokenPB.Parser.ParseFrom(transactionToken.Span);
+        var tokenPb = TxnTokenPB.Parser.ParseFrom(transactionToken);
         var txnId = tokenPb.TxnId;
         var keepaliveEnabled = tokenPb.HasEnableKeepalive && tokenPb.EnableKeepalive;
         var keepaliveInterval = keepaliveEnabled
