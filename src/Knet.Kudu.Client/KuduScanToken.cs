@@ -25,7 +25,7 @@ namespace Knet.Kudu.Client;
 /// <para>
 /// Scan tokens may be serialized using the <see cref="Serialize"/> method and
 /// deserialized back into a scanner using the
-/// <see cref="KuduClient.NewScanBuilderFromTokenAsync(ReadOnlyMemory{byte}, CancellationToken)"/>
+/// <see cref="KuduClient.NewScanBuilderFromTokenAsync(ReadOnlySpan{byte}, CancellationToken)"/>
 /// method. This allows use cases such as generating scan tokens in the planner
 /// component of a query engine, then sending the tokens to execution nodes based
 /// on locality, and then instantiating the scanners on those nodes.

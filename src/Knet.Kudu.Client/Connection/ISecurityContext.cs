@@ -39,7 +39,7 @@ public interface ISecurityContext
     /// Import data allowing this client to authenticate to the cluster.
     /// </summary>
     /// <param name="token">The authentication token.</param>
-    public void ImportAuthenticationCredentials(ReadOnlyMemory<byte> token);
+    public void ImportAuthenticationCredentials(ReadOnlySpan<byte> token);
 
     /// <summary>
     /// Mark the given CA cert (provided in DER form) as the trusted CA cert for the

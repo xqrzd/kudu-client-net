@@ -159,7 +159,7 @@ public sealed class KuduTransaction : IDisposable
     /// Kudu clients can perform operations to be a part of the same distributed
     /// transaction. The resulting string is referred to as a "transaction token"
     /// and it can be deserialized into a <see cref="KuduTransaction"/> via the
-    /// <see cref="KuduClient.NewTransactionFromToken(ReadOnlyMemory{byte})"/>.
+    /// <see cref="KuduClient.NewTransactionFromToken(ReadOnlySpan{byte})"/>.
     /// </para>
     /// </summary>
     public byte[] Serialize(KuduTransactionSerializationOptions options)
@@ -189,7 +189,7 @@ public sealed class KuduTransaction : IDisposable
     /// Kudu clients can perform operations to be a part of the same distributed
     /// transaction. The resulting string is referred to as a "transaction token"
     /// and it can be deserialized into a <see cref="KuduTransaction"/> via the
-    /// <see cref="KuduClient.NewTransactionFromToken(ReadOnlyMemory{byte})"/>.
+    /// <see cref="KuduClient.NewTransactionFromToken(ReadOnlySpan{byte})"/>.
     /// </para>
     /// </summary>
     public byte[] Serialize() => Serialize(_defaultSerializationOptions);
