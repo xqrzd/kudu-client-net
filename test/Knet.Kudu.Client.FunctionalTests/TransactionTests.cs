@@ -208,7 +208,7 @@ public class TransactionTests
             async () => await transaction.WaitForCommitAsync());
 
         Assert.True(exception1.Status.IsIllegalState);
-        Assert.Equal("transaction is still open", exception1.Message);
+        Assert.Equal("Transaction is still open", exception1.Message);
 
         await transaction.RollbackAsync();
 
@@ -216,7 +216,7 @@ public class TransactionTests
             async () => await transaction.WaitForCommitAsync());
 
         Assert.True(exception2.Status.IsAborted);
-        Assert.Equal("transaction is being aborted", exception2.Message);
+        Assert.Equal("Transaction is being aborted", exception2.Message);
 
         using var fakeTransaction = MakeFakeTransaction(client, transaction);
         var exception3 = await Assert.ThrowsAsync<NonRecoverableException>(
@@ -614,7 +614,7 @@ public class TransactionTests
                 async () => await transaction.WaitForCommitAsync());
 
             Assert.True(exception.Status.IsIllegalState);
-            Assert.Equal("transaction is still open", exception.Message);
+            Assert.Equal("Transaction is still open", exception.Message);
 
             await harness.KillAllMasterServersAsync();
             await harness.StartAllMasterServersAsync();
@@ -830,7 +830,7 @@ public class TransactionTests
                 async () => await transaction.WaitForCommitAsync());
 
             Assert.True(exception.Status.IsIllegalState);
-            Assert.Equal("transaction is still open", exception.Message);
+            Assert.Equal("Transaction is still open", exception.Message);
 
             // In addition, it should be possible to insert rows in the context
             // of the transaction.
