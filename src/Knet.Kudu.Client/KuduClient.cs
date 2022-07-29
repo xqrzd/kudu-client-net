@@ -1840,7 +1840,7 @@ public sealed class KuduClient : IAsyncDisposable
         return header;
     }
 
-    private static Task DelayRpcAsync(KuduRpc rpc, CancellationToken cancellationToken)
+    internal static Task DelayRpcAsync(KuduRpc rpc, CancellationToken cancellationToken)
     {
         int attemptCount = rpc.Attempt;
 

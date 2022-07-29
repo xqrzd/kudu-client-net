@@ -132,15 +132,15 @@ public sealed class KuduTransaction : IDisposable
         while (true)
         {
             var response = await _client.SendRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
-            var state = response.State;
 
             if (response.HasCommitTimestamp)
                 _client.LastPropagatedTimestamp = (long)response.CommitTimestamp;
 
-            if (IsTransactionCommited(state))
+            if (IsTransactionCommited(response.State))
                 return;
 
             rpc.Attempt++;
+            await KuduClient.DelayRpcAsync(rpc, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -245,18 +245,14 @@ public sealed class KuduTransaction : IDisposable
         {
             TxnStatePB.Committed => true,
             TxnStatePB.CommitInProgress or TxnStatePB.FinalizeInProgress => false,
-
             TxnStatePB.AbortInProgress => throw new NonRecoverableException(
-                KuduStatus.Aborted("transaction is being aborted")),
-
+                KuduStatus.Aborted("Transaction is being aborted")),
             TxnStatePB.Aborted => throw new NonRecoverableException(
-                KuduStatus.Aborted("transaction was aborted")),
-
+                KuduStatus.Aborted("Transaction was aborted")),
             TxnStatePB.Open => throw new NonRecoverableException(
-                KuduStatus.IllegalState("transaction is still open")),
-
+                KuduStatus.IllegalState("Transaction is still open")),
             _ => throw new NonRecoverableException(
-                KuduStatus.NotSupported($"unexpected transaction state: {txnState}"))
+                KuduStatus.NotSupported($"Unexpected transaction state: {txnState}"))
         };
     }
 }
