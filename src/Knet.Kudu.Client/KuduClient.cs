@@ -556,17 +556,15 @@ public sealed class KuduClient : IAsyncDisposable
 
         OperationsEncoder.Encode(operations, rowDataMemory.Span, indirectDataMemory.Span);
 
-        var rowOperations = new RowOperationsPB
-        {
-            Rows = UnsafeByteOperations.UnsafeWrap(rowDataMemory),
-            IndirectData = UnsafeByteOperations.UnsafeWrap(indirectDataMemory)
-        };
-
         var request = new WriteRequestPB
         {
             Schema = table.SchemaPbNoIds.Schema,
-            RowOperations = rowOperations,
-            ExternalConsistencyMode = (Protobuf.ExternalConsistencyMode)externalConsistencyMode
+            ExternalConsistencyMode = (Protobuf.ExternalConsistencyMode)externalConsistencyMode,
+            RowOperations = new RowOperationsPB
+            {
+                Rows = UnsafeByteOperations.UnsafeWrap(rowDataMemory),
+                IndirectData = UnsafeByteOperations.UnsafeWrap(indirectDataMemory)
+            }
         };
 
         if (txnId != InvalidTxnId)
