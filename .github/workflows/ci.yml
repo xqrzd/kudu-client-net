@@ -9,7 +9,7 @@ env:
 jobs:
   linux_build:
     name: Linux build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04
 
     steps:
     - uses: actions/checkout@v2
@@ -25,7 +25,7 @@ jobs:
   publish:
     name: Publish nuget package
     needs: linux_build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04
 
     if: github.ref == 'refs/heads/main'
     steps:
