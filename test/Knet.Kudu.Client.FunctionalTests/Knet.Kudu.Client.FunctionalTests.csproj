@@ -1,24 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net7.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Grpc.Tools" Version="2.46.3" PrivateAssets="All" />
+    <PackageReference Include="Grpc.Tools" Version="2.50.0" PrivateAssets="All" />
     <PackageReference Include="Knet.Kudu.Binary" Version="1.16.0" />
     <PackageReference Include="McMaster.Extensions.Xunit" Version="0.1.0" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.2.0" />
-    <PackageReference Include="xunit" Version="2.4.1" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.4.0" />
+    <PackageReference Include="xunit" Version="2.4.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5" PrivateAssets="All" />
   </ItemGroup>
 
   <ItemGroup>
-    <Protobuf Include="../../src/Knet.Kudu.Client/Protos/kudu/tools/tool.proto"
-              ProtoRoot="../../src/Knet.Kudu.Client/Protos"
-              GrpcServices="None" />
+    <Protobuf Include="..\..\src\Knet.Kudu.Client\Protos\kudu\tools\tool.proto" ProtoRoot="..\..\src\Knet.Kudu.Client\Protos" GrpcServices="None" />
   </ItemGroup>
 
   <ItemGroup>
