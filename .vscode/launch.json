@@ -6,7 +6,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/examples/InsertLoadgen/bin/Debug/net6.0/InsertLoadgen.dll",
+            "program": "${workspaceFolder}/examples/InsertLoadgen/bin/Debug/net7.0/InsertLoadgen.dll",
             "args": [],
             "cwd": "${workspaceFolder}/examples/InsertLoadgen",
             "console": "internalConsole",
