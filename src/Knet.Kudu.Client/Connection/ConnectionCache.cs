@@ -17,7 +17,8 @@ public sealed class ConnectionCache : IAsyncDisposable
     private readonly IKuduConnectionFactory _connectionFactory;
     private readonly ILogger _logger;
     private readonly Dictionary<IPEndPoint, Task<KuduConnection>> _connections;
-    private volatile bool _disposed;
+    private readonly CancellationTokenSource _disposedCts;
+    private bool _disposed;
 
     public ConnectionCache(
         IKuduConnectionFactory connectionFactory,
@@ -26,23 +27,28 @@ public sealed class ConnectionCache : IAsyncDisposable
         _connectionFactory = connectionFactory;
         _logger = loggerFactory.CreateLogger<ConnectionCache>();
         _connections = new Dictionary<IPEndPoint, Task<KuduConnection>>();
+        _disposedCts = new CancellationTokenSource();
     }
 
     public async Task<KuduConnection> GetConnectionAsync(
         ServerInfo serverInfo, CancellationToken cancellationToken = default)
     {
-        if (_disposed)
-            ThrowObjectDisposedException();
-
         IPEndPoint endpoint = serverInfo.Endpoint;
         Task<KuduConnection>? connectionTask;
-        bool newConnection = false;
+        var newConnection = false;
+        var stoppingToken = _disposedCts.Token;
 
         lock (_connections)
         {
+            if (_disposed)
+                ThrowObjectDisposedException();
+
             if (!_connections.TryGetValue(endpoint, out connectionTask))
             {
-                connectionTask = _connectionFactory.ConnectAsync(serverInfo, cancellationToken);
+                // Don't cancel the connect task if the requesting RPC was cancelled.
+                // This prevents unnecessary connects if RPCs are configured with short
+                // timeouts. Only abort the connect task when the client is disposed.
+                connectionTask = _connectionFactory.ConnectAsync(serverInfo, stoppingToken);
                 _connections.Add(endpoint, connectionTask);
                 newConnection = true;
             }
@@ -50,7 +56,9 @@ public sealed class ConnectionCache : IAsyncDisposable
 
         try
         {
-            var connection = await connectionTask.ConfigureAwait(false);
+            var connection = await connectionTask
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
 
             if (newConnection)
             {
@@ -87,8 +95,8 @@ public sealed class ConnectionCache : IAsyncDisposable
         {
             if (_connections.TryGetValue(endpoint, out var connectionTask))
             {
-                // Someone else might have already replaced the faulted connection.
-                // Confirm that the connection we're about to remove is faulted.
+                // The faulted connection may have already been replaced.
+                // Confirm the connection we're about to remove is faulted.
                 if (connectionTask.IsFaulted)
                 {
                     _connections.Remove(endpoint);
@@ -107,26 +115,34 @@ public sealed class ConnectionCache : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        _disposed = true;
-        List<Task<KuduConnection>> connections;
+        List<Task<KuduConnection>>? connections = null;
 
         lock (_connections)
         {
-            connections = _connections.Values.ToList();
-            _connections.Clear();
+            if (!_disposed)
+            {
+                connections = _connections.Values.ToList();
+                _connections.Clear();
+                _disposedCts.Cancel();
+
+                _disposed = true;
+            }
         }
 
-        foreach (var connectionTask in connections)
+        if (connections is not null)
         {
-            try
+            foreach (var connectionTask in connections)
             {
-                // TODO: Cancellation token support so we can cancel
-                // any connections still in the negotiation phase?
-                KuduConnection connection = await connectionTask.ConfigureAwait(false);
-                await connection.DisposeAsync().ConfigureAwait(false);
+                try
+                {
+                    KuduConnection connection = await connectionTask.ConfigureAwait(false);
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                }
+                catch { }
             }
-            catch { }
         }
+
+        _disposedCts.Dispose();
     }
 
     [DoesNotReturn]

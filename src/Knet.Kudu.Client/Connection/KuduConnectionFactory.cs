@@ -65,7 +65,8 @@ public sealed class KuduConnectionFactory : IKuduConnectionFactory
     public async Task<List<ServerInfo>> GetMasterServerInfoAsync(
         HostAndPort hostPort, CancellationToken cancellationToken = default)
     {
-        var ipAddresses = await GetHostAddressesAsync(hostPort.Host).ConfigureAwait(false);
+        var ipAddresses = await GetHostAddressesAsync(hostPort.Host, cancellationToken)
+            .ConfigureAwait(false);
         var servers = new List<ServerInfo>(ipAddresses.Length);
 
         foreach (var ipAddress in ipAddresses)
@@ -83,7 +84,8 @@ public sealed class KuduConnectionFactory : IKuduConnectionFactory
     public async Task<ServerInfo> GetTabletServerInfoAsync(
         HostAndPort hostPort, string uuid, string? location, CancellationToken cancellationToken = default)
     {
-        var ipAddresses = await GetHostAddressesAsync(hostPort.Host).ConfigureAwait(false);
+        var ipAddresses = await GetHostAddressesAsync(hostPort.Host, cancellationToken)
+            .ConfigureAwait(false);
         var ipAddress = ipAddresses[0];
 
         var endpoint = new IPEndPoint(ipAddress, hostPort.Port);
@@ -97,13 +99,17 @@ public sealed class KuduConnectionFactory : IKuduConnectionFactory
         return IPAddress.IsLoopback(ipAddress) || _localIPs.Contains(ipAddress);
     }
 
-    private static async Task<IPAddress[]> GetHostAddressesAsync(string hostName)
+    private static async Task<IPAddress[]> GetHostAddressesAsync(string hostName, CancellationToken cancellationToken)
     {
         Exception? exception = null;
 
         try
         {
+#if NET6_0_OR_GREATER
+            var ipAddresses = await Dns.GetHostAddressesAsync(hostName, cancellationToken).ConfigureAwait(false);
+#else
             var ipAddresses = await Dns.GetHostAddressesAsync(hostName).ConfigureAwait(false);
+#endif
 
             if (ipAddresses.Length > 0)
             {

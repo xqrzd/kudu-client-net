@@ -128,6 +128,36 @@ internal static class Netstandard2Extensions
             task.GetAwaiter().GetResult(); // Already completed; propagate any exception.
         }
     }
+
+    public static Task<T> WaitAsync<T>(this Task<T> task, CancellationToken cancellationToken)
+    {
+        if (task.IsCompleted || !cancellationToken.CanBeCanceled)
+        {
+            return task;
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Task.FromCanceled<T>(cancellationToken);
+        }
+
+        return WithCancellationCore(task, cancellationToken);
+
+        static async Task<T> WithCancellationCore(Task<T> task, CancellationToken cancellationToken)
+        {
+            var tcs = new TaskCompletionSource();
+
+            using var _ = cancellationToken.Register(
+                static state => ((TaskCompletionSource)state!).TrySetResult(), tcs);
+
+            if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
+            {
+                throw new TaskCanceledException(Task.FromCanceled(cancellationToken));
+            }
+
+            return task.GetAwaiter().GetResult(); // Already completed; propagate any exception.
+        }
+    }
 }
 
 #endif
