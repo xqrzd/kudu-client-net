@@ -676,7 +676,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
     }
 
     private static KuduPredicate NewComparisonPredicate(
-        ColumnSchema column, ComparisonOp op, KuduInt128 value, KuduInt128 minValue, KuduInt128 maxValue)
+        ColumnSchema column, ComparisonOp op, Int128 value, Int128 minValue, Int128 maxValue)
     {
         if (op == ComparisonOp.LessEqual)
         {
@@ -1112,8 +1112,8 @@ public class KuduPredicate : IEquatable<KuduPredicate>
                 }
             case KuduType.Decimal128:
                 {
-                    KuduInt128 m = KuduEncoder.DecodeInt128(a);
-                    KuduInt128 n = KuduEncoder.DecodeInt128(b);
+                    Int128 m = KuduEncoder.DecodeInt128(a);
+                    Int128 n = KuduEncoder.DecodeInt128(b);
 
                     return m < n && (m + 1) == n;
                 }
