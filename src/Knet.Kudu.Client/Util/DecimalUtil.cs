@@ -121,6 +121,23 @@ public static class DecimalUtil
         };
     }
 
+    /// <summary>
+    /// Given a precision, returns the smallest unscaled data type.
+    /// </summary>
+    /// <param name="precision">The precision of the decimal.</param>
+    public static KuduType PrecisionToKuduType(int precision)
+    {
+        return precision switch
+        {
+            <= MaxDecimal32Precision => KuduType.Decimal32,
+            <= MaxDecimal64Precision => KuduType.Decimal64,
+            <= MaxDecimal128Precision => KuduType.Decimal128,
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(precision),
+                $"Unsupported decimal type precision: {precision}")
+        };
+    }
+
     public static int EncodeDecimal32(decimal value, int targetPrecision, int targetScale)
     {
         var dec = new DecimalAccessor(value);
