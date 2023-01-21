@@ -135,9 +135,9 @@ public static class DecimalUtil
 
         int scaleAdjustment = targetScale - scale;
         uint maxValue = PowerOf10Int32(targetPrecision - scaleAdjustment) - 1;
-        uint unscaledValue = dec.Low;
+        uint unscaledValue = dec.Low32;
 
-        if (dec.High > 0 || dec.Mid > 0 || unscaledValue > maxValue)
+        if (dec.High32 > 0 || dec.Mid > 0 || unscaledValue > maxValue)
             ThrowValueTooBig(value, targetPrecision, targetScale);
 
         uint factor = PowerOf10Int32(scaleAdjustment);
@@ -155,9 +155,9 @@ public static class DecimalUtil
 
         int scaleAdjustment = targetScale - scale;
         ulong maxValue = PowerOf10Int64(targetPrecision - scaleAdjustment) - 1;
-        ulong unscaledValue = ToLong(dec.Low, dec.Mid);
+        ulong unscaledValue = dec.Low64;
 
-        if (dec.High > 0 || unscaledValue > maxValue)
+        if (dec.High32 > 0 || unscaledValue > maxValue)
             ThrowValueTooBig(value, targetPrecision, targetScale);
 
         ulong factor = PowerOf10Int64(scaleAdjustment);
@@ -175,7 +175,7 @@ public static class DecimalUtil
 
         int scaleAdjustment = targetScale - scale;
         var maxValue = PowerOf10Int128(targetPrecision - scaleAdjustment) - 1;
-        var unscaledValue = new UInt128(dec.High, dec.Low64);
+        var unscaledValue = new UInt128(dec.High32, dec.Low64);
 
         if (unscaledValue > maxValue)
             ThrowValueTooBig(value, targetPrecision, targetScale);
@@ -263,11 +263,6 @@ public static class DecimalUtil
         return dec.Decimal;
     }
 
-    private static ulong ToLong(uint low, uint high)
-    {
-        return ((ulong)high << 32) | low;
-    }
-
     private static void CheckConditions(decimal value, int scale, int targetPrecision, int targetScale)
     {
         if (scale > targetScale)
@@ -319,17 +314,16 @@ public static class DecimalUtil
         [FieldOffset(0)]
         public uint Flags;
         [FieldOffset(4)]
-        public uint High;
-        [FieldOffset(8)]
-        public uint Low;
-        [FieldOffset(12)]
-        public uint Mid;
-
+        public uint High32;
         [FieldOffset(8)]
         public ulong Low64;
 
         [FieldOffset(0)]
         public decimal Decimal;
+
+        public readonly uint Low32 => (uint)Low64;
+
+        public readonly uint Mid => (uint)(Low64 >> 32);
 
         public DecimalAccessor(decimal value)
         {
