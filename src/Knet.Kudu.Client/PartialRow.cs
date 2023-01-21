@@ -496,7 +496,18 @@ public class PartialRow
         int scale = typeAttributes.Scale.GetValueOrDefault();
         Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, column.Size);
 
-        KuduEncoder.EncodeDecimal(span, column.Type, value, precision, scale);
+        switch (column.Type)
+        {
+            case KuduType.Decimal32:
+                KuduEncoder.EncodeDecimal32(span, value, precision, scale);
+                break;
+            case KuduType.Decimal64:
+                KuduEncoder.EncodeDecimal64(span, value, precision, scale);
+                break;
+            default:
+                KuduEncoder.EncodeDecimal128(span, value, precision, scale);
+                break;
+        }
     }
 
     public decimal GetDecimal(string columnName)
@@ -514,7 +525,13 @@ public class PartialRow
 
         int scale = column.TypeAttributes!.Scale.GetValueOrDefault();
         ReadOnlySpan<byte> data = GetRowAllocColumn(columnIndex, column.Size);
-        return KuduEncoder.DecodeDecimal(data, column.Type, scale);
+
+        return column.Type switch
+        {
+            KuduType.Decimal32 => KuduEncoder.DecodeDecimal32(data, scale),
+            KuduType.Decimal64 => KuduEncoder.DecodeDecimal64(data, scale),
+            _ => KuduEncoder.DecodeDecimal128(data, scale),
+        };
     }
 
     public void SetString(string columnName, string value)

@@ -341,19 +341,14 @@ public class KuduPredicate : IEquatable<KuduPredicate>
             KuduType.String => $@"""{KuduEncoder.DecodeString(value)}""",
             KuduType.Varchar => $@"""{KuduEncoder.DecodeString(value)}""",
             KuduType.Binary => BitConverter.ToString(value),
-            KuduType.Decimal32 => DecodeDecimal(value).ToString(),
-            KuduType.Decimal64 => DecodeDecimal(value).ToString(),
-            KuduType.Decimal128 => DecodeDecimal(value).ToString(),
+            KuduType.Decimal32 => KuduEncoder.DecodeDecimal32(value, GetScale()).ToString(),
+            KuduType.Decimal64 => KuduEncoder.DecodeDecimal64(value, GetScale()).ToString(),
+            KuduType.Decimal128 => KuduEncoder.DecodeDecimal128(value, GetScale()).ToString(),
 
             _ => throw new Exception($"Unknown column type {Column.Type}")
         };
-    }
 
-    private decimal DecodeDecimal(ReadOnlySpan<byte> value)
-    {
-        int scale = Column.TypeAttributes!.Scale.GetValueOrDefault();
-
-        return KuduEncoder.DecodeDecimal(value, Column.Type, scale);
+        int GetScale() => Column.TypeAttributes!.Scale.GetValueOrDefault();
     }
 
     /// <summary>
