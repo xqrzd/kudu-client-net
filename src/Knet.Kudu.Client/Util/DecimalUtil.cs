@@ -18,6 +18,10 @@ public static class DecimalUtil
     public const int Decimal64Size = 8;
 
     public const int MaxDecimal128Precision = 38;
+    public static readonly Int128 MaxUnscaledDecimal128 = new(
+        // 99999999999999999999999999999999999999
+        0x4B3B4CA85A86C47A, 0x98A223FFFFFFFFF);
+    public static readonly Int128 MinUnscaledDecimal128 = -MaxUnscaledDecimal128;
     public const int Decimal128Size = 16;
 
     public const int MaxDecimalPrecision = MaxDecimal128Precision;
