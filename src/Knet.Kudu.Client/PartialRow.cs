@@ -201,7 +201,7 @@ public class PartialRow
     private void WriteByte(int columnIndex, byte value)
     {
         Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 1);
-        KuduEncoder.EncodeUInt8(span, value);
+        KuduEncoder.EncodeInteger(span, value);
     }
 
     public byte GetByte(string columnName)
@@ -233,7 +233,7 @@ public class PartialRow
     private void WriteSByte(int columnIndex, sbyte value)
     {
         Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 1);
-        KuduEncoder.EncodeInt8(span, value);
+        KuduEncoder.EncodeInteger(span, value);
     }
 
     public sbyte GetSByte(string columnName)
@@ -265,7 +265,7 @@ public class PartialRow
     private void WriteInt16(int columnIndex, short value)
     {
         Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 2);
-        KuduEncoder.EncodeInt16(span, value);
+        KuduEncoder.EncodeInteger(span, value);
     }
 
     public short GetInt16(string columnName)
@@ -297,7 +297,7 @@ public class PartialRow
     private void WriteInt32(int columnIndex, int value)
     {
         Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 4);
-        KuduEncoder.EncodeInt32(span, value);
+        KuduEncoder.EncodeInteger(span, value);
     }
 
     public int GetInt32(string columnName)
@@ -329,7 +329,7 @@ public class PartialRow
     private void WriteInt64(int columnIndex, long value)
     {
         Span<byte> span = GetSpanInRowAllocAndSetBitSet(columnIndex, 8);
-        KuduEncoder.EncodeInt64(span, value);
+        KuduEncoder.EncodeInteger(span, value);
     }
 
     public long GetInt64(string columnName)
@@ -670,10 +670,10 @@ public class PartialRow
                 break;
             case KuduType.Decimal128:
                 {
-                    KuduInt128 min = DecimalUtil.MinDecimal128(
+                    Int128 min = DecimalUtil.MinDecimal128(
                         column.TypeAttributes!.Precision.GetValueOrDefault());
                     Span<byte> span = GetSpanInRowAllocAndSetBitSet(index, 16);
-                    KuduEncoder.EncodeInt128(span, min);
+                    KuduEncoder.EncodeInteger(span, min);
                     break;
                 }
             case KuduType.String:
@@ -719,7 +719,7 @@ public class PartialRow
                         if (existing == sbyte.MaxValue)
                             return false;
 
-                        KuduEncoder.EncodeInt8(data, (sbyte)(existing + 1));
+                        KuduEncoder.EncodeInteger(data, (sbyte)(existing + 1));
                         return true;
                     }
                 case KuduType.Int16:
@@ -728,7 +728,7 @@ public class PartialRow
                         if (existing == short.MaxValue)
                             return false;
 
-                        KuduEncoder.EncodeInt16(data, (short)(existing + 1));
+                        KuduEncoder.EncodeInteger(data, (short)(existing + 1));
                         return true;
                     }
                 case KuduType.Int32:
@@ -737,7 +737,7 @@ public class PartialRow
                         if (existing == int.MaxValue)
                             return false;
 
-                        KuduEncoder.EncodeInt32(data, existing + 1);
+                        KuduEncoder.EncodeInteger(data, existing + 1);
                         return true;
                     }
                 case KuduType.Date:
@@ -746,7 +746,7 @@ public class PartialRow
                         if (existing == EpochTime.MaxDateValue)
                             return false;
 
-                        KuduEncoder.EncodeInt32(data, existing + 1);
+                        KuduEncoder.EncodeInteger(data, existing + 1);
                         return true;
                     }
                 case KuduType.Int64:
@@ -756,7 +756,7 @@ public class PartialRow
                         if (existing == long.MaxValue)
                             return false;
 
-                        KuduEncoder.EncodeInt64(data, existing + 1);
+                        KuduEncoder.EncodeInteger(data, existing + 1);
                         return true;
                     }
                 case KuduType.Float:
@@ -786,7 +786,7 @@ public class PartialRow
                         if (existing == DecimalUtil.MaxDecimal32(precision))
                             return false;
 
-                        KuduEncoder.EncodeInt32(data, existing + 1);
+                        KuduEncoder.EncodeInteger(data, existing + 1);
                         return true;
                     }
                 case KuduType.Decimal64:
@@ -796,17 +796,17 @@ public class PartialRow
                         if (existing == DecimalUtil.MaxDecimal64(precision))
                             return false;
 
-                        KuduEncoder.EncodeInt64(data, existing + 1);
+                        KuduEncoder.EncodeInteger(data, existing + 1);
                         return true;
                     }
                 case KuduType.Decimal128:
                     {
-                        KuduInt128 existing = KuduEncoder.DecodeInt128(data);
+                        Int128 existing = KuduEncoder.DecodeInt128(data);
                         int precision = column.TypeAttributes!.Precision.GetValueOrDefault();
                         if (existing == DecimalUtil.MaxDecimal128(precision))
                             return false;
 
-                        KuduEncoder.EncodeInt128(data, existing + 1);
+                        KuduEncoder.EncodeInteger(data, existing + 1);
                         return true;
                     }
                 default:

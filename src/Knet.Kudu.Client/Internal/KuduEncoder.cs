@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -12,49 +13,57 @@ internal static class KuduEncoder
     public static void EncodeBool(Span<byte> destination, bool value) =>
         destination[0] = (byte)(value ? 1 : 0);
 
-    public static void EncodeInt8(Span<byte> destination, sbyte value) =>
+#if NET7_0_OR_GREATER
+    public static void EncodeInteger<T>(Span<byte> destination, T value)
+        where T : IBinaryInteger<T>
+    {
+        value.TryWriteLittleEndian(destination, out _);
+    }
+#else
+    public static void EncodeInteger(Span<byte> destination, sbyte value) =>
         destination[0] = (byte)value;
 
-    public static void EncodeUInt8(Span<byte> destination, byte value) =>
+    public static void EncodeInteger(Span<byte> destination, byte value) =>
         destination[0] = value;
 
-    public static void EncodeInt16(Span<byte> destination, short value) =>
+    public static void EncodeInteger(Span<byte> destination, short value) =>
         BinaryPrimitives.WriteInt16LittleEndian(destination, value);
 
-    public static void EncodeInt32(Span<byte> destination, int value) =>
+    public static void EncodeInteger(Span<byte> destination, int value) =>
         BinaryPrimitives.WriteInt32LittleEndian(destination, value);
 
-    public static void EncodeInt64(Span<byte> destination, long value) =>
+    public static void EncodeInteger(Span<byte> destination, long value) =>
         BinaryPrimitives.WriteInt64LittleEndian(destination, value);
 
-    public static void EncodeInt128(Span<byte> destination, KuduInt128 value)
+    public static void EncodeInteger(Span<byte> destination, Int128 value)
     {
-        BinaryPrimitives.WriteUInt64LittleEndian(destination, value.Low);
-        BinaryPrimitives.WriteInt64LittleEndian(destination.Slice(8), value.High);
+        BinaryPrimitives.WriteUInt64LittleEndian(destination, (ulong)value);
+        BinaryPrimitives.WriteUInt64LittleEndian(destination.Slice(8), (ulong)(value >> 64));
     }
+#endif
 
     public static void EncodeDateTime(Span<byte> destination, DateTime value)
     {
         long micros = EpochTime.ToUnixTimeMicros(value);
-        EncodeInt64(destination, micros);
+        EncodeInteger(destination, micros);
     }
 
     public static void EncodeDate(Span<byte> destination, DateTime value)
     {
         int days = EpochTime.ToUnixTimeDays(value);
-        EncodeInt32(destination, days);
+        EncodeInteger(destination, days);
     }
 
     public static void EncodeFloat(Span<byte> destination, float value)
     {
         int intValue = value.AsInt();
-        EncodeInt32(destination, intValue);
+        EncodeInteger(destination, intValue);
     }
 
     public static void EncodeDouble(Span<byte> destination, double value)
     {
         long longValue = value.AsLong();
-        EncodeInt64(destination, longValue);
+        EncodeInteger(destination, longValue);
     }
 
     public static void EncodeDecimal(
@@ -64,17 +73,17 @@ internal static class KuduEncoder
         {
             case KuduType.Decimal32:
                 int intVal = DecimalUtil.EncodeDecimal32(value, precision, scale);
-                EncodeInt32(destination, intVal);
+                EncodeInteger(destination, intVal);
                 break;
 
             case KuduType.Decimal64:
                 long longVal = DecimalUtil.EncodeDecimal64(value, precision, scale);
-                EncodeInt64(destination, longVal);
+                EncodeInteger(destination, longVal);
                 break;
 
             default:
                 var int128Val = DecimalUtil.EncodeDecimal128(value, precision, scale);
-                EncodeInt128(destination, int128Val);
+                EncodeInteger(destination, int128Val);
                 break;
         }
     }
@@ -83,21 +92,21 @@ internal static class KuduEncoder
         Span<byte> destination, decimal value, int precision, int scale)
     {
         int encodedValue = DecimalUtil.EncodeDecimal32(value, precision, scale);
-        EncodeInt32(destination, encodedValue);
+        EncodeInteger(destination, encodedValue);
     }
 
     public static void EncodeDecimal64(
         Span<byte> destination, decimal value, int precision, int scale)
     {
         long encodedValue = DecimalUtil.EncodeDecimal64(value, precision, scale);
-        EncodeInt64(destination, encodedValue);
+        EncodeInteger(destination, encodedValue);
     }
 
     public static void EncodeDecimal128(
         Span<byte> destination, decimal value, int precision, int scale)
     {
         var encodedValue = DecimalUtil.EncodeDecimal128(value, precision, scale);
-        EncodeInt128(destination, encodedValue);
+        EncodeInteger(destination, encodedValue);
     }
 
     public static byte[] EncodeBool(bool value) =>
@@ -112,28 +121,28 @@ internal static class KuduEncoder
     public static byte[] EncodeInt16(short value)
     {
         var buffer = new byte[2];
-        EncodeInt16(buffer, value);
+        EncodeInteger(buffer, value);
         return buffer;
     }
 
     public static byte[] EncodeInt32(int value)
     {
         var buffer = new byte[4];
-        EncodeInt32(buffer, value);
+        EncodeInteger(buffer, value);
         return buffer;
     }
 
     public static byte[] EncodeInt64(long value)
     {
         var buffer = new byte[8];
-        EncodeInt64(buffer, value);
+        EncodeInteger(buffer, value);
         return buffer;
     }
 
-    public static byte[] EncodeInt128(KuduInt128 value)
+    public static byte[] EncodeInt128(Int128 value)
     {
         var buffer = new byte[16];
-        EncodeInt128(buffer, value);
+        EncodeInteger(buffer, value);
         return buffer;
     }
 
@@ -260,12 +269,12 @@ internal static class KuduEncoder
     public static long DecodeInt64(ReadOnlySpan<byte> source) =>
         BinaryPrimitives.ReadInt64LittleEndian(source);
 
-    public static KuduInt128 DecodeInt128(ReadOnlySpan<byte> source)
+    public static Int128 DecodeInt128(ReadOnlySpan<byte> source)
     {
-        var low = BinaryPrimitives.ReadUInt64LittleEndian(source);
-        var high = BinaryPrimitives.ReadInt64LittleEndian(source.Slice(8));
+        var lower = BinaryPrimitives.ReadUInt64LittleEndian(source);
+        var upper = BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(8));
 
-        return new KuduInt128(high, low);
+        return new Int128(upper, lower);
     }
 
     public static DateTime DecodeDateTime(ReadOnlySpan<byte> source)
@@ -305,7 +314,7 @@ internal static class KuduEncoder
                 return DecimalUtil.DecodeDecimal64(longVal, scale);
 
             default:
-                KuduInt128 int128Val = DecodeInt128(source);
+                Int128 int128Val = DecodeInt128(source);
                 return DecimalUtil.DecodeDecimal128(int128Val, scale);
         }
     }
@@ -363,12 +372,12 @@ internal static class KuduEncoder
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static KuduInt128 DecodeInt128Unsafe(byte[] source, int offset)
+    public static Int128 DecodeInt128Unsafe(byte[] source, int offset)
     {
-        var low = (ulong)DecodeInt64Unsafe(source, offset);
-        var high = DecodeInt64Unsafe(source, offset + 8);
+        var lower = (ulong)DecodeInt64Unsafe(source, offset);
+        var upper = (ulong)DecodeInt64Unsafe(source, offset + 8);
 
-        return new KuduInt128(high, low);
+        return new Int128(upper, lower);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -412,7 +421,7 @@ internal static class KuduEncoder
                 return DecimalUtil.DecodeDecimal64(longVal, scale);
 
             default:
-                KuduInt128 int128Val = DecodeInt128Unsafe(source, offset);
+                Int128 int128Val = DecodeInt128Unsafe(source, offset);
                 return DecimalUtil.DecodeDecimal128(int128Val, scale);
         }
     }

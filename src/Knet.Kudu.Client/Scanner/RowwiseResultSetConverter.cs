@@ -121,7 +121,7 @@ internal static class RowwiseResultSetConverter
                         indirectSlice.CopyTo(varlenData);
                         varlenData = varlenData.Slice(length);
 
-                        KuduEncoder.EncodeInt32(dataOutput, currentVarlenOffset);
+                        KuduEncoder.EncodeInteger(dataOutput, currentVarlenOffset);
                         currentVarlenOffset += length;
                     }
                 }
@@ -133,7 +133,7 @@ internal static class RowwiseResultSetConverter
 
             if (!isFixedSize)
             {
-                KuduEncoder.EncodeInt32(dataOutput, currentVarlenOffset);
+                KuduEncoder.EncodeInteger(dataOutput, currentVarlenOffset);
                 varlenDataSidecarOffsets[columnIndex] = new SidecarOffset(offset, currentVarlenOffset);
 
                 offset += currentVarlenOffset;

@@ -13,7 +13,7 @@ public class DecimalUtilTests
     [InlineData(-667386670618854952, 7376056636151202432, 35)] //-123.1111111111111111111111111111
     public void KuduDecimalTooLarge(long high, ulong low, int scale)
     {
-        var value = new KuduInt128(high, low);
+        var value = new Int128((ulong)high, low);
 
         Assert.Throws<OverflowException>(
             () => DecimalUtil.DecodeDecimal128(value, scale));
