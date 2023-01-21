@@ -106,24 +106,15 @@ public static class DecimalUtil
     /// <param name="precision">The precision of the decimal.</param>
     public static int PrecisionToSize(int precision)
     {
-        if (precision <= MaxDecimal32Precision)
+        return precision switch
         {
-            return Decimal32Size;
-        }
-        else if (precision <= MaxDecimal64Precision)
-        {
-            return Decimal64Size;
-        }
-        else if (precision <= MaxDecimal128Precision)
-        {
-            return Decimal128Size;
-        }
-        else
-        {
-            throw new ArgumentOutOfRangeException(
+            <= MaxDecimal32Precision => Decimal32Size,
+            <= MaxDecimal64Precision => Decimal64Size,
+            <= MaxDecimal128Precision => Decimal128Size,
+            _ => throw new ArgumentOutOfRangeException(
                 nameof(precision),
-                $"Unsupported decimal type precision: {precision}");
-        }
+                $"Unsupported decimal type precision: {precision}")
+        };
     }
 
     public static int EncodeDecimal32(decimal value, int targetPrecision, int targetScale)
