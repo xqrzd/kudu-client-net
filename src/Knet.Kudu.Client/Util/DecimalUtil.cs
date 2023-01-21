@@ -18,6 +18,10 @@ public static class DecimalUtil
     public const int Decimal64Size = 8;
 
     public const int MaxDecimal128Precision = 38;
+    public static readonly Int128 MaxUnscaledDecimal128 = new(
+        // 99999999999999999999999999999999999999
+        0x4B3B4CA85A86C47A, 0x98A223FFFFFFFFF);
+    public static readonly Int128 MinUnscaledDecimal128 = -MaxUnscaledDecimal128;
     public const int Decimal128Size = 16;
 
     public const int MaxDecimalPrecision = MaxDecimal128Precision;
@@ -106,24 +110,32 @@ public static class DecimalUtil
     /// <param name="precision">The precision of the decimal.</param>
     public static int PrecisionToSize(int precision)
     {
-        if (precision <= MaxDecimal32Precision)
+        return precision switch
         {
-            return Decimal32Size;
-        }
-        else if (precision <= MaxDecimal64Precision)
-        {
-            return Decimal64Size;
-        }
-        else if (precision <= MaxDecimal128Precision)
-        {
-            return Decimal128Size;
-        }
-        else
-        {
-            throw new ArgumentOutOfRangeException(
+            <= MaxDecimal32Precision => Decimal32Size,
+            <= MaxDecimal64Precision => Decimal64Size,
+            <= MaxDecimal128Precision => Decimal128Size,
+            _ => throw new ArgumentOutOfRangeException(
                 nameof(precision),
-                $"Unsupported decimal type precision: {precision}");
-        }
+                $"Unsupported decimal type precision: {precision}")
+        };
+    }
+
+    /// <summary>
+    /// Given a precision, returns the smallest unscaled data type.
+    /// </summary>
+    /// <param name="precision">The precision of the decimal.</param>
+    public static KuduType PrecisionToKuduType(int precision)
+    {
+        return precision switch
+        {
+            <= MaxDecimal32Precision => KuduType.Decimal32,
+            <= MaxDecimal64Precision => KuduType.Decimal64,
+            <= MaxDecimal128Precision => KuduType.Decimal128,
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(precision),
+                $"Unsupported decimal type precision: {precision}")
+        };
     }
 
     public static int EncodeDecimal32(decimal value, int targetPrecision, int targetScale)

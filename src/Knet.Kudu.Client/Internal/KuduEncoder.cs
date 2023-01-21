@@ -66,28 +66,6 @@ internal static class KuduEncoder
         EncodeInteger(destination, longValue);
     }
 
-    public static void EncodeDecimal(
-        Span<byte> destination, KuduType kuduType, decimal value, int precision, int scale)
-    {
-        switch (kuduType)
-        {
-            case KuduType.Decimal32:
-                int intVal = DecimalUtil.EncodeDecimal32(value, precision, scale);
-                EncodeInteger(destination, intVal);
-                break;
-
-            case KuduType.Decimal64:
-                long longVal = DecimalUtil.EncodeDecimal64(value, precision, scale);
-                EncodeInteger(destination, longVal);
-                break;
-
-            default:
-                var int128Val = DecimalUtil.EncodeDecimal128(value, precision, scale);
-                EncodeInteger(destination, int128Val);
-                break;
-        }
-    }
-
     public static void EncodeDecimal32(
         Span<byte> destination, decimal value, int precision, int scale)
     {
@@ -244,12 +222,9 @@ internal static class KuduEncoder
             KuduType.Binary => value.ToArray(),
             KuduType.UnixtimeMicros => DecodeDateTime(value),
             KuduType.Date => DecodeDate(value),
-            KuduType.Decimal32 => DecodeDecimal(
-                value, type, typeAttributes!.Scale.GetValueOrDefault()),
-            KuduType.Decimal64 => DecodeDecimal(
-                value, type, typeAttributes!.Scale.GetValueOrDefault()),
-            KuduType.Decimal128 => DecodeDecimal(
-                value, type, typeAttributes!.Scale.GetValueOrDefault()),
+            KuduType.Decimal32 => DecodeDecimal32(value, typeAttributes!.Scale.GetValueOrDefault()),
+            KuduType.Decimal64 => DecodeDecimal64(value, typeAttributes!.Scale.GetValueOrDefault()),
+            KuduType.Decimal128 => DecodeDecimal128(value, typeAttributes!.Scale.GetValueOrDefault()),
             _ => throw new Exception($"Unknown data type {type}"),
         };
     }
@@ -301,22 +276,22 @@ internal static class KuduEncoder
         return value.AsDouble();
     }
 
-    public static decimal DecodeDecimal(ReadOnlySpan<byte> source, KuduType kuduType, int scale)
+    public static decimal DecodeDecimal32(ReadOnlySpan<byte> source, int scale)
     {
-        switch (kuduType)
-        {
-            case KuduType.Decimal32:
-                int intVal = DecodeInt32(source);
-                return DecimalUtil.DecodeDecimal32(intVal, scale);
+        int intVal = DecodeInt32(source);
+        return DecimalUtil.DecodeDecimal32(intVal, scale);
+    }
 
-            case KuduType.Decimal64:
-                long longVal = DecodeInt64(source);
-                return DecimalUtil.DecodeDecimal64(longVal, scale);
+    public static decimal DecodeDecimal64(ReadOnlySpan<byte> source, int scale)
+    {
+        long intVal = DecodeInt64(source);
+        return DecimalUtil.DecodeDecimal64(intVal, scale);
+    }
 
-            default:
-                Int128 int128Val = DecodeInt128(source);
-                return DecimalUtil.DecodeDecimal128(int128Val, scale);
-        }
+    public static decimal DecodeDecimal128(ReadOnlySpan<byte> source, int scale)
+    {
+        Int128 intVal = DecodeInt128(source);
+        return DecimalUtil.DecodeDecimal128(intVal, scale);
     }
 
     public static string DecodeString(ReadOnlySpan<byte> source) =>
@@ -408,22 +383,25 @@ internal static class KuduEncoder
         return value.AsDouble();
     }
 
-    public static decimal DecodeDecimalUnsafe(byte[] source, int offset, KuduType kuduType, int scale)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static decimal DecodeDecimal32Unsafe(byte[] source, int offset, int scale)
     {
-        switch (kuduType)
-        {
-            case KuduType.Decimal32:
-                int intVal = DecodeInt32Unsafe(source, offset);
-                return DecimalUtil.DecodeDecimal32(intVal, scale);
+        int intVal = DecodeInt32Unsafe(source, offset);
+        return DecimalUtil.DecodeDecimal32(intVal, scale);
+    }
 
-            case KuduType.Decimal64:
-                long longVal = DecodeInt64Unsafe(source, offset);
-                return DecimalUtil.DecodeDecimal64(longVal, scale);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static decimal DecodeDecimal64Unsafe(byte[] source, int offset, int scale)
+    {
+        long intVal = DecodeInt64Unsafe(source, offset);
+        return DecimalUtil.DecodeDecimal64(intVal, scale);
+    }
 
-            default:
-                Int128 int128Val = DecodeInt128Unsafe(source, offset);
-                return DecimalUtil.DecodeDecimal128(int128Val, scale);
-        }
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static decimal DecodeDecimal128Unsafe(byte[] source, int offset, int scale)
+    {
+        Int128 intVal = DecodeInt128Unsafe(source, offset);
+        return DecimalUtil.DecodeDecimal128(intVal, scale);
     }
 
     public static string DecodeString(byte[] source, int offset, int length) =>

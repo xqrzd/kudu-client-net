@@ -458,7 +458,14 @@ public sealed class ResultSet : IEnumerable<RowResult>
     {
         int scale = column.TypeAttributes!.Scale.GetValueOrDefault();
         int offset = GetStartIndexUnsafe(columnIndex, rowIndex, column.Size);
-        return KuduEncoder.DecodeDecimalUnsafe(_data!, offset, column.Type, scale);
+        var data = _data!;
+
+        return column.Type switch
+        {
+            KuduType.Decimal32 => KuduEncoder.DecodeDecimal32Unsafe(data, offset, scale),
+            KuduType.Decimal64 => KuduEncoder.DecodeDecimal64Unsafe(data, offset, scale),
+            _ => KuduEncoder.DecodeDecimal128Unsafe(data, offset, scale)
+        };
     }
 
     internal ReadOnlySpan<byte> GetSpan(string columnName, int rowIndex)
