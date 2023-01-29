@@ -9,32 +9,41 @@ env:
 jobs:
   linux_build:
     name: Linux build
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     steps:
     - uses: actions/checkout@v3
+
     - name: Setup dotnet
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: '7.0.x'
+
+    # Needed for Kudu test binary used in integration tests
+    - name: Install libncurses5
+      run: sudo apt install -y libncurses5
+
     - name: Build
       run: dotnet build --configuration Release
+
     - name: Test
       run: dotnet test --no-restore --no-build --configuration Release
 
   publish:
     name: Publish nuget package
     needs: linux_build
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     if: github.ref == 'refs/heads/main'
     steps:
     - uses: actions/checkout@v3
+
     - name: Setup dotnet
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: '7.0.x'
-    - name: Publish on version change
+
+    - name: Publish NuGet package on version change
       uses: alirezanet/publish-nuget@v3.0.4
       with:
         PROJECT_FILE_PATH: src/Knet.Kudu.Client/Knet.Kudu.Client.csproj
