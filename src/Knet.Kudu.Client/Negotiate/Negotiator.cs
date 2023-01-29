@@ -291,7 +291,8 @@ public class Negotiator
         using var gssApiStream = new KuduGssApiAuthenticationStream(this);
         using var negotiateStream = new NegotiateStream(gssApiStream);
 
-        var targetName = $"{_options.SaslProtocolName}/{_serverInfo.HostPort.Host}";
+        var hostName = await GetHostNameAsync(cancellationToken).ConfigureAwait(false);
+        var targetName = $"{_options.SaslProtocolName}/{hostName}";
         _authentication = "SASL/GSSAPI Kerberos";
         _servicePrincipalName = targetName;
 
@@ -523,6 +524,25 @@ public class Negotiator
                 _options.ReceivePipeOptions,
                 name: _serverInfo.ToString());
         }
+    }
+
+    private async Task<string> GetHostNameAsync(CancellationToken cancellationToken)
+    {
+        var serverInfo = _serverInfo;
+        var ipAddress = serverInfo.Endpoint.Address;
+
+#if NET6_0_OR_GREATER
+        var hostEntry = await Dns.GetHostEntryAsync(ipAddress.ToString(), ipAddress.AddressFamily, cancellationToken)
+            .ConfigureAwait(false);
+#else
+        var hostEntry = await Dns.GetHostEntryAsync(ipAddress).ConfigureAwait(false);
+#endif
+
+        var hostName = hostEntry.HostName;
+
+        return string.IsNullOrEmpty(hostName)
+            ? serverInfo.HostPort.Host
+            : hostName;
     }
 
     private static AuthenticationType ChooseAuthenticationType(NegotiatePB features)
