@@ -20,16 +20,16 @@ public static class Murmur2
     public static ulong Hash64(ReadOnlySpan<byte> key, ulong seed)
     {
         uint length = (uint)key.Length;
-        ulong m = 0xc6a4a7935bd1e995;
-        int r = 47;
+        const ulong m = 0xc6a4a7935bd1e995;
+        const int r = 47;
 
         ulong h = seed ^ (length * m);
 
-        ReadOnlySpan<ulong> data = MemoryMarshal.Cast<byte, ulong>(key);
+        var data = MemoryMarshal.Cast<byte, ulong>(key);
 
-        for (int i = 0; i < data.Length; i++)
+        foreach (ulong d in data)
         {
-            ulong k = data[i];
+            ulong k = d;
 
             k *= m;
             k ^= k >> r;
