@@ -89,7 +89,7 @@ public class BlockBloomFilter
 
     public ReadOnlyMemory<byte> Memory => _directory;
 
-    public unsafe void Insert(uint hash)
+    public void Insert(uint hash)
     {
         AlwaysFalse = false;
         uint bucketIndex = Rehash32to32(hash) & _directoryMask;
@@ -376,15 +376,15 @@ public class BlockBloomFilter
         var rehash = Vector256.Create(_rehash);
 
         // Load hash into a YMM register, repeated eight times
-        var hash_data = Vector256.Create(hash);
+        var hashData = Vector256.Create(hash);
 
         // Multiply-shift hashing ala Dietzfelbinger et al.: multiply 'hash' by eight different
         // odd constants, then keep the 5 most significant bits from each product.
-        hash_data = Vector256.Multiply(rehash, hash_data);
-        hash_data = Vector256.ShiftRightLogical(hash_data, 27);
+        hashData = Vector256.Multiply(rehash, hashData);
+        hashData = Vector256.ShiftRightLogical(hashData, 27);
 
         // Use these 5 bits to shift a single bit to a location in each 32-bit lane
-        return Avx2.ShiftLeftLogicalVariable(ones, hash_data);
+        return Avx2.ShiftLeftLogicalVariable(ones, hashData);
     }
 #endif
 
