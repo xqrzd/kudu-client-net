@@ -65,7 +65,11 @@ public class BlockBloomFilter
 
     private readonly byte[] _directory;
 
-    public BlockBloomFilter(int logSpaceBytes)
+    public BlockBloomFilter(int logSpaceBytes) : this(logSpaceBytes, null, true)
+    {
+    }
+
+    public BlockBloomFilter(int logSpaceBytes, byte[]? directory, bool alwaysFalse)
     {
         // Since logSpaceBytes is in bytes, we need to convert it to the number of tiny
         // Bloom filters we will use.
@@ -81,9 +85,24 @@ public class BlockBloomFilter
         }
 
         _directoryMask = (1u << _logNumBuckets) - 1;
-        _directory = new byte[1 << LogSpaceBytes];
 
-        AlwaysFalse = true;
+        var directorySize = 1 << LogSpaceBytes;
+        if (directory is null)
+        {
+            _directory = new byte[directorySize];
+        }
+        else
+        {
+            if (directory.Length != directorySize)
+            {
+                throw new ArgumentException($"Mismatch in BlockBloomFilter source directory " +
+                    $"size {directory.Length} and expected size {directorySize}");
+            }
+
+            _directory = directory;
+        }
+
+        AlwaysFalse = alwaysFalse;
     }
 
     /// <summary>
