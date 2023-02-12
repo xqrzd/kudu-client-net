@@ -21,6 +21,17 @@ public class BlockBloomFilter
     };
 
     /// <summary>
+    /// Lanczos approximation g=5, n=7
+    /// </summary>
+    private static readonly double[] _lgammaCoef = new double[]
+    {
+        1.000000000190015,
+        76.18009172947146, -86.50532032941677,
+        24.01409824083091, -1.231739572450155,
+        0.1208650973866179e-2, -0.5395239384953e-5
+    };
+
+    /// <summary>
     /// The BloomFilter is divided up into Buckets and each Bucket comprises of 8 BucketWords
     /// of 4 bytes each.
     /// </summary>
@@ -391,13 +402,8 @@ public class BlockBloomFilter
     // https://visualstudiomagazine.com/articles/2022/08/02/logbeta-loggamma-functions-csharp.aspx
     private static double LogGamma(double z)
     {
-        // Lanczos approximation g=5, n=7
-        double[] coef = new double[7] { 1.000000000190015,
-            76.18009172947146, -86.50532032941677,
-            24.01409824083091, -1.231739572450155,
-            0.1208650973866179e-2, -0.5395239384953e-5 };
-
         const double LogSqrtTwoPi = 0.91893853320467274178;
+        var coef = _lgammaCoef;
 
         if (z < 0.5)
             return Math.Log(Math.PI / Math.Sin(Math.PI * z)) - LogGamma(1.0 - z);
