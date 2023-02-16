@@ -8,10 +8,10 @@ using System.Runtime.Intrinsics.X86;
 
 namespace Knet.Kudu.Client.Util;
 
-public class BlockBloomFilter
+public class BlockBloomFilter : IEquatable<BlockBloomFilter>
 {
     /// <summary>
-    /// Rehash is used as 8 odd 32-bit unsigned ints.  See Dietzfelbinger et al.'s
+    /// Rehash is used as 8 odd 32-bit unsigned ints. See Dietzfelbinger et al.'s
     /// "A reliable randomized algorithm for the closest-pair problem".
     /// </summary>
     private static readonly uint[] _rehash = new uint[]
@@ -237,6 +237,23 @@ public class BlockBloomFilter
         return true;
     }
 
+    public bool Equals(BlockBloomFilter? other)
+    {
+        if (other is null)
+            return false;
+
+        if (ReferenceEquals(this, other))
+            return true;
+
+        return
+            AlwaysFalse == other.AlwaysFalse &&
+            Span.SequenceEqual(other.Span);
+    }
+
+    public override bool Equals(object? obj) => Equals(obj as BlockBloomFilter);
+
+    public override int GetHashCode() => HashCode.Combine(AlwaysFalse, _directory.Length);
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private Span<uint> GetBucketSpan(uint bucketIndex)
     {
@@ -292,7 +309,7 @@ public class BlockBloomFilter
             // lgamma for the log of the factorial function:
             double logp = i * loglam - lam - LogGamma(i + 1);
             // The f_inner part of the equation in the paper is the probability of a single
-            // collision in the bucket. Since there are kBucketWords non-overlapping lanes in each
+            // collision in the bucket. Since there are BucketWords non-overlapping lanes in each
             // bucket, the log of this probability is:
             double logfinner = BucketWords * Math.Log(1.0 - Math.Pow(1.0 - 1.0 / wordBits, i));
             // Here we are forced out of log-space calculations
