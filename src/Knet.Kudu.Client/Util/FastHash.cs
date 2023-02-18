@@ -10,6 +10,10 @@ namespace Knet.Kudu.Client.Util;
 /// </summary>
 public static class FastHash
 {
+    // Help distinguish zero-length objects like empty strings.
+    // These values must match those used by Apache Kudu.
+    private static ReadOnlySpan<byte> HashValEmpty => new byte[] { 0xee, 0x7e, 0xca, 0x7d };
+
     /// <summary>
     /// Compute 64-bit FastHash.
     /// </summary>
@@ -17,8 +21,13 @@ public static class FastHash
     /// <param name="seed">Seed to compute the hash.</param>
     public static ulong Hash64(ReadOnlySpan<byte> source, ulong seed)
     {
+        if (source.Length == 0)
+        {
+            source = HashValEmpty;
+        }
+
         uint length = (uint)source.Length;
-        ulong kMultiplier = 0x880355f21e6d1965UL;
+        const ulong kMultiplier = 0x880355f21e6d1965;
         ulong h = seed ^ (length * kMultiplier);
 
         ReadOnlySpan<ulong> data = MemoryMarshal.Cast<byte, ulong>(source);
@@ -71,7 +80,7 @@ public static class FastHash
     private static ulong FastHashMix(ulong h)
     {
         h ^= h >> 23;
-        h *= 0x2127599bf4325c37UL;
+        h *= 0x2127599bf4325c37;
         h ^= h >> 47;
         return h;
     }
