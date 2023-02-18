@@ -171,7 +171,7 @@ internal static class KuduEncoder
     public static byte[] EncodeString(string source) =>
         Encoding.UTF8.GetBytes(source);
 
-    public static byte[] EncodeDefaultValue(ColumnSchema columnSchema, object value)
+    public static byte[] EncodeValue(ColumnSchema columnSchema, object value)
     {
         var type = columnSchema.Type;
 
