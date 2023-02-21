@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Xml.Linq;
 using Google.Protobuf;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Protobuf;

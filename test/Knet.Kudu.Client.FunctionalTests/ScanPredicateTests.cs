@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Knet.Kudu.Client.FunctionalTests.MiniCluster;
 using Knet.Kudu.Client.FunctionalTests.Util;
@@ -70,7 +71,8 @@ public class ScanPredicateTests : IAsyncLifetime
 
         var table = await _client.CreateTableAsync(builder);
 
-        var values = CreateIntegerValues(KuduType.Int8);
+        var values = CreateIntegerValues<sbyte>(KuduType.Int8);
+        var testValues = CreateIntegerTestValues<sbyte>(KuduType.Int8);
 
         long i = 0;
         foreach (byte value in values)
@@ -87,7 +89,7 @@ public class ScanPredicateTests : IAsyncLifetime
         await _session.EnqueueAsync(nullInsert);
         await _session.FlushAsync();
 
-        await CheckPredicatesAsync(table, values, CreateIntegerTestValues(KuduType.Int8));
+        await CheckPredicatesAsync(table, values, testValues);
     }
 
     [SkippableFact]
@@ -99,7 +101,8 @@ public class ScanPredicateTests : IAsyncLifetime
 
         var table = await _client.CreateTableAsync(builder);
 
-        var values = CreateIntegerValues(KuduType.Int16);
+        var values = CreateIntegerValues<short>(KuduType.Int16);
+        var testValues = CreateIntegerTestValues<short>(KuduType.Int16);
 
         long i = 0;
         foreach (short value in values)
@@ -116,7 +119,7 @@ public class ScanPredicateTests : IAsyncLifetime
         await _session.EnqueueAsync(nullInsert);
         await _session.FlushAsync();
 
-        await CheckPredicatesAsync(table, values, CreateIntegerTestValues(KuduType.Int16));
+        await CheckPredicatesAsync(table, values, testValues);
     }
 
     [SkippableFact]
@@ -128,7 +131,8 @@ public class ScanPredicateTests : IAsyncLifetime
 
         var table = await _client.CreateTableAsync(builder);
 
-        var values = CreateIntegerValues(KuduType.Int32);
+        var values = CreateIntegerValues<int>(KuduType.Int32);
+        var testValues = CreateIntegerTestValues<int>(KuduType.Int32);
 
         long i = 0;
         foreach (int value in values)
@@ -145,7 +149,7 @@ public class ScanPredicateTests : IAsyncLifetime
         await _session.EnqueueAsync(nullInsert);
         await _session.FlushAsync();
 
-        await CheckPredicatesAsync(table, values, CreateIntegerTestValues(KuduType.Int32));
+        await CheckPredicatesAsync(table, values, testValues);
     }
 
     [SkippableFact]
@@ -157,7 +161,8 @@ public class ScanPredicateTests : IAsyncLifetime
 
         var table = await _client.CreateTableAsync(builder);
 
-        var values = CreateIntegerValues(KuduType.Int64);
+        var values = CreateIntegerValues<long>(KuduType.Int64);
+        var testValues = CreateIntegerTestValues<long>(KuduType.Int64);
 
         long i = 0;
         foreach (long value in values)
@@ -174,7 +179,7 @@ public class ScanPredicateTests : IAsyncLifetime
         await _session.EnqueueAsync(nullInsert);
         await _session.FlushAsync();
 
-        await CheckPredicatesAsync(table, values, CreateIntegerTestValues(KuduType.Int64));
+        await CheckPredicatesAsync(table, values, testValues);
     }
 
     [SkippableFact]
@@ -397,15 +402,15 @@ public class ScanPredicateTests : IAsyncLifetime
 
         var table = await _client.CreateTableAsync(builder);
 
-        var values = CreateStringValues();
-        var testValues = CreateStringTestValues();
+        var values = CreateBinaryValues();
+        var testValues = CreateBinaryTestValues();
 
         long i = 0;
         foreach (var value in values)
         {
             var insert = table.NewInsert();
             insert.SetInt64("key", i++);
-            insert.SetBinary("value", value.ToUtf8ByteArray());
+            insert.SetBinary("value", value);
             await _session.EnqueueAsync(insert);
         }
 
@@ -415,39 +420,7 @@ public class ScanPredicateTests : IAsyncLifetime
         await _session.EnqueueAsync(nullInsert);
         await _session.FlushAsync();
 
-        var col = table.Schema.GetColumn("value");
-        Assert.Equal(values.Count + 1, await CountRowsAsync(table));
-
-        foreach (var s in testValues)
-        {
-            var v = s.ToUtf8ByteArray();
-
-            // value = v
-            var equal = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Equal, v);
-            Assert.Equal(values.GetViewBetween(s, s).Count, await CountRowsAsync(table, equal));
-
-            // value >= v
-            var greaterEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.GreaterEqual, v);
-            Assert.Equal(values.TailSet(s).Count, await CountRowsAsync(table, greaterEqual));
-
-            // value <= v
-            var lessEqual = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.LessEqual, v);
-            Assert.Equal(values.HeadSet(s, true).Count, await CountRowsAsync(table, lessEqual));
-
-            // value > v
-            var greater = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Greater, v);
-            Assert.Equal(values.TailSet(s, false).Count, await CountRowsAsync(table, greater));
-
-            // value < v
-            var less = KuduPredicate.NewComparisonPredicate(col, ComparisonOp.Less, v);
-            Assert.Equal(values.HeadSet(s).Count, await CountRowsAsync(table, less));
-        }
-
-        var isNotNull = KuduPredicate.NewIsNotNullPredicate(col);
-        Assert.Equal(values.Count, await CountRowsAsync(table, isNotNull));
-
-        var isNull = KuduPredicate.NewIsNullPredicate(col);
-        Assert.Equal(1, await CountRowsAsync(table, isNull));
+        await CheckPredicatesAsync(table, values, testValues);
     }
 
     private static TableBuilder GetDefaultTableBuilder()
@@ -469,9 +442,9 @@ public class ScanPredicateTests : IAsyncLifetime
         return scanner.CountAsync();
     }
 
-    private static SortedSet<long> CreateIntegerValues(KuduType type)
+    private static SortedSet<T> CreateIntegerValues<T>(KuduType type)
     {
-        var values = new SortedSet<long>();
+        var values = new List<long>();
         for (long i = -50; i < 50; i++)
         {
             values.Add(i);
@@ -480,12 +453,12 @@ public class ScanPredicateTests : IAsyncLifetime
         values.Add(KuduPredicate.MinIntValue(type) + 1);
         values.Add(KuduPredicate.MaxIntValue(type) - 1);
         values.Add(KuduPredicate.MaxIntValue(type));
-        return values;
+        return new SortedSet<T>(values.Select(value => (T)(dynamic)value));
     }
 
-    private static List<long> CreateIntegerTestValues(KuduType type)
+    private static List<T> CreateIntegerTestValues<T>(KuduType type)
     {
-        return new List<long>
+        var values = new List<long>
         {
             KuduPredicate.MinIntValue(type),
             KuduPredicate.MinIntValue(type) + 1,
@@ -497,6 +470,8 @@ public class ScanPredicateTests : IAsyncLifetime
             KuduPredicate.MaxIntValue(type) - 1,
             KuduPredicate.MaxIntValue(type)
         };
+
+        return values.Select(value => (T)(dynamic)value).ToList();
     }
 
     private static SortedSet<DateTime> CreateTimestampValues()
@@ -585,14 +560,12 @@ public class ScanPredicateTests : IAsyncLifetime
         return new List<float>
         {
             float.NegativeInfinity,
-            -float.MaxValue,
+            float.MinValue,
             -100.0F,
             -1.1F,
             -1.0F,
             -float.Epsilon,
-            -float.MinValue,
             0.0F,
-            float.MinValue,
             float.Epsilon,
             1.0F,
             1.1F,
@@ -627,14 +600,12 @@ public class ScanPredicateTests : IAsyncLifetime
         return new List<double>
         {
             double.NegativeInfinity,
-            -double.MaxValue,
+            double.MinValue,
             -100.0,
             -1.1,
             -1.0,
             -double.Epsilon,
-            -double.MinValue,
             0.0,
-            double.MinValue,
             double.Epsilon,
             1.0,
             1.1,
@@ -703,6 +674,22 @@ public class ScanPredicateTests : IAsyncLifetime
         };
     }
 
+    private static SortedSet<byte[]> CreateBinaryValues()
+    {
+        var binaryValues = CreateStringValues()
+            .Select(value => value.ToUtf8ByteArray());
+
+        return new SortedSet<byte[]>(binaryValues, new ByteArrayComparer());
+    }
+
+    private static List<byte[]> CreateBinaryTestValues()
+    {
+        var binaryValues = CreateStringTestValues()
+            .Select(value => value.ToUtf8ByteArray());
+
+        return binaryValues.ToList();
+    }
+
     private async Task CheckPredicatesAsync<T>(
         KuduTable table,
         SortedSet<T> values,
@@ -739,5 +726,76 @@ public class ScanPredicateTests : IAsyncLifetime
 
         var isNull = KuduPredicate.NewIsNullPredicate(col);
         Assert.Equal(1, await CountRowsAsync(table, isNull));
+
+        var numInListValues = testValues
+            .Where(testValue => values.Contains(testValue))
+            .Count();
+
+        var inList = KuduPredicate.NewInListPredicate(col, testValues);
+        Assert.Equal(numInListValues, await CountRowsAsync(table, inList));
+
+        var bloomFilter = CreateBloomFilterPredicate<T>(table, col, testValues);
+        Assert.Equal(numInListValues, await CountRowsAsync(table, bloomFilter));
+    }
+
+    private static KuduPredicate CreateBloomFilterPredicate<T>(
+        KuduTable table,
+        ColumnSchema column,
+        List<T> values)
+    {
+        var bloomFilter = table.NewBloomFilterBuilder(column.Name, (ulong)values.Count)
+            .Build();
+
+        foreach (var value in values)
+        {
+            switch (value)
+            {
+                case bool v:
+                    bloomFilter.AddBool(v);
+                    break;
+                case sbyte v:
+                    bloomFilter.AddSByte(v);
+                    break;
+                case short v:
+                    bloomFilter.AddInt16(v);
+                    break;
+                case int v:
+                    bloomFilter.AddInt32(v);
+                    break;
+                case long v:
+                    bloomFilter.AddInt64(v);
+                    break;
+                case DateTime v:
+                    bloomFilter.AddDateTime(v);
+                    break;
+                case float v:
+                    bloomFilter.AddFloat(v);
+                    break;
+                case double v:
+                    bloomFilter.AddDouble(v);
+                    break;
+                case decimal v:
+                    bloomFilter.AddDecimal(v);
+                    break;
+                case string v:
+                    bloomFilter.AddString(v);
+                    break;
+                case byte[] v:
+                    bloomFilter.AddBinary(v);
+                    break;
+                default:
+                    throw new Exception();
+            }
+        }
+
+        return KuduPredicate.NewInBloomFilterPredicate(new List<KuduBloomFilter> { bloomFilter });
+    }
+
+    private sealed class ByteArrayComparer : IComparer<byte[]>
+    {
+        public int Compare(byte[] x, byte[] y)
+        {
+            return x.SequenceCompareTo(y);
+        }
     }
 }
