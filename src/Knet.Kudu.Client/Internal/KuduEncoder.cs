@@ -133,7 +133,7 @@ internal static class KuduEncoder
 
     public static byte[] EncodeDate(DateTime value)
     {
-        var buffer = new byte[8];
+        var buffer = new byte[4];
         EncodeDate(buffer, value);
         return buffer;
     }
