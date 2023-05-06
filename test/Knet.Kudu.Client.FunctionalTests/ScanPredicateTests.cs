@@ -75,11 +75,11 @@ public class ScanPredicateTests : IAsyncLifetime
         var testValues = CreateIntegerTestValues<sbyte>(KuduType.Int8);
 
         long i = 0;
-        foreach (byte value in values)
+        foreach (sbyte value in values)
         {
             var insert = table.NewInsert();
             insert.SetInt64("key", i++);
-            insert.SetByte("value", value);
+            insert.SetSByte("value", value);
             await _session.EnqueueAsync(insert);
         }
 
@@ -728,7 +728,7 @@ public class ScanPredicateTests : IAsyncLifetime
         Assert.Equal(1, await CountRowsAsync(table, isNull));
 
         var numInListValues = testValues
-            .Where(testValue => values.Contains(testValue))
+            .Where(values.Contains)
             .Count();
 
         var inList = KuduPredicate.NewInListPredicate(col, testValues);
