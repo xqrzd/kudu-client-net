@@ -1362,7 +1362,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
         {
             var range = pb.Range;
             var lower = range.HasLower ? range.Lower.ToByteArray() : null;
-            var upper = range.HasLower ? range.Lower.ToByteArray() : null;
+            var upper = range.HasUpper ? range.Upper.ToByteArray() : null;
 
             return new KuduPredicate(PredicateType.Range, column, lower, upper);
         }
