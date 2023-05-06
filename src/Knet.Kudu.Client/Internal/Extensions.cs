@@ -92,7 +92,7 @@ internal static class Extensions
     /// </summary>
     /// <typeparam name="T">The type of element in the list.</typeparam>
     /// <param name="source">The enumerable to return as a list.</param>
-    [return: NotNullIfNotNull("source")]
+    [return: NotNullIfNotNull(nameof(source))]
     public static List<T>? AsList<T>(this IEnumerable<T>? source) =>
         source == null || source is List<T> ? (List<T>)source! : source.ToList();
 
