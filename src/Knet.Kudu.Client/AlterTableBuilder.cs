@@ -176,7 +176,7 @@ public class AlterTableBuilder
             ThrowDefaultValueNullException();
 
         var column = _table.Schema.GetColumn(name);
-        var defaultValue = KuduEncoder.EncodeDefaultValue(column, newDefault);
+        var defaultValue = KuduEncoder.EncodeValue(column, newDefault);
 
         _request.AlterSchemaSteps.Add(new Step
         {

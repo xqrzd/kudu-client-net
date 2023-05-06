@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using Knet.Kudu.Client.Internal;
 
 namespace Knet.Kudu.Client;
 
@@ -108,6 +110,22 @@ public static class ScanBuilderExtensions
     {
         var column = scanBuilder.Table.Schema.GetColumn(columnName);
         var predicate = KuduPredicate.NewInListPredicate(column, values);
+        return scanBuilder.AddPredicate(predicate);
+    }
+
+    public static TBuilder AddInBloomFilterPredicate<TBuilder>(
+        this TBuilder scanBuilder, params KuduBloomFilter[] bloomFilter)
+        where TBuilder : AbstractKuduScannerBuilder<TBuilder>
+    {
+        var predicate = KuduPredicate.NewInBloomFilterPredicate(bloomFilter.ToList());
+        return scanBuilder.AddPredicate(predicate);
+    }
+
+    public static TBuilder AddInBloomFilterPredicate<TBuilder>(
+        this TBuilder scanBuilder, IEnumerable<KuduBloomFilter> bloomFilter)
+        where TBuilder : AbstractKuduScannerBuilder<TBuilder>
+    {
+        var predicate = KuduPredicate.NewInBloomFilterPredicate(bloomFilter.AsList());
         return scanBuilder.AddPredicate(predicate);
     }
 }

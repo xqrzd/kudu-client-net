@@ -25,5 +25,10 @@ public enum PredicateType
     /// <summary>
     /// A predicate which filters all rows not matching a list of values.
     /// </summary>
-    InList
+    InList,
+    /// <summary>
+    /// A predicate which evaluates to true if the column value is present in
+    /// a bloom filter.
+    /// </summary>
+    InBloomFilter
 }

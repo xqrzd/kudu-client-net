@@ -28,6 +28,11 @@ public class KuduPredicate : IEquatable<KuduPredicate>
     /// </summary>
     internal SortedSet<byte[]>? InListValues { get; }
 
+    /// <summary>
+    /// The list of bloom filters in this predicate.
+    /// </summary>
+    internal List<KuduBloomFilter>? BloomFilters { get; }
+
     public PredicateType Type { get; }
 
     public ColumnSchema Column { get; }
@@ -62,6 +67,35 @@ public class KuduPredicate : IEquatable<KuduPredicate>
         InListValues = inListValues;
     }
 
+    /// <summary>
+    /// Constructor for in bloom filter predicate.
+    /// </summary>
+    /// <param name="bloomFilters"></param>
+    /// <param name="lower">
+    /// The lower bound serialized value if this is a Range predicate,
+    /// or the equality value if this is an Equality predicate.
+    /// </param>
+    /// <param name="upper">The upper bound serialized value if this is a Range predicate.</param>
+    public KuduPredicate(List<KuduBloomFilter> bloomFilters, byte[]? lower, byte[]? upper)
+    {
+        ColumnSchema? column = null;
+        foreach (var bloomFilter in bloomFilters)
+        {
+            if (column is not null && !column.Equals(bloomFilter.Column))
+            {
+                throw new ArgumentException("Bloom filters must be for the same column", nameof(bloomFilters));
+            }
+
+            column = bloomFilter.Column;
+        }
+
+        Column = column ?? throw new ArgumentException("Missing bloom filters", nameof(bloomFilters));
+        Type = PredicateType.InBloomFilter;
+        BloomFilters = bloomFilters;
+        Lower = lower;
+        Upper = upper;
+    }
+
     public bool Equals(KuduPredicate? other)
     {
         if (other is null)
@@ -74,7 +108,8 @@ public class KuduPredicate : IEquatable<KuduPredicate>
             Column.Equals(other.Column) &&
             Lower.SequenceEqual(other.Lower) &&
             Upper.SequenceEqual(other.Upper) &&
-            InListEquals(other.InListValues);
+            InListEquals(other.InListValues) &&
+            InBloomFiltersEquals(other.BloomFilters);
     }
 
     private bool InListEquals(SortedSet<byte[]>? other)
@@ -86,6 +121,29 @@ public class KuduPredicate : IEquatable<KuduPredicate>
             return false;
 
         return InListValues.SetEquals(other);
+    }
+
+    private bool InBloomFiltersEquals(List<KuduBloomFilter>? other)
+    {
+        if (BloomFilters is null && other is null)
+            return true;
+
+        if (BloomFilters is null || other is null)
+            return false;
+
+        if (BloomFilters.Count != other.Count)
+            return false;
+
+        for (int i = 0; i < other.Count; i++)
+        {
+            var bf1 = BloomFilters[i];
+            var bf2 = other[i];
+
+            if (!bf1.BloomFilter.Equals(bf2.BloomFilter))
+                return false;
+        }
+
+        return true;
     }
 
     public override bool Equals(object? obj) => Equals(obj as KuduPredicate);
@@ -103,126 +161,195 @@ public class KuduPredicate : IEquatable<KuduPredicate>
         if (!Column.Equals(other.Column))
             throw new ArgumentException("Predicates from different columns may not be merged");
 
-        // First, consider other.type == NONE, IS_NOT_NULL, or IS_NULL
-        // NONE predicates dominate.
+        // First, consider other.Type == None, IsNotNull, or IsNull
+        // None predicates dominate.
         if (other.Type == PredicateType.None)
             return other;
 
-        // NOT NULL is dominated by all other predicates,
-        // except IS NULL, for which the merge is NONE.
+        // IsNotNull is dominated by all other predicates,
+        // except IsNull, for which the merge is None.
         if (other.Type == PredicateType.IsNotNull)
             return Type == PredicateType.IsNull ? None(Column) : this;
 
-        // NULL merged with any predicate type besides itself is NONE.
+        // IsNull merged with any predicate type besides itself is None.
         if (other.Type == PredicateType.IsNull)
             return Type == PredicateType.IsNull ? this : None(Column);
 
-        // Now other.type == EQUALITY, RANGE, or IN_LIST.
+        // Now other.Type == Equality, Range, InList, or InBloomFilter.
         switch (Type)
         {
             case PredicateType.None: return this;
             case PredicateType.IsNotNull: return other;
             case PredicateType.IsNull: return None(Column);
             case PredicateType.Equality:
+                if (other.Type == PredicateType.Equality)
                 {
-                    if (other.Type == PredicateType.Equality)
+                    if (Compare(Column, Lower!, other.Lower!) != 0)
                     {
-                        if (Compare(Column, Lower!, other.Lower!) != 0)
-                        {
-                            return None(Column);
-                        }
-                        else
-                        {
-                            return this;
-                        }
-                    }
-                    else if (other.Type == PredicateType.Range)
-                    {
-                        if (other.RangeContains(Lower!))
-                        {
-                            return this;
-                        }
-                        else
-                        {
-                            return None(Column);
-                        }
+                        return None(Column);
                     }
                     else
                     {
-                        CheckPredicateType(other.Type, PredicateType.InList);
-                        return other.Merge(this);
+                        return this;
                     }
+                }
+                else if (other.Type == PredicateType.Range)
+                {
+                    if (other.RangeContains(Lower!))
+                    {
+                        return this;
+                    }
+                    else
+                    {
+                        return None(Column);
+                    }
+                }
+                else if (other.Type == PredicateType.InList || other.Type == PredicateType.InBloomFilter)
+                {
+                    return other.Merge(this);
+                }
+                else
+                {
+                    throw new Exception($"Unknown predicate type {other.Type}");
                 }
             case PredicateType.Range:
+                if (other.Type == PredicateType.Equality ||
+                    other.Type == PredicateType.InList ||
+                    other.Type == PredicateType.InBloomFilter)
                 {
-                    if (other.Type == PredicateType.Equality || other.Type == PredicateType.InList)
+                    return other.Merge(this);
+                }
+                else if (other.Type == PredicateType.Range)
+                {
+                    var (newLower, newUpper) = MergeRange(other);
+
+                    if (newLower != null && newUpper != null && Compare(Column, newLower, newUpper) >= 0)
                     {
-                        return other.Merge(this);
+                        return None(Column);
                     }
                     else
                     {
-                        CheckPredicateType(other.Type, PredicateType.Range);
-                        byte[]? newLower = other.Lower == null ||
-                            (Lower != null && Compare(Column, Lower, other.Lower) >= 0) ? Lower : other.Lower;
-                        byte[]? newUpper = other.Upper == null ||
-                            (Upper != null && Compare(Column, Upper, other.Upper) <= 0) ? Upper : other.Upper;
-                        if (newLower != null && newUpper != null && Compare(Column, newLower, newUpper) >= 0)
+                        if (newLower != null && newUpper != null && AreConsecutive(newLower, newUpper))
                         {
-                            return None(Column);
+                            return new KuduPredicate(PredicateType.Equality, Column, newLower, null);
                         }
                         else
                         {
-                            if (newLower != null && newUpper != null && AreConsecutive(newLower, newUpper))
-                            {
-                                return new KuduPredicate(PredicateType.Equality, Column, newLower, null);
-                            }
-                            else
-                            {
-                                return new KuduPredicate(PredicateType.Range, Column, newLower, newUpper);
-                            }
+                            return new KuduPredicate(PredicateType.Range, Column, newLower, newUpper);
                         }
                     }
                 }
-            case PredicateType.InList:
+                else
                 {
-                    if (other.Type == PredicateType.Equality)
+                    throw new Exception($"Unknown predicate type {other.Type}");
+                }
+            case PredicateType.InList:
+                if (other.Type == PredicateType.Equality)
+                {
+                    // The equality value needs to be a member of the InList
+                    if (InListValues!.Contains(other.Lower!))
                     {
-                        if (InListValues!.Contains(other.Lower!))
-                        {
-                            return other;
-                        }
-                        else
-                        {
-                            return None(Column);
-                        }
-                    }
-                    else if (other.Type == PredicateType.Range)
-                    {
-                        var comparer = new PredicateComparer(Column);
-                        var values = new SortedSet<byte[]>(comparer);
-                        foreach (var value in InListValues!)
-                        {
-                            if (other.RangeContains(value))
-                            {
-                                values.Add(value);
-                            }
-                        }
-                        return BuildInList(Column, values);
+                        return other;
                     }
                     else
                     {
-                        CheckPredicateType(other.Type, PredicateType.InList);
-                        var comparer = new PredicateComparer(Column);
-                        var values = new SortedSet<byte[]>(comparer);
-                        foreach (var value in InListValues!)
-                        {
-                            if (other.InListValues!.Contains(value))
-                            {
-                                values.Add(value);
-                            }
-                        }
-                        return BuildInList(Column, values);
+                        return None(Column);
                     }
+                }
+                else if (other.Type == PredicateType.Range)
+                {
+                    var comparer = new PredicateComparer(Column);
+                    var values = new SortedSet<byte[]>(comparer);
+                    foreach (var value in InListValues!)
+                    {
+                        if (other.RangeContains(value))
+                        {
+                            values.Add(value);
+                        }
+                    }
+                    return BuildInList(Column, values);
+                }
+                else if (other.Type == PredicateType.InList)
+                {
+                    var comparer = new PredicateComparer(Column);
+                    var values = new SortedSet<byte[]>(comparer);
+                    foreach (var value in InListValues!)
+                    {
+                        if (other.InListValues!.Contains(value))
+                        {
+                            values.Add(value);
+                        }
+                    }
+                    return BuildInList(Column, values);
+                }
+                else if (other.Type == PredicateType.InBloomFilter)
+                {
+                    return other.Merge(this);
+                }
+                else
+                {
+                    throw new Exception($"Unknown predicate type {other.Type}");
+                }
+            case PredicateType.InBloomFilter:
+                if (other.Type == PredicateType.Equality)
+                {
+                    if (CheckValueInBloomFilter(other.Lower))
+                    {
+                        // Value falls in bloom filters so change to Equality predicate.
+                        return other;
+                    }
+                    else
+                    {
+                        // Value does not fall in bloom filters.
+                        return None(Column);
+                    }
+                }
+                else if (other.Type == PredicateType.InList)
+                {
+                    var comparer = new PredicateComparer(Column);
+                    var values = new SortedSet<byte[]>(comparer);
+                    foreach (var value in other.InListValues!)
+                    {
+                        if (CheckValueInBloomFilter(value))
+                        {
+                            values.Add(value);
+                        }
+                    }
+                    return BuildInList(Column, values);
+                }
+                else if (other.Type == PredicateType.Range || other.Type == PredicateType.InBloomFilter)
+                {
+                    var (newLower, newUpper) = MergeRange(other);
+
+                    if (newLower != null && newUpper != null && Compare(Column, newLower, newUpper) >= 0)
+                    {
+                        return None(Column);
+                    }
+                    else
+                    {
+                        if (newLower != null && newUpper != null && AreConsecutive(newLower, newUpper) &&
+                            CheckValueInBloomFilter(newLower))
+                        {
+                            return new KuduPredicate(PredicateType.Equality, Column, newLower, null);
+                        }
+                        else
+                        {
+                            // Other could be Range and may not have bloom filters.
+                            var newBloomFilters = new List<KuduBloomFilter>(
+                                BloomFilters!.Count + other.BloomFilters?.Count ?? 0);
+
+                            newBloomFilters.AddRange(BloomFilters);
+
+                            if (other.BloomFilters != null)
+                                newBloomFilters.AddRange(other.BloomFilters);
+
+                            return NewInBloomFilterPredicate(newBloomFilters, newLower, newUpper);
+                        }
+                    }
+                }
+                else
+                {
+                    throw new Exception($"Unknown predicate type {other.Type}");
                 }
             default:
                 throw new Exception($"Unknown predicate type {Type}");
@@ -244,11 +371,11 @@ public class KuduPredicate : IEquatable<KuduPredicate>
 
             case PredicateType.Range:
                 predicate.Range = new ColumnPredicatePB.Types.Range();
-                if (Lower is not null)
+                if (Lower != null)
                 {
                     predicate.Range.Lower = UnsafeByteOperations.UnsafeWrap(Lower);
                 }
-                if (Upper is not null)
+                if (Upper != null)
                 {
                     predicate.Range.Upper = UnsafeByteOperations.UnsafeWrap(Upper);
                 }
@@ -275,6 +402,27 @@ public class KuduPredicate : IEquatable<KuduPredicate>
 
                 break;
 
+            case PredicateType.InBloomFilter:
+                predicate.InBloomFilter = new ColumnPredicatePB.Types.InBloomFilter();
+                if (Lower != null)
+                {
+                    predicate.InBloomFilter.Lower = UnsafeByteOperations.UnsafeWrap(Lower);
+                }
+                if (Upper != null)
+                {
+                    predicate.InBloomFilter.Upper = UnsafeByteOperations.UnsafeWrap(Upper);
+                }
+
+                var bloomFilters = predicate.InBloomFilter.BloomFilters;
+                bloomFilters.Capacity = BloomFilters!.Count;
+
+                foreach (var bf in BloomFilters)
+                {
+                    bloomFilters.Add(bf.ToProtobuf());
+                }
+
+                break;
+
             case PredicateType.None:
                 throw new Exception("Can not convert None predicate to protobuf message");
 
@@ -292,21 +440,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
         switch (Type)
         {
             case PredicateType.Equality: return $"`{name}` = {ValueToString(Lower!)}";
-            case PredicateType.Range:
-                {
-                    if (Lower is null)
-                    {
-                        return $"`{name}` < {ValueToString(Upper!)}";
-                    }
-                    else if (Upper is null)
-                    {
-                        return $"`{name}` >= {ValueToString(Lower)}";
-                    }
-                    else
-                    {
-                        return $"`{name}` >= {ValueToString(Lower)} AND `{name}` < {ValueToString(Upper)}";
-                    }
-                }
+            case PredicateType.Range: return RangeToString();
             case PredicateType.InList:
                 {
                     var strings = new List<string>(InListValues!.Count);
@@ -314,10 +448,40 @@ public class KuduPredicate : IEquatable<KuduPredicate>
                         strings.Add(ValueToString(value));
                     return $"`{name}` IN ({string.Join(", ", strings)})";
                 }
+            case PredicateType.InBloomFilter:
+                {
+                    if (Lower != null || Upper != null)
+                    {
+                        var range = RangeToString();
+                        return $"{range} AND `{name}` IN {BloomFilters!.Count} BLOOM FILTERS";
+                    }
+                    else
+                    {
+                        return $"`{name}` IN {BloomFilters!.Count} BLOOM FILTERS";
+                    }
+                }
             case PredicateType.IsNotNull: return $"`{name}` IS NOT NULL";
             case PredicateType.IsNull: return $"`{name}` IS NULL";
             case PredicateType.None: return $"`{name}` NONE";
             default: throw new Exception($"Unknown predicate type {Type}");
+        }
+    }
+
+    private string RangeToString()
+    {
+        var name = Column.Name;
+
+        if (Lower is null)
+        {
+            return $"`{name}` < {ValueToString(Upper!)}";
+        }
+        else if (Upper is null)
+        {
+            return $"`{name}` >= {ValueToString(Lower)}";
+        }
+        else
+        {
+            return $"`{name}` >= {ValueToString(Lower)} AND `{name}` < {ValueToString(Upper)}";
         }
     }
 
@@ -961,6 +1125,14 @@ public class KuduPredicate : IEquatable<KuduPredicate>
         return BuildInList(column, encoded);
     }
 
+    public static KuduPredicate NewInBloomFilterPredicate(
+        List<KuduBloomFilter> bloomFilters,
+        byte[]? lower = null,
+        byte[]? upper = null)
+    {
+        return new KuduPredicate(bloomFilters, lower, upper);
+    }
+
     internal static long MinIntValue(KuduType type)
     {
         return type switch
@@ -1011,7 +1183,7 @@ public class KuduPredicate : IEquatable<KuduPredicate>
     /// <param name="column">The column which the values belong to.</param>
     /// <param name="a">The first serialized value.</param>
     /// <param name="b">The second serialized value.</param>
-    private static int Compare(ColumnSchema column, byte[] a, byte[] b)
+    private static int Compare(ColumnSchema column, ReadOnlySpan<byte> a, ReadOnlySpan<byte> b)
     {
         switch (column.Type)
         {
@@ -1141,20 +1313,40 @@ public class KuduPredicate : IEquatable<KuduPredicate>
         };
     }
 
-    private static void CheckPredicateType(PredicateType actual, PredicateType expected)
-    {
-        if (actual != expected)
-            throw new Exception($"Expected {expected}, received {actual}");
-    }
-
     /// <summary>
-    /// Check if this RANGE predicate contains the value.
+    /// Check if this Range predicate contains the value.
     /// </summary>
     /// <param name="value">The value to check.</param>
     private bool RangeContains(byte[] value)
     {
         return (Lower == null || Compare(Column, value, Lower) >= 0) &&
                (Upper == null || Compare(Column, value, Upper) < 0);
+    }
+
+    private bool CheckValueInBloomFilter(ReadOnlySpan<byte> value)
+    {
+        var bloomFilters = BloomFilters!;
+
+        foreach (var bloomFilter in bloomFilters)
+        {
+            if (!bloomFilter.FindBinary(value))
+                return false;
+        }
+
+        return true;
+    }
+
+    private (byte[]? Lower, byte[]? Upper) MergeRange(KuduPredicate other)
+    {
+        // Set the lower bound to the larger of the two.
+        byte[]? newLower = other.Lower == null ||
+            (Lower != null && Compare(Column, Lower, other.Lower) >= 0) ? Lower : other.Lower;
+
+        // Set the upper bound to the smaller of the two.
+        byte[]? newUpper = other.Upper == null ||
+            (Upper != null && Compare(Column, Upper, other.Upper) <= 0) ? Upper : other.Upper;
+
+        return (newLower, newUpper);
     }
 
     public static KuduPredicate FromPb(KuduSchema schema, ColumnPredicatePB pb)
@@ -1191,9 +1383,42 @@ public class KuduPredicate : IEquatable<KuduPredicate>
 
             return BuildInList(column, values);
         }
+        else if (pb.InBloomFilter != null)
+        {
+            var inBloomFilter = pb.InBloomFilter;
+            var lower = inBloomFilter.HasLower ? inBloomFilter.Lower.ToByteArray() : null;
+            var upper = inBloomFilter.HasUpper ? inBloomFilter.Upper.ToByteArray() : null;
+
+            var numBloomFilters = inBloomFilter.BloomFilters.Count;
+
+            if (numBloomFilters <= 0)
+            {
+                throw new ArgumentException("Invalid bloom filter predicate on column " +
+                    $"{column.Name}. No bloom filters supplied");
+            }
+
+            var bloomFilters = new List<KuduBloomFilter>(numBloomFilters);
+
+            foreach (var bloomFilterPb in inBloomFilter.BloomFilters)
+            {
+                var blockBloomFilter = new BlockBloomFilter(
+                    bloomFilterPb.LogSpaceBytes,
+                    bloomFilterPb.BloomData.ToByteArray(),
+                    bloomFilterPb.AlwaysFalse);
+
+                var bloomFilter = new KuduBloomFilter(
+                    blockBloomFilter,
+                    bloomFilterPb.HashSeed,
+                    column);
+
+                bloomFilters.Add(bloomFilter);
+            }
+
+            return NewInBloomFilterPredicate(bloomFilters, lower, upper);
+        }
         else
         {
-            throw new Exception("Unknown predicate type");
+            throw new ArgumentException($"Unknown predicate type for column {column.Name}");
         }
     }
 

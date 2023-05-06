@@ -47,6 +47,18 @@ public class KuduTable
 
     public override string ToString() => TableName;
 
+    public KuduBloomFilterBuilder NewBloomFilterBuilder(int columnIndex, ulong numKeys)
+    {
+        var column = Schema.GetColumn(columnIndex);
+        return new KuduBloomFilterBuilder(column, numKeys);
+    }
+
+    public KuduBloomFilterBuilder NewBloomFilterBuilder(string columnName, ulong numKeys)
+    {
+        var column = Schema.GetColumn(columnName);
+        return new KuduBloomFilterBuilder(column, numKeys);
+    }
+
     /// <summary>
     /// Get a new insert configured with this table's schema.
     /// </summary>

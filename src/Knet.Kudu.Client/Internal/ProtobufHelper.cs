@@ -136,7 +136,7 @@ internal static class ProtobufHelper
         var defaultValue = columnSchema.DefaultValue;
         if (defaultValue is not null)
         {
-            var encodedDefaultValue = KuduEncoder.EncodeDefaultValue(columnSchema, defaultValue);
+            var encodedDefaultValue = KuduEncoder.EncodeValue(columnSchema, defaultValue);
             columnSchemaPb.ReadDefaultValue = UnsafeByteOperations.UnsafeWrap(encodedDefaultValue);
         }
     }

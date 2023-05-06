@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Knet.Kudu.Client.Internal;
 using Knet.Kudu.Client.Util;
 using Xunit;
@@ -969,7 +972,7 @@ public class KuduPredicateTests
         // No test for decimal128, as C#'s decimal can't store a value that large.
         Assert.Equal(KuduPredicate.NewComparisonPredicate(stringCol, ComparisonOp.Less, ""),
                      KuduPredicate.None(stringCol));
-        Assert.Equal(KuduPredicate.NewComparisonPredicate(binaryCol, ComparisonOp.Less, new byte[] { }),
+        Assert.Equal(KuduPredicate.NewComparisonPredicate(binaryCol, ComparisonOp.Less, Array.Empty<byte>()),
                      KuduPredicate.None(binaryCol));
         Assert.Equal(KuduPredicate.NewComparisonPredicate(varcharCol, ComparisonOp.Less, ""),
                      KuduPredicate.None(varcharCol));
@@ -997,7 +1000,7 @@ public class KuduPredicateTests
         // No test for decimal128, as C#'s decimal can't store a value that large.
         Assert.Equal(KuduPredicate.NewComparisonPredicate(stringCol, ComparisonOp.GreaterEqual, ""),
                      KuduPredicate.NewIsNotNullPredicate(stringCol));
-        Assert.Equal(KuduPredicate.NewComparisonPredicate(binaryCol, ComparisonOp.GreaterEqual, new byte[] { }),
+        Assert.Equal(KuduPredicate.NewComparisonPredicate(binaryCol, ComparisonOp.GreaterEqual, Array.Empty<byte>()),
                      KuduPredicate.NewIsNotNullPredicate(binaryCol));
 
         Assert.Equal(KuduPredicate.NewComparisonPredicate(byteCol, ComparisonOp.GreaterEqual, sbyte.MaxValue),
@@ -1124,7 +1127,188 @@ public class KuduPredicateTests
             KuduPredicate.NewComparisonPredicate(decimal128Col, ComparisonOp.Equal, 1.00m));
     }
 
-    private void TestMerge(KuduPredicate a, KuduPredicate b, KuduPredicate expected)
+    [Fact]
+    public void TestBloomFilterMerge()
+    {
+        const int numKeys = 5; // 0 1 both hit bf1 and bf2, 2 3 4 only hit bf2.
+
+        var longColumn = CreateColumnSchema("c1", KuduType.Int64);
+        var builder = new KuduBloomFilterBuilder(longColumn, numKeys)
+            .SetHashSeed(0)
+            .SetFalsePositiveProbability(0.01);
+
+        var b1 = builder.Build();
+        var b2 = builder.Build();
+        var values = new List<long>();
+
+        FillBloomFilterAndValues(numKeys, values, b1, b2);
+        TestMergeBloomFilterCombinations(longColumn, values, b1);
+        TestMergeBloomFilterCombinations(longColumn, values, b1, b2);
+
+        var stringColumn = CreateColumnSchema("c1", KuduType.String);
+        var b3 = new KuduBloomFilterBuilder(stringColumn, numKeys)
+            .SetHashSeed(0)
+            .SetFalsePositiveProbability(0.01)
+            .Build();
+
+        var stringKeys = new List<string> { "0", "00", "10", "100", "1100" };
+        for (int i = 0; i < 2; i++)
+        {
+            b3.AddString(stringKeys[i]);
+        }
+
+        TestMergeBloomFilterCombinations(stringColumn, stringKeys, b3);
+
+        var binaryColumn = CreateColumnSchema("c1", KuduType.Binary);
+        var b4 = new KuduBloomFilterBuilder(binaryColumn, numKeys)
+            .SetHashSeed(0)
+            .SetFalsePositiveProbability(0.01)
+            .Build();
+
+        var binaryKeys = new List<byte[]>
+        {
+            Array.Empty<byte>(),
+            new byte[] { 0 },
+            new byte[] { 0, 0 },
+            new byte[] { 0, 0, 0 },
+            new byte[] { 0, 0, 0, 0 },
+        };
+
+        for (int i = 0; i < 2; i++)
+        {
+            b4.AddBinary(binaryKeys[i]);
+        }
+
+        TestMergeBloomFilterCombinations(binaryColumn, binaryKeys, b4);
+    }
+
+    private static void TestMergeBloomFilterCombinations<T>(
+        ColumnSchema column, List<T> values, params KuduBloomFilter[] bloomFilters)
+    {
+        var bf = new List<KuduBloomFilter>(bloomFilters);
+
+        // BloomFilter AND
+        // NONE
+        // =
+        // NONE
+        TestMerge(NewBloomFilterPredicate(bf, null, null),
+                  KuduPredicate.None(column),
+                  KuduPredicate.None(column));
+
+        // BloomFilter AND
+        // Equality
+        // =
+        // Equality
+        TestMerge(NewBloomFilterPredicate(bf, null, null),
+                  KuduPredicate.NewComparisonPredicate(column, ComparisonOp.Equal, (dynamic)values[0]),
+                  KuduPredicate.NewComparisonPredicate(column, ComparisonOp.Equal, (dynamic)values[0]));
+
+        // BloomFilter AND
+        // Equality
+        // =
+        // None
+        TestMerge(NewBloomFilterPredicate(bf, null, null),
+                  // Value in index 2 is not present in one of the bloom filters.
+                  KuduPredicate.NewComparisonPredicate(column, ComparisonOp.Equal, (dynamic)values[2]),
+                  KuduPredicate.None(column));
+
+        // BloomFilter AND
+        // IS NOT NULL
+        // =
+        // BloomFilter
+        TestMerge(NewBloomFilterPredicate(bf, null, null),
+                  KuduPredicate.NewIsNotNullPredicate(column),
+                  NewBloomFilterPredicate(bf, null, null));
+
+        // BloomFilter AND
+        // IS NULL
+        // =
+        // None
+        TestMerge(NewBloomFilterPredicate(bf, null, null),
+                  KuduPredicate.NewIsNullPredicate(column),
+                  KuduPredicate.None(column));
+
+        // BloomFilter AND
+        // InList
+        // =
+        // None(the value in list can not hit bloom filter)
+        var inList = new List<T> { values[2], values[3], values[4] };
+        TestMerge(NewBloomFilterPredicate(bf, null, null),
+                  KuduPredicate.NewInListPredicate(column, inList),
+                  KuduPredicate.None(column));
+
+        // BloomFilter AND
+        // InList
+        // =
+        // InList(the value in list all hits bloom filter)
+        inList = new List<T> { values[0], values[1] };
+        var hitList = new List<T> { values[0], values[1] };
+        TestMerge(NewBloomFilterPredicate(bf, null, null),
+                  KuduPredicate.NewInListPredicate(column, inList),
+                  KuduPredicate.NewInListPredicate(column, hitList));
+
+        // BloomFilter AND
+        // InList
+        // =
+        // InList(only the some values in list hits bloom filter)
+        inList = new List<T> { values[0], values[1], values[2], values[3] };
+        hitList = new List<T> { values[0], values[1] };
+        TestMerge(NewBloomFilterPredicate(bf, null, null),
+                  KuduPredicate.NewInListPredicate(column, inList),
+                  KuduPredicate.NewInListPredicate(column, hitList));
+
+        // BloomFilter AND
+        // InList
+        // =
+        // Equality(only the first value in list hits bloom filter, so it simplify to Equality)
+        inList = new List<T> { values[0], values[2], values[3] };
+        TestMerge(NewBloomFilterPredicate(bf, null, null),
+                  KuduPredicate.NewInListPredicate(column, inList),
+                  KuduPredicate.NewComparisonPredicate(column, ComparisonOp.Equal, (dynamic)values[0]));
+
+        // Range AND
+        // BloomFilter
+        // =
+        // BloomFilter with lower and upper bound
+        TestMerge(NewRangePredicate(column, values[0], values[4]),
+                  NewBloomFilterPredicate(bf, null, null),
+                  NewBloomFilterPredicate(bf, values[0], values[4]));
+
+        // BloomFilter with lower and upper bound AND
+        // Range
+        // =
+        // BloomFilter with lower and upper bound
+        TestMerge(NewBloomFilterPredicate(bf, values[0], values[4]),
+                  NewRangePredicate(column, values[1], values[3]),
+                  NewBloomFilterPredicate(bf, values[1], values[3]));
+
+        // BloomFilter with lower and upper bound AND
+        // Range
+        // =
+        // None
+        TestMerge(NewBloomFilterPredicate(bf, values[0], values[2]),
+                  NewRangePredicate(column, values[2], values[4]),
+                  KuduPredicate.None(column));
+
+        // BloomFilter AND
+        // BloomFilter with lower and upper bound
+        // =
+        // BloomFilter with lower and upper bound
+        var expected = bf.Concat(bf).ToList();
+        TestMerge(NewBloomFilterPredicate(bf, null, null),
+                  NewBloomFilterPredicate(bf, values[0], values[4]),
+                  NewBloomFilterPredicate(expected, values[0], values[4]));
+
+        // BloomFilter with lower and upper bound AND
+        // BloomFilter with lower and upper bound
+        // =
+        // BloomFilter with lower and upper bound
+        TestMerge(NewBloomFilterPredicate(bf, values[1], values[3]),
+                  NewBloomFilterPredicate(bf, values[0], values[4]),
+                  NewBloomFilterPredicate(expected, values[1], values[3]));
+    }
+
+    private static void TestMerge(KuduPredicate a, KuduPredicate b, KuduPredicate expected)
     {
         Assert.Equal(expected, a.Merge(b));
         Assert.Equal(expected, b.Merge(a));
@@ -1146,9 +1330,28 @@ public class KuduPredicateTests
     private KuduPredicate StringInList(params string[] values) =>
         KuduPredicate.NewInListPredicate(stringCol, values);
 
+    private static KuduPredicate NewRangePredicate(
+        ColumnSchema column, object lower, object upper)
+    {
+        var rawLower = lower is null ? null : KuduEncoder.EncodeValue(column, lower);
+        var rawUpper = upper is null ? null : KuduEncoder.EncodeValue(column, upper);
+
+        return new KuduPredicate(PredicateType.Range, column, rawLower, rawUpper);
+    }
+
+    private static KuduPredicate NewBloomFilterPredicate(
+        List<KuduBloomFilter> bloomFilters, object lower, object upper)
+    {
+        var column = bloomFilters[0].Column;
+        var rawLower = lower is null ? null : KuduEncoder.EncodeValue(column, lower);
+        var rawUpper = upper is null ? null : KuduEncoder.EncodeValue(column, upper);
+
+        return KuduPredicate.NewInBloomFilterPredicate(bloomFilters, rawLower, rawUpper);
+    }
+
     private static ColumnSchema CreateColumnSchema(
         string name, KuduType dataType, ColumnTypeAttributes attributes = null) =>
-        new ColumnSchema(
+        new(
             name,
             dataType,
             false,
@@ -1159,4 +1362,45 @@ public class KuduPredicateTests
             CompressionType.DefaultCompression,
             attributes,
             null);
+
+    private static void FillBloomFilterAndValues(
+        int numKeys,
+        List<long> values,
+        KuduBloomFilter b1,
+        KuduBloomFilter b2)
+    {
+        long current = 0;
+        for (int i = 0; i < 2; i++)
+        {
+            while (true)
+            {
+                long key = Random.Shared.NextInt64();
+                if (key <= current)
+                    continue;
+
+                current = key;
+                b1.AddInt64(key);
+                b2.AddInt64(key);
+                values.Add(key);
+
+                break;
+            }
+        }
+
+        for (int i = 2; i < numKeys; i++)
+        {
+            while (true)
+            {
+                long key = Random.Shared.NextInt64();
+                if (!b1.FindInt64(key) && key > current)
+                {
+                    current = key;
+                    values.Add(key);
+                    b2.AddInt64(key);
+
+                    break;
+                }
+            }
+        }
+    }
 }
