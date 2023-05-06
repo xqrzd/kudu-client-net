@@ -316,7 +316,6 @@ public class KuduBloomFilter
 
     private uint GetBinaryHash(ReadOnlySpan<byte> value)
     {
-        CheckType(KuduType.Binary);
         return FastHash.Hash32(value, _hashSeed);
     }
 
