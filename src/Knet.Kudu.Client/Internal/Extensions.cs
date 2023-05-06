@@ -98,6 +98,7 @@ internal static class Extensions
 
     public static int GetContentHashCode(this byte[] source)
     {
+#if NETSTANDARD2_0
         if (source == null)
             return 0;
 
@@ -106,5 +107,10 @@ internal static class Extensions
             result = 31 * result + element;
 
         return result;
+#else
+        var hashcode = new HashCode();
+        hashcode.AddBytes(source);
+        return hashcode.ToHashCode();
+#endif
     }
 }
