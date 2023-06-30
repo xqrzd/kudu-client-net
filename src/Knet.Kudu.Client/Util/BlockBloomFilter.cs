@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Knet.Kudu.Client.Internal;
 #if NET7_0_OR_GREATER
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
@@ -252,7 +253,7 @@ public class BlockBloomFilter : IEquatable<BlockBloomFilter>
 
     public override bool Equals(object? obj) => Equals(obj as BlockBloomFilter);
 
-    public override int GetHashCode() => HashCode.Combine(AlwaysFalse, _directory.Length);
+    public override int GetHashCode() => _directory.GetContentHashCode();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private Span<uint> GetBucketSpan(uint bucketIndex)
