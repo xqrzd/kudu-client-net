@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Knet.Kudu.Client.Connection;
 using Knet.Kudu.Client.Protobuf;
 
@@ -23,6 +25,88 @@ internal static class Extensions
 
     public static bool SequenceEqual<T>(this T[]? array, ReadOnlySpan<T> other)
         where T : IEquatable<T> => MemoryExtensions.SequenceEqual(array, other);
+
+#if NETSTANDARD2_0 || NETSTANDARD2_1
+    public static CancellationTokenRegistration UnsafeRegister(
+        this CancellationToken cancellationToken, Action<object?> callback, object? state)
+    {
+        return cancellationToken.Register(s => callback(s), state);
+    }
+#endif
+
+#if !NET6_0_OR_GREATER
+    public static CancellationTokenRegistration UnsafeRegister(
+        this CancellationToken cancellationToken,
+        Action<object?, CancellationToken> callback, object? state)
+    {
+#if NETCOREAPP3_1_OR_GREATER
+        return cancellationToken.UnsafeRegister(s => callback(s, cancellationToken), state);
+#else
+        return cancellationToken.Register(s => callback(s, cancellationToken), state);
+#endif
+    }
+
+    // https://github.com/dotnet/runtime/blob/master/src/libraries/Common/src/System/Threading/Tasks/TaskTimeoutExtensions.cs
+    public static Task WaitAsync(this Task task, CancellationToken cancellationToken)
+    {
+        if (task.IsCompleted || !cancellationToken.CanBeCanceled)
+        {
+            return task;
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Task.FromCanceled(cancellationToken);
+        }
+
+        return WithCancellationCore(task, cancellationToken);
+
+        static async Task WithCancellationCore(Task task, CancellationToken cancellationToken)
+        {
+            var tcs = new TaskCompletionSource();
+
+            using var _ = cancellationToken.Register(
+                static state => ((TaskCompletionSource)state!).TrySetResult(), tcs);
+
+            if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
+            {
+                throw new TaskCanceledException(Task.FromCanceled(cancellationToken));
+            }
+
+            task.GetAwaiter().GetResult(); // Already completed; propagate any exception.
+        }
+    }
+
+    public static Task<T> WaitAsync<T>(this Task<T> task, CancellationToken cancellationToken)
+    {
+        if (task.IsCompleted || !cancellationToken.CanBeCanceled)
+        {
+            return task;
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Task.FromCanceled<T>(cancellationToken);
+        }
+
+        return WithCancellationCore(task, cancellationToken);
+
+        static async Task<T> WithCancellationCore(Task<T> task, CancellationToken cancellationToken)
+        {
+            var tcs = new TaskCompletionSource();
+
+            using var _ = cancellationToken.Register(
+                static state => ((TaskCompletionSource)state!).TrySetResult(), tcs);
+
+            if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
+            {
+                throw new TaskCanceledException(Task.FromCanceled(cancellationToken));
+            }
+
+            return task.GetAwaiter().GetResult(); // Already completed; propagate any exception.
+        }
+    }
+#endif
 
     public static int NextClearBit(this BitArray array, int from)
     {
@@ -98,7 +182,7 @@ internal static class Extensions
 
     public static int GetContentHashCode(this byte[] source)
     {
-#if NETSTANDARD2_0
+#if NETSTANDARD2_0 || NETSTANDARD2_1
         if (source == null)
             return 0;
 
