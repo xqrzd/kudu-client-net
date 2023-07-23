@@ -48,13 +48,11 @@ internal sealed class ColumnNameMatcher<T> where T : class
 
             if (StringComparer.OrdinalIgnoreCase.Equals(destinationName, projectedName))
             {
-                if (caseInsensitiveMatch is null)
-                    caseInsensitiveMatch = column;
+                caseInsensitiveMatch ??= column;
             }
             else
             {
-                if (firstMatch is null)
-                    firstMatch = column;
+                firstMatch ??= column;
             }
         }
 

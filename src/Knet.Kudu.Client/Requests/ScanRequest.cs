@@ -3,7 +3,6 @@ using System.Buffers;
 using Google.Protobuf;
 using Google.Protobuf.Collections;
 using Knet.Kudu.Client.Exceptions;
-using Knet.Kudu.Client.Protobuf;
 using Knet.Kudu.Client.Protobuf.Tserver;
 using Knet.Kudu.Client.Protocol;
 using Knet.Kudu.Client.Scanner;

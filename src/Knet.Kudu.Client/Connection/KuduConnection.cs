@@ -272,15 +272,12 @@ public sealed class KuduConnection : IAsyncDisposable
 
     private int AddInflightRpc(InflightRpc inflightRpc)
     {
-        int callId;
-
         lock (_inflightRpcs)
         {
-            callId = _nextCallId++;
+            int callId = _nextCallId++;
             _inflightRpcs.Add(callId, inflightRpc);
+            return callId;
         }
-
-        return callId;
     }
 
     private void RemoveInflightRpc(int callId)

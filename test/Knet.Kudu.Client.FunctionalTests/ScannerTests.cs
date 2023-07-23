@@ -467,7 +467,7 @@ public class ScannerTests
             }
             else if (type == RowOperation.Delete)
             {
-                Assert.True(false, "Shouldn't see any DELETEs");
+                Assert.Fail("Shouldn't see any DELETEs");
             }
             else
             {
