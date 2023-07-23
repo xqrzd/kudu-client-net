@@ -12,7 +12,7 @@ public class SchemaTests
 
         var schema = GetSchema(builder);
 
-        Assert.Equal(1, schema.Columns.Count);
+        Assert.Single(schema.Columns);
         Assert.False(schema.HasNullableColumns);
         Assert.Equal(0, schema.VarLengthColumnCount);
         Assert.Equal(1, schema.RowAllocSize);

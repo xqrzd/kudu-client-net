@@ -20,7 +20,7 @@ public static class DecimalUtil
     public const int MaxDecimal128Precision = 38;
     public static readonly Int128 MaxUnscaledDecimal128 = new(
         // 99999999999999999999999999999999999999
-        0x4B3B4CA85A86C47A, 0x98A223FFFFFFFFF);
+        0x4b3b4ca85a86c47a, 0x98a223fffffffff);
     public static readonly Int128 MinUnscaledDecimal128 = -MaxUnscaledDecimal128;
     public const int Decimal128Size = 16;
 
@@ -318,7 +318,7 @@ public static class DecimalUtil
         // Scale mask for the flags field. This byte in the flags field contains
         // the power of 10 to divide the Decimal value by. The scale byte must
         // contain a value between 0 and 28 inclusive.
-        private const int ScaleMask = 0x00FF0000;
+        private const int ScaleMask = 0x00ff0000;
 
         // Number of bits scale is shifted by.
         private const int ScaleShift = 16;
