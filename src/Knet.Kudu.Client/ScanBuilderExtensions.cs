@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Knet.Kudu.Client.Internal;
 
 namespace Knet.Kudu.Client;
@@ -98,13 +97,6 @@ public static class ScanBuilderExtensions
     }
 
     public static TBuilder AddInListPredicate<TBuilder, T>(
-        this TBuilder scanBuilder, string columnName, params T[] values)
-        where TBuilder : AbstractKuduScannerBuilder<TBuilder>
-    {
-        return AddInListPredicate(scanBuilder, columnName, (IEnumerable<T>)values);
-    }
-
-    public static TBuilder AddInListPredicate<TBuilder, T>(
         this TBuilder scanBuilder, string columnName, IEnumerable<T> values)
         where TBuilder : AbstractKuduScannerBuilder<TBuilder>
     {
@@ -114,18 +106,18 @@ public static class ScanBuilderExtensions
     }
 
     public static TBuilder AddInBloomFilterPredicate<TBuilder>(
-        this TBuilder scanBuilder, params KuduBloomFilter[] bloomFilter)
+        this TBuilder scanBuilder, KuduBloomFilter bloomFilter)
         where TBuilder : AbstractKuduScannerBuilder<TBuilder>
     {
-        var predicate = KuduPredicate.NewInBloomFilterPredicate(bloomFilter.ToList());
-        return scanBuilder.AddPredicate(predicate);
+        return AddInBloomFilterPredicate(
+            scanBuilder, new List<KuduBloomFilter> { bloomFilter });
     }
 
     public static TBuilder AddInBloomFilterPredicate<TBuilder>(
-        this TBuilder scanBuilder, IEnumerable<KuduBloomFilter> bloomFilter)
+        this TBuilder scanBuilder, IEnumerable<KuduBloomFilter> bloomFilters)
         where TBuilder : AbstractKuduScannerBuilder<TBuilder>
     {
-        var predicate = KuduPredicate.NewInBloomFilterPredicate(bloomFilter.AsList());
+        var predicate = KuduPredicate.NewInBloomFilterPredicate(bloomFilters.AsList());
         return scanBuilder.AddPredicate(predicate);
     }
 }
