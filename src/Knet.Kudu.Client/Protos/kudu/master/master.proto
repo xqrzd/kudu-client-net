@@ -90,6 +90,9 @@ message MasterErrorPB {
 
     // Master is already part of the Raft configuration.
     MASTER_ALREADY_PRESENT = 15;
+
+    // The requested table is in soft_deleted state.
+    TABLE_SOFT_DELETED = 16;
   }
 
   // The error code.
@@ -130,6 +133,7 @@ message SysTabletsEntryPB {
     RUNNING = 2;
     REPLACED = 3;
     DELETED = 4;
+    SOFT_DELETED = 5;
   }
 
   // DEPRECATED. Replaced by 'partition'.
@@ -152,6 +156,9 @@ message SysTabletsEntryPB {
   // The dimension label for the tablet. Used for dimension-specific
   // placement of the tablet's replicas.
   optional string dimension_label = 8;
+
+  // The delete time of the tablet, in seconds since the epoch.
+  optional int64 delete_timestamp = 9;
 }
 
 // The on-disk entry in the sys.catalog table ("metadata" column) for
@@ -163,6 +170,7 @@ message SysTablesEntryPB {
     RUNNING = 2;
     ALTERING = 3;
     REMOVED = 4;
+    SOFT_DELETED = 5;
   }
 
   // Table name
@@ -216,6 +224,12 @@ message SysTablesEntryPB {
 
   // The comment on the table.
   optional string comment = 17;
+
+  // The delete time of the table, in seconds since the epoch.
+  optional int64 delete_timestamp = 18;
+
+  // The reservation time interval (in seconds) between soft delete and delete.
+  optional uint32 soft_deleted_reserved_seconds = 19;
 }
 
 // The on-disk entry in the sys.catalog table ("metadata" column) to represent
@@ -571,9 +585,30 @@ message DeleteTableRequestPB {
   // Whether to apply the deletion to external catalogs, such as the Hive Metastore,
   // which the Kudu master has been configured to integrate with.
   optional bool modify_external_catalogs = 2 [default = true];
+
+  // Reserve seconds after the table has been deleted.
+  // If this field is specified by the client, means the request coming from a newer Kudu
+  // client with the precise value for 'reserve_seconds', and the field's value from the request
+  // should be taken as-is regardless of the current setting of the '--default_deleted_table_reserve_seconds'
+  // flag at the server side.
+  // Otherwise, the behavior of DeleteRPC is controlled by the '--default_deleted_table_reserve_seconds' flag.
+  optional uint32 reserve_seconds = 3;
 }
 
 message DeleteTableResponsePB {
+  // The error, if an error occurred with this request.
+  optional MasterErrorPB error = 1;
+}
+
+message RecallDeletedTableRequestPB {
+  required TableIdentifierPB table = 1;
+
+  // If this field is set, that's the name for the recalled table.
+  // Otherwise, the recalled table will use the original table name.
+  optional string new_table_name = 2;
+}
+
+message RecallDeletedTableResponsePB {
   // The error, if an error occurred with this request.
   optional MasterErrorPB error = 1;
 }
@@ -586,11 +621,25 @@ message ListTablesRequestPB {
   // interpreted as if it were set to [TableTypePB::DEFAULT_TABLE], meaning
   // to include only user-defined tables.
   repeated TableTypePB type_filter = 2;
+
+  // Set this field 'true' to include information on the partition backed by
+  // each tablet in the result list.
+  optional bool list_tablet_with_partition = 3 [default = false];
+
+  // Use to select the tables type for display.
+  // Only show regular tables if false.
+  // Only show soft_deleted tables if true.
+  optional bool show_soft_deleted = 4;
 }
 
 message ListTablesResponsePB {
   // The error, if an error occurred with this request.
   optional MasterErrorPB error = 1;
+
+  message TabletWithPartition {
+    optional string tablet_id = 1;
+    optional PartitionPB partition = 2;
+  }
 
   message TableInfo {
     required bytes id = 1;
@@ -598,6 +647,7 @@ message ListTablesResponsePB {
     optional uint64 live_row_count = 3;
     optional int32 num_tablets = 4;
     optional int32 num_replicas = 5;
+    repeated TabletWithPartition tablet_with_partition = 6;
   }
 
   repeated TableInfo tables = 2;
@@ -687,7 +737,7 @@ message GetTableLocationsResponsePB {
 
   // If the client caches table locations, the entries should not live longer
   // than this timeout. Defaults to one hour.
-  optional uint32 ttl_millis = 3 [default = 36000000];
+  optional uint32 ttl_millis = 3 [default = 3600000];
 }
 
 message AlterTableRequestPB {
@@ -720,6 +770,15 @@ message AlterTableRequestPB {
     optional ColumnSchemaDeltaPB delta = 1;
   }
   message AddRangePartition {
+    // A structure to define range-specific hash schema. This separate type
+    // exists to distinguish from an empty hash schema (i.e. no hash bucketing)
+    // and the absence of range-specific hash schema when a range partition
+    // uses the table-wide hash schema instead. Otherwise, using a field of
+    // repeated HashBucketSchemaPB wouldn't allow to tell between those cases.
+    message CustomHashSchema {
+      repeated PartitionSchemaPB.HashBucketSchemaPB hash_schema = 1;
+    }
+
     // A set of row operations containing the lower and upper range bound for
     // the range partition to add or drop.
     optional RowOperationsPB range_bounds = 1;
@@ -727,6 +786,10 @@ message AlterTableRequestPB {
     // The dimension label for the tablet. Used for dimension-specific placement
     // of the tablet's replicas.
     optional string dimension_label = 2;
+
+    // The custom hash partition schema for the range, if specified. If absent,
+    // the range uses table-wide hash schema.
+    optional CustomHashSchema custom_hash_schema = 3;
   }
   message DropRangePartition {
     // A set of row operations containing the lower and upper range bound for
@@ -1108,6 +1171,14 @@ enum MasterFeatures {
   // Though this is technically a tserver feature, it's unreasonable to check if every
   // tablet server supports this feature. Instead we use the master as a proxy.
   IGNORE_OPERATIONS = 7;
+  // Whether master supports tables with range-specific hash schemas.
+  RANGE_SPECIFIC_HASH_SCHEMA = 8;
+  // Similar to IGNORE_OPERATIONS, but this is for UPSERT_IGNORE specifically.
+  UPSERT_IGNORE = 9;
+  // Whether master supports immutable attribute on column schema.
+  IMMUTABLE_COLUMN_ATTRIBUTE = 10;
+  // Whether master supports auto incrementing column.
+  AUTO_INCREMENTING_COLUMN = 11;
 }
 
 service MasterService {
@@ -1141,6 +1212,10 @@ service MasterService {
     option (kudu.rpc.authz_method) = "AuthorizeClientOrServiceUser";
   }
   rpc DeleteTable(DeleteTableRequestPB) returns (DeleteTableResponsePB) {
+    option (kudu.rpc.authz_method) = "AuthorizeClient";
+  }
+
+  rpc RecallDeletedTable(RecallDeletedTableRequestPB) returns (RecallDeletedTableResponsePB) {
     option (kudu.rpc.authz_method) = "AuthorizeClient";
   }
 
