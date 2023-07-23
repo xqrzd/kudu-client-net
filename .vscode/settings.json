@@ -1,4 +1,5 @@
 {
+    "dotnet.defaultSolution": "kudu-client-net.sln",
     "files.exclude": {
         "**/bin": true,
         "**/obj": true
