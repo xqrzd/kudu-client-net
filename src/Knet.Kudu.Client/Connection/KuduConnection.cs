@@ -196,14 +196,14 @@ public sealed class KuduConnection : IAsyncDisposable
 
         while (KuduMessageParser.TryParse(ref reader, parserContext))
         {
-            HandleRpc(parserContext);
+            CompleteInflightRpc(parserContext);
             parserContext.Reset();
         }
 
         return reader.Position;
     }
 
-    private void HandleRpc(ParserContext parserContext)
+    private void CompleteInflightRpc(ParserContext parserContext)
     {
         var header = parserContext.Header!;
         var callId = header.CallId;
