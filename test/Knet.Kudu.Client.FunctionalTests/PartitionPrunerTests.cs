@@ -524,6 +524,70 @@ public class PartitionPrunerTests : IAsyncLifetime
             KuduPredicate.NewInListPredicate(a, new byte[] { 0, 1 }),
             KuduPredicate.NewInListPredicate(b, new byte[] { 0, 1 }),
             KuduPredicate.NewInListPredicate(c, new byte[] { 0, 1 }));
+
+        // a in [0, 1, 2], b in [0, 1, 2], c in [0, 1, 2];
+        await CheckPartitionsAsync(8, 8, table, partitions,
+            KuduPredicate.NewInListPredicate(a, new byte[] { 0, 1, 2 }),
+            KuduPredicate.NewInListPredicate(b, new byte[] { 0, 1, 2 }),
+            KuduPredicate.NewInListPredicate(c, new byte[] { 0, 1, 2 }));
+
+        // a in [0, 1, 2, 3], b in [0, 1, 2, 3], c in [0, 1, 2, 3];
+        await CheckPartitionsAsync(8, 8, table, partitions,
+            KuduPredicate.NewInListPredicate(a, new byte[] { 0, 1, 2, 3 }),
+            KuduPredicate.NewInListPredicate(b, new byte[] { 0, 1, 2, 3 }),
+            KuduPredicate.NewInListPredicate(c, new byte[] { 0, 1, 2, 3 }));
+
+        var expectedList = new List<List<int>>
+        {
+            new List<int> { 1, 1 },
+            new List<int> { 8, 8 },
+            new List<int> { 8, 8 },
+            new List<int> { 8, 8 },
+            new List<int> { 27, 1 },
+            new List<int> { 27, 1 },
+            new List<int> { 27, 1 },
+            new List<int> { 27, 1 },
+            new List<int> { 27, 1 },
+            new List<int> { 27, 1 }
+        };
+
+        for (int size = 1; size <= 10; size++)
+        {
+            int columnCount = table.Schema.Columns.Count;
+            var testCases = new List<List<byte>>();
+
+            for (int i = 0; i < columnCount; i++)
+            {
+                var testCase = new List<byte>();
+                for (int j = 0; j < size; j++)
+                {
+                    testCase.Add((byte)j);
+                }
+
+                testCases.Add(testCase);
+            }
+
+            var scanBuilder = _client.NewScanBuilder(table);
+
+            var columnSchemas = new List<ColumnSchema> { a, b, c };
+            var predicates = new KuduPredicate[3];
+
+            for (int i = 0; i < 3; i++)
+            {
+                predicates[i] = KuduPredicate.NewInListPredicate(
+                    columnSchemas[i], testCases[i]);
+
+                scanBuilder.AddPredicate(predicates[i]);
+            }
+
+            await CheckPartitionsAsync(
+                expectedList[size - 1][0],
+                expectedList[size - 1][1],
+                table, partitions, predicates);
+
+            var partitionSchema = scanBuilder.Table.PartitionSchema;
+            Assert.Equal(columnCount, partitionSchema.HashBucketSchemas.Count);
+        }
     }
 
     [SkippableFact]

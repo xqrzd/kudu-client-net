@@ -514,6 +514,7 @@ public class PartitionPruner
     {
         var hashBuckets = new BitArray(hashSchema.NumBuckets);
         List<int> columnIdxs = IdsToIndexes(schema, hashSchema.ColumnIds);
+        var predicateValueList = new List<List<byte[]>>();
 
         foreach (int idx in columnIdxs)
         {
@@ -526,49 +527,90 @@ public class PartitionPruner
                 hashBuckets.SetAll(true);
                 return hashBuckets;
             }
+
+            var predicateValues = predicate.Type == PredicateType.Equality
+                ? new List<byte[]> { predicate.Lower! }
+                : new List<byte[]>(predicate.InListValues!);
+
+            predicateValueList.Add(predicateValues);
         }
 
-        var rows = new List<PartialRow> { new PartialRow(schema) };
+        var valuesCombination = new List<byte[]>();
 
-        foreach (int idx in columnIdxs)
+        ComputeHashBuckets(
+            schema, hashSchema, hashBuckets, columnIdxs,
+            predicateValueList, valuesCombination);
+
+        return hashBuckets;
+    }
+
+    /// <summary>
+    /// Pick all combinations and compute their hashes.
+    /// </summary>
+    /// <param name="schema">The table schema.</param>
+    /// <param name="hashSchema">The hash partition schema.</param>
+    /// <param name="hashBuckets">The result of this algorithm, a bit 0 means a partition can be pruned.</param>
+    /// <param name="columnIdxs">Column indexes of columns in the hash partition schema.</param>
+    /// <param name="predicateValueList">Values in in-list predicates of these columns.</param>
+    /// <param name="valuesCombination">A combination of in-list and equality predicates.</param>
+    private static void ComputeHashBuckets(
+        KuduSchema schema,
+        HashBucketSchema hashSchema,
+        BitArray hashBuckets,
+        List<int> columnIdxs,
+        List<List<byte[]>> predicateValueList,
+        List<byte[]> valuesCombination)
+    {
+        if (hashBuckets.Cardinality() == hashSchema.NumBuckets)
         {
-            var newRows = new List<PartialRow>();
-            ColumnSchema column = schema.GetColumn(idx);
-            KuduPredicate predicate = predicates[column.Name];
-            SortedSet<byte[]> predicateValues;
-
-            if (predicate.Type == PredicateType.Equality)
-            {
-                predicateValues = new SortedSet<byte[]> { predicate.Lower! };
-            }
-            else
-            {
-                predicateValues = predicate.InListValues!;
-            }
-
-            // For each of the encoded string, replicate it by the number of values in
-            // equality and in-list predicate.
-            foreach (PartialRow row in rows)
-            {
-                foreach (byte[] predicateValue in predicateValues)
-                {
-                    var newRow = new PartialRow(row);
-                    newRow.SetRaw(idx, predicateValue);
-                    newRows.Add(newRow);
-                }
-            }
-
-            rows = newRows;
+            return;
         }
 
-        foreach (PartialRow row in rows)
+        int level = valuesCombination.Count;
+
+        if (level == columnIdxs.Count)
         {
+            // This 'valuesCombination' is a picked combination value for computing hash bucket.
+            //
+            // The algorithm is an argorithm like DFS, which pick value for every column in
+            // 'predicateValueList', 'valuesCombination' is the picked values.
+            //
+            // The valuesCombination is a value list picked by followings algorithm:
+            // 1. pick a value from predicateValueList[0] for the column who columnIdxs[0]
+            // stand for. Every value in predicateValueList[0] can be picked.
+            // The count of pick method is predicateValueList[0].Count.
+            // 2. pick a value from predicateValueList[1] for the column who columnIdxs[1]
+            // stand for.
+            // The count of pick method is predicateValueList[1].Count.
+            // 3. Do this like step 1,2 until the last one column value picked in
+            // 'predicateValueList[columnIdx.Count-1]' columnIdx[columnIdx.Count-1] stand for.
+            //
+            // The algorithm ends when all combinations has been searched.
+            // 'valuesCombination' saves a combination values of in-list predicates.
+            // So we use the 'valuesCombination' to construct a row, then compute its hash bucket.
+            var row = new PartialRow(schema);
+            for (int i = 0; i < valuesCombination.Count; i++)
+            {
+                row.SetRaw(columnIdxs[i], valuesCombination[i]);
+            }
+
             int maxSize = KeyEncoder.CalculateMaxPrimaryKeySize(row);
             int hash = KeyEncoder.GetHashBucket(row, hashSchema, maxSize);
             hashBuckets.Set(hash, true);
         }
+        else
+        {
+            for (int i = 0; i < predicateValueList[level].Count; i++)
+            {
+                valuesCombination.Add(predicateValueList[level][i]);
 
-        return hashBuckets;
+                ComputeHashBuckets(
+                    schema, hashSchema, hashBuckets, columnIdxs,
+                    predicateValueList, valuesCombination);
+
+                valuesCombination.RemoveAt(valuesCombination.Count - 1);
+            }
+        }
     }
 
     private readonly struct PartitionKeyRangeBuilder
